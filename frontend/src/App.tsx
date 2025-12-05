@@ -2,6 +2,7 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 import { Box } from '@mui/material';
 import Sidebar from './components/layout/Sidebar';
 import ToastNotification from './components/common/ToastNotification';
+import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
 import Dashboard from './pages/Dashboard';
 import CompaniesList from './pages/companies/CompaniesList';
 import CompanyDetails from './pages/companies/CompanyDetails';
@@ -17,6 +18,9 @@ import Notifications from './pages/Notifications';
 import Settings from './pages/Settings';
 
 function App() {
+  // Initialize keyboard shortcuts (Ctrl+T, Ctrl+B for theme toggle)
+  useKeyboardShortcuts();
+
   return (
     <>
       <ToastNotification />

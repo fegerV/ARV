@@ -25,6 +25,7 @@ import {
   Settings as SettingsIcon,
   Menu as MenuIcon,
 } from '@mui/icons-material';
+import ThemeToggle from '../common/ThemeToggle';
 
 const drawerWidth = 240;
 
@@ -106,6 +107,7 @@ export default function Sidebar() {
           <Typography variant="h6" noWrap component="div" sx={{ flexGrow: 1 }}>
             Admin Panel
           </Typography>
+          <ThemeToggle />
         </Toolbar>
       </AppBar>
 
