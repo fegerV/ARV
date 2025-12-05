@@ -1,0 +1,142 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`StatusBadge Snapshots should match snapshot for all statuses: status-active 1`] = `
+<div
+  class="MuiChip-root MuiChip-filled MuiChip-sizeMedium MuiChip-colorSuccess MuiChip-filledSuccess css-1m0hkyr-MuiChip-root"
+>
+  <svg
+    aria-hidden="true"
+    class="MuiSvgIcon-root MuiSvgIcon-fontSizeSmall MuiChip-icon MuiChip-iconMedium MuiChip-iconColorSuccess css-ptiqhd-MuiSvgIcon-root"
+    data-testid="CheckCircleIcon"
+    focusable="false"
+    viewBox="0 0 24 24"
+  >
+    <path
+      d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2m-2 15-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8z"
+    />
+  </svg>
+  <span
+    class="MuiChip-label MuiChip-labelMedium css-6od3lo-MuiChip-label"
+  >
+    Активно
+  </span>
+</div>
+`;
+
+exports[`StatusBadge Snapshots should match snapshot for all statuses: status-expired 1`] = `
+<div
+  class="MuiChip-root MuiChip-filled MuiChip-sizeMedium MuiChip-colorWarning MuiChip-filledWarning css-p3eqdf-MuiChip-root"
+>
+  <svg
+    aria-hidden="true"
+    class="MuiSvgIcon-root MuiSvgIcon-fontSizeSmall MuiChip-icon MuiChip-iconMedium MuiChip-iconColorWarning css-ptiqhd-MuiSvgIcon-root"
+    data-testid="WarningIcon"
+    focusable="false"
+    viewBox="0 0 24 24"
+  >
+    <path
+      d="M1 21h22L12 2zm12-3h-2v-2h2zm0-4h-2v-4h2z"
+    />
+  </svg>
+  <span
+    class="MuiChip-label MuiChip-labelMedium css-6od3lo-MuiChip-label"
+  >
+    Истекло
+  </span>
+</div>
+`;
+
+exports[`StatusBadge Snapshots should match snapshot for all statuses: status-failed 1`] = `
+<div
+  class="MuiChip-root MuiChip-filled MuiChip-sizeMedium MuiChip-colorError MuiChip-filledError css-4a6sbf-MuiChip-root"
+>
+  <svg
+    aria-hidden="true"
+    class="MuiSvgIcon-root MuiSvgIcon-fontSizeSmall MuiChip-icon MuiChip-iconMedium MuiChip-iconColorError css-ptiqhd-MuiSvgIcon-root"
+    data-testid="ErrorIcon"
+    focusable="false"
+    viewBox="0 0 24 24"
+  >
+    <path
+      d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2m1 15h-2v-2h2zm0-4h-2V7h2z"
+    />
+  </svg>
+  <span
+    class="MuiChip-label MuiChip-labelMedium css-6od3lo-MuiChip-label"
+  >
+    Ошибка
+  </span>
+</div>
+`;
+
+exports[`StatusBadge Snapshots should match snapshot for all statuses: status-pending 1`] = `
+<div
+  class="MuiChip-root MuiChip-filled MuiChip-sizeMedium MuiChip-colorDefault MuiChip-filledDefault css-4fo3hd-MuiChip-root"
+>
+  <svg
+    aria-hidden="true"
+    class="MuiSvgIcon-root MuiSvgIcon-fontSizeSmall MuiChip-icon MuiChip-iconMedium MuiChip-iconColorDefault css-ptiqhd-MuiSvgIcon-root"
+    data-testid="ScheduleIcon"
+    focusable="false"
+    viewBox="0 0 24 24"
+  >
+    <path
+      d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2M12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8"
+    />
+    <path
+      d="M12.5 7H11v6l5.25 3.15.75-1.23-4.5-2.67z"
+    />
+  </svg>
+  <span
+    class="MuiChip-label MuiChip-labelMedium css-6od3lo-MuiChip-label"
+  >
+    В очереди
+  </span>
+</div>
+`;
+
+exports[`StatusBadge Snapshots should match snapshot for all statuses: status-processing 1`] = `
+<div
+  class="MuiChip-root MuiChip-filled MuiChip-sizeMedium MuiChip-colorInfo MuiChip-filledInfo css-mphppt-MuiChip-root"
+>
+  <svg
+    aria-hidden="true"
+    class="MuiSvgIcon-root MuiSvgIcon-fontSizeSmall MuiChip-icon MuiChip-iconMedium MuiChip-iconColorInfo css-ptiqhd-MuiSvgIcon-root"
+    data-testid="HourglassEmptyIcon"
+    focusable="false"
+    viewBox="0 0 24 24"
+  >
+    <path
+      d="M6 2v6h.01L6 8.01 10 12l-4 4 .01.01H6V22h12v-5.99h-.01L18 16l-4-4 4-3.99-.01-.01H18V2zm10 14.5V20H8v-3.5l4-4zm-4-5-4-4V4h8v3.5z"
+    />
+  </svg>
+  <span
+    class="MuiChip-label MuiChip-labelMedium css-6od3lo-MuiChip-label"
+  >
+    Обработка
+  </span>
+</div>
+`;
+
+exports[`StatusBadge Snapshots should match snapshot for all statuses: status-ready 1`] = `
+<div
+  class="MuiChip-root MuiChip-filled MuiChip-sizeMedium MuiChip-colorSuccess MuiChip-filledSuccess css-1m0hkyr-MuiChip-root"
+>
+  <svg
+    aria-hidden="true"
+    class="MuiSvgIcon-root MuiSvgIcon-fontSizeSmall MuiChip-icon MuiChip-iconMedium MuiChip-iconColorSuccess css-ptiqhd-MuiSvgIcon-root"
+    data-testid="CheckCircleIcon"
+    focusable="false"
+    viewBox="0 0 24 24"
+  >
+    <path
+      d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2m-2 15-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8z"
+    />
+  </svg>
+  <span
+    class="MuiChip-label MuiChip-labelMedium css-6od3lo-MuiChip-label"
+  >
+    Готово
+  </span>
+</div>
+`;

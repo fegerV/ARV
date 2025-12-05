@@ -10,7 +10,11 @@ class Video(Base):
 
     video_path = Column(String(500), nullable=False)
     video_url = Column(String(500))
-    thumbnail_url = Column(String(500))
+    
+    # Превью разных размеров (WebP)
+    thumbnail_url = Column(String(500))  # medium: 400x225
+    thumbnail_small_url = Column(String(500))  # small: 200x112
+    thumbnail_large_url = Column(String(500))  # large: 800x450
 
     title = Column(String(255))
     duration = Column(Float)

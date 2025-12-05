@@ -85,7 +85,7 @@ configure_logging()
 app = FastAPI(
     title="Vertex AR B2B Platform",
     description="B2B SaaS platform for creating AR content based on image recognition (NFT markers)",
-    version="0.1.0",
+    version="2.0.0",  # Синхронизировано с core.config.VERSION
     docs_url="/docs",
     redoc_url="/redoc",
     openapi_url="/openapi.json",

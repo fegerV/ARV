@@ -1,0 +1,97 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`Loading Components ButtonSpinner should match snapshot 1`] = `
+<div>
+  <span
+    class="MuiCircularProgress-root MuiCircularProgress-indeterminate MuiCircularProgress-colorPrimary css-18lrjg1-MuiCircularProgress-root"
+    role="progressbar"
+    style="width: 20px; height: 20px;"
+  >
+    <svg
+      class="MuiCircularProgress-svg css-1idz92c-MuiCircularProgress-svg"
+      viewBox="22 22 44 44"
+    >
+      <circle
+        class="MuiCircularProgress-circle MuiCircularProgress-circleIndeterminate css-176wh8e-MuiCircularProgress-circle"
+        cx="44"
+        cy="44"
+        fill="none"
+        r="20.2"
+        stroke-width="3.6"
+      />
+    </svg>
+  </span>
+</div>
+`;
+
+exports[`Loading Components ListSkeleton should match snapshot with custom count 1`] = `
+<div
+  class="MuiStack-root css-1sazv7p-MuiStack-root"
+>
+  <span
+    class="MuiSkeleton-root MuiSkeleton-rectangular MuiSkeleton-pulse css-153n0d3-MuiSkeleton-root"
+    style="height: 80px;"
+  />
+  <span
+    class="MuiSkeleton-root MuiSkeleton-rectangular MuiSkeleton-pulse css-153n0d3-MuiSkeleton-root"
+    style="height: 80px;"
+  />
+  <span
+    class="MuiSkeleton-root MuiSkeleton-rectangular MuiSkeleton-pulse css-153n0d3-MuiSkeleton-root"
+    style="height: 80px;"
+  />
+</div>
+`;
+
+exports[`Loading Components ListSkeleton should match snapshot with default count 1`] = `
+<div
+  class="MuiStack-root css-1sazv7p-MuiStack-root"
+>
+  <span
+    class="MuiSkeleton-root MuiSkeleton-rectangular MuiSkeleton-pulse css-153n0d3-MuiSkeleton-root"
+    style="height: 80px;"
+  />
+  <span
+    class="MuiSkeleton-root MuiSkeleton-rectangular MuiSkeleton-pulse css-153n0d3-MuiSkeleton-root"
+    style="height: 80px;"
+  />
+  <span
+    class="MuiSkeleton-root MuiSkeleton-rectangular MuiSkeleton-pulse css-153n0d3-MuiSkeleton-root"
+    style="height: 80px;"
+  />
+  <span
+    class="MuiSkeleton-root MuiSkeleton-rectangular MuiSkeleton-pulse css-153n0d3-MuiSkeleton-root"
+    style="height: 80px;"
+  />
+  <span
+    class="MuiSkeleton-root MuiSkeleton-rectangular MuiSkeleton-pulse css-153n0d3-MuiSkeleton-root"
+    style="height: 80px;"
+  />
+</div>
+`;
+
+exports[`Loading Components PageSpinner should match snapshot 1`] = `
+<div
+  class="MuiBox-root css-bkcytj"
+>
+  <span
+    class="MuiCircularProgress-root MuiCircularProgress-indeterminate MuiCircularProgress-colorPrimary css-18lrjg1-MuiCircularProgress-root"
+    role="progressbar"
+    style="width: 48px; height: 48px;"
+  >
+    <svg
+      class="MuiCircularProgress-svg css-1idz92c-MuiCircularProgress-svg"
+      viewBox="22 22 44 44"
+    >
+      <circle
+        class="MuiCircularProgress-circle MuiCircularProgress-circleIndeterminate css-176wh8e-MuiCircularProgress-circle"
+        cx="44"
+        cy="44"
+        fill="none"
+        r="20.2"
+        stroke-width="3.6"
+      />
+    </svg>
+  </span>
+</div>
+`;

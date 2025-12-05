@@ -1,5 +1,5 @@
 import { Snackbar, Alert } from '@mui/material';
-import { useToast } from '../store/useToast';
+import { useToast } from '../../store/useToast';
 
 export default function ToastNotification() {
   const { open, message, severity, hideToast } = useToast();

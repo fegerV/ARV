@@ -18,6 +18,12 @@ RUN apt-get update && apt-get install -y \
     curl \
     nodejs \
     npm \
+    # FFmpeg для обработки видео и генерации превью
+    ffmpeg \
+    libavcodec-extra \
+    libavformat-dev \
+    libavutil-dev \
+    libswscale-dev \
     && rm -rf /var/lib/apt/lists/*
 
 # Set working directory

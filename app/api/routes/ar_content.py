@@ -11,6 +11,7 @@ from app.core.database import get_db
 from app.models.ar_content import ARContent
 from app.models.video import Video
 from app.tasks.marker_tasks import generate_ar_content_marker_task
+from app.tasks.thumbnail_generator import generate_video_thumbnail, generate_image_thumbnail
 
 router = APIRouter()
 
@@ -59,14 +60,17 @@ async def create_ar_content(
     await db.commit()
     await db.refresh(ac)
 
-    task = generate_ar_content_marker_task.delay(ac.id)
+    # Запускаем генерацию маркера и превью параллельно
+    marker_task = generate_ar_content_marker_task.delay(ac.id)
+    thumbnail_task = generate_image_thumbnail.delay(ac.id)
 
     return {
         "id": ac.id,
         "unique_id": str(ac.unique_id),
         "image_url": ac.image_url,
         "marker_status": ac.marker_status,
-        "task_id": task.id,
+        "marker_task_id": marker_task.id,
+        "thumbnail_task_id": thumbnail_task.id,
     }
 
 @router.get("/projects/{project_id}/ar-content")
@@ -96,6 +100,13 @@ async def upload_video(
     is_active: bool = Form(False),
     db: AsyncSession = Depends(get_db),
 ):
+    # Валидация типа файла
+    if not file.content_type or not file.content_type.startswith('video/'):
+        raise HTTPException(
+            status_code=400, 
+            detail="Только видео файлы поддерживаются (video/*)"
+        )
+    
     ac = await db.get(ARContent, content_id)
     if not ac:
         raise HTTPException(status_code=404, detail="AR content not found")
@@ -115,8 +126,9 @@ async def upload_video(
         ar_content_id=ac.id,
         video_path=str(video_path),
         video_url=_build_public_url(video_path),
-        title=title,
+        title=title or file.filename,
         is_active=is_active,
+        mime_type=file.content_type,
     )
     db.add(v)
     await db.flush()
@@ -125,10 +137,14 @@ async def upload_video(
     await db.commit()
     await db.refresh(v)
 
+    # Запускаем фоновую генерацию превью
+    thumbnail_task = generate_video_thumbnail.delay(v.id)
+
     return {
         "id": v.id,
         "video_url": v.video_url,
         "is_active": v.is_active,
+        "thumbnail_task_id": thumbnail_task.id,
     }
 
 

@@ -17,6 +17,9 @@ python-dotenv==1.0.0
 qrcode[pil]==7.4.2
 pillow==10.2.0
 aiofiles==23.2.1
+
+# Video processing & thumbnails
+ffmpeg-python==0.2.0
 pytest==7.4.4
 pytest-asyncio==0.23.3
 pytest-cov==4.1.0

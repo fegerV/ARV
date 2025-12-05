@@ -1,70 +1,104 @@
-import { Box, Typography, Grid, Card, CardContent, Paper } from '@mui/material';
+/**
+ * Dashboard - Обзор системы с метриками
+ * Обновлено: использует новую структуру компонентов
+ */
+
+import { Grid, Box as MuiBox, Typography, Paper } from '@mui/material';
+import { PageHeader, PageContent, KpiCard } from '@/components';
 import {
-  Visibility as ViewsIcon,
-  People as SessionsIcon,
-  ViewInAr as ContentIcon,
-  Storage as StorageIcon,
-  Business as CompaniesIcon,
-  Folder as ProjectsIcon,
-  AttachMoney as RevenueIcon,
-  CheckCircle as UptimeIcon,
-} from '@mui/icons-material';
+  Eye,
+  Users,
+  Package,
+  HardDrive,
+  Building2,
+  FolderOpen,
+  DollarSign,
+  CheckCircle,
+} from 'lucide-react';
 
 const statsCards = [
-  { title: 'Total AR Views', value: '45,892', change: '+12.5%', icon: <ViewsIcon fontSize="large" />, color: '#1976d2' },
-  { title: 'Unique Sessions', value: '38,234', change: '+8.2%', icon: <SessionsIcon fontSize="large" />, color: '#2e7d32' },
-  { title: 'Active Content', value: '280', change: '+15', icon: <ContentIcon fontSize="large" />, color: '#9c27b0' },
-  { title: 'Storage Usage', value: '125GB', change: '10%', icon: <StorageIcon fontSize="large" />, color: '#ed6c02' },
-  { title: 'Active Companies', value: '15', change: '+2', icon: <CompaniesIcon fontSize="large" />, color: '#0288d1' },
-  { title: 'Active Projects', value: '100', change: '+12', icon: <ProjectsIcon fontSize="large" />, color: '#7b1fa2' },
-  { title: 'Revenue', value: '$4,200', change: '+15%', icon: <RevenueIcon fontSize="large" />, color: '#2e7d32' },
-  { title: 'Uptime', value: '99.92%', change: '✅', icon: <UptimeIcon fontSize="large" />, color: '#4caf50' },
+  {
+    title: 'Всего просмотров',
+    value: '45,892',
+    trend: { value: 12.5, direction: 'up' as const },
+    icon: <Eye size={24} />,
+  },
+  {
+    title: 'Уникальных сессий',
+    value: '38,234',
+    trend: { value: 8.2, direction: 'up' as const },
+    icon: <Users size={24} />,
+  },
+  {
+    title: 'Активного контента',
+    value: '280',
+    subtitle: '+15 за месяц',
+    icon: <Package size={24} />,
+  },
+  {
+    title: 'Использовано',
+    value: '125GB',
+    subtitle: '10% от лимита',
+    icon: <HardDrive size={24} />,
+  },
+  {
+    title: 'Компаний',
+    value: '15',
+    trend: { value: 2, direction: 'up' as const },
+    icon: <Building2 size={24} />,
+  },
+  {
+    title: 'Проектов',
+    value: '100',
+    subtitle: '+12 активных',
+    icon: <FolderOpen size={24} />,
+  },
+  {
+    title: 'Доход',
+    value: '$4,200',
+    trend: { value: 15, direction: 'up' as const },
+    icon: <DollarSign size={24} />,
+  },
+  {
+    title: 'Uptime',
+    value: '99.92%',
+    subtitle: '✅ Все сервисы работают',
+    icon: <CheckCircle size={24} />,
+  },
 ];
 
 export default function Dashboard() {
   return (
-    <Box>
-      <Typography variant="h4" gutterBottom sx={{ mb: 4 }}>
-        Dashboard
-      </Typography>
+    <PageContent>
+      <PageHeader
+        title="Dashboard"
+        subtitle="Обзор системы Vertex AR"
+      />
 
       <Grid container spacing={3}>
         {statsCards.map((stat, index) => (
           <Grid item xs={12} sm={6} md={3} key={index}>
-            <Card elevation={2}>
-              <CardContent>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                  <Box>
-                    <Typography color="textSecondary" variant="caption" gutterBottom>
-                      {stat.title}
-                    </Typography>
-                    <Typography variant="h5" sx={{ fontWeight: 700, my: 1 }}>
-                      {stat.value}
-                    </Typography>
-                    <Typography variant="body2" color="success.main">
-                      {stat.change}
-                    </Typography>
-                  </Box>
-                  <Box sx={{ color: stat.color }}>
-                    {stat.icon}
-                  </Box>
-                </Box>
-              </CardContent>
-            </Card>
+            <KpiCard
+              title={stat.title}
+              value={stat.value}
+              icon={stat.icon}
+              trend={stat.trend}
+              subtitle={stat.subtitle}
+            />
           </Grid>
         ))}
       </Grid>
 
-      <Box sx={{ mt: 4 }}>
+      <MuiBox sx={{ mt: 4 }}>
         <Paper elevation={2} sx={{ p: 3 }}>
           <Typography variant="h6" gutterBottom>
-            Recent Activity
+            Недавняя активность
           </Typography>
           <Typography variant="body2" color="textSecondary">
             Activity feed будет здесь...
           </Typography>
         </Paper>
-      </Box>
-    </Box>
+      </MuiBox>
+    </PageContent>
   );
 }

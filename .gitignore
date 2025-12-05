@@ -67,6 +67,14 @@ htmlcov/
 .pytest_cache/
 .tox/
 
+# Frontend Testing
+frontend/coverage/
+frontend/test-results/
+frontend/playwright-report/
+frontend/.lighthouseci/
+frontend/playwright/.cache/
+*.png-snapshots/
+
 # Alembic
 alembic/versions/*.pyc
 

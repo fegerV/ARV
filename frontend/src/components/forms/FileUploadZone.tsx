@@ -21,7 +21,6 @@ export default function FileUploadZone({
 }: FileUploadZoneProps) {
   const [isDragging, setIsDragging] = useState(false);
   const [file, setFile] = useState<File | null>(null);
-  const [uploading, setUploading] = useState(false);
   const { showToast } = useToast();
 
   const validateFile = (file: File): boolean => {
