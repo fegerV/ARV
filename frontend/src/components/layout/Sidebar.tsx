@@ -26,6 +26,8 @@ import {
   Menu as MenuIcon,
 } from '@mui/icons-material';
 import ThemeToggle from '../common/ThemeToggle';
+import { useAuthStore } from '../../store/authStore';
+import { useNavigate } from 'react-router-dom';
 
 const drawerWidth = 240;
 
@@ -42,10 +44,17 @@ const menuItems = [
 
 export default function Sidebar() {
   const location = useLocation();
+  const navigate = useNavigate();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const { user, logout } = useAuthStore();
 
   const handleDrawerToggle = () => {
     setMobileOpen(!mobileOpen);
+  };
+
+  const handleLogout = () => {
+    logout();
+    navigate('/login');
   };
 
   const drawer = (
@@ -107,7 +116,19 @@ export default function Sidebar() {
           <Typography variant="h6" noWrap component="div" sx={{ flexGrow: 1 }}>
             Admin Panel
           </Typography>
+          {user && (
+            <Typography variant="body2" sx={{ mr: 2, display: { xs: 'none', sm: 'block' } }}>
+              {user.email}
+            </Typography>
+          )}
           <ThemeToggle />
+          <Button 
+            color="inherit" 
+            onClick={handleLogout}
+            sx={{ ml: 1 }}
+          >
+            Выйти
+          </Button>
         </Toolbar>
       </AppBar>
 
