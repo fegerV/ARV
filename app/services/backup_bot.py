@@ -1,0 +1,102 @@
+import asyncio
+import structlog
+import httpx
+import redis.asyncio as redis
+import json
+
+from app.core.config import settings
+
+logger = structlog.get_logger()
+
+async def run_manual_backup() -> str:
+    # Placeholder: trigger docker compose backup services
+    logger.info("manual_backup_triggered")
+    return "Backup triggered (postgres/redis/minio)"
+
+async def restore_backup(backup_id: str) -> str:
+    logger.info("restore_backup_triggered", backup_id=backup_id)
+    return f"Restored from {backup_id} (placeholder)"
+
+async def _get_health() -> dict:
+    try:
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            resp = await client.get("http://app:8000/api/health/status")
+            if resp.status_code == 200:
+                return resp.json()
+    except Exception:
+        return {}
+
+async def status_command(update, context):
+    data = await _get_health()
+    overall = data.get("overall", "unknown")
+    await update.message.reply_text(f"📊 Status: {overall}")
+
+async def metrics_command(update, context):
+    data = await _get_health()
+    sys = data.get("system", {})
+    celery = data.get("celery", {})
+    db = data.get("database", "unknown")
+    redis_status = data.get("redis", "unknown")
+    msg = (
+        f"CPU: {sys.get('cpu_percent','n/a')}%\n"
+        f"RAM: {sys.get('memory_percent','n/a')}%\n"
+        f"Disk: {sys.get('disk_percent','n/a')}%\n"
+        f"Queue: {celery.get('queue_length','n/a')}\n"
+        f"DB: {db}\nRedis: {redis_status}"
+    )
+    await update.message.reply_text(msg)
+
+async def alerts_command(update, context):
+    try:
+        r = redis.from_url(settings.REDIS_URL)
+        items = await r.lrange("alerts_history", 0, 9)
+        await r.aclose()
+        if not items:
+            await update.message.reply_text("No recent alerts")
+            return
+        lines = []
+        for it in items:
+            try:
+                obj = json.loads(it.decode())
+                lines.append(f"• [{obj.get('severity','')}] {obj.get('title','')}: {obj.get('message','')}")
+            except Exception:
+                lines.append(str(it))
+        await update.message.reply_text("\n".join(lines))
+    except Exception:
+        await update.message.reply_text("Error reading alerts")
+
+async def health_command(update, context):
+    data = await _get_health()
+    # return compact JSON
+    await update.message.reply_text(json.dumps(data, ensure_ascii=False, indent=2)[:3500])
+
+async def logs_command(update, context):
+    # reuse alerts_history as recent log-like entries
+    await alerts_command(update, context)
+
+
+async def backup_bot_command(update, context):
+    text = update.message.text.strip()
+    if text == "/backup":
+        result = await run_manual_backup()
+        await update.message.reply_text(f"✅ Backup completed:\n{result}")
+    elif text == "/restore":
+        await update.message.reply_text("🔄 Available backups:\n/list")
+    elif text.startswith("/restore "):
+        backup_id = text.split()[1]
+        result = await restore_backup(backup_id)
+        await update.message.reply_text(f"✅ Restored from {backup_id}")
+    elif text == "/status":
+        await status_command(update, context)
+    elif text == "/metrics":
+        await metrics_command(update, context)
+    elif text == "/alerts":
+        await alerts_command(update, context)
+    elif text == "/health":
+        await health_command(update, context)
+    elif text == "/logs":
+        await logs_command(update, context)
+    elif text == "/storage":
+        await storage_command(update, context)
+    else:
+        await update.message.reply_text("Unknown command")

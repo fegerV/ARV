@@ -1,0 +1,31 @@
+version: '3.8'
+
+services:
+  app:
+    volumes:
+      - .:/app  # Mount source code for hot reload
+      - ./storage/content:/app/storage/content
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    environment:
+      DEBUG: "true"
+      LOG_LEVEL: DEBUG
+      ENVIRONMENT: development
+    ports:
+      - "8000:8000"
+
+  celery-worker:
+    volumes:
+      - .:/app
+      - ./storage/content:/app/storage/content
+
+  celery-beat:
+    volumes:
+      - .:/app
+
+  postgres:
+    ports:
+      - "5432:5432"
+
+  redis:
+    ports:
+      - "6379:6379"
