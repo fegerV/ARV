@@ -9,6 +9,7 @@ import ProjectsList from './pages/projects/ProjectsList';
 import ProjectForm from './pages/projects/ProjectForm';
 import ARContentList from './pages/ar-content/ARContentList';
 import ARContentForm from './pages/ar-content/ARContentForm';
+import ARContentDetail from './pages/ar-content/ARContentDetail';
 import Analytics from './pages/Analytics';
 import Storage from './pages/Storage';
 import Notifications from './pages/Notifications';
@@ -34,6 +35,7 @@ function App() {
           {/* AR Content */}
           <Route path="/projects/:projectId/content" element={<ARContentList />} />
           <Route path="/projects/:projectId/content/new" element={<ARContentForm />} />
+          <Route path="/ar-content/:arContentId" element={<ARContentDetail />} />
           
           {/* Other pages */}
           <Route path="/analytics" element={<Analytics />} />
