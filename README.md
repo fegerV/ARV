@@ -14,7 +14,7 @@ B2B SaaS платформа для создания AR-контента на о�
 
 ```bash
 # 1. Клонировать репозиторий
-git clone <repository-url>
+git clone https://github.com/fegerV/ARV.git
 cd vertex-ar
 
 # 2. Создать .env файл
