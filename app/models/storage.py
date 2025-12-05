@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, Text, BigInteger
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, Text, BigInteger, ForeignKey
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import relationship
 from datetime import datetime
@@ -27,36 +27,14 @@ class StorageConnection(Base):
     test_status = Column(String(50))
     test_error = Column(Text)
 
-    metadata = Column(JSONB, default={})
+    connection_metadata = Column(JSONB, default={}, name="metadata")
 
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     created_by = Column(Integer, nullable=True)  # FK omitted until users table exists
 
     # Relationships
-    companies = relationship("Company", back_populates="storage_connection")
-
-
-class Company(Base):
-    __tablename__ = "companies"
-
-    id = Column(Integer, primary_key=True)
-    name = Column(String(255), unique=True, nullable=False)
-
-    # Storage
-    storage_connection_id = Column(Integer)
-    storage_path = Column(String(500))  # bucket/folder path
-
-    # Quota
-    storage_quota_gb = Column(Integer)
-    storage_used_bytes = Column(BigInteger, default=0)
-
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-
-    # Relationships
-    storage_connection = relationship("StorageConnection", back_populates="companies")
-    folders = relationship("StorageFolder", back_populates="company")
+    companies = relationship("Company", back_populates="storage_connection", foreign_keys="Company.storage_connection_id")
 
 
 class StorageFolder(Base):

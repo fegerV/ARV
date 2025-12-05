@@ -53,7 +53,6 @@ async def create_ar_content(
         image_url=_build_public_url(image_path),
         marker_status="pending",
         is_active=True,
-        metadata={},
     )
     db.add(ac)
     await db.flush()

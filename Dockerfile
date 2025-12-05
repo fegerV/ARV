@@ -16,8 +16,6 @@ RUN apt-get update && apt-get install -y \
     libpq-dev \
     postgresql-client \
     curl \
-    nodejs \
-    npm \
     # FFmpeg для обработки видео и генерации превью
     ffmpeg \
     libavcodec-extra \
@@ -25,14 +23,12 @@ RUN apt-get update && apt-get install -y \
     libavutil-dev \
     libswscale-dev \
     && rm -rf /var/lib/apt/lists/*
-
 # Set working directory
 WORKDIR /app
 
 # Copy requirements and install Python dependencies
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
-RUN npm install -g mind-ar-js-compiler
 
 # Copy application code
 COPY app/ ./app/
@@ -42,7 +38,9 @@ COPY scripts/ ./scripts/
 
 # Create storage directory
 RUN mkdir -p /app/storage/content && \
-    chown -R appuser:appuser /app
+    mkdir -p /tmp/prometheus && \
+    chown -R appuser:appuser /app && \
+    chown appuser:appuser /tmp/prometheus
 
 # Switch to non-root user
 USER appuser

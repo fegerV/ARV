@@ -12,20 +12,8 @@ import redis.asyncio as redis
 import structlog
 
 from app.core.config import settings
-async def publish_alerts(alerts: List[Alert]) -> None:
-    try:
-        r = redis.from_url(settings.REDIS_URL)
-        for a in alerts:
-            msg = {"severity": a.severity, "title": a.title, "message": a.message, "services": a.affected_services}
-            payload = json.dumps(msg)
-            await r.publish("alerts", payload)
-            # store a short history for /alerts and /logs commands
-            await r.lpush("alerts_history", payload)
-            await r.ltrim("alerts_history", 0, 99)
-        await r.aclose()
-    except Exception as e:
-        logger.error("publish_alerts_error", error=str(e))
 
+logger = structlog.get_logger(__name__)
 
 @dataclass
 class Alert:
@@ -41,6 +29,21 @@ ALERT_COOLDOWN_SECONDS = {
     "warning": 900,   # 15 минут
     "info": 3600      # 1 час
 }
+
+
+async def publish_alerts(alerts: List[Alert]) -> None:
+    try:
+        r = redis.from_url(settings.REDIS_URL)
+        for a in alerts:
+            msg = {"severity": a.severity, "title": a.title, "message": a.message, "services": a.affected_services}
+            payload = json.dumps(msg)
+            await r.publish("alerts", payload)
+            # store a short history for /alerts and /logs commands
+            await r.lpush("alerts_history", payload)
+            await r.ltrim("alerts_history", 0, 99)
+        await r.aclose()
+    except Exception as e:
+        logger.error("publish_alerts_error", error=str(e))
 
 
 async def send_critical_alerts(alerts: List[Alert], metrics: dict) -> None:

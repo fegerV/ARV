@@ -32,7 +32,6 @@ async def create_project(payload: dict, db: AsyncSession = Depends(get_db)):
         status=payload.get("status", "active"),
         notify_before_expiry_days=payload.get("notify_before_expiry_days", 7),
         tags=_parse_tags(payload.get("tags")),
-        metadata=payload.get("metadata", {}),
     )
     db.add(proj)
     await db.flush()
@@ -121,7 +120,6 @@ async def extend_project(project_id: int, payload: dict, db: AsyncSession = Depe
         "status": proj.status,
         "notify_before_expiry_days": proj.notify_before_expiry_days,
         "tags": proj.tags,
-        "metadata": proj.metadata,
     }
 
 

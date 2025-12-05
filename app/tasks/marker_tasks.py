@@ -11,6 +11,7 @@ from app.models.portrait import Portrait
 from app.models.company import Company
 from app.models.storage import StorageConnection
 from app.services.storage.factory import get_provider
+from app.services.marker_service import marker_service
 
 logger = structlog.get_logger()
 
@@ -63,7 +64,7 @@ def generate_mind_marker_task(self, portrait_id: int):
                 portrait.marker_path = result["marker_path"]
                 portrait.marker_url = result["marker_url"]
                 portrait.marker_status = result["status"]
-                portrait.metadata = result.get("metadata", {})
+                portrait.content_metadata = result.get("metadata", {})
 
                 await db.commit()
 

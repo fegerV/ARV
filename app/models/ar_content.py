@@ -39,7 +39,7 @@ class ARContent(Base):
     views_count = Column(Integer, default=0)
     last_viewed_at = Column(DateTime)
 
-    metadata = Column(JSONB, default={})
+    content_metadata = Column(JSONB, default={}, name="metadata")
 
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

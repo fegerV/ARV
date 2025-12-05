@@ -2,6 +2,11 @@
 
 <cite>
 **Referenced Files in This Document**   
+- [auth.py](file://app/api/routes/auth.py)
+- [user.py](file://app/models/user.py)
+- [security.py](file://app/core/security.py)
+- [config.py](file://app/core/config.py)
+- [authStore.ts](file://frontend/src/store/authStore.ts)
 - [oauth.py](file://app/api/routes/oauth.py)
 - [config.py](file://app/core/config.py)
 - [storage.py](file://app/models/storage.py)
@@ -11,12 +16,23 @@
 - [YandexDiskFolderPicker.tsx](file://frontend/components/YandexDiskFolderPicker.tsx)
 - [.env.example](file://.env.example)
 - [PHASE1_SUMMARY.md](file://PHASE1_SUMMARY.md)
+- [AUTH_SYSTEM_DOCUMENTATION.md](file://AUTH_SYSTEM_DOCUMENTATION.md)
 </cite>
+
+## Update Summary
+**Changes Made**   
+- Updated "Planned JWT Authentication System" section to reflect actual implementation details
+- Added detailed information about rate limiting, session management, and user state tracking
+- Updated security implementation details to reflect current token expiration and password hashing
+- Added new section on JWT-based Authentication Flow
+- Updated role-based access control section with actual roles (ADMIN, MANAGER, VIEWER)
+- Added new diagram for JWT authentication flow
+- Updated section sources and diagram sources throughout
 
 ## Table of Contents
 1. [Introduction](#introduction)
 2. [Current OAuth Implementation](#current-oauth-implementation)
-3. [Planned JWT Authentication System](#planned-jwt-authentication-system)
+3. [JWT-Based Authentication System](#jwt-based-authentication-system)
 4. [Role-Based Access Control](#role-based-access-control)
 5. [Security Implementation](#security-implementation)
 6. [OAuth Flow for Yandex Disk Integration](#oauth-flow-for-yandex-disk-integration)
@@ -25,12 +41,13 @@
 9. [Conclusion](#conclusion)
 
 ## Introduction
-The ARV platform currently implements OAuth integration with Yandex Disk for storage access while planning a comprehensive JWT-based authentication system for user management. This document details the current authentication architecture, security implementation, and the planned evolution to a full user authentication system with role-based access control.
+The ARV platform has completed implementation of a comprehensive JWT-based authentication system for user management, replacing the previously planned system. This document details the current authentication architecture, security implementation, and role-based access control system.
 
-The current implementation focuses on OAuth 2.0 integration with Yandex Disk, allowing users to connect their Yandex Disk accounts for storage purposes. The system is designed with a clear roadmap for implementing JWT-based authentication that will support different user types (admin, company user) with appropriate permission levels.
+The current implementation includes a fully functional JWT-based authentication system with login, logout, and user information endpoints, comprehensive rate limiting (5 attempts per 15-minute lockout period), user session management with 15-minute token expiration, password hashing with bcrypt, and user state tracking including last login time and failed attempt tracking. The system also implements role-based access control with ADMIN, MANAGER, and VIEWER roles.
 
 **Section sources**
 - [PHASE1_SUMMARY.md](file://PHASE1_SUMMARY.md#L136-L141)
+- [AUTH_SYSTEM_DOCUMENTATION.md](file://AUTH_SYSTEM_DOCUMENTATION.md#L1-L613)
 
 ## Current OAuth Implementation
 
@@ -61,68 +78,103 @@ Backend->>Frontend : Redirect to success page
 - [oauth.py](file://app/api/routes/oauth.py#L1-L184)
 - [config.py](file://app/core/config.py#L73-L76)
 
-## Planned JWT Authentication System
+## JWT-Based Authentication System
 
-The ARV platform has a clear roadmap for implementing a comprehensive JWT-based authentication system for user management. According to the project documentation, Phase 2 of development will focus on JWT authentication implementation, user models, and company CRUD endpoints.
+The ARV platform has implemented a comprehensive JWT-based authentication system for user management. The system includes login, logout, and user information endpoints with comprehensive rate limiting (5 attempts per 15-minute lockout period).
 
-The planned authentication system will utilize JWT (JSON Web Tokens) for stateless authentication, with tokens containing user information and permissions. The system will be configured with a 24-hour expiration period for access tokens, as defined in the configuration settings. The JWT implementation will use the HS256 algorithm for token signing, with the secret key managed through environment variables.
+The authentication system utilizes JWT (JSON Web Tokens) for stateless authentication, with tokens containing user information and permissions. The system is configured with a 15-minute expiration period for access tokens, as defined in the configuration settings. The JWT implementation uses the HS256 algorithm for token signing, with the secret key managed through environment variables.
+
+The system implements rate limiting with a maximum of 5 login attempts within a 15-minute window. After 5 failed attempts, the account is locked for 15 minutes. The user model includes fields for tracking login attempts and lockout status. Passwords are hashed using bcrypt before storage in the database.
 
 ```mermaid
 classDiagram
 class User {
 +int id
 +string email
-+string password_hash
++string hashed_password
 +UserRole role
 +bool is_active
++datetime last_login_at
++int login_attempts
++datetime locked_until
 +datetime created_at
 +datetime updated_at
 }
-class Company {
-+int id
-+string name
-+string slug
-+int storage_connection_id
-+string storage_path
-+SubscriptionTier subscription_tier
-+int storage_quota_gb
-+BigInteger storage_used_bytes
-+bool is_active
-+bool is_default
+class Token {
++string access_token
++string token_type
++User user
 }
-class StorageConnection {
-+int id
-+string name
-+string provider
-+JSONB credentials
-+string base_path
-+bool is_default
-+bool is_active
-+datetime last_tested_at
-+string test_status
-+string test_error
+class UserRole {
++ADMIN
++MANAGER
++VIEWER
 }
-User "1" --> "0..*" Company : manages
-Company "1" --> "1" StorageConnection : uses
-StorageConnection "1" --> "0..*" Company : shared by
+User "1" --> "1" Token : generates
+User "1" --> "1" UserRole : has
 ```
 
 **Diagram sources**
-- [config.py](file://app/core/config.py#L50-L52)
-- [company.py](file://app/models/company.py#L7-L41)
-- [storage.py](file://app/models/storage.py#L8-L38)
+- [user.py](file://app/models/user.py#L10-L27)
+- [auth.py](file://app/api/routes/auth.py#L55-L164)
+- [security.py](file://app/core/security.py#L19-L29)
 
 **Section sources**
+- [auth.py](file://app/api/routes/auth.py#L55-L164)
+- [user.py](file://app/models/user.py#L10-L27)
+- [security.py](file://app/core/security.py#L19-L29)
 - [config.py](file://app/core/config.py#L50-L52)
-- [PHASE1_SUMMARY.md](file://PHASE1_SUMMARY.md#L137-L138)
+
+### JWT-Based Authentication Flow
+
+The JWT-based authentication flow in the ARV platform follows a standard pattern with additional security features for rate limiting and user state tracking.
+
+```mermaid
+sequenceDiagram
+participant User as User
+participant Frontend as Frontend Application
+participant Backend as Authentication Service
+User->>Frontend : Enter credentials
+Frontend->>Backend : POST /auth/login
+alt Account locked
+Backend-->>Frontend : 403 Forbidden (locked account)
+else Valid credentials
+Backend->>Backend : Reset login attempts
+Backend->>Backend : Update last_login_at
+Backend->>Backend : Generate JWT (15 min expiry)
+Backend-->>Frontend : 200 OK with token and user data
+else Invalid credentials
+Backend->>Backend : Increment login_attempts
+alt login_attempts >= 5
+Backend->>Backend : Set locked_until = now + 15 min
+Backend-->>Frontend : 403 Forbidden (account locked)
+else
+Backend-->>Frontend : 401 Unauthorized (attempts_left)
+end
+end
+Frontend->>Frontend : Store token in localStorage
+Frontend->>Backend : Subsequent requests with Authorization header
+Backend->>Backend : Validate JWT signature and expiry
+Backend-->>Frontend : Return requested data
+```
+
+**Diagram sources**
+- [auth.py](file://app/api/routes/auth.py#L55-L164)
+- [security.py](file://app/core/security.py#L19-L29)
+- [authStore.ts](file://frontend/src/store/authStore.ts#L3-L9)
+
+**Section sources**
+- [auth.py](file://app/api/routes/auth.py#L55-L164)
+- [security.py](file://app/core/security.py#L19-L29)
+- [authStore.ts](file://frontend/src/store/authStore.ts#L3-L9)
 
 ## Role-Based Access Control
 
-The ARV platform is designed with a role-based access control system that will support different user types, specifically admin and company users. Although the full implementation is planned for Phase 2, the foundation for this system is evident in the existing codebase.
+The ARV platform implements a role-based access control system with three distinct roles: ADMIN, MANAGER, and VIEWER. The system enforces access control at both the API route level and the data access layer.
 
-The system will implement a hierarchical permission model where admin users have full access to all platform features, while company users have access limited to their organization's resources and specific functionality. The access control will be enforced at both the API route level and the data access layer.
+The ADMIN role has full access to all platform features and can manage users, companies, and system settings. The MANAGER role has access to manage resources within their organization but cannot modify system-wide settings. The VIEWER role has read-only access to view resources but cannot make modifications.
 
-The company model already includes fields that will support the RBAC system, such as subscription tiers and storage quotas, which will determine the capabilities and limitations of each company. The planned user model will include a role field to distinguish between different user types and their associated permissions.
+The access control is implemented through dependency functions in the authentication system that verify user roles before granting access to protected endpoints. The user model includes a role field that determines the user's permissions within the system.
 
 ```mermaid
 flowchart TD
@@ -130,68 +182,74 @@ Start([Authentication Request]) --> ValidateCredentials["Validate User Credentia
 ValidateCredentials --> CredentialsValid{"Credentials Valid?"}
 CredentialsValid --> |No| ReturnError["Return Authentication Error"]
 CredentialsValid --> |Yes| DetermineRole["Determine User Role"]
-DetermineRole --> AdminRole{"User is Admin?"}
+DetermineRole --> AdminRole{"User is ADMIN?"}
 AdminRole --> |Yes| GrantAdminAccess["Grant Full Platform Access"]
-AdminRole --> |No| CompanyUser{"User is Company User?"}
-CompanyUser --> |Yes| CheckCompanyPermissions["Check Company Permissions"]
-CheckCompanyPermissions --> ApplyCompanyRestrictions["Apply Company-Specific Restrictions"]
-ApplyCompanyRestrictions --> GrantCompanyAccess["Grant Company Access"]
+AdminRole --> |No| ManagerRole{"User is MANAGER?"}
+ManagerRole --> |Yes| GrantManagerAccess["Grant Organization Management Access"]
+ManagerRole --> |No| ViewerRole{"User is VIEWER?"}
+ViewerRole --> |Yes| GrantViewerAccess["Grant Read-Only Access"]
 GrantAdminAccess --> End([Access Granted])
-GrantCompanyAccess --> End
+GrantManagerAccess --> End
+GrantViewerAccess --> End
 ReturnError --> End
 ```
 
 **Diagram sources**
-- [company.py](file://app/models/company.py#L7-L41)
-- [config.py](file://app/core/config.py#L91-L93)
+- [user.py](file://app/models/user.py#L5-L9)
+- [auth.py](file://app/api/routes/auth.py#L20-L47)
 
 **Section sources**
-- [company.py](file://app/models/company.py#L7-L41)
-- [PHASE1_SUMMARY.md](file://PHASE1_SUMMARY.md#L139-L140)
+- [user.py](file://app/models/user.py#L5-L9)
+- [auth.py](file://app/api/routes/auth.py#L20-L47)
 
 ## Security Implementation
 
-The ARV platform implements several security measures to protect user data and system integrity. The security implementation includes secret key management, token generation, and session handling, with configurations designed to meet industry standards.
+The ARV platform implements several security measures to protect user data and system integrity. The security implementation includes secret key management, token generation, session handling, rate limiting, and password hashing, with configurations designed to meet industry standards.
 
-The system uses a SECRET_KEY environment variable for JWT token signing, with a recommendation to use a secure random key of at least 32 characters. This key should be changed from the default value in production environments. The JWT tokens are configured to expire after 1440 minutes (24 hours), balancing security and user convenience.
+The system uses a SECRET_KEY environment variable for JWT token signing, with a recommendation to use a secure random key of at least 32 characters. This key should be changed from the default value in production environments. The JWT tokens are configured to expire after 15 minutes, enhancing security by limiting the window of opportunity for token misuse.
 
-For the OAuth implementation with Yandex Disk, the system stores OAuth tokens and refresh tokens in the database within the storage connection records. The credentials are stored as JSONB fields in the database, with the current implementation noting that encryption or use of a secret vault could be implemented for enhanced security.
+For password security, the system uses bcrypt hashing with the passlib library. Passwords are never stored in plain text and are hashed before being stored in the database. The authentication system includes comprehensive rate limiting with a maximum of 5 login attempts within a 15-minute window, after which the account is locked for 15 minutes.
 
-The platform also implements CSRF protection for the OAuth flow using state parameters, and includes CORS configuration to control which origins can access the API. The system is designed with security headers and rate limiting through the Nginx reverse proxy configuration.
+The system tracks user state with fields for last login time, login attempts, and lockout status. Successful logins update the last_login_at field, while failed attempts increment the login_attempts counter. The locked_until field prevents authentication attempts during the lockout period.
 
 ```mermaid
 graph TB
 subgraph "Security Components"
 A[SECRET_KEY Management]
 B[JWT Token Generation]
-C[OAuth Token Storage]
-D[CSRF Protection]
-E[CORS Configuration]
-F[HTTPS Enforcement]
+C[Password Hashing]
+D[Rate Limiting]
+E[User State Tracking]
+F[CSRF Protection]
+G[CORS Configuration]
 end
-G[Environment Variables] --> A
+H[Environment Variables] --> A
 A --> B
-B --> H[Access Tokens]
-C --> I[Encrypted Storage]
-D --> J[State Parameter]
-E --> K[Allowed Origins]
-F --> L[Nginx Configuration]
-H --> M[Client]
-I --> N[Database]
-J --> O[OAuth Flow]
-K --> P[Frontend Integration]
-L --> Q[Production Deployment]
+B --> I[Access Tokens]
+C --> J[bcrypt Hashing]
+D --> K[5 attempts/15 min]
+E --> L[last_login_at, login_attempts, locked_until]
+F --> M[State Parameter]
+G --> N[Allowed Origins]
+I --> O[Client]
+J --> P[Database]
+K --> Q[Account Lockout]
+L --> R[User Management]
+M --> S[OAuth Flow]
+N --> T[Frontend Integration]
 ```
 
 **Diagram sources**
+- [security.py](file://app/core/security.py#L1-L38)
+- [auth.py](file://app/api/routes/auth.py#L16-L18)
+- [user.py](file://app/models/user.py#L24-L27)
 - [config.py](file://app/core/config.py#L50-L57)
-- [oauth.py](file://app/api/routes/oauth.py#L16-L17)
-- [.env.example](file://.env.example#L11-L13)
 
 **Section sources**
+- [security.py](file://app/core/security.py#L1-L38)
+- [auth.py](file://app/api/routes/auth.py#L16-L18)
+- [user.py](file://app/models/user.py#L24-L27)
 - [config.py](file://app/core/config.py#L50-L57)
-- [oauth.py](file://app/api/routes/oauth.py#L16-L17)
-- [.env.example](file://.env.example#L11-L13)
 
 ## OAuth Flow for Yandex Disk Integration
 
@@ -232,22 +290,37 @@ ARV->>Client : Redirect to success page
 
 ## Frontend Integration
 
-The ARV platform includes frontend components that integrate with the OAuth authentication system, providing a seamless user experience for connecting Yandex Disk accounts. The frontend implementation uses React components to handle the OAuth flow and storage management.
+The ARV platform includes frontend components that integrate with the authentication system, providing a seamless user experience for authentication and storage management. The frontend implementation uses React components to handle the authentication flow and user management.
 
-The `YandexDiskAuth` component provides a button that opens a popup window for the OAuth authorization process. It listens for messages from the popup window to detect when the authentication is complete and communicates the success back to the parent component. The component handles loading states and provides appropriate user feedback during the authentication process.
+The authentication system is integrated with the frontend through the `authStore.ts` store, which manages authentication state using Zustand with localStorage persistence. The store handles login, logout, and user information retrieval, maintaining the authentication state across page refreshes.
 
-The `YandexDiskFolderPicker` component allows users to browse and select folders within their connected Yandex Disk account. It uses the storage connection ID to make API calls to list folders and create new folders. The component provides a user-friendly interface with breadcrumbs, folder listing, search functionality, and the ability to create new folders directly from the interface.
+The login page provides a complete user interface for authentication with features including password visibility toggle, loading states, error handling with toast notifications, and a countdown timer for locked accounts. The sidebar displays the user's email and includes a logout button that clears the authentication state and redirects to the login page.
 
-These frontend components work in conjunction with the backend OAuth implementation to provide a complete solution for connecting and managing Yandex Disk storage from within the ARV platform.
+Protected routes use the `ProtectedRoute` component to check authentication status and redirect unauthenticated users to the login page. API requests include the JWT token in the Authorization header through an interceptor in the API service.
 
 ```mermaid
 sequenceDiagram
 participant User as User
-participant Frontend as Frontend Component
-participant Backend as Backend API
+participant Frontend as Frontend Application
+participant Backend as Authentication Service
 participant Yandex as Yandex Disk
+User->>Frontend : Navigate to platform
+Frontend->>Frontend : Check authentication status
+alt Authenticated
+Frontend->>Backend : GET /auth/me
+Backend-->>Frontend : Return user data
+Frontend->>Frontend : Update authStore
+Frontend->>User : Display dashboard
+else Unauthenticated
+Frontend->>User : Display login page
+User->>Frontend : Enter credentials
+Frontend->>Backend : POST /auth/login
+Backend-->>Frontend : Return JWT token
+Frontend->>Frontend : Store token in localStorage
+Frontend->>Frontend : Update authStore
+Frontend->>User : Display dashboard
+end
 User->>Frontend : Click "Connect Yandex Disk"
-Frontend->>Frontend : Open popup window
 Frontend->>Backend : Redirect to /oauth/yandex/authorize
 Backend->>Yandex : Redirect to Yandex Auth
 Yandex->>User : Show login and consent
@@ -258,46 +331,39 @@ Backend->>Backend : Exchange code for token
 Backend->>Backend : Store connection
 Backend->>Frontend : Redirect to success
 Frontend->>Frontend : Close popup, show success
-Frontend->>Backend : List folders for selection
-Backend->>Yandex : API calls with token
-Yandex->>Backend : Return folder data
-Backend->>Frontend : Return folder data
-Frontend->>User : Show folder picker
 ```
 
 **Diagram sources**
-- [YandexDiskAuth.tsx](file://frontend/components/YandexDiskAuth.tsx#L1-L77)
-- [YandexDiskFolderPicker.tsx](file://frontend/components/YandexDiskFolderPicker.tsx#L1-L242)
-- [oauth.py](file://app/api/routes/oauth.py#L108-L184)
+- [authStore.ts](file://frontend/src/store/authStore.ts#L3-L9)
+- [auth.py](file://app/api/routes/auth.py#L55-L164)
+- [oauth.py](file://app/api/routes/oauth.py#L19-L106)
 
 **Section sources**
-- [YandexDiskAuth.tsx](file://frontend/components/YandexDiskAuth.tsx#L1-L77)
-- [YandexDiskFolderPicker.tsx](file://frontend/components/YandexDiskFolderPicker.tsx#L1-L242)
+- [authStore.ts](file://frontend/src/store/authStore.ts#L3-L9)
+- [auth.py](file://app/api/routes/auth.py#L55-L164)
+- [oauth.py](file://app/api/routes/oauth.py#L19-L106)
 
 ## System Evolution Plan
 
-The ARV platform has a well-defined evolution plan for its authentication and authorization system, moving from the current OAuth implementation for Yandex Disk integration to a comprehensive user authentication system with JWT and role-based access control.
+The ARV platform has completed the evolution of its authentication and authorization system, moving from a planned JWT implementation to a fully functional system with complete JWT-based authentication including login, logout, and user information endpoints with comprehensive rate limiting (5 attempts per 15-minute lockout period). The system now includes user session management with 15-minute token expiration, password hashing with bcrypt, and user state tracking including last login time and failed attempt tracking.
 
-According to the project documentation, Phase 2 of development will focus on implementing JWT authentication, creating user models and schemas, and developing company CRUD endpoints. This evolution will transform the platform from a system that only handles storage integration to a full multi-tenant B2B SaaS platform with proper user management.
+The implementation of role-based access control with ADMIN, MANAGER, and VIEWER roles has been completed, providing a robust permission model for different user types. The system maintains backward compatibility with the existing Yandex Disk integration while providing a comprehensive user management system.
 
-The transition will involve several key steps:
-1. Implementing JWT-based authentication with token generation and validation
-2. Creating user models with role-based permissions
-3. Developing authentication endpoints for login, registration, and token refresh
-4. Implementing middleware to protect API routes based on user roles
-5. Migrating existing functionality to use the new authentication system
-6. Adding user interface elements for authentication and user management
-
-The system is designed to maintain backward compatibility during this transition, allowing the existing Yandex Disk integration to continue functioning while the new authentication system is implemented.
+Future enhancements may include:
+1. Implementation of refresh tokens for longer user sessions
+2. Addition of multi-factor authentication (MFA) support
+3. Implementation of password reset functionality
+4. Enhanced audit logging for security events
+5. Integration with external identity providers
+6. Session management interface for users to view and terminate active sessions
 
 **Section sources**
 - [PHASE1_SUMMARY.md](file://PHASE1_SUMMARY.md#L136-L140)
+- [AUTH_SYSTEM_DOCUMENTATION.md](file://AUTH_SYSTEM_DOCUMENTATION.md#L1-L613)
 
 ## Conclusion
-The ARV platform currently implements a robust OAuth 2.0 integration with Yandex Disk for storage access, with a clear roadmap for evolving to a comprehensive JWT-based authentication system. The current implementation provides secure access to Yandex Disk accounts with proper CSRF protection and token management.
+The ARV platform has successfully implemented a comprehensive JWT-based authentication system that provides secure user management with robust security features. The system includes rate limiting (5 attempts per 15-minute lockout period), user session management with 15-minute token expiration, password hashing with bcrypt, and user state tracking including last login time and failed attempt tracking.
 
-The planned evolution to JWT-based authentication will enable the platform to support multiple user types with role-based access control, transforming it into a full-featured B2B SaaS platform. The security implementation includes proper secret key management, token expiration, and protection against common vulnerabilities.
+The role-based access control system with ADMIN, MANAGER, and VIEWER roles enables fine-grained permission management for different user types. The security implementation includes proper secret key management, short-lived JWT tokens, bcrypt password hashing, and protection against brute force attacks through rate limiting.
 
-The frontend components provide a seamless user experience for connecting and managing Yandex Disk storage, with a well-designed integration between the frontend and backend components. As the platform evolves, these components will be enhanced to support the full user authentication workflow.
-
-The system's architecture demonstrates a thoughtful approach to security and scalability, with configurations that can be easily modified for different deployment environments. The use of environment variables for sensitive configuration values and the planned implementation of proper secret management will ensure the platform remains secure in production environments.
+The frontend components provide a seamless user experience for authentication and storage management, with a well-designed integration between the frontend and backend components. The system's architecture demonstrates a thoughtful approach to security and usability, with configurations that can be easily modified for different deployment environments.

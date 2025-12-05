@@ -18,7 +18,6 @@ async def create_connection(payload: StorageConnectionCreate, db: AsyncSession =
         name=payload.name,
         provider=payload.provider,
         credentials=payload.credentials,
-        metadata=payload.metadata or {},
         is_active=True,
         last_tested_at=None,
         test_status=None,

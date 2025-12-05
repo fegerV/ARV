@@ -19,7 +19,7 @@ from app.core.database import AsyncSessionLocal
 from app.models.ar_content import ARContent
 from app.models.company import Company
 from app.models.video import Video
-from app.core.storage import storage_manager
+from app.services.storage.factory import get_provider
 
 logger = structlog.get_logger()
 
@@ -62,7 +62,7 @@ def generate_video_thumbnail(self, video_id: int):
             if not company:
                 raise ValueError(f"Company {ar_content.company_id} not found")
             
-            provider = storage_manager.get_provider(company.storage_connection)
+            provider = get_provider(company.storage_connection)
             
             # Создаём временную директорию
             temp_dir = Path(tempfile.mkdtemp())
@@ -192,7 +192,7 @@ def generate_image_thumbnail(self, ar_content_id: int):
             if not company:
                 raise ValueError(f"Company {ar_content.company_id} not found")
                 
-            provider = storage_manager.get_provider(company.storage_connection)
+            provider = get_provider(company.storage_connection)
             
             temp_dir = Path(tempfile.mkdtemp())
             input_image = temp_dir / "portrait.jpg"

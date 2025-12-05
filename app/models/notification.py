@@ -26,6 +26,6 @@ class Notification(Base):
     subject = Column(String(500))
     message = Column(Text)
 
-    metadata = Column(JSONB, default={})
+    notification_metadata = Column(JSONB, default={}, name="metadata")
 
     created_at = Column(DateTime, default=datetime.utcnow)

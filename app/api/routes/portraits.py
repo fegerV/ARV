@@ -48,7 +48,6 @@ async def upload_portrait(
         image_path=str(image_path),
         image_url=image_url,
         marker_status="pending",
-        metadata={},
     )
 
     db.add(portrait)
@@ -79,7 +78,6 @@ async def get_portrait(portrait_id: int, db: AsyncSession = Depends(get_db)):
         "image_url": portrait.image_url,
         "marker_status": portrait.marker_status,
         "marker_url": portrait.marker_url,
-        "metadata": portrait.metadata,
     }
 
 
@@ -98,7 +96,6 @@ async def get_portrait_by_unique(unique_id: str, db: AsyncSession = Depends(get_
         "image_url": portrait.image_url,
         "marker_status": portrait.marker_status,
         "marker_url": portrait.marker_url,
-        "metadata": portrait.metadata,
     }
 
 
