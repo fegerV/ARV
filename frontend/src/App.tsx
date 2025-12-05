@@ -1,6 +1,7 @@
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { Box } from '@mui/material';
 import Sidebar from './components/layout/Sidebar';
+import ToastNotification from './components/common/ToastNotification';
 import Dashboard from './pages/Dashboard';
 import CompaniesList from './pages/companies/CompaniesList';
 import CompanyDetails from './pages/companies/CompanyDetails';
@@ -17,7 +18,9 @@ import Settings from './pages/Settings';
 
 function App() {
   return (
-    <Box sx={{ display: 'flex' }}>
+    <>
+      <ToastNotification />
+      <Box sx={{ display: 'flex' }}>
       <Sidebar />
       <Box component="main" sx={{ flexGrow: 1, p: 3, mt: 8 }}>
         <Routes>
@@ -48,6 +51,7 @@ function App() {
         </Routes>
       </Box>
     </Box>
+    </>
   );
 }
 

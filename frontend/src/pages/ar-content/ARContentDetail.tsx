@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   Box,
@@ -16,10 +16,9 @@ import {
   Dialog,
   DialogContent,
   DialogTitle,
-  Table,
-  TableBody,
-  TableRow,
-  TableCell,
+  DialogActions,
+  Skeleton,
+  CircularProgress,
 } from '@mui/material';
 import {
   ArrowBack as BackIcon,
@@ -37,6 +36,9 @@ import {
 } from '@mui/icons-material';
 import QRCode from 'qrcode.react';
 import { format } from 'date-fns';
+import { arContentAPI } from '../../services/api';
+import { useToast } from '../../store/useToast';
+import { downloadQRAsPNG, downloadQRAsSVG, downloadQRAsPDF } from '../../utils/qrCodeExport';
 
 interface ARContentDetailProps {
   id: number;
@@ -83,6 +85,8 @@ interface Stats {
 export default function ARContentDetail() {
   const { arContentId } = useParams<{ arContentId: string }>();
   const navigate = useNavigate();
+  const { showToast } = useToast();
+  const qrCanvasRef = useRef<HTMLCanvasElement>(null);
   
   const [content, setContent] = useState<ARContentDetailProps | null>(null);
   const [videos, setVideos] = useState<VideoInfo[]>([]);
@@ -90,96 +94,41 @@ export default function ARContentDetail() {
   const [company, setCompany] = useState<{ name: string } | null>(null);
   const [project, setProject] = useState<{ name: string } | null>(null);
   
+  const [loading, setLoading] = useState(true);
+  const [deleting, setDeleting] = useState(false);
   const [portraitLightbox, setPortraitLightbox] = useState(false);
   const [videoLightbox, setVideoLightbox] = useState<VideoInfo | null>(null);
   const [qrDialog, setQrDialog] = useState(false);
+  const [deleteDialog, setDeleteDialog] = useState(false);
   const [zoom, setZoom] = useState(100);
+  const [downloadingQR, setDownloadingQR] = useState(false);
 
   useEffect(() => {
     fetchContentDetail();
   }, [arContentId]);
 
   const fetchContentDetail = async () => {
-    // Mock data - replace with actual API call
-    setContent({
-      id: 456,
-      title: 'Постер #1 - Санта с подарками',
-      uniqueId: 'abc123',
-      imageUrl: '/api/portraits/santa-poster.jpg',
-      imageWidth: 1920,
-      imageHeight: 1080,
-      imageSize: 2621440,
-      mimeType: 'image/jpeg',
-      markerStatus: 'ready',
-      markerFileName: 'targets.mind',
-      markerSize: 251658,
-      markerFeaturePoints: 1247,
-      markerGenerationTime: 8.2,
-      createdAt: '2025-12-05T14:30:00',
-      createdBy: 'admin@vertexar.com',
-    });
-
-    setVideos([
-      {
-        id: 1,
-        fileName: 'santa-animation.mp4',
-        fileSize: 12582912,
-        duration: 15,
-        width: 1920,
-        height: 1080,
-        fps: 30,
-        codec: 'H.264',
-        previewUrl: '/api/videos/preview-1.jpg',
-        videoUrl: '/api/videos/santa-animation.mp4',
-        isActive: true,
-        scheduleType: 'default',
-      },
-      {
-        id: 2,
-        fileName: 'newyear-animation.mp4',
-        fileSize: 18874368,
-        duration: 20,
-        width: 1920,
-        height: 1080,
-        fps: 30,
-        codec: 'H.264',
-        previewUrl: '/api/videos/preview-2.jpg',
-        videoUrl: '/api/videos/newyear-animation.mp4',
-        isActive: false,
-        scheduleType: 'date_specific',
-        scheduleDate: '2025-12-31',
-      },
-      {
-        id: 3,
-        fileName: 'snowfall.mp4',
-        fileSize: 8388608,
-        duration: 10,
-        width: 1920,
-        height: 1080,
-        fps: 30,
-        codec: 'H.264',
-        previewUrl: '/api/videos/preview-3.jpg',
-        videoUrl: '/api/videos/snowfall.mp4',
-        isActive: false,
-        scheduleType: 'date_specific',
-        scheduleDate: '2025-12-25',
-      },
-    ]);
-
-    setCompany({ name: 'Рекламное агентство 1' });
-    setProject({ name: 'Новогодние постеры 2025' });
-    
-    setStats({
-      totalViews: 3245,
-      uniqueSessions: 2890,
-      avgSessionDuration: 28,
-      avgFps: 26.4,
-      deviceBreakdown: [
-        { device: 'Android', percentage: 72 },
-        { device: 'iOS', percentage: 25 },
-        { device: 'Другое', percentage: 3 },
-      ],
-    });
+    setLoading(true);
+    try {
+      const response = await arContentAPI.getDetail(Number(arContentId));
+      const data = response.data;
+      
+      setContent(data.arContent);
+      setVideos(data.videos || []);
+      setStats(data.stats);
+      setCompany(data.company);
+      setProject(data.project);
+      
+      showToast('Content loaded successfully', 'success');
+    } catch (error: any) {
+      showToast(
+        error.response?.data?.message || 'Failed to load AR content',
+        'error'
+      );
+      console.error('Failed to fetch content:', error);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const formatBytes = (bytes: number): string => {
@@ -190,25 +139,89 @@ export default function ARContentDetail() {
     return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
   };
 
-  const copyToClipboard = (text: string) => {
-    navigator.clipboard.writeText(text);
-    // Show success snackbar
-  };
-
-  const downloadQR = (format: 'png' | 'svg') => {
-    const canvas = document.querySelector('canvas');
-    if (!canvas) return;
-    
-    if (format === 'png') {
-      const url = canvas.toDataURL('image/png');
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `qr-${content?.uniqueId}.png`;
-      link.click();
+  const handleDelete = async () => {
+    setDeleting(true);
+    try {
+      await arContentAPI.delete(Number(arContentId));
+      showToast('AR content deleted successfully', 'success');
+      navigate(-1);
+    } catch (error: any) {
+      showToast(
+        error.response?.data?.message || 'Failed to delete AR content',
+        'error'
+      );
+      console.error('Failed to delete:', error);
+    } finally {
+      setDeleting(false);
+      setDeleteDialog(false);
     }
   };
 
-  if (!content) return <Typography>Loading...</Typography>;
+  const handleEdit = () => {
+    navigate(`/ar-content/${arContentId}/edit`);
+  };
+
+  const copyToClipboard = (text: string) => {
+    navigator.clipboard.writeText(text).then(() => {
+      showToast('Copied to clipboard!', 'success');
+    }).catch(() => {
+      showToast('Failed to copy', 'error');
+    });
+  };
+
+  const handleDownloadQR = async (format: 'png' | 'svg' | 'pdf') => {
+    if (!content) return;
+    
+    setDownloadingQR(true);
+    try {
+      const canvas = qrCanvasRef.current;
+      if (!canvas) {
+        showToast('QR code not ready', 'error');
+        return;
+      }
+
+      const filename = `qr-${content.uniqueId}.${format}`;
+      const arUrl = `https://ar.vertexar.com/view/${content.uniqueId}`;
+
+      switch (format) {
+        case 'png':
+          downloadQRAsPNG(canvas, filename);
+          break;
+        case 'svg':
+          await downloadQRAsSVG(arUrl, filename);
+          break;
+        case 'pdf':
+          await downloadQRAsPDF(canvas, filename, arUrl);
+          break;
+      }
+
+      showToast(`QR code downloaded as ${format.toUpperCase()}`, 'success');
+    } catch (error) {
+      showToast('Failed to download QR code', 'error');
+      console.error('Download error:', error);
+    } finally {
+      setDownloadingQR(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <Box sx={{ maxWidth: 1200, mx: 'auto' }}>
+        <Skeleton variant="rectangular" height={60} sx={{ mb: 3 }} />
+        <Skeleton variant="rectangular" height={100} sx={{ mb: 3 }} />
+        <Grid container spacing={3}>
+          <Grid item xs={12} md={6}>
+            <Skeleton variant="rectangular" height={400} />
+          </Grid>
+          <Grid item xs={12} md={6}>
+            <Skeleton variant="rectangular" height={400} />
+          </Grid>
+        </Grid>
+      </Box>
+    );
+  }
+
+  if (!content) return <Typography>AR content not found</Typography>;
 
   const arUrl = `https://ar.vertexar.com/view/${content.uniqueId}`;
 
@@ -228,10 +241,15 @@ export default function ARContentDetail() {
           <Button variant="outlined" startIcon={<QrCodeIcon />} onClick={() => setQrDialog(true)}>
             QR-код
           </Button>
-          <Button variant="outlined" startIcon={<EditIcon />}>
+          <Button variant="outlined" startIcon={<EditIcon />} onClick={handleEdit}>
             Редактировать
           </Button>
-          <Button variant="outlined" color="error" startIcon={<DeleteIcon />}>
+          <Button 
+            variant="outlined" 
+            color="error" 
+            startIcon={<DeleteIcon />}
+            onClick={() => setDeleteDialog(true)}
+          >
             Удалить
           </Button>
         </Box>
@@ -326,18 +344,48 @@ export default function ARContentDetail() {
         
         <Box sx={{ display: 'flex', gap: 3, alignItems: 'flex-start' }}>
           <Box>
-            <QRCode value={arUrl} size={200} />
+            <QRCode 
+              value={arUrl} 
+              size={200}
+              ref={(el) => {
+                if (el) {
+                  const canvas = el.querySelector('canvas');
+                  if (canvas && qrCanvasRef.current !== canvas) {
+                    // @ts-ignore
+                    qrCanvasRef.current = canvas;
+                  }
+                }
+              }}
+            />
           </Box>
           <Box>
             <Typography variant="body2" gutterBottom>Скачать QR-код:</Typography>
             <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-              <Button variant="outlined" size="small" startIcon={<DownloadIcon />} onClick={() => downloadQR('png')}>
+              <Button 
+                variant="outlined" 
+                size="small" 
+                startIcon={downloadingQR ? <CircularProgress size={16} /> : <DownloadIcon />}
+                onClick={() => handleDownloadQR('png')}
+                disabled={downloadingQR}
+              >
                 PNG
               </Button>
-              <Button variant="outlined" size="small" startIcon={<DownloadIcon />}>
+              <Button 
+                variant="outlined" 
+                size="small" 
+                startIcon={downloadingQR ? <CircularProgress size={16} /> : <DownloadIcon />}
+                onClick={() => handleDownloadQR('svg')}
+                disabled={downloadingQR}
+              >
                 SVG
               </Button>
-              <Button variant="outlined" size="small" startIcon={<DownloadIcon />}>
+              <Button 
+                variant="outlined" 
+                size="small" 
+                startIcon={downloadingQR ? <CircularProgress size={16} /> : <DownloadIcon />}
+                onClick={() => handleDownloadQR('pdf')}
+                disabled={downloadingQR}
+              >
                 PDF
               </Button>
             </Box>
@@ -561,23 +609,72 @@ export default function ARContentDetail() {
         </DialogTitle>
         <DialogContent>
           <Box sx={{ textAlign: 'center', mb: 2 }}>
-            <QRCode value={arUrl} size={300} />
+            <div ref={(el) => {
+              if (el) {
+                const canvas = el.querySelector('canvas');
+                if (canvas && qrCanvasRef.current !== canvas) {
+                  // @ts-ignore
+                  qrCanvasRef.current = canvas;
+                }
+              }
+            }}>
+              <QRCode value={arUrl} size={300} />
+            </div>
           </Box>
           <Typography variant="body2" sx={{ mb: 2 }}>
             {arUrl}
           </Typography>
           <Box sx={{ display: 'flex', gap: 1, justifyContent: 'center', flexWrap: 'wrap' }}>
-            <Button variant="contained" startIcon={<DownloadIcon />} onClick={() => downloadQR('png')}>
+            <Button 
+              variant="contained" 
+              startIcon={downloadingQR ? <CircularProgress size={16} /> : <DownloadIcon />}
+              onClick={() => handleDownloadQR('png')}
+              disabled={downloadingQR}
+            >
               PNG
             </Button>
-            <Button variant="outlined" startIcon={<DownloadIcon />}>
+            <Button 
+              variant="outlined" 
+              startIcon={downloadingQR ? <CircularProgress size={16} /> : <DownloadIcon />}
+              onClick={() => handleDownloadQR('svg')}
+              disabled={downloadingQR}
+            >
               SVG
             </Button>
-            <Button variant="outlined" startIcon={<DownloadIcon />}>
+            <Button 
+              variant="outlined" 
+              startIcon={downloadingQR ? <CircularProgress size={16} /> : <DownloadIcon />}
+              onClick={() => handleDownloadQR('pdf')}
+              disabled={downloadingQR}
+            >
               PDF
             </Button>
           </Box>
         </DialogContent>
+      </Dialog>
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={deleteDialog} onClose={() => setDeleteDialog(false)}>
+        <DialogTitle>Подтвердите удаление</DialogTitle>
+        <DialogContent>
+          <Typography>
+            Вы уверены, что хотите удалить AR контент "{content.title}"?
+            Это действие нельзя отменить.
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setDeleteDialog(false)} disabled={deleting}>
+            Отмена
+          </Button>
+          <Button 
+            onClick={handleDelete} 
+            color="error" 
+            variant="contained"
+            disabled={deleting}
+            startIcon={deleting ? <CircularProgress size={16} /> : <DeleteIcon />}
+          >
+            {deleting ? 'Удаление...' : 'Удалить'}
+          </Button>
+        </DialogActions>
       </Dialog>
     </Box>
   );
