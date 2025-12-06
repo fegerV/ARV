@@ -1,12 +1,10 @@
-import { Box, Typography, Paper } from '@mui/material';
+import { Box, Typography } from '@mui/material';
+import { CompanyFormCard } from '@/components/(forms)/CompanyFormCard';
 
 export default function CompanyForm() {
   return (
     <Box>
-      <Typography variant="h4" gutterBottom>New Company</Typography>
-      <Paper sx={{ p: 3 }}>
-        <Typography>Company form будет здесь...</Typography>
-      </Paper>
+      <CompanyFormCard />
     </Box>
   );
 }

@@ -15,8 +15,8 @@ export * from './(auth)';
 // ============= Forms =============
 export * from './(forms)';
 
-// ============= Data Display (будут добавлены позже) =============
-// export * from './(data)';
+// ============= Data Display =============
+export * from './(data)';
 
 // ============= Media Components =============
 export * from './(media)';

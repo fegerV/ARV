@@ -45,7 +45,7 @@ export const arContentAPI = {
 };
 
 export const companiesAPI = {
-  list: () => api.get('/companies'),
+  list: (params?: { include_default?: boolean }) => api.get('/companies', { params }),
   get: (id: number) => api.get(`/companies/${id}`),
   create: (data: any) => api.post('/companies', data),
   update: (id: number, data: any) => api.put(`/companies/${id}`, data),

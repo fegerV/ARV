@@ -29,7 +29,7 @@ test.describe('Company CRUD Operations', () => {
     
     // Fill form
     await page.fill('[data-testid="company-name"]', 'Test Agency E2E');
-    await page.selectOption('[data-testid="storage-provider"]', 'local');
+    await page.check('input[value="local_disk"]');
     
     // Submit
     await page.click('[data-testid="create-company-button"]');

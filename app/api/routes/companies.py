@@ -88,7 +88,7 @@ async def create_company(
     return company
 
 @router.get("/", response_model=List[CompanyResponse])
-async def list_companies(include_default: bool = False, db: AsyncSession = Depends(get_db)):
+async def list_companies(include_default: bool = True, db: AsyncSession = Depends(get_db)):
     query = select(Company)
     if not include_default:
         query = query.where(Company.is_default == False)

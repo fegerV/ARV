@@ -25,7 +25,6 @@ import {
   Security as SecurityIcon,
   Help as HelpIcon,
 } from '@mui/icons-material';
-import { useThemeStore } from '../store/themeStore';
 import { useAuthStore } from '../store/authStore';
 import ThemeToggle from '../components/common/ThemeToggle';
 import { useToast } from '../store/useToast';

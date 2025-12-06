@@ -42,3 +42,4 @@ class Company(Base):
 
     # Relationships
     storage_connection = relationship("StorageConnection", back_populates="companies")
+    folders = relationship("StorageFolder", back_populates="company")

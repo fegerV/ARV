@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { Box, Typography, Paper, LinearProgress, IconButton } from '@mui/material';
+import { Box, Typography, Paper, IconButton } from '@mui/material';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import DeleteIcon from '@mui/icons-material/Delete';
 import { useToast } from '../../store/useToast';
@@ -125,7 +125,6 @@ export default function FileUploadZone({
           <Typography variant="caption" color="text.secondary">
             {(file.size / 1024 / 1024).toFixed(2)} MB
           </Typography>
-          {uploading && <LinearProgress sx={{ mt: 2 }} />}
         </Box>
       )}
     </Paper>

@@ -1,7 +1,7 @@
 """Create users table
 
 Revision ID: 003_create_users
-Revises: 002
+Revises: 20251205_thumbnails
 Create Date: 2025-12-05 14:00:00
 
 """
@@ -11,47 +11,85 @@ from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
 revision = '003_create_users'
-down_revision = '002'  # Adjust based on your last migration
+down_revision = '20251205_thumbnails'  # Adjust based on your last migration
 branch_labels = None
 depends_on = None
 
 
 def upgrade() -> None:
-    # Create users table
-    op.create_table(
-        'users',
-        sa.Column('id', sa.Integer(), nullable=False),
-        sa.Column('email', sa.String(), nullable=False),
-        sa.Column('hashed_password', sa.String(), nullable=False),
-        sa.Column('full_name', sa.String(), nullable=False),
-        sa.Column('role', sa.Enum('admin', 'manager', 'viewer', name='userrole'), nullable=False),
-        sa.Column('is_active', sa.Boolean(), nullable=False, server_default='true'),
-        sa.Column('last_login_at', sa.DateTime(timezone=True), nullable=True),
-        sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
-        sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
-        sa.Column('login_attempts', sa.Integer(), nullable=False, server_default='0'),
-        sa.Column('locked_until', sa.DateTime(timezone=True), nullable=True),
-        sa.PrimaryKeyConstraint('id')
-    )
-    op.create_index(op.f('ix_users_id'), 'users', ['id'], unique=False)
-    op.create_index(op.f('ix_users_email'), 'users', ['email'], unique=True)
+    # Check if userrole enum exists
+    conn = op.get_bind()
+    result = conn.execute(sa.text("""
+        SELECT 1 FROM pg_type WHERE typname = 'userrole'
+    """))
     
-    # Insert default admin user (password: admin123)
-    # IMPORTANT: Change password in production!
-    op.execute("""
-        INSERT INTO users (email, hashed_password, full_name, role, is_active)
-        VALUES (
-            'admin@vertexar.com',
-            '$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewY5GyYIxF2PQaDi',  -- admin123
-            'Vertex AR Admin',
-            'admin',
-            true
-        )
-    """)
+    # Create enum type if it doesn't exist
+    if not result.fetchone():
+        op.execute("CREATE TYPE userrole AS ENUM ('ADMIN', 'MANAGER', 'VIEWER')")
+    
+    # Check if users table exists
+    result = conn.execute(sa.text("""
+        SELECT 1 FROM information_schema.tables WHERE table_name = 'users'
+    """))
+    
+    # Create users table if it doesn't exist
+    if not result.fetchone():
+        op.execute("""
+            CREATE TABLE users (
+                id SERIAL PRIMARY KEY,
+                email VARCHAR NOT NULL,
+                hashed_password VARCHAR NOT NULL,
+                full_name VARCHAR NOT NULL,
+                role userrole NOT NULL,
+                is_active BOOLEAN NOT NULL DEFAULT true,
+                last_login_at TIMESTAMP WITH TIME ZONE,
+                created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+                updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+                login_attempts INTEGER NOT NULL DEFAULT 0,
+                locked_until TIMESTAMP WITH TIME ZONE
+            )
+        """)
+        
+        op.create_index(op.f('ix_users_id'), 'users', ['id'], unique=False)
+        op.create_index(op.f('ix_users_email'), 'users', ['email'], unique=True)
+    
+    # Check if default admin user exists before inserting
+    result = conn.execute(sa.text("""
+        SELECT 1 FROM users WHERE email = 'admin@vertexar.com'
+    """))
+    
+    if not result.fetchone():
+        # Insert default admin user (password: admin123)
+        # IMPORTANT: Change password in production!
+        op.execute("""
+            INSERT INTO users (email, hashed_password, full_name, role, is_active, login_attempts)
+            VALUES (
+                'admin@vertexar.com',
+                '$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewY5GyYIxF2PQaDi',  -- admin123
+                'Vertex AR Admin',
+                'ADMIN',
+                true,
+                0
+            )
+        """)
 
 
 def downgrade() -> None:
-    op.drop_index(op.f('ix_users_email'), table_name='users')
-    op.drop_index(op.f('ix_users_id'), table_name='users')
-    op.drop_table('users')
-    op.execute('DROP TYPE userrole')
+    # Check if users table exists before dropping
+    conn = op.get_bind()
+    result = conn.execute(sa.text("""
+        SELECT 1 FROM information_schema.tables WHERE table_name = 'users'
+    """))
+    
+    if result.fetchone():
+        op.drop_index(op.f('ix_users_email'), table_name='users')
+        op.drop_index(op.f('ix_users_id'), table_name='users')
+        op.drop_table('users')
+    
+    # Check if userrole enum exists before dropping
+    result = conn.execute(sa.text("""
+        SELECT 1 FROM pg_type WHERE typname = 'userrole'
+    """))
+    
+    if result.fetchone():
+        op.execute('DROP TYPE userrole')

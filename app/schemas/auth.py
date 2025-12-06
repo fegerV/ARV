@@ -25,3 +25,6 @@ class LoginError(BaseModel):
     detail: str
     locked_until: Optional[datetime] = None
     attempts_left: Optional[int] = None
+
+# Update forward references
+Token.model_rebuild()
