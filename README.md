@@ -69,11 +69,19 @@ vertex-ar/
 
 ## 📚 Документация
 
+### Основная документация
 - [Архитектура системы](docs/01-architecture.md)
 - [Миграции БД](docs/02-migrations.md)
 - [Deployment](docs/03-deployment.md)
 - [Monitoring](docs/04-monitoring.md)
 - [Backup & Recovery](docs/05-backup-recovery.md)
+
+### Storage и Провайдеры
+- [🗄️ Storage Providers Guide](docs/STORAGE_PROVIDERS.md) - Конфигурация и использование хранилищ
+- [✅ Verification Plan](docs/VERIFICATION_PLAN.md) - План тестирования и валидации
+- [Storage Connections Feature](STORAGE_CONNECTIONS_FEATURE.md) - Управление подключениями
+
+### Интеграции и настройки
 - [Email Notifications Setup](EMAIL_SETUP.md)
 - [Email Notifications Summary](EMAIL_NOTIFICATIONS_SUMMARY.md)
 - [Dependency Audit Summary](DEPENDENCY_AUDIT_SUMMARY.md)
@@ -110,6 +118,26 @@ pytest tests/ -v --cov=app
 cd frontend
 npm run test
 ```
+
+### 🔍 Запуск верификации Storage
+
+Для комплексной проверки всех storage провайдеров и тестирования:
+
+```bash
+# Запустить полный набор верификационных тестов
+./scripts/run_verification.sh
+
+# Скрипт последовательно выполнит:
+# 1. Unit тесты для storage провайдеров
+# 2. Интеграционные тесты API
+# 3. E2E тесты административной панели
+# 4. Проверку Celery задач
+# 5. Ручную проверку storage провайдеров
+# 6. Health checks API
+# 7. Performance бенчмарки
+```
+
+Подробнее о тестировании и верификации см. в [Verification Plan](docs/VERIFICATION_PLAN.md).
 
 ## 🌍 Environment Variables
 
