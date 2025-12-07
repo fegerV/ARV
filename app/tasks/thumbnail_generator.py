@@ -83,68 +83,78 @@ def generate_video_thumbnail(self, video_id: int):
                 try:
                     logger.info("Starting video thumbnail generation", video_id=video_id)
                     
-                    # Download video from storage
-                    video_data = await provider.download_file(video.video_path)
-                    input_video = io.BytesIO(video_data)
-                    
-                    # Get video duration using FFmpeg probe
-                    probe = ffmpeg.probe(input_video)
-                    duration = float(probe['format']['duration'])
-                    middle_time = duration / 2.0  # Take frame from middle
-                    
-                    logger.info("Extracting frame from video", 
-                               video_id=video_id, 
-                               duration=duration,
-                               middle_time=middle_time)
-                    
-                    # Extract frame from middle of video
-                    (
-                        ffmpeg
-                        .input(input_video, ss=middle_time)
-                        .filter('scale', 1920, -1)  # 1920px width, auto height
-                        .output('pipe:', vframes=1, format='rawvideo', pix_fmt='rgb24')
-                        .overwrite_output()
-                        .run(capture_stdout=True, capture_stderr=True)
-                    )
-                    
-                    # Generate thumbnails in different sizes in WebP
-                    thumbnails = {}
-                    for size_name, (width, height) in THUMBNAIL_SIZES.items():
-                        thumbnail_path = temp_dir / f"thumbnail_{size_name}.webp"
+                    # Create temporary directory
+                    with tempfile.TemporaryDirectory() as temp_dir_str:
+                        temp_dir = Path(temp_dir_str)
                         
-                        # Resize + convert to WebP with optimization
-                        img = Image.frombytes('RGB', (1920, 1080), output_frame)
+                        # Download video from storage
+                        video_data = await provider.download_file(video.video_path)
+                        input_video = io.BytesIO(video_data)
                         
-                        # Resize while maintaining aspect ratio
-                        img.thumbnail((width, height), Image.Resampling.LANCZOS)
+                        # Get video duration using FFmpeg probe
+                        probe = ffmpeg.probe(input_video)
+                        duration = float(probe['format']['duration'])
+                        middle_time = duration / 2.0  # Take frame from middle
                         
-                        # Save as WebP with optimization
-                        img.save(thumbnail_path, 'WEBP', quality=85, method=6)
-                    
-                        # Upload to company storage
-                        storage_path = f"thumbnails/videos/{video.id}/{uuid.uuid4()}_{size_name}.webp"
-                        thumbnail_url = await provider.upload_file(
-                            str(thumbnail_path),
-                            storage_path,
-                            content_type='image/webp'
+                        logger.info("Extracting frame from video", 
+                                   video_id=video_id, 
+                                   duration=duration,
+                                   middle_time=middle_time)
+                        
+                        # Extract frame from middle of video
+                        input_video.seek(0)  # Rewind buffer for FFmpeg
+                        out, _ = (
+                            ffmpeg
+                            .input(input_video, ss=middle_time)
+                            .filter('scale', 1920, -1)  # 1920px width, auto height
+                            .output('pipe:', vframes=1, format='rawvideo', pix_fmt='rgb24')
+                            .overwrite_output()
+                            .run(capture_stdout=True, capture_stderr=True)
                         )
                         
-                        thumbnails[size_name] = thumbnail_url
-                        logger.info("Generated thumbnail", 
+                        # Generate thumbnails in different sizes in WebP
+                        thumbnails = {}
+                        for size_name, (width, height) in THUMBNAIL_SIZES.items():
+                            thumbnail_path = temp_dir / f"thumbnail_{size_name}.webp"
+                            
+                            # Create image from raw video frame data
+                            # Calculate actual height based on aspect ratio
+                            frame_width = 1920
+                            frame_height = len(out) // (frame_width * 3)  # 3 bytes per pixel (RGB)
+                            
+                            # Resize + convert to WebP with optimization
+                            img = Image.frombytes('RGB', (frame_width, frame_height), out)
+                            
+                            # Resize while maintaining aspect ratio
+                            img.thumbnail((width, height), Image.Resampling.LANCZOS)
+                            
+                            # Save as WebP with optimization
+                            img.save(thumbnail_path, 'WEBP', quality=85, method=6)
+                        
+                            # Upload to company storage
+                            storage_path = f"thumbnails/videos/{video.id}/{uuid.uuid4()}_{size_name}.webp"
+                            thumbnail_url = await provider.upload_file(
+                                str(thumbnail_path),
+                                storage_path,
+                                content_type='image/webp'
+                            )
+                            
+                            thumbnails[size_name] = thumbnail_url
+                            logger.info("Generated thumbnail", 
+                                       video_id=video_id, 
+                                       size=size_name, 
+                                       url=thumbnail_url)
+                        
+                        # Update video record
+                        video.thumbnail_url = thumbnails['medium']
+                        video.thumbnail_small_url = thumbnails.get('small')
+                        video.thumbnail_large_url = thumbnails.get('large')
+                        await db.commit()
+                        
+                        logger.info("Video thumbnails generated successfully", 
                                    video_id=video_id, 
-                                   size=size_name, 
-                                   url=thumbnail_url)
-                    
-                    # Update video record
-                    video.thumbnail_url = thumbnails['medium']
-                    video.thumbnail_small_url = thumbnails.get('small')
-                    video.thumbnail_large_url = thumbnails.get('large')
-                    await db.commit()
-                    
-                    logger.info("Video thumbnails generated successfully", 
-                               video_id=video_id, 
-                               thumbnails=thumbnails)
-                    return thumbnails
+                                   thumbnails=thumbnails)
+                        return thumbnails
                     
                 except ffmpeg.Error as e:
                     error_msg = e.stderr.decode() if e.stderr else str(e)
@@ -157,9 +167,6 @@ def generate_video_thumbnail(self, video_id: int):
                                 video_id=video_id, 
                                 error=str(e))
                     raise
-                finally:
-                    # Clean up temporary files
-                    shutil.rmtree(temp_dir, ignore_errors=True)
                     
             except Exception as e:
                 logger.error("thumbnail_generation_failed", video_id=video_id, error=str(e))
@@ -213,59 +220,62 @@ def generate_image_thumbnail(self, ar_content_id: int):
                 try:
                     logger.info("Starting image thumbnail generation", ar_content_id=ar_content_id)
                     
-                    # Download original from storage
-                    image_data = await provider.download_file(ar_content.image_path)
-                    input_image = io.BytesIO(image_data)
-                    
-                    thumbnails = {}
-                    for size_name, (width, height) in THUMBNAIL_SIZES.items():
-                        thumbnail_path = temp_dir / f"thumbnail_{size_name}.webp"
+                    # Create temporary directory
+                    with tempfile.TemporaryDirectory() as temp_dir_str:
+                        temp_dir = Path(temp_dir_str)
                         
-                        with Image.open(input_image) as img:
-                            # Convert to RGB if needed
-                            if img.mode in ('RGBA', 'LA', 'P'):
-                                background = Image.new('RGB', img.size, (255, 255, 255))
-                                if img.mode == 'P':
-                                    img = img.convert('RGBA')
-                                background.paste(img, mask=img.split()[-1] if img.mode == 'RGBA' else None)
-                                img = background
+                        # Download original from storage
+                        image_data = await provider.download_file(ar_content.image_path)
+                        input_image = io.BytesIO(image_data)
+                        
+                        thumbnails = {}
+                        for size_name, (width, height) in THUMBNAIL_SIZES.items():
+                            thumbnail_path = temp_dir / f"thumbnail_{size_name}.webp"
                             
-                            # Maintain aspect ratio + center crop
-                            img.thumbnail((width, height), Image.Resampling.LANCZOS)
+                            input_image.seek(0)  # Rewind buffer for each iteration
+                            with Image.open(input_image) as img:
+                                # Convert to RGB if needed
+                                if img.mode in ('RGBA', 'LA', 'P'):
+                                    background = Image.new('RGB', img.size, (255, 255, 255))
+                                    if img.mode == 'P':
+                                        img = img.convert('RGBA')
+                                    background.paste(img, mask=img.split()[-1] if img.mode == 'RGBA' else None)
+                                    img = background
+                                
+                                # Maintain aspect ratio + center crop
+                                img.thumbnail((width, height), Image.Resampling.LANCZOS)
+                                
+                                # Convert to WebP
+                                img.save(thumbnail_path, 'WEBP', quality=85, method=6)
                             
-                            # Convert to WebP
-                            img.save(thumbnail_path, 'WEBP', quality=85, method=6)
+                            # Upload to company storage
+                            storage_path = f"thumbnails/portraits/{ar_content.id}/{uuid.uuid4()}_{size_name}.webp"
+                            thumbnail_url = await provider.upload_file(
+                                str(thumbnail_path),
+                                storage_path,
+                                content_type='image/webp'
+                            )
+                            
+                            thumbnails[size_name] = thumbnail_url
+                            logger.info("Generated thumbnail", 
+                                       ar_content_id=ar_content_id, 
+                                       size=size_name, 
+                                       url=thumbnail_url)
                         
-                        # Upload to company storage
-                        storage_path = f"thumbnails/portraits/{ar_content.id}/{uuid.uuid4()}_{size_name}.webp"
-                        thumbnail_url = await provider.upload_file(
-                            str(thumbnail_path),
-                            storage_path,
-                            content_type='image/webp'
-                        )
+                        # Update AR content record
+                        ar_content.thumbnail_url = thumbnails['medium']
+                        await db.commit()
                         
-                        thumbnails[size_name] = thumbnail_url
-                        logger.info("Generated thumbnail", 
+                        logger.info("Image thumbnails generated successfully", 
                                    ar_content_id=ar_content_id, 
-                                   size=size_name, 
-                                   url=thumbnail_url)
-                    
-                    # Update AR content record
-                    ar_content.thumbnail_url = thumbnails['medium']
-                    await db.commit()
-                    
-                    logger.info("Image thumbnails generated successfully", 
-                               ar_content_id=ar_content_id, 
-                               thumbnails=thumbnails)
-                    return thumbnails
+                                   thumbnails=thumbnails)
+                        return thumbnails
                     
                 except Exception as e:
                     logger.error("Error during image thumbnail generation", 
                                 ar_content_id=ar_content_id, 
                                 error=str(e))
                     raise
-                finally:
-                    shutil.rmtree(temp_dir, ignore_errors=True)
                     
             except Exception as e:
                 logger.error("thumbnail_generation_failed", ar_content_id=ar_content_id, error=str(e))
