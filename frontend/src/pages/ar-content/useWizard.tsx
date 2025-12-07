@@ -44,8 +44,9 @@ export const WizardProvider: React.FC<{ children: React.ReactNode; projectId: nu
     setCurrentStep(0);
   };
 
+  const value = { data, setData, currentStep, goNext, goBack, reset };
   return (
-    <WizardContext.Provider value={{ data, setData, currentStep, goNext, goBack, reset }}>
+    <WizardContext.Provider value={value}>
       {children}
     </WizardContext.Provider>
   );
@@ -56,3 +57,4 @@ export const useWizard = () => {
   if (!context) throw new Error('useWizard must be used within WizardProvider');
   return context;
 };
+

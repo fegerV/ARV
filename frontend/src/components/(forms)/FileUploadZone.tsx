@@ -26,7 +26,7 @@ export const FileUploadZone: React.FC<FileUploadZoneProps> = ({
   uploading
 }) => {
   const theme = useTheme();
-  const inputRef = useRef&lt;HTMLInputElement&gt;(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -36,7 +36,7 @@ export const FileUploadZone: React.FC<FileUploadZoneProps> = ({
     }
   }, [onFileSelect]);
 
-  const handleFileSelect = (e: React.ChangeEvent&lt;HTMLInputElement&gt;) => {
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
     if (selectedFile) {
       onFileSelect(selectedFile);
@@ -52,14 +52,14 @@ export const FileUploadZone: React.FC<FileUploadZoneProps> = ({
   };
 
   return (
-    &lt;Card
+    <Card
       sx={{
         border: 2,
         borderColor: 'divider',
         borderStyle: 'dashed',
         borderRadius: 2,
         transition: 'all 0.3s',
-        '&amp;:hover': {
+        '&:hover': {
           borderColor: 'primary.main',
           backgroundColor: 'action.hover'
         },
@@ -71,15 +71,15 @@ export const FileUploadZone: React.FC<FileUploadZoneProps> = ({
       }}
       onDrop={handleDrop}
       onDragOver={(e) => e.preventDefault()}
-    &gt;
+    >
       {uploading ? (
-        &lt;Box sx={{ textAlign: 'center' }}&gt;
-          &lt;CircularProgress size={48} /&gt;
-          &lt;Typography sx={{ mt: 2 }}&gt;Загрузка...&lt;/Typography&gt;
-        &lt;/Box&gt;
+        <Box sx={{ textAlign: 'center' }}>
+          <CircularProgress size={48} />
+          <Typography sx={{ mt: 2 }}>Загрузка...</Typography>
+        </Box>
       ) : file ? (
-        &lt;Box sx={{ textAlign: 'center', p: 2 }}&gt;
-          &lt;img
+        <Box sx={{ textAlign: 'center', p: 2 }}>
+          <img
             src={URL.createObjectURL(file)}
             alt="Preview"
             style={{
@@ -88,47 +88,47 @@ export const FileUploadZone: React.FC<FileUploadZoneProps> = ({
               objectFit: 'contain',
               borderRadius: 8
             }}
-          /&gt;
-          &lt;Typography variant="h6" sx={{ mt: 2 }}&gt;
+          />
+          <Typography variant="h6" sx={{ mt: 2 }}>
             {file.name}
-          &lt;/Typography&gt;
-          &lt;Typography variant="body2" color="text.secondary"&gt;
+          </Typography>
+          <Typography variant="body2" color="text.secondary">
             {formatBytes(file.size)} • {file.type}
-          &lt;/Typography&gt;
-          &lt;Button
+          </Typography>
+          <Button
             variant="outlined"
-            startIcon={&lt;Delete /&gt;}
+            startIcon={<Delete />}
             onClick={() => onFileSelect(null)}
             sx={{ mt: 2 }}
-          &gt;
+          >
             Удалить
-          &lt;/Button&gt;
-        &lt;/Box&gt;
+          </Button>
+        </Box>
       ) : (
-        &lt;CardContent sx={{ textAlign: 'center', p: 4 }}&gt;
-          &lt;CloudUpload sx={{ fontSize: 64, color: 'action.active', mb: 2 }} /&gt;
-          &lt;Typography variant="h6" gutterBottom&gt;
+        <CardContent sx={{ textAlign: 'center', p: 4 }}>
+          <CloudUpload sx={{ fontSize: 64, color: 'action.active', mb: 2 }} />
+          <Typography variant="h6" gutterBottom>
             {label}
-          &lt;/Typography&gt;
-          &lt;Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}&gt;
+          </Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
             Перетащите файл сюда или кликните для выбора
-          &lt;/Typography&gt;
-          &lt;Button
+          </Typography>
+          <Button
             variant="contained"
             component="label"
-            startIcon={&lt;Image /&gt;}
-          &gt;
+            startIcon={<Image />}
+          >
             Выбрать файл
-            &lt;input
+            <input
               ref={inputRef}
               type="file"
               accept={accept}
               hidden
               onChange={handleFileSelect}
-            /&gt;
-          &lt;/Button&gt;
-        &lt;/CardContent&gt;
+            />
+          </Button>
+        </CardContent>
       )}
-    &lt;/Card&gt;
+    </Card>
   );
 };
