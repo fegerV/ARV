@@ -62,29 +62,20 @@ class Settings(BaseSettings):
     STORAGE_TYPE: str = "local"  # local, minio, yandex_disk
     STORAGE_BASE_PATH: str = "/app/storage/content"
     
-    # MinIO
-    MINIO_ENDPOINT: str = "minio:9000"
-    MINIO_ACCESS_KEY: str = "minioadmin"
-    MINIO_SECRET_KEY: str = "minioadmin"
-    MINIO_BUCKET_NAME: str = "vertex-ar"
-    # Separate buckets (optional)
-    MINIO_BUCKET_VIDEOS: str = "ar-videos"
-    MINIO_BUCKET_MARKERS: str = "ar-markers"
-    MINIO_BUCKET_THUMBNAILS: str = "ar-thumbnails"
-    MINIO_SECURE: bool = False
-    
     # Yandex Disk
     YANDEX_OAUTH_CLIENT_ID: str = ""
     YANDEX_OAUTH_CLIENT_SECRET: str = ""
     YANDEX_OAUTH_REDIRECT_URI: str = "http://localhost:8000/api/oauth/yandex/callback"
     
-    # Email
-    SMTP_HOST: str = "smtp.gmail.com"
-    SMTP_PORT: int = 587
-    SMTP_USERNAME: str = ""
-    SMTP_PASSWORD: str = ""
-    SMTP_FROM_EMAIL: str = "noreply@vertexar.com"
-    SMTP_FROM_NAME: str = "Vertex AR Platform"
+    # Email configuration
+    MAIL_USERNAME: str = ""
+    MAIL_PASSWORD: str = ""
+    MAIL_FROM: str = ""
+    MAIL_FROM_NAME: str = "Vertex AR"
+    MAIL_SERVER: str = "smtp.yandex.ru"
+    MAIL_PORT: int = 465
+    MAIL_TLS: bool = False
+    MAIL_SSL: bool = True
     
     # Telegram
     TELEGRAM_BOT_TOKEN: str = ""

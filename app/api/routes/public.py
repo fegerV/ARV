@@ -3,6 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
 from app.core.database import get_db
+from app.core.errors import AppException
 from app.models.ar_content import ARContent
 from app.models.video import Video
 from app.services.video_scheduler import get_active_video
@@ -14,7 +15,11 @@ async def get_active_video_endpoint(unique_id: str, db: AsyncSession = Depends(g
     res = await db.execute(stmt)
     ac = res.scalar_one_or_none()
     if not ac or not ac.is_active:
-        raise HTTPException(status_code=404, detail="AR content not found or inactive")
+        raise AppException(
+            status_code=404,
+            detail="AR-контент не найден или не активен",
+            code="AR_CONTENT_NOT_FOUND",
+        )
 
     vid = await get_active_video(ac.id, db)
     if not vid:
@@ -35,7 +40,11 @@ async def get_public_ar_content(unique_id: str, db: AsyncSession = Depends(get_d
     res = await db.execute(stmt)
     ac = res.scalar_one_or_none()
     if not ac:
-        raise HTTPException(status_code=404, detail="AR content not found")
+        raise AppException(
+            status_code=404,
+            detail="AR-контент не найден",
+            code="AR_CONTENT_NOT_FOUND",
+        )
     active_video_url = None
     if ac.active_video_id:
         vid = await db.get(Video, ac.active_video_id)

@@ -1,39 +1,105 @@
-from datetime import datetime
-from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+"""
+Notification API routes for email notifications.
+"""
 
-from app.core.database import get_db
-from app.models.notification import Notification
-from app.tasks.notification_tasks import send_email_notification, send_telegram_notification
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
+from pydantic import BaseModel
+from typing import Dict, Any, List
+import structlog
 
-router = APIRouter()
+from app.services.email import send_template_email, EmailTemplate
+from app.core.errors import AppException
 
-
-@router.get("/notifications")
-async def list_notifications(limit: int = 50, db: AsyncSession = Depends(get_db)):
-    stmt = select(Notification).order_by(Notification.created_at.desc())
-    res = await db.execute(stmt)
-    items = res.scalars().all()[:limit]
-    return [
-        {
-            "id": n.id,
-            "company_id": n.company_id,
-            "project_id": n.project_id,
-            "ar_content_id": n.ar_content_id,
-            "type": n.notification_type,
-            "email_sent": n.email_sent,
-            "telegram_sent": n.telegram_sent,
-            "subject": n.subject,
-            "message": n.message,
-            "created_at": n.created_at.isoformat() if n.created_at else None,
-        }
-        for n in items
-    ]
+router = APIRouter(prefix="/api/notifications", tags=["notifications"])
+logger = structlog.get_logger()
 
 
-@router.post("/notifications/test")
-async def test_notification(email: str, chat_id: str):
-    send_email_notification.delay(email, "Test Email", "<p>Vertex AR test email</p>")
-    send_telegram_notification.delay(chat_id, "Vertex AR test message")
-    return {"status": "sent"}
+class EmailNotificationRequest(BaseModel):
+    """Request model for sending email notifications."""
+    template_id: str
+    recipients: List[str]
+    data: Dict[str, Any]
+
+
+class EmailNotificationResponse(BaseModel):
+    """Response model for email notification."""
+    status: str
+    message: str
+
+
+@router.post("/email", response_model=EmailNotificationResponse)
+async def send_email_notification(
+    request: EmailNotificationRequest,
+    background_tasks: BackgroundTasks
+):
+    """
+    Send email notification using template.
+    
+    This endpoint allows sending templated emails by specifying a template ID
+    and providing the required data for that template.
+    """
+    try:
+        # Validate template ID
+        template_meta = EmailTemplate.get_template_meta()
+        if request.template_id not in template_meta:
+            raise AppException(
+                status_code=400,
+                detail=f"Unknown template ID: {request.template_id}",
+                code="INVALID_TEMPLATE_ID"
+            )
+        
+        # Validate recipients
+        if not request.recipients:
+            raise AppException(
+                status_code=400,
+                detail="At least one recipient is required",
+                code="MISSING_RECIPIENTS"
+            )
+        
+        # Send email using template
+        await send_template_email(
+            background_tasks=background_tasks,
+            template_id=request.template_id,
+            recipients=request.recipients,
+            data=request.data
+        )
+        
+        logger.info(
+            "email_notification_sent",
+            template_id=request.template_id,
+            recipients=request.recipients
+        )
+        
+        return EmailNotificationResponse(
+            status="success",
+            message=f"Email queued for delivery to {len(request.recipients)} recipients"
+        )
+        
+    except AppException:
+        # Re-raise AppExceptions
+        raise
+    except Exception as e:
+        logger.error(
+            "email_notification_failed",
+            template_id=request.template_id,
+            recipients=request.recipients,
+            error=str(e)
+        )
+        raise AppException(
+            status_code=500,
+            detail="Failed to send email notification",
+            code="EMAIL_SEND_FAILED",
+            meta={"error": str(e)}
+        )
+
+
+@router.get("/email/templates")
+async def list_email_templates():
+    """
+    List available email templates.
+    
+    Returns metadata about all available email templates including
+    required variables and examples.
+    """
+    templates = EmailTemplate.get_template_meta()
+    return templates

@@ -37,6 +37,21 @@ class CompanyCreate(BaseModel):
     notes: Optional[str] = None
 
 
+class CompanyUpdate(BaseModel):
+    name: Optional[str] = None
+    contact_email: Optional[EmailStr] = None
+    contact_phone: Optional[str] = None
+    telegram_chat_id: Optional[str] = None
+    storage_connection_id: Optional[int] = None
+    storage_path: Optional[str] = None
+    subscription_tier: Optional[str] = None
+    subscription_expires_at: Optional[datetime] = None
+    storage_quota_gb: Optional[int] = None
+    projects_limit: Optional[int] = None
+    is_active: Optional[bool] = None
+    notes: Optional[str] = None
+
+
 class CompanyResponse(BaseModel):
     id: int
     name: str

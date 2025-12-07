@@ -65,15 +65,17 @@ vertex-ar/
 - **AR Engine**: Mind AR 1.2.5, Three.js 0.158
 - **Storage**: Local/MinIO/Yandex Disk
 - **Monitoring**: Prometheus, Grafana, Sentry
+- **Notifications**: Email (SMTP), Telegram
 
 ## 📚 Документация
 
 - [Архитектура системы](docs/01-architecture.md)
-- [API Reference](docs/02-api-reference.md)
+- [Миграции БД](docs/02-migrations.md)
 - [Deployment](docs/03-deployment.md)
 - [Monitoring](docs/04-monitoring.md)
 - [Backup & Recovery](docs/05-backup-recovery.md)
-- [Developer Onboarding](docs/06-onboarding.md)
+- [Email Notifications Setup](EMAIL_SETUP.md)
+- [Email Notifications Summary](EMAIL_NOTIFICATIONS_SUMMARY.md)
 
 ## 🔧 Разработка
 
@@ -125,8 +127,17 @@ SECRET_KEY=your-super-secret-key-change-in-production
 # Storage
 STORAGE_TYPE=local  # local, minio, yandex_disk
 
-# Notifications
-SMTP_HOST=smtp.gmail.com
+# Email Notifications
+MAIL_USERNAME=your_smtp_username
+MAIL_PASSWORD=your_smtp_password
+MAIL_FROM=noreply@yourdomain.com
+MAIL_FROM_NAME="Vertex AR Platform"
+MAIL_SERVER=smtp.yandex.ru
+MAIL_PORT=465
+MAIL_TLS=False
+MAIL_SSL=True
+
+# Telegram Notifications
 TELEGRAM_BOT_TOKEN=your-bot-token
 ```
 
@@ -138,6 +149,7 @@ TELEGRAM_BOT_TOKEN=your-bot-token
 - [x] Local storage
 - [x] Health check endpoints
 - [x] Structured logging
+- [x] Email notification system
 
 ## 📝 License
 

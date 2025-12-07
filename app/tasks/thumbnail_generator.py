@@ -12,14 +12,17 @@ from typing import Dict
 
 import ffmpeg
 import structlog
-from celery import shared_task
+from celery import Celery
 from PIL import Image
+import io
+from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import settings
 from app.core.database import AsyncSessionLocal
-from app.models.ar_content import ARContent
 from app.models.company import Company
 from app.models.video import Video
-from app.services.storage.factory import get_provider
+from app.models.storage import StorageConnection
+from app.services.storage.factory import StorageProviderFactory
 
 logger = structlog.get_logger()
 
@@ -32,233 +35,297 @@ THUMBNAIL_SIZES = {
 }
 
 
-@shared_task(bind=True, max_retries=3, default_retry_delay=60)
+celery_app = Celery(
+    "app.tasks.thumbnail_generator",
+    broker=settings.CELERY_BROKER_URL,
+    backend=settings.CELERY_RESULT_BACKEND,
+)
+
+
+@celery_app.task(bind=True, name="app.tasks.thumbnail_generator.generate_video_thumbnail")
 def generate_video_thumbnail(self, video_id: int):
-    """
-    Генерация превью из середины видео (WebP формат).
-    
-    Args:
-        video_id: ID видео из таблицы videos
-        
-    Returns:
-        dict: Словарь с URL превью разных размеров
-        
-    Raises:
-        ValueError: Если видео не найдено
-        ffmpeg.Error: Если FFmpeg не может обработать видео
-    """
-    async def task_logic():
+    """Generate thumbnail for a video."""
+    async def _generate():
         async with AsyncSessionLocal() as db:
-            video = await db.get(Video, video_id)
-            if not video:
-                raise ValueError(f"Video {video_id} not found")
-            
-            # Получаем AR контент и компанию
-            ar_content = await db.get(ARContent, video.ar_content_id)
-            if not ar_content:
-                raise ValueError(f"AR Content {video.ar_content_id} not found")
-                
-            company = await db.get(Company, ar_content.company_id)
-            if not company:
-                raise ValueError(f"Company {ar_content.company_id} not found")
-            
-            provider = get_provider(company.storage_connection)
-            
-            # Создаём временную директорию
-            temp_dir = Path(tempfile.mkdtemp())
-            input_video = temp_dir / "input.mp4"
-            output_frame = temp_dir / "frame.png"
-            
             try:
-                logger.info("Starting video thumbnail generation", video_id=video_id)
+                # Get video
+                video = await db.get(Video, video_id)
+                if not video:
+                    raise ValueError(f"Video {video_id} not found")
                 
-                # Скачиваем видео из хранилища
-                await provider.download_file(video.video_path, str(input_video))
+                # Get company and storage connection
+                company = await db.get(Company, video.company_id)
+                if not company or not company.storage_connection_id:
+                    raise ValueError(f"Company {video.company_id} not found or has no storage connection")
                 
-                # Получаем длительность видео через FFmpeg probe
-                probe = ffmpeg.probe(str(input_video))
-                duration = float(probe['format']['duration'])
-                middle_time = duration / 2.0  # Берём кадр из середины
+                storage_conn = await db.get(StorageConnection, company.storage_connection_id)
+                if not storage_conn:
+                    raise ValueError(f"Storage connection {company.storage_connection_id} not found")
                 
-                logger.info("Extracting frame from video", 
-                           video_id=video_id, 
-                           duration=duration,
-                           middle_time=middle_time)
+                # Create provider
+                try:
+                    provider = StorageProviderFactory.create_provider(
+                        storage_conn.provider,
+                        storage_conn.metadata or {}
+                    )
+                except Exception as e:
+                    logger.error(
+                        "storage_provider_creation_failed",
+                        company_id=company.id,
+                        provider=storage_conn.provider,
+                        error=str(e)
+                    )
+                    raise
                 
-                # Извлекаем кадр из середины видео
-                (
-                    ffmpeg
-                    .input(str(input_video), ss=middle_time)
-                    .filter('scale', 1920, -1)  # 1920px ширина, авто высота
-                    .output(str(output_frame), vframes=1)
-                    .overwrite_output()
-                    .run(capture_stdout=True, capture_stderr=True)
-                )
-                
-                # Генерируем превью разных размеров в WebP
-                thumbnails = {}
-                for size_name, (width, height) in THUMBNAIL_SIZES.items():
-                    thumbnail_path = temp_dir / f"thumbnail_{size_name}.webp"
+                # Generate thumbnail
+                try:
+                    logger.info("Starting video thumbnail generation", video_id=video_id)
                     
-                    # Resize + конвертация в WebP с оптимизацией
-                    with Image.open(output_frame) as img:
-                        # Создаём копию в RGB (WebP требует RGB)
-                        if img.mode in ('RGBA', 'LA', 'P'):
-                            background = Image.new('RGB', img.size, (255, 255, 255))
-                            if img.mode == 'P':
-                                img = img.convert('RGBA')
-                            background.paste(img, mask=img.split()[-1] if img.mode == 'RGBA' else None)
-                            img = background
-                        
-                        # Resize с сохранением пропорций
-                        img.thumbnail((width, height), Image.Resampling.LANCZOS)
-                        
-                        # Сохраняем в WebP с оптимизацией
-                        img.save(thumbnail_path, 'WEBP', quality=85, method=6)
+                    # Download video from storage
+                    video_data = await provider.download_file(video.video_path)
+                    input_video = io.BytesIO(video_data)
                     
-                    # Загружаем в хранилище компании
-                    storage_path = f"thumbnails/videos/{video.id}/{uuid.uuid4()}_{size_name}.webp"
-                    thumbnail_url = await provider.upload_file(
-                        str(thumbnail_path),
-                        storage_path,
-                        content_type='image/webp'
+                    # Get video duration using FFmpeg probe
+                    probe = ffmpeg.probe(input_video)
+                    duration = float(probe['format']['duration'])
+                    middle_time = duration / 2.0  # Take frame from middle
+                    
+                    logger.info("Extracting frame from video", 
+                               video_id=video_id, 
+                               duration=duration,
+                               middle_time=middle_time)
+                    
+                    # Extract frame from middle of video
+                    (
+                        ffmpeg
+                        .input(input_video, ss=middle_time)
+                        .filter('scale', 1920, -1)  # 1920px width, auto height
+                        .output('pipe:', vframes=1, format='rawvideo', pix_fmt='rgb24')
+                        .overwrite_output()
+                        .run(capture_stdout=True, capture_stderr=True)
                     )
                     
-                    thumbnails[size_name] = thumbnail_url
-                    logger.info("Generated thumbnail", 
+                    # Generate thumbnails in different sizes in WebP
+                    thumbnails = {}
+                    for size_name, (width, height) in THUMBNAIL_SIZES.items():
+                        thumbnail_path = temp_dir / f"thumbnail_{size_name}.webp"
+                        
+                        # Resize + convert to WebP with optimization
+                        img = Image.frombytes('RGB', (1920, 1080), output_frame)
+                        
+                        # Resize while maintaining aspect ratio
+                        img.thumbnail((width, height), Image.Resampling.LANCZOS)
+                        
+                        # Save as WebP with optimization
+                        img.save(thumbnail_path, 'WEBP', quality=85, method=6)
+                    
+                        # Upload to company storage
+                        storage_path = f"thumbnails/videos/{video.id}/{uuid.uuid4()}_{size_name}.webp"
+                        thumbnail_url = await provider.upload_file(
+                            str(thumbnail_path),
+                            storage_path,
+                            content_type='image/webp'
+                        )
+                        
+                        thumbnails[size_name] = thumbnail_url
+                        logger.info("Generated thumbnail", 
+                                   video_id=video_id, 
+                                   size=size_name, 
+                                   url=thumbnail_url)
+                    
+                    # Update video record
+                    video.thumbnail_url = thumbnails['medium']
+                    video.thumbnail_small_url = thumbnails.get('small')
+                    video.thumbnail_large_url = thumbnails.get('large')
+                    await db.commit()
+                    
+                    logger.info("Video thumbnails generated successfully", 
                                video_id=video_id, 
-                               size=size_name, 
-                               url=thumbnail_url)
-                
-                # Обновляем запись видео
-                video.thumbnail_url = thumbnails['medium']
-                video.thumbnail_small_url = thumbnails.get('small')
-                video.thumbnail_large_url = thumbnails.get('large')
-                await db.commit()
-                
-                logger.info("Video thumbnails generated successfully", 
-                           video_id=video_id, 
-                           thumbnails=thumbnails)
-                return thumbnails
-                
-            except ffmpeg.Error as e:
-                error_msg = e.stderr.decode() if e.stderr else str(e)
-                logger.error("FFmpeg error during thumbnail generation", 
-                            video_id=video_id, 
-                            error=error_msg)
-                raise
+                               thumbnails=thumbnails)
+                    return thumbnails
+                    
+                except ffmpeg.Error as e:
+                    error_msg = e.stderr.decode() if e.stderr else str(e)
+                    logger.error("FFmpeg error during thumbnail generation", 
+                                video_id=video_id, 
+                                error=error_msg)
+                    raise
+                except Exception as e:
+                    logger.error("Unexpected error during thumbnail generation", 
+                                video_id=video_id, 
+                                error=str(e))
+                    raise
+                finally:
+                    # Clean up temporary files
+                    shutil.rmtree(temp_dir, ignore_errors=True)
+                    
             except Exception as e:
-                logger.error("Unexpected error during thumbnail generation", 
-                            video_id=video_id, 
-                            error=str(e))
-                raise
-            finally:
-                # Очистка временных файлов
-                shutil.rmtree(temp_dir, ignore_errors=True)
-    
-    # Запуск async кода внутри Celery (sync context)
+                logger.error("thumbnail_generation_failed", video_id=video_id, error=str(e))
+                raise self.retry(exc=e, countdown=60 * 2 ** self.request.retries)
+                
+    # Run async function
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
     try:
-        return loop.run_until_complete(task_logic())
-    except Exception as exc:
-        logger.error("Retrying thumbnail generation", video_id=video_id, attempt=self.request.retries)
-        self.retry(exc=exc, countdown=60)
+        return loop.run_until_complete(_generate())
     finally:
         loop.close()
 
 
-@shared_task(bind=True, max_retries=3, default_retry_delay=60)
+@celery_app.task(bind=True, name="app.tasks.thumbnail_generator.generate_image_thumbnail")
 def generate_image_thumbnail(self, ar_content_id: int):
-    """
-    Генерация превью для портрета/изображения (WebP формат).
-    
-    Args:
-        ar_content_id: ID AR контента из таблицы ar_content
-        
-    Returns:
-        dict: Словарь с URL превью разных размеров
-        
-    Raises:
-        ValueError: Если AR контент не найден
-    """
-    async def task_logic():
+    """Generate thumbnail for an image."""
+    async def _generate():
         async with AsyncSessionLocal() as db:
-            ar_content = await db.get(ARContent, ar_content_id)
-            if not ar_content:
-                raise ValueError(f"AR Content {ar_content_id} not found")
-            
-            company = await db.get(Company, ar_content.company_id)
-            if not company:
-                raise ValueError(f"Company {ar_content.company_id} not found")
-                
-            provider = get_provider(company.storage_connection)
-            
-            temp_dir = Path(tempfile.mkdtemp())
-            input_image = temp_dir / "portrait.jpg"
-            
             try:
-                logger.info("Starting image thumbnail generation", ar_content_id=ar_content_id)
+                # Get AR content
+                ar_content = await db.get(ARContent, ar_content_id)
+                if not ar_content:
+                    raise ValueError(f"AR Content {ar_content_id} not found")
                 
-                # Скачиваем оригинал из хранилища
-                await provider.download_file(ar_content.image_path, str(input_image))
+                # Get company and storage connection
+                company = await db.get(Company, ar_content.company_id)
+                if not company or not company.storage_connection_id:
+                    raise ValueError(f"Company {ar_content.company_id} not found or has no storage connection")
                 
-                thumbnails = {}
-                for size_name, (width, height) in THUMBNAIL_SIZES.items():
-                    thumbnail_path = temp_dir / f"thumbnail_{size_name}.webp"
-                    
-                    with Image.open(input_image) as img:
-                        # Конвертация в RGB если нужно
-                        if img.mode in ('RGBA', 'LA', 'P'):
-                            background = Image.new('RGB', img.size, (255, 255, 255))
-                            if img.mode == 'P':
-                                img = img.convert('RGBA')
-                            background.paste(img, mask=img.split()[-1] if img.mode == 'RGBA' else None)
-                            img = background
-                        
-                        # Сохраняем пропорции + обрезка по центру
-                        img.thumbnail((width, height), Image.Resampling.LANCZOS)
-                        
-                        # Конвертация в WebP
-                        img.save(thumbnail_path, 'WEBP', quality=85, method=6)
-                    
-                    # Загружаем в хранилище компании
-                    storage_path = f"thumbnails/portraits/{ar_content.id}/{uuid.uuid4()}_{size_name}.webp"
-                    thumbnail_url = await provider.upload_file(
-                        str(thumbnail_path),
-                        storage_path,
-                        content_type='image/webp'
+                storage_conn = await db.get(StorageConnection, company.storage_connection_id)
+                if not storage_conn:
+                    raise ValueError(f"Storage connection {company.storage_connection_id} not found")
+                
+                # Create provider
+                try:
+                    provider = StorageProviderFactory.create_provider(
+                        storage_conn.provider,
+                        storage_conn.metadata or {}
                     )
+                except Exception as e:
+                    logger.error(
+                        "storage_provider_creation_failed",
+                        company_id=company.id,
+                        provider=storage_conn.provider,
+                        error=str(e)
+                    )
+                    raise
+                
+                # Generate thumbnail
+                try:
+                    logger.info("Starting image thumbnail generation", ar_content_id=ar_content_id)
                     
-                    thumbnails[size_name] = thumbnail_url
-                    logger.info("Generated thumbnail", 
+                    # Download original from storage
+                    image_data = await provider.download_file(ar_content.image_path)
+                    input_image = io.BytesIO(image_data)
+                    
+                    thumbnails = {}
+                    for size_name, (width, height) in THUMBNAIL_SIZES.items():
+                        thumbnail_path = temp_dir / f"thumbnail_{size_name}.webp"
+                        
+                        with Image.open(input_image) as img:
+                            # Convert to RGB if needed
+                            if img.mode in ('RGBA', 'LA', 'P'):
+                                background = Image.new('RGB', img.size, (255, 255, 255))
+                                if img.mode == 'P':
+                                    img = img.convert('RGBA')
+                                background.paste(img, mask=img.split()[-1] if img.mode == 'RGBA' else None)
+                                img = background
+                            
+                            # Maintain aspect ratio + center crop
+                            img.thumbnail((width, height), Image.Resampling.LANCZOS)
+                            
+                            # Convert to WebP
+                            img.save(thumbnail_path, 'WEBP', quality=85, method=6)
+                        
+                        # Upload to company storage
+                        storage_path = f"thumbnails/portraits/{ar_content.id}/{uuid.uuid4()}_{size_name}.webp"
+                        thumbnail_url = await provider.upload_file(
+                            str(thumbnail_path),
+                            storage_path,
+                            content_type='image/webp'
+                        )
+                        
+                        thumbnails[size_name] = thumbnail_url
+                        logger.info("Generated thumbnail", 
+                                   ar_content_id=ar_content_id, 
+                                   size=size_name, 
+                                   url=thumbnail_url)
+                    
+                    # Update AR content record
+                    ar_content.thumbnail_url = thumbnails['medium']
+                    await db.commit()
+                    
+                    logger.info("Image thumbnails generated successfully", 
                                ar_content_id=ar_content_id, 
-                               size=size_name, 
-                               url=thumbnail_url)
-                
-                # Обновляем запись AR контента
-                ar_content.thumbnail_url = thumbnails['medium']
-                await db.commit()
-                
-                logger.info("Image thumbnails generated successfully", 
-                           ar_content_id=ar_content_id, 
-                           thumbnails=thumbnails)
-                return thumbnails
-                
+                               thumbnails=thumbnails)
+                    return thumbnails
+                    
+                except Exception as e:
+                    logger.error("Error during image thumbnail generation", 
+                                ar_content_id=ar_content_id, 
+                                error=str(e))
+                    raise
+                finally:
+                    shutil.rmtree(temp_dir, ignore_errors=True)
+                    
             except Exception as e:
-                logger.error("Error during image thumbnail generation", 
-                            ar_content_id=ar_content_id, 
-                            error=str(e))
-                raise
-            finally:
-                shutil.rmtree(temp_dir, ignore_errors=True)
-    
+                logger.error("thumbnail_generation_failed", ar_content_id=ar_content_id, error=str(e))
+                raise self.retry(exc=e, countdown=60 * 2 ** self.request.retries)
+                
+    # Run async function
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
     try:
-        return loop.run_until_complete(task_logic())
-    except Exception as exc:
-        logger.error("Retrying thumbnail generation", ar_content_id=ar_content_id, attempt=self.request.retries)
-        self.retry(exc=exc, countdown=60)
+        return loop.run_until_complete(_generate())
+    finally:
+        loop.close()
+
+
+@celery_app.task(bind=True, name="app.tasks.thumbnail_generator.batch_generate_thumbnails")
+def batch_generate_thumbnails(self, company_id: int):
+    """Generate thumbnails for all videos of a company."""
+    async def _generate():
+        async with AsyncSessionLocal() as db:
+            try:
+                # Get company and storage connection
+                company = await db.get(Company, company_id)
+                if not company or not company.storage_connection_id:
+                    raise ValueError(f"Company {company_id} not found or has no storage connection")
+                
+                storage_conn = await db.get(StorageConnection, company.storage_connection_id)
+                if not storage_conn:
+                    raise ValueError(f"Storage connection {company.storage_connection_id} not found")
+                
+                # Create provider
+                try:
+                    provider = StorageProviderFactory.create_provider(
+                        storage_conn.provider,
+                        storage_conn.metadata or {}
+                    )
+                except Exception as e:
+                    logger.error(
+                        "storage_provider_creation_failed",
+                        company_id=company.id,
+                        provider=storage_conn.provider,
+                        error=str(e)
+                    )
+                    raise
+                
+                # Generate thumbnails for all videos
+                videos = await db.scalars(
+                    select(Video).where(Video.company_id == company_id)
+                ).all()
+                for video in videos:
+                    if not video.thumbnail_url:
+                        generate_video_thumbnail.delay(video.id)
+                
+                logger.info("Batch thumbnail generation initiated", company_id=company_id)
+                    
+            except Exception as e:
+                logger.error("batch_thumbnail_generation_failed", company_id=company_id, error=str(e))
+                raise self.retry(exc=e, countdown=60 * 2 ** self.request.retries)
+                
+    # Run async function
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    try:
+        return loop.run_until_complete(_generate())
     finally:
         loop.close()

@@ -2,6 +2,7 @@ from typing import Optional, List
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from datetime import datetime
 
 from app.core.database import get_db
 from app.models.video_rotation_schedule import VideoRotationSchedule
@@ -11,6 +12,7 @@ router = APIRouter()
 
 @router.post("/ar-content/{content_id}/rotation")
 async def set_rotation(content_id: int, payload: dict, db: AsyncSession = Depends(get_db)):
+    """Create a new rotation schedule for AR content."""
     sched = VideoRotationSchedule(
         ar_content_id=content_id,
         rotation_type=payload.get("rotation_type", "daily"),
@@ -29,20 +31,54 @@ async def set_rotation(content_id: int, payload: dict, db: AsyncSession = Depend
     return {"id": sched.id}
 
 
-@router.put("/rotation/{schedule_id}")
-async def update_rotation(schedule_id: int, payload: dict, db: AsyncSession = Depends(get_db)):
+@router.get("/rotation/{schedule_id}")
+async def get_rotation(schedule_id: int, db: AsyncSession = Depends(get_db)):
+    """Get rotation schedule details by ID."""
     sched = await db.get(VideoRotationSchedule, schedule_id)
     if not sched:
         raise HTTPException(status_code=404, detail="Rotation schedule not found")
+    return {
+        "id": sched.id,
+        "ar_content_id": sched.ar_content_id,
+        "rotation_type": sched.rotation_type,
+        "time_of_day": sched.time_of_day.isoformat() if sched.time_of_day else None,
+        "day_of_week": sched.day_of_week,
+        "day_of_month": sched.day_of_month,
+        "cron_expression": sched.cron_expression,
+        "video_sequence": sched.video_sequence,
+        "current_index": sched.current_index,
+        "is_active": sched.is_active,
+        "last_rotation_at": sched.last_rotation_at.isoformat() if sched.last_rotation_at else None,
+        "next_rotation_at": sched.next_rotation_at.isoformat() if sched.next_rotation_at else None,
+        "created_at": sched.created_at.isoformat() if sched.created_at else None,
+    }
+
+
+@router.put("/rotation/{schedule_id}")
+async def update_rotation(schedule_id: int, payload: dict, db: AsyncSession = Depends(get_db)):
+    """Update rotation schedule details."""
+    sched = await db.get(VideoRotationSchedule, schedule_id)
+    if not sched:
+        raise HTTPException(status_code=404, detail="Rotation schedule not found")
+    
+    # Update allowed fields
+    allowed_fields = {
+        "rotation_type", "time_of_day", "day_of_week", "day_of_month", 
+        "cron_expression", "video_sequence", "current_index", "is_active",
+        "last_rotation_at", "next_rotation_at"
+    }
+    
     for k, v in payload.items():
-        if hasattr(sched, k):
+        if k in allowed_fields and hasattr(sched, k):
             setattr(sched, k, v)
+    
     await db.commit()
     return {"status": "updated"}
 
 
 @router.delete("/rotation/{schedule_id}")
 async def delete_rotation(schedule_id: int, db: AsyncSession = Depends(get_db)):
+    """Delete a rotation schedule."""
     sched = await db.get(VideoRotationSchedule, schedule_id)
     if not sched:
         raise HTTPException(status_code=404, detail="Rotation schedule not found")

@@ -1,0 +1,1 @@
+export { default as ARContentDetailPage } from './ARContentDetailPage';

@@ -1,17 +1,15 @@
 import asyncio
 from pathlib import Path
-from typing import Optional
+import asyncio
+import subprocess
 import structlog
-
 from app.core.config import settings
-from app.core.storage import minio_client
+from app.core.storage import storage_provider
 
-
-logger = structlog.get_logger()
-
+log = structlog.get_logger()
 
 class MindARMarkerService:
-    """Сервис генерации Mind AR маркеров"""
+    """Сервис для генерации MindAR маркеров."""
 
     async def generate_marker(
         self,
@@ -70,14 +68,24 @@ class MindARMarkerService:
             if not output_file.exists():
                 raise FileNotFoundError(f"Marker file not created: {output_file}")
 
-            # Загружаем в MinIO
-            bucket = getattr(settings, "MINIO_BUCKET_MARKERS", settings.MINIO_BUCKET_NAME)
-            marker_url = minio_client.upload_file(
-                file_path=str(output_file),
-                bucket=bucket,
-                object_name=f"{portrait_id}/targets.mind",
-                content_type="application/octet-stream",
-            )
+            # Загружаем в хранилище или используем локальный путь
+            marker_url = None
+            if storage_provider:
+                # Если провайдер хранения доступен, загружаем туда
+                marker_url = await storage_provider.upload_file(
+                    local_path=str(output_file),
+                    remote_path=f"markers/{portrait_id}/targets.mind",
+                    content_type="application/octet-stream",
+                )
+            else:
+                # Если провайдер хранения недоступен, используем локальный путь
+                marker_url = f"/storage/content/markers/{portrait_id}/targets.mind"
+                # Убедимся, что директория существует
+                marker_path = Path(settings.STORAGE_BASE_PATH) / "markers" / str(portrait_id)
+                marker_path.mkdir(parents=True, exist_ok=True)
+                # Копируем файл в нужное место
+                import shutil
+                shutil.copy2(output_file, marker_path / "targets.mind")
 
             # Получаем метаданные маркера
             metadata = await self._extract_marker_metadata(output_file)

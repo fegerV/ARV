@@ -1,7 +1,7 @@
 """Add missing fields for videos, ar_content, storage_folders
 
 Revision ID: 20251205_add_missing_fields
-Revises: 20251205_perf_idx
+Revises: 0015_create_demo_data
 Create Date: 2025-12-05
 """
 from alembic import op
@@ -10,7 +10,7 @@ from sqlalchemy.dialects.postgresql import JSONB
 
 # revision identifiers, used by Alembic.
 revision = '20251205_add_missing_fields'
-down_revision = '20251205_perf_idx'
+down_revision = '0015_create_demo_data'
 branch_labels = None
 depends_on = None
 

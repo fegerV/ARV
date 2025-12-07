@@ -1,5 +1,6 @@
-from sqlalchemy import Column, Integer, String, Text, DateTime
+from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey
 from sqlalchemy.dialects.postgresql import JSONB, ARRAY
+from sqlalchemy.orm import relationship
 from datetime import datetime
 from app.core.database import Base
 
@@ -8,7 +9,7 @@ class Project(Base):
     __tablename__ = "projects"
 
     id = Column(Integer, primary_key=True)
-    company_id = Column(Integer, nullable=False)
+    company_id = Column(Integer, ForeignKey("companies.id"), nullable=False)
 
     name = Column(String(255), nullable=False)
     slug = Column(String(255), nullable=False)
@@ -32,3 +33,6 @@ class Project(Base):
 
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    # Отношения
+    ar_contents = relationship("ARContent", back_populates="project")

@@ -350,7 +350,7 @@ export default function Login() {
         {/* Footer */}
         <Box sx={{ mt: 4, pt: 3, borderTop: 1, borderColor: 'divider' }}>
           <Typography variant="caption" color="text.secondary" align="center" display="block">
-            © 2025 Vertex AR. Все права защищены.
+            © 2025 Vertex AR. Все права защищены. Version: 1.5.0
           </Typography>
           <Typography variant="caption" color="text.secondary" align="center" display="block" sx={{ mt: 0.5 }}>
             <MuiLink href="/privacy" underline="hover" color="inherit">

@@ -1,4 +1,5 @@
-from sqlalchemy import Column, Integer, String, Float, Boolean, DateTime
+from sqlalchemy import Column, Integer, String, Float, Boolean, DateTime, ForeignKey
+from sqlalchemy.orm import relationship
 from app.core.database import Base
 
 
@@ -6,7 +7,7 @@ class Video(Base):
     __tablename__ = "videos"
 
     id = Column(Integer, primary_key=True)
-    ar_content_id = Column(Integer, nullable=False)
+    ar_content_id = Column(Integer, ForeignKey("ar_content.id"), nullable=False)
 
     video_path = Column(String(500), nullable=False)
     video_url = Column(String(500))
@@ -32,3 +33,6 @@ class Video(Base):
 
     created_at = Column(DateTime)
     updated_at = Column(DateTime)
+
+    # Отношения
+    ar_content = relationship("ARContent", back_populates="videos")

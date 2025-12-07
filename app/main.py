@@ -11,6 +11,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.exceptions import RequestValidationError
 from prometheus_client import Summary
 from starlette.exceptions import HTTPException as StarletteHTTPException
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
 
 from app.core.config import settings
 from app.core.database import init_db, close_db, seed_defaults
@@ -81,6 +84,9 @@ async def lifespan(app: FastAPI) -> AsyncGenerator:
 # Configure logging before creating app
 configure_logging()
 
+# Initialize rate limiter
+limiter = Limiter(key_func=get_remote_address)
+
 # Create FastAPI application
 app = FastAPI(
     title="Vertex AR B2B Platform",
@@ -91,6 +97,10 @@ app = FastAPI(
     openapi_url="/openapi.json",
     lifespan=lifespan,
 )
+
+# Add rate limiter middleware
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 # Jinja2 templates
 templates = Jinja2Templates(directory="templates")
@@ -105,108 +115,20 @@ app.add_middleware(
 )
 
 
-# Request logging middleware
-REQUEST_DURATION = Summary('api_request_duration_seconds', 'API request duration seconds', ['method','path'])
+# Enhanced logging middleware with request ID, user ID, and company ID
+from app.core.logging_middleware import logging_middleware as enhanced_logging_middleware
+
 @app.middleware("http")
 async def logging_middleware(request: Request, call_next):
-    """Log all HTTP requests with structured logging."""
-    logger = structlog.get_logger()
-    
-    start_time = datetime.utcnow()
-    
-    # Log request
-    logger.info(
-        "http_request_started",
-        method=request.method,
-        path=request.url.path,
-        client_host=request.client.host if request.client else None,
-    )
-    
-    # Process request
-    response = await call_next(request)
-    
-    # Calculate duration
-    duration = (datetime.utcnow() - start_time).total_seconds()
-    REQUEST_DURATION.labels(request.method, request.url.path).observe(duration)
-    
-    # Log response
-    logger.info(
-        "http_request_completed",
-        method=request.method,
-        path=request.url.path,
-        status_code=response.status_code,
-        duration_seconds=duration,
-    )
-    
-    return response
+    """Enhanced logging middleware with structured logging and request tracking."""
+    return await enhanced_logging_middleware(request, call_next)
 
 
 # Exception handlers
-@app.exception_handler(StarletteHTTPException)
-async def http_exception_handler(request: Request, exc: StarletteHTTPException):
-    """Handle HTTP exceptions."""
-    logger = structlog.get_logger()
-    logger.warning(
-        "http_exception",
-        status_code=exc.status_code,
-        detail=exc.detail,
-        path=request.url.path,
-    )
-    return JSONResponse(
-        status_code=exc.status_code,
-        content={
-            "error": {
-                "code": exc.status_code,
-                "message": exc.detail,
-                "timestamp": datetime.utcnow().isoformat(),
-            }
-        },
-    )
+from app.core.errors import setup_exception_handlers
 
-
-@app.exception_handler(RequestValidationError)
-async def validation_exception_handler(request: Request, exc: RequestValidationError):
-    """Handle request validation errors."""
-    logger = structlog.get_logger()
-    logger.warning(
-        "validation_error",
-        errors=exc.errors(),
-        path=request.url.path,
-    )
-    return JSONResponse(
-        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-        content={
-            "error": {
-                "code": 422,
-                "message": "Validation error",
-                "details": exc.errors(),
-                "timestamp": datetime.utcnow().isoformat(),
-            }
-        },
-    )
-
-
-@app.exception_handler(Exception)
-async def general_exception_handler(request: Request, exc: Exception):
-    """Handle all other exceptions."""
-    logger = structlog.get_logger()
-    logger.error(
-        "unhandled_exception",
-        error=str(exc),
-        error_type=type(exc).__name__,
-        path=request.url.path,
-        exc_info=True,
-    )
-    return JSONResponse(
-        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-        content={
-            "error": {
-                "code": 500,
-                "message": "Internal server error" if not settings.DEBUG else str(exc),
-                "timestamp": datetime.utcnow().isoformat(),
-            }
-        },
-    )
+# Setup exception handlers
+setup_exception_handlers(app)
 
 
 # Health check endpoints

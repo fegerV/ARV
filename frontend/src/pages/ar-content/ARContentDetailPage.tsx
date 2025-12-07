@@ -17,10 +17,13 @@ import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import { AppLayout } from '@/components/(layout)/AppLayout';
 import { PageHeader } from '@/components/(layout)/PageHeader';
-import { MarkerStatusBadge } from '@/components/(media)/MarkerStatus';
+import { MarkerStatusBadge } from '@/components/(media)/MarkerStatusBadge';
 import { QRCodeCard } from '@/components/(media)/QRCodeCard';
-import { VideoPreview } from '@/components/(media)/VideoPreview';
 import { Lightbox } from '@/components/(media)/Lightbox';
+import { ErrorState } from '@/components/common/ErrorState';
+import { LoadingState } from '@/components/common/LoadingState';
+import { VideoListVirtualized } from '@/components/(media)/VideoListVirtualized';
+import { LazyImage } from '@/components/(media)/LazyImage';
 import { arContentApi } from '@/services/ar-content';
 import { ARContentDetail } from '@/types/ar-content-detail';
 
@@ -30,11 +33,11 @@ const ARContentDetailPage = () => {
   const [portraitOpen, setPortraitOpen] = useState(false);
   const [videoLightbox, setVideoLightbox] = useState<number | null>(null);
 
-  const { data, isLoading } = useQuery(
-    ['ar-content', id],
-    () => arContentApi.get(Number(id)),
-    { enabled: !!id }
-  );
+  const { data, isLoading, isError, refetch, error } = useQuery({
+    queryKey: ['ar-content', id],
+    queryFn: () => arContentApi.get(Number(id)),
+    enabled: !!id
+  });
 
   const content: ARContentDetail | undefined = data?.data;
   const publicUrl = content
@@ -45,7 +48,22 @@ const ARContentDetailPage = () => {
     return (
       <AppLayout>
         <Container maxWidth="lg">
-          <PageHeader title="Загрузка заказа..." backUrl="/projects" />
+          <PageHeader title="Загрузка заказа..." breadcrumbs={[{ label: 'Проекты', href: '/projects' }]} />
+          <LoadingState message="Загрузка деталей заказа..." />
+        </Container>
+      </AppLayout>
+    );
+  }
+
+  if (isError) {
+    return (
+      <AppLayout>
+        <Container maxWidth="lg">
+          <PageHeader title="Заказ AR‑контента" breadcrumbs={[{ label: 'Проекты', href: '/projects' }]} />
+          <ErrorState
+            message={(error as any)?.response?.data?.detail}
+            onRetry={() => refetch()}
+          />
         </Container>
       </AppLayout>
     );
@@ -57,18 +75,7 @@ const ARContentDetailPage = () => {
         <PageHeader
           title={content.title}
           subtitle={`Компания: ${content.company_name} • Проект: ${content.project_name}`}
-          backUrl={`/projects/${content.project_id}/content`}
-          actions={[
-            {
-              label: 'Открыть AR',
-              icon: OpenInNewIcon,
-              onClick: () => window.open(publicUrl, '_blank'),
-            },
-            {
-              label: 'Редактировать',
-              onClick: () => navigate(`/ar-content/${content.id}/edit`),
-            },
-          ]}
+          breadcrumbs={[{ label: 'Проекты', href: `/projects/${content.project_id}/content` }]}
         />
 
         <Grid container spacing={3}>
@@ -87,10 +94,10 @@ const ARContentDetailPage = () => {
                 }}
                 onClick={() => setPortraitOpen(true)}
               >
-                <img
+                <LazyImage
                   src={content.image_url || content.thumbnail_url}
                   alt={content.title}
-                  style={{ width: '100%', height: 'auto', display: 'block' }}
+                  style={{ width: '100%', height: 'auto' }}
                 />
               </Box>
               <Typography variant="body2" color="text.secondary">
@@ -182,21 +189,18 @@ const ARContentDetailPage = () => {
                 Видеоанимации
               </Typography>
               {content.videos.length === 0 ? (
-                <Typography variant="body2" color="text.secondary">
-                  Видео ещё не загружены
-                </Typography>
+                <Box sx={{ py: 4, textAlign: 'center' }}>
+                  <Typography variant="body2" color="text.secondary">
+                    Видео ещё не загружены
+                  </Typography>
+                </Box>
               ) : (
-                <Grid container spacing={1}>
-                  {content.videos.map((video) => (
-                    <Grid item xs={12} sm={6} key={video.id}>
-                      <VideoPreview
-                        video={video}
-                        size="small"
-                        onClick={() => setVideoLightbox(video.id)}
-                      />
-                    </Grid>
-                  ))}
-                </Grid>
+                <Box sx={{ height: 320 }}>
+                  <VideoListVirtualized
+                    videos={content.videos}
+                    onVideoClick={(video) => setVideoLightbox(video.id)}
+                  />
+                </Box>
               )}
             </Paper>
 

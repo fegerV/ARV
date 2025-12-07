@@ -60,6 +60,20 @@ class StorageConnectionResponse(StorageConnectionBase):
     class Config:
         from_attributes = True
 
+# ============ Presigned URLs ============
+
+class PresignedURLRequest(BaseModel):
+    bucket: str = Field(..., example="my-bucket")
+    object_name: str = Field(..., example="path/to/file.jpg")
+    expires_in: Optional[int] = Field(default=3600, example=3600, description="Expiration time in seconds")
+    method: Optional[str] = Field(default="PUT", example="PUT", description="HTTP method for the presigned URL")
+
+class PresignedURLResponse(BaseModel):
+    url: str = Field(..., example="https://minio:9000/my-bucket/path/to/file.jpg?X-Amz-Algorithm=...")
+    method: str = Field(..., example="PUT")
+    expires_at: float = Field(..., example=1640995200.0)
+    fields: Dict[str, str] = Field(default={}, description="Additional form fields for POST requests")
+
 # ============ Storage Folders ============
 
 class YandexDiskFolder(BaseModel):

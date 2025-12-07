@@ -1,4 +1,5 @@
-from sqlalchemy import Column, Integer, String, Time, DateTime, ARRAY
+from sqlalchemy import Column, Integer, String, Time, DateTime, ARRAY, ForeignKey
+from sqlalchemy.orm import relationship
 from app.core.database import Base
 
 
@@ -6,7 +7,7 @@ class VideoRotationSchedule(Base):
     __tablename__ = "video_rotation_schedules"
 
     id = Column(Integer, primary_key=True)
-    ar_content_id = Column(Integer, nullable=False)
+    ar_content_id = Column(Integer, ForeignKey("ar_content.id"), nullable=False)
 
     rotation_type = Column(String(50), nullable=False)
 
@@ -23,3 +24,6 @@ class VideoRotationSchedule(Base):
     next_rotation_at = Column(DateTime)
 
     created_at = Column(DateTime)
+
+    # Отношения
+    ar_content = relationship("ARContent", back_populates="rotation_rule")

@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Boolean, DateTime
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, Float
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from datetime import datetime
 from app.core.database import Base
@@ -24,6 +24,7 @@ class ARViewSession(Base):
     city = Column(String(100))
 
     duration_seconds = Column(Integer)
+    avg_fps = Column(Float)
     tracking_quality = Column(String(50))
     video_played = Column(Boolean, default=False)
 

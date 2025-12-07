@@ -6,6 +6,7 @@
 import React from 'react';
 import { Box, Chip } from '@mui/material';
 import { PlayCircle } from 'lucide-react';
+import { LazyImage } from './LazyImage';
 
 export interface Video {
   id: number;
@@ -83,14 +84,12 @@ export const VideoPreview: React.FC<VideoPreviewProps> = ({
       onClick={onClick}
     >
       {/* Thumbnail изображение */}
-      <img
+      <LazyImage
         src={thumbnailUrl}
         alt={video.title || 'Video preview'}
-        loading="lazy"
         style={{
           width: '100%',
           height: 'auto',
-          display: 'block',
           backgroundColor: '#000',
         }}
       />

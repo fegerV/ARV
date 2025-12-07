@@ -11,7 +11,7 @@ from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
 revision = '003_create_users'
-down_revision = '20251205_thumbnails'  # Adjust based on your last migration
+down_revision = '0015_create_demo_data'  # Fixed dependency chain
 branch_labels = None
 depends_on = None
 

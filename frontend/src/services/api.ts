@@ -1,36 +1,32 @@
 import axios from 'axios';
+import { toast } from 'react-hot-toast';
 
-const api = axios.create({
-  baseURL: '/api',
-  timeout: 10000,
-  headers: {
-    'Content-Type': 'application/json',
-  },
+export const api = axios.create({
+  baseURL: import.meta.env.VITE_API_BASE_URL ?? '/api',
+  withCredentials: true,
 });
 
-// Request interceptor
-api.interceptors.request.use(
-  (config) => {
-    // Add auth token if available
-    const token = localStorage.getItem('auth_token');
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
-    }
-    return config;
-  },
-  (error) => {
-    return Promise.reject(error);
-  }
-);
-
-// Response interceptor
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response?.status === 401) {
-      // Redirect to login
-      window.location.href = '/login';
+    if (!error.response) {
+      toast.error('Проблема с сетью. Проверьте подключение.');
+      return Promise.reject(error);
     }
+
+    const { status, data } = error.response;
+    const detail: string =
+      data?.detail ||
+      data?.message ||
+      'Произошла непредвиденная ошибка';
+
+    // 4xx — показываем сообщение пользователю
+    if (status >= 400 && status < 500) {
+      toast.error(detail);
+    } else if (status >= 500) {
+      toast.error('Сервер временно недоступен. Попробуйте позже.');
+    }
+
     return Promise.reject(error);
   }
 );

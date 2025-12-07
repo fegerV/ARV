@@ -1,8 +1,9 @@
-from app.tasks.celery_app import celery_app
+from celery import Celery
+import asyncio
 import structlog
 from pathlib import Path
 from datetime import datetime
-import asyncio
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.core.database import AsyncSessionLocal
@@ -10,8 +11,9 @@ from app.models.ar_content import ARContent
 from app.models.portrait import Portrait
 from app.models.company import Company
 from app.models.storage import StorageConnection
-from app.services.storage.factory import get_provider
+from app.services.storage.factory import StorageProviderFactory
 from app.services.marker_service import marker_service
+from app.tasks.celery_app import celery_app
 
 logger = structlog.get_logger()
 
@@ -105,7 +107,12 @@ def generate_ar_content_marker_task(self, content_id: int):
             conn = await db.get(StorageConnection, company.storage_connection_id)
             if not conn:
                 raise ValueError(f"StorageConnection {company.storage_connection_id} not found")
-            provider = get_provider(conn)
+            
+            # Create provider using factory
+            provider = StorageProviderFactory.create_provider(
+                conn.provider,
+                conn.metadata or {}
+            )
 
             # Update status to processing
             ac.marker_status = "processing"

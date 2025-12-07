@@ -5,6 +5,7 @@
 import React from 'react';
 import { Box, Chip, Skeleton } from '@mui/material';
 import { Image as ImageIcon } from 'lucide-react';
+import { LazyImage } from './LazyImage';
 
 export interface ARContent {
   id: number;
@@ -111,14 +112,12 @@ export const ImagePreview: React.FC<ImagePreviewProps> = ({
       onClick={onClick}
     >
       {/* Изображение */}
-      <img
+      <LazyImage
         src={imageUrl}
         alt={arContent.title}
-        loading="lazy"
         style={{
           width: '100%',
           height: 'auto',
-          display: 'block',
           backgroundColor: '#f5f5f5',
         }}
         onError={(e) => {

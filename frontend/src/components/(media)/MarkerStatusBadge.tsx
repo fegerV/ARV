@@ -5,12 +5,13 @@ import {
   CircularProgress,
   Chip,
   CheckCircle,
-  HourglassEmpty
-} from '@mui/material';
-import { amber, green } from '@mui/material/colors';
+  HourglassEmpty,
+  Error as ErrorIcon
+} from '@mui/icons-material';
+import { amber, green, red } from '@mui/material/colors';
 
 interface MarkerStatusBadgeProps {
-  status: 'pending' | 'processing' | 'ready';
+  status: 'pending' | 'processing' | 'ready' | 'failed';
   size?: 'small' | 'medium' | 'large';
 }
 
@@ -33,6 +34,8 @@ export const MarkerStatusBadge: React.FC<MarkerStatusBadgeProps> = ({ status, si
         return <CircularProgress size={iconSize} thickness={4} />;
       case 'ready':
         return <CheckCircle sx={{ color: green[500], fontSize: iconSize }} />;
+      case 'failed':
+        return <ErrorIcon sx={{ color: red[500], fontSize: iconSize }} />;
       default:
         return <HourglassEmpty sx={{ color: amber[500], fontSize: iconSize }} />;
     }
@@ -46,6 +49,8 @@ export const MarkerStatusBadge: React.FC<MarkerStatusBadgeProps> = ({ status, si
         return amber[100];
       case 'ready':
         return green[100];
+      case 'failed':
+        return red[100];
       default:
         return amber[100];
     }
@@ -59,6 +64,8 @@ export const MarkerStatusBadge: React.FC<MarkerStatusBadgeProps> = ({ status, si
         return 'Обработка';
       case 'ready':
         return 'Готово';
+      case 'failed':
+        return 'Ошибка';
       default:
         return 'Ожидание';
     }

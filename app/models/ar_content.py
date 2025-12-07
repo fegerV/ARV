@@ -1,5 +1,6 @@
-from sqlalchemy import Column, Integer, String, Text, Boolean, DateTime
+from sqlalchemy import Column, Integer, String, Text, Boolean, DateTime, ForeignKey, Index
 from sqlalchemy.dialects.postgresql import JSONB, UUID
+from sqlalchemy.orm import relationship
 from datetime import datetime
 from app.core.database import Base
 
@@ -7,39 +8,47 @@ from app.core.database import Base
 class ARContent(Base):
     __tablename__ = "ar_content"
 
-    id = Column(Integer, primary_key=True)
-    project_id = Column(Integer, nullable=False)
-    company_id = Column(Integer, nullable=False)
+    id = Column(Integer, primary_key=True, index=True)
+    project_id = Column(Integer, ForeignKey("projects.id"), nullable=False, index=True)
+    company_id = Column(Integer, ForeignKey("companies.id"), nullable=False, index=True)
 
-    unique_id = Column(UUID(as_uuid=True), nullable=False)
+    unique_id = Column(UUID(as_uuid=True), unique=True, nullable=False, index=True)
     title = Column(String(255), nullable=False)
     description = Column(Text)
 
-    image_path = Column(String(500), nullable=False)
+    # изображение
+    image_path = Column(String(500))
     image_url = Column(String(500))
     thumbnail_url = Column(String(500))
+    image_metadata = Column(JSONB, nullable=True)  # width/height/size_readable
 
+    # маркер
     marker_path = Column(String(500))
     marker_url = Column(String(500))
-    marker_status = Column(String(50), default="pending")
-    marker_generated_at = Column(DateTime)
+    marker_status = Column(String(32), default="pending", nullable=False)  # pending/processing/ready/failed
+    marker_metadata = Column(JSONB, nullable=True)  # feature_points, quality
 
-    active_video_id = Column(Integer)
+    is_active = Column(Boolean, default=True, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(
+        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False
+    )
+    expires_at = Column(DateTime, nullable=True)
 
-    video_rotation_enabled = Column(Boolean, default=False)
-    video_rotation_type = Column(String(50))
+    # связи
+    company = relationship("Company", back_populates="ar_contents")
+    project = relationship("Project", back_populates="ar_contents")
+    videos = relationship("Video", back_populates="ar_content", cascade="all, delete-orphan")
+    rotation_rule = relationship(
+        "VideoRotationSchedule",
+        back_populates="ar_content",
+        uselist=False,
+        cascade="all, delete-orphan",
+    )
 
-    is_active = Column(Boolean, default=True)
-    published_at = Column(DateTime)
-    expires_at = Column(DateTime)
-
-    qr_code_path = Column(String(500))
-    qr_code_url = Column(String(500))
-
-    views_count = Column(Integer, default=0)
-    last_viewed_at = Column(DateTime)
-
-    content_metadata = Column(JSONB, default={}, name="metadata")
-
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    # Индексы
+    __table_args__ = (
+        Index('ix_ar_content_unique_id', unique_id, unique=True),
+        Index('ix_ar_content_company_id', company_id),
+        Index('ix_ar_content_project_id', project_id),
+    )
