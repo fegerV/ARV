@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Form
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select, func
 from typing import List, Optional
 import structlog
 import uuid
@@ -7,6 +8,7 @@ from datetime import datetime
 
 from app.core.database import get_db
 from app.models.storage import StorageConnection
+from app.models.company import Company
 from app.schemas.storage import (
     StorageConnectionCreate, 
     StorageConnectionResponse,
@@ -46,7 +48,7 @@ async def create_storage_connection(
         db_storage = StorageConnection(
             name=storage.name,
             provider=storage.provider,
-            metadata=storage.credentials or {},
+            connection_metadata=storage.credentials or {},
             base_path=storage.base_path,
             is_default=storage.is_default
         )
@@ -58,7 +60,7 @@ async def create_storage_connection(
         try:
             provider = StorageProviderFactory.create_provider(
                 db_storage.provider,
-                db_storage.metadata or {}
+                db_storage.connection_metadata or {}
             )
             # Test connection
             logger.info("storage_connection_created", storage_id=db_storage.id, provider=db_storage.provider)
@@ -96,7 +98,7 @@ async def update_storage_connection(
         # Update fields
         conn.name = storage.name
         conn.provider = storage.provider
-        conn.metadata = storage.credentials or {}
+        conn.connection_metadata = storage.credentials or {}
         conn.base_path = storage.base_path
         conn.is_default = storage.is_default
         conn.updated_at = datetime.utcnow()
@@ -105,7 +107,7 @@ async def update_storage_connection(
         try:
             provider = StorageProviderFactory.create_provider(
                 conn.provider,
-                conn.metadata or {}
+                conn.connection_metadata or {}
             )
             # Test connection
             logger.info("storage_connection_updated", storage_id=conn.id, provider=conn.provider)
@@ -194,7 +196,7 @@ async def generate_minio_presigned_url(
         # Create provider
         provider = StorageProviderFactory.create_provider(
             conn.provider,
-            conn.metadata or {}
+            conn.connection_metadata or {}
         )
         
         # Generate presigned URL

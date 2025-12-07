@@ -19,8 +19,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.core.database import AsyncSessionLocal
+from sqlalchemy import select
 from app.models.company import Company
 from app.models.video import Video
+from app.models.ar_content import ARContent
 from app.models.storage import StorageConnection
 from app.services.storage.factory import StorageProviderFactory
 
@@ -66,7 +68,7 @@ def generate_video_thumbnail(self, video_id: int):
                 try:
                     provider = StorageProviderFactory.create_provider(
                         storage_conn.provider,
-                        storage_conn.metadata or {}
+                        storage_conn.connection_metadata or {}
                     )
                 except Exception as e:
                     logger.error(
@@ -196,7 +198,7 @@ def generate_image_thumbnail(self, ar_content_id: int):
                 try:
                     provider = StorageProviderFactory.create_provider(
                         storage_conn.provider,
-                        storage_conn.metadata or {}
+                        storage_conn.connection_metadata or {}
                     )
                 except Exception as e:
                     logger.error(
@@ -297,7 +299,7 @@ def batch_generate_thumbnails(self, company_id: int):
                 try:
                     provider = StorageProviderFactory.create_provider(
                         storage_conn.provider,
-                        storage_conn.metadata or {}
+                        storage_conn.connection_metadata or {}
                     )
                 except Exception as e:
                     logger.error(

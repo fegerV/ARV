@@ -94,6 +94,10 @@ Vertex AR is a B2B SaaS platform for creating augmented reality content based on
 - File upload and download operations
 - Storage quota management
 - Path isolation and security
+- Configurable storage providers via environment variables
+- Graceful fallback to local storage on provider failure
+- Provider-specific configuration validation
+- Presigned URL generation for direct uploads (MinIO)
 
 ### Marker Service
 - NFT marker generation using MindAR

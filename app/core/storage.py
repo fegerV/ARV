@@ -26,6 +26,10 @@ def initialize_storage_provider():
         )
     elif settings.STORAGE_TYPE == "minio":
         try:
+            # Validate required MinIO settings
+            if not all([settings.MINIO_ENDPOINT, settings.MINIO_ACCESS_KEY, settings.MINIO_SECRET_KEY]):
+                raise ValueError("Missing required MinIO configuration: endpoint, access_key, or secret_key")
+            
             storage_provider = StorageProviderFactory.create_provider(
                 "minio",
                 {
@@ -33,6 +37,7 @@ def initialize_storage_provider():
                     "access_key": settings.MINIO_ACCESS_KEY,
                     "secret_key": settings.MINIO_SECRET_KEY,
                     "secure": settings.MINIO_SECURE,
+                    "region": settings.MINIO_REGION,
                     "bucket_name": settings.MINIO_BUCKET_NAME,
                 }
             )
@@ -47,10 +52,15 @@ def initialize_storage_provider():
             )
     elif settings.STORAGE_TYPE == "yandex_disk":
         try:
+            # Validate required Yandex Disk settings
+            if not settings.YANDEX_DISK_OAUTH_TOKEN:
+                raise ValueError("Missing required Yandex Disk configuration: oauth_token")
+            
             storage_provider = StorageProviderFactory.create_provider(
                 "yandex_disk",
                 {
-                    "oauth_token": settings.YANDEX_OAUTH_CLIENT_SECRET
+                    "oauth_token": settings.YANDEX_DISK_OAUTH_TOKEN,
+                    "base_path": settings.YANDEX_DISK_BASE_PATH
                 }
             )
         except Exception as e:
