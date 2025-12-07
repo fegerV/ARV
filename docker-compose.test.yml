@@ -14,6 +14,18 @@ services:
     ports:
       - "6380:6379"
 
+  test-minio:
+    image: minio/minio:latest
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: testuser
+      MINIO_ROOT_PASSWORD: testpass123
+    volumes:
+      - test_minio_data:/data
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+
   test-app:
     build:
       context: .
@@ -22,8 +34,19 @@ services:
       DATABASE_URL: postgresql+asyncpg://test_user:test_pass@localhost:5433/test_vertex_ar
       REDIS_URL: redis://localhost:6380/0
       TESTING: true
+      STORAGE_PROVIDER: local
+      MINIO_ENDPOINT: localhost:9000
+      MINIO_ROOT_USER: testuser
+      MINIO_ROOT_PASSWORD: testpass123
+      MINIO_BUCKET_NAME: test-vertex-ar
+      MINIO_USE_SSL: "false"
     depends_on:
       - test-postgres
       - test-redis
+      - test-minio
     ports:
       - "8001:8000"
+
+volumes:
+  test_minio_data:
+    driver: local

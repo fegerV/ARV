@@ -58,21 +58,27 @@ class Settings(BaseSettings):
     ]
     CORS_ALLOW_CREDENTIALS: bool = True
     
-    # Storage
-    STORAGE_TYPE: str = "local"  # local, minio, yandex_disk
-    STORAGE_BASE_PATH: str = "/app/storage/content"
+    # Storage Configuration
+    STORAGE_PROVIDER: str = "local"  # local, minio, yandex_disk
+    STORAGE_ENABLE_CACHING: bool = True
+    STORAGE_CACHE_TTL: int = 3600  # 1 hour in seconds
+    
+    # Local Storage Configuration
+    LOCAL_STORAGE_PATH: str = "/app/storage/content"
+    LOCAL_STORAGE_PUBLIC_URL: str = "http://localhost:8000/storage"
     
     # MinIO Configuration
     MINIO_ENDPOINT: str = "localhost:9000"
-    MINIO_ACCESS_KEY: str = ""
-    MINIO_SECRET_KEY: str = ""
+    MINIO_ROOT_USER: str = ""
+    MINIO_ROOT_PASSWORD: str = ""
     MINIO_BUCKET_NAME: str = "vertex-ar"
+    MINIO_USE_SSL: bool = False
     MINIO_REGION: str = "us-east-1"
-    MINIO_SECURE: bool = False
     
     # Yandex Disk Configuration
-    YANDEX_DISK_OAUTH_TOKEN: str = ""
-    YANDEX_DISK_BASE_PATH: str = "/VertexAR"
+    YANDEX_OAUTH_TOKEN: str = ""
+    YANDEX_APP_ID: str = ""
+    YANDEX_ROOT_FOLDER: str = "/VertexAR"
     
     # Yandex OAuth (for token exchange)
     YANDEX_OAUTH_CLIENT_ID: str = ""
