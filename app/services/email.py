@@ -12,21 +12,26 @@ from app.core.config import settings
 
 logger = structlog.get_logger()
 
-# Configure email connection
-conf = ConnectionConfig(
-    MAIL_USERNAME=settings.MAIL_USERNAME,
-    MAIL_PASSWORD=settings.MAIL_PASSWORD,
-    MAIL_FROM=settings.MAIL_FROM,
-    MAIL_FROM_NAME=settings.MAIL_FROM_NAME,
-    MAIL_SERVER=settings.MAIL_SERVER,
-    MAIL_PORT=settings.MAIL_PORT,
-    MAIL_STARTTLS=settings.MAIL_TLS,  # Изменено с MAIL_TLS на MAIL_STARTTLS
-    MAIL_SSL_TLS=settings.MAIL_SSL,   # Изменено с MAIL_SSL на MAIL_SSL_TLS
-    USE_CREDENTIALS=True,
-    VALIDATE_CERTS=True,
-)
-
-fm = FastMail(conf)
+# Configure email connection - only if settings are properly configured
+if settings.MAIL_FROM and "@" in settings.MAIL_FROM:
+    conf = ConnectionConfig(
+        MAIL_USERNAME=settings.MAIL_USERNAME,
+        MAIL_PASSWORD=settings.MAIL_PASSWORD,
+        MAIL_FROM=settings.MAIL_FROM,
+        MAIL_FROM_NAME=settings.MAIL_FROM_NAME,
+        MAIL_SERVER=settings.MAIL_SERVER,
+        MAIL_PORT=settings.MAIL_PORT,
+        MAIL_STARTTLS=settings.MAIL_TLS,  # Изменено с MAIL_TLS на MAIL_STARTTLS
+        MAIL_SSL_TLS=settings.MAIL_SSL,   # Изменено с MAIL_SSL на MAIL_SSL_TLS
+        USE_CREDENTIALS=True,
+        VALIDATE_CERTS=True,
+    )
+    fm = FastMail(conf)
+else:
+    # Email is not configured
+    conf = None
+    fm = None
+    logger.warning("email_not_configured", mail_from=settings.MAIL_FROM)
 
 
 class EmailTemplate:
@@ -92,6 +97,10 @@ async def send_email(
         html_content: HTML email content
         text_content: Plain text email content (optional)
     """
+    if fm is None:
+        logger.warning("email_not_configured_skip_send", subject=subject, recipients=recipients)
+        return
+        
     try:
         message = MessageSchema(
             subject=subject,
