@@ -62,7 +62,19 @@ class Settings(BaseSettings):
     STORAGE_TYPE: str = "local"  # local, minio, yandex_disk
     STORAGE_BASE_PATH: str = "/app/storage/content"
     
-    # Yandex Disk
+    # MinIO Configuration
+    MINIO_ENDPOINT: str = "localhost:9000"
+    MINIO_ACCESS_KEY: str = ""
+    MINIO_SECRET_KEY: str = ""
+    MINIO_BUCKET_NAME: str = "vertex-ar"
+    MINIO_REGION: str = "us-east-1"
+    MINIO_SECURE: bool = False
+    
+    # Yandex Disk Configuration
+    YANDEX_DISK_OAUTH_TOKEN: str = ""
+    YANDEX_DISK_BASE_PATH: str = "/VertexAR"
+    
+    # Yandex OAuth (for token exchange)
     YANDEX_OAUTH_CLIENT_ID: str = ""
     YANDEX_OAUTH_CLIENT_SECRET: str = ""
     YANDEX_OAUTH_REDIRECT_URI: str = "http://localhost:8000/api/oauth/yandex/callback"

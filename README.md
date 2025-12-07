@@ -127,6 +127,19 @@ SECRET_KEY=your-super-secret-key-change-in-production
 
 # Storage
 STORAGE_TYPE=local  # local, minio, yandex_disk
+STORAGE_BASE_PATH=/app/storage/content
+
+# MinIO Configuration (if using MinIO)
+MINIO_ENDPOINT=localhost:9000
+MINIO_ACCESS_KEY=your-minio-access-key
+MINIO_SECRET_KEY=your-minio-secret-key
+MINIO_BUCKET_NAME=vertex-ar
+MINIO_REGION=us-east-1
+MINIO_SECURE=false
+
+# Yandex Disk Configuration (if using Yandex Disk)
+YANDEX_DISK_OAUTH_TOKEN=your-yandex-oauth-token
+YANDEX_DISK_BASE_PATH=/VertexAR
 
 # Email Notifications
 MAIL_USERNAME=your_smtp_username

@@ -12,6 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.core.database import AsyncSessionLocal
+from sqlalchemy import select
 from app.models.company import Company
 from app.models.storage import StorageConnection
 from app.services.storage.factory import StorageProviderFactory
@@ -41,7 +42,7 @@ def cleanup_expired_content():
                     try:
                         provider = StorageProviderFactory.create_provider(
                             storage_conn.provider,
-                            storage_conn.metadata or {}
+                            storage_conn.connection_metadata or {}
                         )
                     except Exception as e:
                         logger.error(
@@ -113,7 +114,7 @@ def cleanup_temp_files():
                     try:
                         provider = StorageProviderFactory.create_provider(
                             storage_conn.provider,
-                            storage_conn.metadata or {}
+                            storage_conn.connection_metadata or {}
                         )
                     except Exception as e:
                         logger.error(
@@ -185,7 +186,7 @@ def cleanup_orphaned_files():
                     try:
                         provider = StorageProviderFactory.create_provider(
                             storage_conn.provider,
-                            storage_conn.metadata or {}
+                            storage_conn.connection_metadata or {}
                         )
                     except Exception as e:
                         logger.error(
