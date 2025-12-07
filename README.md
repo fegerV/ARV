@@ -76,6 +76,7 @@ vertex-ar/
 - [Backup & Recovery](docs/05-backup-recovery.md)
 - [Email Notifications Setup](EMAIL_SETUP.md)
 - [Email Notifications Summary](EMAIL_NOTIFICATIONS_SUMMARY.md)
+- [Dependency Audit Summary](DEPENDENCY_AUDIT_SUMMARY.md)
 
 ## 🔧 Разработка
 
