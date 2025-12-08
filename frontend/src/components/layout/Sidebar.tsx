@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
   Box,
   Drawer,
@@ -13,6 +13,7 @@ import {
   AppBar,
   IconButton,
   Divider,
+  Button,
 } from '@mui/material';
 import {
   Dashboard as DashboardIcon,
@@ -27,7 +28,6 @@ import {
 } from '@mui/icons-material';
 import ThemeToggle from '../common/ThemeToggle';
 import { useAuthStore } from '../../store/authStore';
-import { useNavigate } from 'react-router-dom';
 
 const drawerWidth = 240;
 

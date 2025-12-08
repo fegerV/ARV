@@ -1,19 +1,28 @@
 import { Snackbar, Alert } from '@mui/material';
-import { useToast } from '../store/useToast';
+import { useToast } from '../../store/useToast';
 
 export default function ToastNotification() {
-  const { open, message, severity, hideToast } = useToast();
+  const { toasts, removeToast } = useToast();
 
   return (
-    <Snackbar
-      open={open}
-      autoHideDuration={6000}
-      onClose={hideToast}
-      anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
-    >
-      <Alert onClose={hideToast} severity={severity} sx={{ width: '100%' }}>
-        {message}
-      </Alert>
-    </Snackbar>
+    <>
+      {toasts.map((toast) => (
+        <Snackbar
+          key={toast.id}
+          open={true}
+          autoHideDuration={toast.duration || 5000}
+          onClose={() => removeToast(toast.id)}
+          anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
+        >
+          <Alert
+            onClose={() => removeToast(toast.id)}
+            severity={toast.type}
+            sx={{ width: '100%' }}
+          >
+            {toast.message}
+          </Alert>
+        </Snackbar>
+      ))}
+    </>
   );
 }

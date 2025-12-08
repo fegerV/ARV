@@ -1,17 +1,44 @@
 import { create } from 'zustand';
 
-interface ToastState {
-  open: boolean;
+export interface Toast {
+  id: string;
   message: string;
-  severity: 'success' | 'error' | 'warning' | 'info';
-  showToast: (message: string, severity?: 'success' | 'error' | 'warning' | 'info') => void;
-  hideToast: () => void;
+  type: 'success' | 'error' | 'warning' | 'info';
+  duration?: number;
 }
 
-export const useToast = create<ToastState>((set) => ({
-  open: false,
-  message: '',
-  severity: 'info',
-  showToast: (message, severity = 'info') => set({ open: true, message, severity }),
-  hideToast: () => set({ open: false }),
+interface ToastStore {
+  toasts: Toast[];
+  addToast: (message: string, type: Toast['type'], duration?: number) => void;
+  removeToast: (id: string) => void;
+  clearAll: () => void;
+}
+
+export const useToast = create<ToastStore>((set) => ({
+  toasts: [],
+  
+  addToast: (message, type, duration = 5000) => {
+    const id = Date.now().toString();
+    set((state) => ({
+      toasts: [...state.toasts, { id, message, type, duration }],
+    }));
+    
+    if (duration > 0) {
+      setTimeout(() => {
+        set((state) => ({
+          toasts: state.toasts.filter((t) => t.id !== id),
+        }));
+      }, duration);
+    }
+  },
+  
+  removeToast: (id) => {
+    set((state) => ({
+      toasts: state.toasts.filter((t) => t.id !== id),
+    }));
+  },
+  
+  clearAll: () => {
+    set({ toasts: [] });
+  },
 }));

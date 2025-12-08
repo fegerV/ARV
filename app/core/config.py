@@ -52,7 +52,9 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 1440  # 24 hours
     
     # CORS
-    CORS_ORIGINS: str = "http://localhost:3000,http://localhost:8000"
+    CORS_ORIGINS: list[str] = Field(
+        default="http://localhost:3000,http://localhost:3001,http://localhost:3002,http://localhost:3003,http://localhost:3004,http://localhost:8000"
+    )
     CORS_ALLOW_CREDENTIALS: bool = True
     
     # Storage
@@ -113,15 +115,15 @@ class Settings(BaseSettings):
     @classmethod
     def parse_cors_origins(cls, v: Any) -> list[str]:
         """Parse CORS origins from comma-separated string to list."""
+        if isinstance(v, list):
+            return [origin.strip() if isinstance(origin, str) else origin for origin in v]
         if isinstance(v, str):
-            return [origin.strip() for origin in v.split(",")]
+            return [origin.strip() for origin in v.split(",") if origin.strip()]
         return v
 
     @property
     def cors_origins_list(self) -> list[str]:
         """Get CORS origins as list."""
-        if isinstance(self.CORS_ORIGINS, str):
-            return [origin.strip() for origin in self.CORS_ORIGINS.split(",")]
         return self.CORS_ORIGINS
 
 

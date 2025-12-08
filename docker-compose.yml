@@ -251,3 +251,7 @@ volumes:
     driver: local
   minio_data:
     driver: local
+
+networks:
+  vertex-ar-network:
+    driver: bridge
