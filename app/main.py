@@ -241,11 +241,9 @@ from app.api.routes import oauth as oauth_router
 from app.api.routes import public as public_router
 from app.api.routes import health as health_router
 from app.api.routes import alerts_ws as alerts_ws_router
-# app.include_router(auth.router, prefix="/api/auth", tags=["Authentication"])
-# app.include_router(companies.router, prefix="/api/companies", tags=["Companies"])
-# app.include_router(projects.router, prefix="/api/projects", tags=["Projects"])
-# app.include_router(ar_content.router, prefix="/api/ar-content", tags=["AR Content"])
-# app.include_router(analytics.router, prefix="/api/analytics", tags=["Analytics"]) 
+from app.api.routes import auth as auth_router
+
+app.include_router(auth_router.router, prefix="/api", tags=["Authentication"])
 app.include_router(portraits_router.router, prefix="/api", tags=["Portraits"])
 app.include_router(storage_router.router, prefix="/api", tags=["Storage"]) 
 app.include_router(projects_router.router, prefix="/api", tags=["Projects"]) 

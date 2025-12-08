@@ -1,5 +1,6 @@
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { Box } from '@mui/material';
+import ErrorBoundary from './components/error/ErrorBoundary';
 import Sidebar from './components/layout/Sidebar';
 import ToastNotification from './components/common/ToastNotification';
 import ProtectedRoute from './components/auth/ProtectedRoute';
@@ -8,12 +9,12 @@ import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import CompaniesList from './pages/companies/CompaniesList';
 import CompanyDetails from './pages/companies/CompanyDetails';
-import CompanyForm from './pages/companies/CompanyForm';
+import CompanyFormWizard from './pages/companies/CompanyFormWizard';
 import ProjectsList from './pages/projects/ProjectsList';
-import ProjectForm from './pages/projects/ProjectForm';
+import ProjectFormWizard from './pages/projects/ProjectFormWizard';
 import ARContentList from './pages/ar-content/ARContentList';
 import ARContentForm from './pages/ar-content/ARContentForm';
-import ARContentDetail from './pages/ar-content/ARContentDetail';
+import ARContentDetails from './pages/ar-content/ARContentDetails';
 import Analytics from './pages/Analytics';
 import Storage from './pages/Storage';
 import Notifications from './pages/Notifications';
@@ -26,34 +27,45 @@ function App() {
   return (
     <>
       <ToastNotification />
-      <Routes>
-        {/* Public Routes */}
-        <Route path="/login" element={<Login />} />
-        
-        {/* Protected Routes */}
-        <Route
-          path="/*"
-          element={
-            <ProtectedRoute>
-              <Box sx={{ display: 'flex' }}>
-                <Sidebar />
-                <Box component="main" sx={{ flexGrow: 1, p: 3, mt: 8 }}>
-                  <Routes>
+      <ErrorBoundary>
+        <Routes>
+          {/* Public Routes */}
+          <Route path="/login" element={<Login />} />
+          
+          {/* Protected Routes */}
+          <Route
+            path="/*"
+            element={
+              <ProtectedRoute>
+                <Box sx={{ display: 'flex', width: '100%' }}>
+                  <Sidebar />
+                  <Box
+                    component="main"
+                    sx={{
+                      flexGrow: 1,
+                      p: 3,
+                      mt: 8,
+                      ml: { xs: 0, sm: 30 }, // 30 = drawerWidth / 8 (240px / 8 = 30)
+                      width: { xs: '100%', sm: 'calc(100% - 240px)' },
+                    }}
+                  >
+                    <Routes>
                     <Route path="/" element={<Dashboard />} />
                     
                     {/* Companies */}
                     <Route path="/companies" element={<CompaniesList />} />
-                    <Route path="/companies/new" element={<CompanyForm />} />
+                    <Route path="/companies/new" element={<CompanyFormWizard />} />
                     <Route path="/companies/:id" element={<CompanyDetails />} />
+                    <Route path="/companies/:id/edit" element={<CompanyFormWizard />} />
                     
                     {/* Projects */}
                     <Route path="/companies/:companyId/projects" element={<ProjectsList />} />
-                    <Route path="/companies/:companyId/projects/new" element={<ProjectForm />} />
+                    <Route path="/companies/:companyId/projects/new" element={<ProjectFormWizard />} />
                     
                     {/* AR Content */}
-                    <Route path="/projects/:projectId/content" element={<ARContentList />} />
-                    <Route path="/projects/:projectId/content/new" element={<ARContentForm />} />
-                    <Route path="/ar-content/:arContentId" element={<ARContentDetail />} />
+                    <Route path="/ar-content" element={<ARContentList />} />
+                    <Route path="/ar-content/new" element={<ARContentForm />} />
+                    <Route path="/ar-content/:id" element={<ARContentDetails />} />
                     
                     {/* Other pages */}
                     <Route path="/analytics" element={<Analytics />} />
@@ -70,6 +82,7 @@ function App() {
           }
         />
       </Routes>
+      </ErrorBoundary>
     </>
   );
 }

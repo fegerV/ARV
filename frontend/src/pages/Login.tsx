@@ -25,13 +25,10 @@ import {
   Security as SecurityIcon,
   Help as HelpIcon,
 } from '@mui/icons-material';
-import { useThemeStore } from '../store/themeStore';
-import { useAuthStore } from '../store/authStore';
 import ThemeToggle from '../components/common/ThemeToggle';
 import { useToast } from '../store/useToast';
+import { useAuthStore } from '../store/authStore';
 import api from '../services/api';
-import { format } from 'date-fns';
-import { ru } from 'date-fns/locale';
 
 interface LoginResponse {
   access_token: string;
@@ -100,36 +97,53 @@ export default function Login() {
     setAttemptsLeft(null);
 
     try {
-      // FormData для OAuth2PasswordRequestForm
-      const formData = new FormData();
-      formData.append('username', email);
-      formData.append('password', password);
+      // Используем URLSearchParams для правильной формировки данных
+      const params = new URLSearchParams();
+      params.append('username', email);
+      params.append('password', password);
 
-      const response = await api.post<LoginResponse>('/auth/login', formData, {
+      const response = await api.post<LoginResponse>('/auth/login', params, {
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
         },
       });
       
       login(response.data);
-      showToast('Успешный вход в систему', 'success');
+      showToast('✅ Успешный вход!', 'success');
       
-      // Navigate handled by useEffect
+      // Редирект на / (dashboard)
+      setTimeout(() => navigate('/'), 500);
     } catch (err: any) {
-      const errorData = err.response?.data as LoginError;
+      console.error('Login error:', err);
+      const errorResponse = err.response?.data;
       
-      if (errorData?.locked_until) {
-        const lockTime = new Date(errorData.locked_until);
-        setLockedUntil(lockTime);
-        setError(`Аккаунт временно заблокирован до ${format(lockTime, 'HH:mm:ss', { locale: ru })}`);
-      } else if (errorData?.attempts_left !== undefined) {
-        setAttemptsLeft(errorData.attempts_left);
-        setError(errorData.detail || 'Неверный email или пароль');
-      } else {
-        setError(errorData?.detail || 'Ошибка авторизации');
+      // Handle error response which can be detail string or object
+      let errorMessage = 'Ошибка авторизации';
+      let detailObj: any = null;
+      
+      if (typeof errorResponse === 'string') {
+        errorMessage = errorResponse;
+      } else if (errorResponse?.detail) {
+        if (typeof errorResponse.detail === 'string') {
+          errorMessage = errorResponse.detail;
+        } else if (typeof errorResponse.detail === 'object') {
+          detailObj = errorResponse.detail;
+          errorMessage = detailObj.detail || errorMessage;
+        }
       }
       
-      showToast(errorData?.detail || 'Ошибка авторизации', 'error');
+      if (detailObj?.locked_until) {
+        const lockTime = new Date(detailObj.locked_until);
+        setLockedUntil(lockTime);
+        setError(`🔒 Аккаунт временно заблокирован`);
+      } else if (detailObj?.attempts_left !== undefined) {
+        setAttemptsLeft(detailObj.attempts_left);
+        setError(`${errorMessage} (осталось попыток: ${detailObj.attempts_left})`);
+      } else {
+        setError(errorMessage);
+      }
+      
+      showToast(errorMessage, 'error');
     } finally {
       setLoading(false);
     }
@@ -229,6 +243,8 @@ export default function Login() {
         {/* Login Form */}
         <Box component="form" onSubmit={handleSubmit} sx={{ mb: 4 }}>
           <TextField
+            id="email"
+            name="email"
             fullWidth
             label="Email"
             type="email"
@@ -250,6 +266,8 @@ export default function Login() {
           />
           
           <TextField
+            id="password"
+            name="password"
             fullWidth
             label="Пароль"
             type={showPassword ? 'text' : 'password'}

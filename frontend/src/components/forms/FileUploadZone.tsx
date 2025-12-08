@@ -125,7 +125,6 @@ export default function FileUploadZone({
           <Typography variant="caption" color="text.secondary">
             {(file.size / 1024 / 1024).toFixed(2)} MB
           </Typography>
-          {uploading && <LinearProgress sx={{ mt: 2 }} />}
         </Box>
       )}
     </Paper>

@@ -13,6 +13,7 @@ import {
   AppBar,
   IconButton,
   Divider,
+  Button,
 } from '@mui/material';
 import {
   Dashboard as DashboardIcon,
@@ -148,12 +149,20 @@ export default function Sidebar() {
         {drawer}
       </Drawer>
 
-      {/* Desktop drawer */}
+      {/* Desktop drawer - sticky */}
       <Drawer
         variant="permanent"
         sx={{
           display: { xs: 'none', sm: 'block' },
-          '& .MuiDrawer-paper': { boxSizing: 'border-box', width: drawerWidth },
+          '& .MuiDrawer-paper': {
+            boxSizing: 'border-box',
+            width: drawerWidth,
+            position: 'fixed',
+            top: 64, // AppBar высота
+            height: 'calc(100vh - 64px)',
+            overflowY: 'auto',
+            zIndex: (theme) => theme.zIndex.drawer,
+          },
         }}
         open
       >

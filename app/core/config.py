@@ -1,5 +1,5 @@
 from typing import Any
-from pydantic import Field, field_validator
+from pydantic import Field, field_validator, ConfigDict
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from functools import lru_cache
 
@@ -52,11 +52,18 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 1440  # 24 hours
     
     # CORS
-    CORS_ORIGINS: list[str] = [
-        "http://localhost:3000",
-        "http://localhost:8000",
-    ]
+    CORS_ORIGINS: str = Field(
+        default="http://localhost:3000,http://localhost:8000"
+    )
     CORS_ALLOW_CREDENTIALS: bool = True
+    
+    @field_validator("CORS_ORIGINS", mode="before")
+    @classmethod
+    def parse_cors_origins_string(cls, v: Any) -> str:
+        """Ensure CORS_ORIGINS is a string."""
+        if isinstance(v, list):
+            return ",".join(v)
+        return str(v) if v else "http://localhost:3000,http://localhost:8000"
     
     # Storage
     STORAGE_TYPE: str = "local"  # local, minio, yandex_disk
@@ -112,18 +119,10 @@ class Settings(BaseSettings):
     BACKUP_S3_BUCKET: str = "vertex-ar-backups"
     BACKUP_RETENTION_DAYS: int = 30
 
-    @field_validator("CORS_ORIGINS", mode="before")
-    @classmethod
-    def parse_cors_origins(cls, v: Any) -> list[str]:
-        """Parse CORS origins from comma-separated string to list."""
-        if isinstance(v, str):
-            return [origin.strip() for origin in v.split(",")]
-        return v
-
     @property
     def cors_origins_list(self) -> list[str]:
         """Get CORS origins as list."""
-        return self.CORS_ORIGINS
+        return [origin.strip() for origin in self.CORS_ORIGINS.split(",")]
 
 
 # Global settings instance

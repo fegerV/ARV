@@ -32,3 +32,9 @@ export * from './(feedback)';
 
 // ============= Icons (будут добавлены позже) =============
 // export * from './icons';
+
+// ============= Error Handling =============
+export * from './error/ErrorBoundary';
+
+// ============= Skeletons =============
+export * from './skeletons';

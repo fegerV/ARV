@@ -41,7 +41,7 @@ class StorageFolder(Base):
     __tablename__ = "storage_folders"
 
     id = Column(Integer, primary_key=True)
-    company_id = Column(Integer)
+    company_id = Column(Integer, ForeignKey("companies.id"), nullable=False)
 
     name = Column(String(255), nullable=False)
     path = Column(String(500), nullable=False)
@@ -55,4 +55,4 @@ class StorageFolder(Base):
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     # Relationships
-    company = relationship("Company", back_populates="folders")
+    company = relationship("Company", back_populates="storage_folders")

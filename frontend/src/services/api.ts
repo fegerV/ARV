@@ -60,5 +60,10 @@ export const projectsAPI = {
 
 export const analyticsAPI = {
   overview: () => api.get('/analytics/overview'),
+  viewsTrend: (days: number = 30) => api.get(`/analytics/views-trend?days=${days}`),
+  byCompany: (days: number = 30) => api.get(`/analytics/by-company?days=${days}`),
+  deviceStats: () => api.get('/analytics/device-stats'),
+  topContent: (limit: number = 10) => api.get(`/analytics/top-content?limit=${limit}`),
   arContent: (id: number, days: number = 30) => api.get(`/analytics/ar-content/${id}?days=${days}`),
+  geographic: (days: number = 30) => api.get(`/analytics/geographic?days=${days}`),
 };
