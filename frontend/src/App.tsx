@@ -35,9 +35,18 @@ function App() {
           path="/*"
           element={
             <ProtectedRoute>
-              <Box sx={{ display: 'flex' }}>
+              <Box sx={{ display: 'flex', width: '100%' }}>
                 <Sidebar />
-                <Box component="main" sx={{ flexGrow: 1, p: 3, mt: 8 }}>
+                <Box
+                  component="main"
+                  sx={{
+                    flexGrow: 1,
+                    p: 3,
+                    mt: 8,
+                    ml: { xs: 0, sm: 30 }, // 30 = drawerWidth / 8 (240px / 8 = 30)
+                    width: { xs: '100%', sm: 'calc(100% - 240px)' },
+                  }}
+                >
                   <Routes>
                     <Route path="/" element={<Dashboard />} />
                     
@@ -47,10 +56,13 @@ function App() {
                     <Route path="/companies/:id" element={<CompanyDetails />} />
                     
                     {/* Projects */}
+                    <Route path="/projects" element={<ProjectsList />} />
                     <Route path="/companies/:companyId/projects" element={<ProjectsList />} />
                     <Route path="/companies/:companyId/projects/new" element={<ProjectForm />} />
                     
                     {/* AR Content */}
+                    <Route path="/ar-content" element={<ARContentList />} />
+                    <Route path="/ar-content/new" element={<ARContentForm />} />
                     <Route path="/projects/:projectId/content" element={<ARContentList />} />
                     <Route path="/projects/:projectId/content/new" element={<ARContentForm />} />
                     <Route path="/ar-content/:arContentId" element={<ARContentDetail />} />

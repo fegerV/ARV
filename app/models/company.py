@@ -33,7 +33,7 @@ class Company(Base):
 
     # Notes & metadata
     notes = Column(Text)
-    metadata = Column(JSONB, default={})
+    company_metadata = Column("metadata", JSONB, default={})
 
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

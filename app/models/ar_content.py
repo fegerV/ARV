@@ -14,6 +14,11 @@ class ARContent(Base):
     unique_id = Column(UUID(as_uuid=True), nullable=False)
     title = Column(String(255), nullable=False)
     description = Column(Text)
+    
+    # Client information
+    client_name = Column(String(255))
+    client_phone = Column(String(50))
+    client_email = Column(String(255))
 
     image_path = Column(String(500), nullable=False)
     image_url = Column(String(500))
@@ -39,7 +44,7 @@ class ARContent(Base):
     views_count = Column(Integer, default=0)
     last_viewed_at = Column(DateTime)
 
-    metadata = Column(JSONB, default={})
+    content_metadata = Column("metadata", JSONB, default={})
 
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

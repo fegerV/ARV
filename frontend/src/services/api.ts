@@ -39,9 +39,16 @@ export default api;
 
 // API methods
 export const arContentAPI = {
+  listAll: () => api.get('/ar-content'),
   getDetail: (id: number) => api.get(`/ar-content/${id}`),
+  create: (data: FormData) => api.post('/ar-content', data, {
+    headers: {
+      'Content-Type': 'multipart/form-data',
+    },
+  }),
   update: (id: number, data: any) => api.put(`/ar-content/${id}`, data),
   delete: (id: number) => api.delete(`/ar-content/${id}`),
+  generateMarker: (id: number) => api.post(`/ar-content/${id}/generate-marker`),
 };
 
 export const companiesAPI = {
@@ -56,6 +63,7 @@ export const projectsAPI = {
   list: (companyId: number) => api.get(`/companies/${companyId}/projects`),
   get: (id: number) => api.get(`/projects/${id}`),
   create: (companyId: number, data: any) => api.post(`/companies/${companyId}/projects`, data),
+  delete: (id: number) => api.delete(`/projects/${id}`),
 };
 
 export const analyticsAPI = {

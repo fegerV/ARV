@@ -121,7 +121,7 @@ async def extend_project(project_id: int, payload: dict, db: AsyncSession = Depe
         "status": proj.status,
         "notify_before_expiry_days": proj.notify_before_expiry_days,
         "tags": proj.tags,
-        "metadata": proj.metadata,
+        "metadata": proj.project_metadata,
     }
 
 

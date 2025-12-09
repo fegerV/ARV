@@ -3,13 +3,16 @@ from pathlib import Path
 from typing import Optional
 from fastapi import APIRouter, UploadFile, File, Form, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, func
 import aiofiles
 
 from app.core.config import settings
 from app.core.database import get_db
 from app.models.ar_content import ARContent
 from app.models.video import Video
+from app.models.ar_view_session import ARViewSession
+from app.models.project import Project
+from app.models.company import Company
 from app.tasks.marker_tasks import generate_ar_content_marker_task
 
 router = APIRouter()
@@ -27,6 +30,9 @@ async def create_ar_content(
     project_id: int = Form(...),
     title: str = Form(...),
     description: Optional[str] = Form(None),
+    client_name: Optional[str] = Form(None),
+    client_phone: Optional[str] = Form(None),
+    client_email: Optional[str] = Form(None),
     image: UploadFile = File(...),
     db: AsyncSession = Depends(get_db),
 ):
@@ -48,11 +54,14 @@ async def create_ar_content(
         unique_id=uid,
         title=title,
         description=description,
+        client_name=client_name,
+        client_phone=client_phone,
+        client_email=client_email,
         image_path=str(image_path),
         image_url=_build_public_url(image_path),
         marker_status="pending",
         is_active=True,
-        metadata={},
+        content_metadata={},
     )
     db.add(ac)
     await db.flush()
@@ -68,6 +77,62 @@ async def create_ar_content(
         "marker_status": ac.marker_status,
         "task_id": task.id,
     }
+
+
+@router.get("/ar-content")
+async def list_all_ar_content(db: AsyncSession = Depends(get_db)):
+    """List all AR content across all projects and companies"""
+    from app.models.project import Project
+    from app.models.company import Company
+    
+    stmt = select(ARContent, Project, Company).join(Project, ARContent.project_id == Project.id).join(Company, Project.company_id == Company.id)
+    res = await db.execute(stmt)
+    
+    items = []
+    for ac, proj, company in res.all():
+        # Get active video info
+        active_video_title = None
+        if ac.active_video_id:
+            video_stmt = select(Video).where(Video.id == ac.active_video_id)
+            video_res = await db.execute(video_stmt)
+            video = video_res.scalar_one_or_none()
+            if video:
+                active_video_title = video.title
+        
+        # Get view count
+        views_stmt = select(func.count()).select_from(ARViewSession).where(ARViewSession.ar_content_id == ac.id)
+        views_res = await db.execute(views_stmt)
+        view_count = views_res.scalar() or 0
+        
+        items.append({
+            "id": ac.id,
+            "unique_id": str(ac.unique_id),
+            "order_number": f"{ac.id:06d}",
+            "title": ac.title,
+            "marker_status": ac.marker_status,
+            "image_url": ac.image_url,
+            "created_at": ac.created_at.isoformat() if ac.created_at else None,
+            "is_active": ac.is_active,
+            "client_name": ac.client_name or "",
+            "client_phone": ac.client_phone or "",
+            "client_email": ac.client_email or "",
+            "views": view_count,
+            "project": {
+                "id": proj.id,
+                "name": proj.name
+            },
+            "company": {
+                "id": company.id,
+                "name": company.name
+            },
+            "active_video": {
+                "id": ac.active_video_id,
+                "title": active_video_title
+            }
+        })
+    
+    return {"items": items}
+
 
 @router.get("/projects/{project_id}/ar-content")
 async def list_ar_content_for_project(project_id: int, db: AsyncSession = Depends(get_db)):
@@ -169,6 +234,10 @@ async def get_active_video(unique_id: str, db: AsyncSession = Depends(get_db)):
     if not vid:
         raise HTTPException(status_code=404, detail="Active video missing")
     return {"video_url": vid.video_url}
+
+
+@router.get("/ar/{unique_id}")
+async def get_ar_content(unique_id: str, db: AsyncSession = Depends(get_db)):
     stmt = select(ARContent).where(ARContent.unique_id == unique_id)
     res = await db.execute(stmt)
     ac = res.scalar_one_or_none()

@@ -10,7 +10,7 @@ from app.models.storage import StorageConnection
 from app.schemas.company import CompanyCreate, CompanyResponse
 from app.services.storage.factory import get_provider
 
-router = APIRouter(prefix="/api/companies", tags=["companies"])
+router = APIRouter(tags=["companies"])
 
 @router.post("/", response_model=CompanyResponse)
 async def create_company(

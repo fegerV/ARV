@@ -28,7 +28,7 @@ class Project(Base):
     last_notification_sent_at = Column(DateTime)
 
     tags = Column(ARRAY(String))
-    metadata = Column(JSONB, default={})
+    project_metadata = Column("metadata", JSONB, default={})
 
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

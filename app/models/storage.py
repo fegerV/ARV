@@ -27,7 +27,7 @@ class StorageConnection(Base):
     test_status = Column(String(50))
     test_error = Column(Text)
 
-    metadata = Column(JSONB, default={})
+    storage_metadata = Column("metadata", JSONB, default={})
 
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
@@ -35,28 +35,6 @@ class StorageConnection(Base):
 
     # Relationships
     companies = relationship("Company", back_populates="storage_connection")
-
-
-class Company(Base):
-    __tablename__ = "companies"
-
-    id = Column(Integer, primary_key=True)
-    name = Column(String(255), unique=True, nullable=False)
-
-    # Storage
-    storage_connection_id = Column(Integer)
-    storage_path = Column(String(500))  # bucket/folder path
-
-    # Quota
-    storage_quota_gb = Column(Integer)
-    storage_used_bytes = Column(BigInteger, default=0)
-
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-
-    # Relationships
-    storage_connection = relationship("StorageConnection", back_populates="companies")
-    folders = relationship("StorageFolder", back_populates="company")
 
 
 class StorageFolder(Base):

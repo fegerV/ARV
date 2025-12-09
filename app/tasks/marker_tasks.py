@@ -63,7 +63,7 @@ def generate_mind_marker_task(self, portrait_id: int):
                 portrait.marker_path = result["marker_path"]
                 portrait.marker_url = result["marker_url"]
                 portrait.marker_status = result["status"]
-                portrait.metadata = result.get("metadata", {})
+                portrait.portrait_metadata = result.get("metadata", {})
 
                 await db.commit()
 

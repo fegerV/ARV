@@ -75,7 +75,6 @@ services:
       PROMETHEUS_MULTIPROC_DIR: /tmp/prometheus
     volumes:
       - ./storage/content:/app/storage/content
-      - /tmp/prometheus:/tmp/prometheus
     ports:
       - "8000:8000"
     healthcheck:

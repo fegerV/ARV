@@ -85,7 +85,7 @@ interface Stats {
 export default function ARContentDetail() {
   const { arContentId } = useParams<{ arContentId: string }>();
   const navigate = useNavigate();
-  const { showToast } = useToast();
+  const { addToast } = useToast();
   const qrCanvasRef = useRef<HTMLCanvasElement>(null);
   
   const [content, setContent] = useState<ARContentDetailProps | null>(null);
@@ -95,6 +95,7 @@ export default function ARContentDetail() {
   const [project, setProject] = useState<{ name: string } | null>(null);
   
   const [loading, setLoading] = useState(true);
+  const [generatingMarker, setGeneratingMarker] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [portraitLightbox, setPortraitLightbox] = useState(false);
   const [videoLightbox, setVideoLightbox] = useState<VideoInfo | null>(null);
@@ -119,9 +120,9 @@ export default function ARContentDetail() {
       setCompany(data.company);
       setProject(data.project);
       
-      showToast('Content loaded successfully', 'success');
+      addToast('Content loaded successfully', 'success');
     } catch (error: any) {
-      showToast(
+      addToast(
         error.response?.data?.message || 'Failed to load AR content',
         'error'
       );
@@ -143,10 +144,10 @@ export default function ARContentDetail() {
     setDeleting(true);
     try {
       await arContentAPI.delete(Number(arContentId));
-      showToast('AR content deleted successfully', 'success');
+      addToast('AR content deleted successfully', 'success');
       navigate(-1);
     } catch (error: any) {
-      showToast(
+      addToast(
         error.response?.data?.message || 'Failed to delete AR content',
         'error'
       );
@@ -161,11 +162,32 @@ export default function ARContentDetail() {
     navigate(`/ar-content/${arContentId}/edit`);
   };
 
+  const handleGenerateMarker = async () => {
+    if (!content) return;
+    
+    setGeneratingMarker(true);
+    try {
+      await arContentAPI.generateMarker(Number(arContentId));
+      addToast('Marker generation started', 'success');
+      
+      // Refresh the content to show updated status
+      await fetchContentDetail();
+    } catch (error: any) {
+      addToast(
+        error.response?.data?.message || 'Failed to start marker generation',
+        'error'
+      );
+      console.error('Failed to generate marker:', error);
+    } finally {
+      setGeneratingMarker(false);
+    }
+  };
+
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text).then(() => {
-      showToast('Copied to clipboard!', 'success');
+      addToast('Copied to clipboard!', 'success');
     }).catch(() => {
-      showToast('Failed to copy', 'error');
+      addToast('Failed to copy', 'error');
     });
   };
 
@@ -176,7 +198,7 @@ export default function ARContentDetail() {
     try {
       const canvas = qrCanvasRef.current;
       if (!canvas) {
-        showToast('QR code not ready', 'error');
+        addToast('QR code not ready', 'error');
         return;
       }
 
@@ -195,9 +217,9 @@ export default function ARContentDetail() {
           break;
       }
 
-      showToast(`QR code downloaded as ${format.toUpperCase()}`, 'success');
+      addToast(`QR code downloaded as ${format.toUpperCase()}`, 'success');
     } catch (error) {
-      showToast('Failed to download QR code', 'error');
+      addToast('Failed to download QR code', 'error');
       console.error('Download error:', error);
     } finally {
       setDownloadingQR(false);
@@ -309,6 +331,18 @@ export default function ARContentDetail() {
                 color={content.markerStatus === 'ready' ? 'success' : 'default'}
                 sx={{ mb: 1 }}
               />
+              {content.markerStatus !== 'ready' && (
+                <Button 
+                  variant="outlined" 
+                  size="small" 
+                  onClick={handleGenerateMarker}
+                  disabled={generatingMarker}
+                  startIcon={generatingMarker ? <CircularProgress size={16} /> : null}
+                  sx={{ ml: 1 }}
+                >
+                  {generatingMarker ? 'Генерация...' : 'Сгенерировать'}
+                </Button>
+              )}
               <Typography variant="body2">📁 {content.markerFileName} ({formatBytes(content.markerSize || 0)})</Typography>
               <Typography variant="body2">🔍 {content.markerFeaturePoints?.toLocaleString()} feature points</Typography>
               <Typography variant="body2">⏱️ Генерация: {content.markerGenerationTime}s</Typography>
@@ -347,7 +381,7 @@ export default function ARContentDetail() {
             <QRCode 
               value={arUrl} 
               size={200}
-              ref={(el) => {
+              ref={(el: any) => {
                 if (el) {
                   const canvas = el.querySelector('canvas');
                   if (canvas && qrCanvasRef.current !== canvas) {
@@ -609,7 +643,7 @@ export default function ARContentDetail() {
         </DialogTitle>
         <DialogContent>
           <Box sx={{ textAlign: 'center', mb: 2 }}>
-            <div ref={(el) => {
+            <div ref={(el: any) => {
               if (el) {
                 const canvas = el.querySelector('canvas');
                 if (canvas && qrCanvasRef.current !== canvas) {
