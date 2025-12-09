@@ -74,68 +74,14 @@ interface ARContentItem {
   };
 }
 
-// Mock data for testing
-const mockData: ARContentItem[] = [
-  {
-    id: 1,
-    unique_id: 'abc123',
-    order_number: '000001',
-    title: 'Постер #1 - Санта с подарками',
-    marker_status: 'ready',
-    image_url: '/api/portraits/santa-poster.jpg',
-    created_at: '2025-12-05T14:30:00',
-    is_active: true,
-    client_name: 'Светлана',
-    client_phone: '+7 (999) 123-45-67',
-    client_email: 'svetlana@example.com',
-    views: 5,
-    project: {
-      id: 10,
-      name: 'Новогодние постеры 2025'
-    },
-    company: {
-      id: 1,
-      name: 'Vertex AR'
-    },
-    active_video: {
-      id: 1,
-      title: 'Анимация 1'
-    }
-  },
-  {
-    id: 2,
-    unique_id: 'def456',
-    order_number: '000002',
-    title: 'Постер #2 - Дед Мороз',
-    marker_status: 'processing',
-    image_url: '/api/portraits/ded-moroz-poster.jpg',
-    created_at: '2025-12-06T10:15:00',
-    is_active: true,
-    client_name: 'Иван',
-    client_phone: '+7 (999) 765-43-21',
-    client_email: 'ivan@example.com',
-    views: 12,
-    project: {
-      id: 10,
-      name: 'Новогодние постеры 2025'
-    },
-    company: {
-      id: 1,
-      name: 'Vertex AR'
-    },
-    active_video: {
-      id: 2,
-      title: 'Анимация 2'
-    }
-  }
-];
+// No mock data needed - using real API
 
 export default function ARContentList() {
   const navigate = useNavigate();
   const { addToast } = useToast();
   
-  const [contentList, setContentList] = useState<ARContentItem[]>(mockData);
-  const [filteredContentList, setFilteredContentList] = useState<ARContentItem[]>(mockData);
+  const [contentList, setContentList] = useState<ARContentItem[]>([]);
+  const [filteredContentList, setFilteredContentList] = useState<ARContentItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
@@ -153,21 +99,12 @@ export default function ARContentList() {
   const fetchContentList = async () => {
     try {
       setLoading(true);
-      // Simulate API call delay
-      await new Promise(resolve => setTimeout(resolve, 1000));
       
-      // In a real implementation, we would use:
-      // const response = await arContentAPI.listAll();
-      // setContentList(response.data.items || []);
-      // setFilteredContentList(response.data.items || []);
+      const response = await arContentAPI.listAll();
+      setContentList(response.data.items || []);
+      setFilteredContentList(response.data.items || []);
       
-      // For now, we're using mock data
-      setContentList(mockData);
-      setFilteredContentList(mockData);
-      
-      if (mockData.length > 0) {
-        addToast('AR content loaded successfully', 'success');
-      }
+      addToast('AR content loaded successfully', 'success');
     } catch (error) {
       console.error('Error fetching AR content:', error);
       addToast('Failed to load AR content', 'error');
@@ -247,10 +184,19 @@ export default function ARContentList() {
     navigate(`/ar-content/${id}`);
   };
 
-  const handleDelete = (id: number) => {
-    // TODO: Implement delete functionality
-    console.log('Delete content with ID:', id);
-    addToast('Delete functionality not implemented yet', 'warning');
+  const handleDelete = async (id: number) => {
+    if (window.confirm('Are you sure you want to delete this AR content? This action cannot be undone.')) {
+      try {
+        await arContentAPI.delete(id);
+        // Remove the deleted item from the list
+        setContentList(prev => prev.filter(item => item.id !== id));
+        setFilteredContentList(prev => prev.filter(item => item.id !== id));
+        addToast('AR content deleted successfully', 'success');
+      } catch (error) {
+        console.error('Error deleting AR content:', error);
+        addToast('Failed to delete AR content', 'error');
+      }
+    }
   };
 
   const handleExport = () => {

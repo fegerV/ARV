@@ -101,7 +101,7 @@ interface Project {
 
 export default function ARContentForm() {
   const navigate = useNavigate();
-  const { projectId } = useParams<{ projectId: string }>();
+  const { projectId, companyId } = useParams<{ projectId: string; companyId: string }>();
   const { addToast } = useToast();
   
   const [activeStep, setActiveStep] = useState(0);
@@ -119,7 +119,7 @@ export default function ARContentForm() {
     customerEmail: '',
     
     // Company info
-    companyId: 1, // Default to Vertex AR
+    companyId: companyId ? parseInt(companyId) : null, // Will be set to default company after loading
     
     // Project info
     projectId: projectId ? parseInt(projectId) : null,
@@ -147,14 +147,52 @@ export default function ARContentForm() {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        // Fetch companies
-        const companiesResponse = await companiesAPI.list();
+        // Fetch companies (including default)
+        const companiesResponse = await companiesAPI.list(true);
         setCompanies(companiesResponse.data);
         
-        // If we have a company ID, fetch its projects
-        if (formData.companyId) {
-          const projectsResponse = await projectsAPI.list(formData.companyId);
-          setProjects(projectsResponse.data.projects || []);
+        // Set company ID from URL params or default company
+        let actualCompanyId = formData.companyId;
+        
+        if (!actualCompanyId && companiesResponse.data.length > 0) {
+          // If companyId is provided in URL params, use it
+          if (companyId) {
+            actualCompanyId = parseInt(companyId);
+          } else {
+            // Otherwise find the Vertex AR company (default company)
+            const vertexARCompany = companiesResponse.data.find((company: Company) => 
+              company.is_default === true || company.name === 'Vertex AR'
+            );
+            
+            actualCompanyId = vertexARCompany ? vertexARCompany.id : companiesResponse.data[0].id;
+          }
+          
+          // Update form data with company ID
+          setFormData(prev => ({
+            ...prev,
+            companyId: actualCompanyId
+          }));
+        }
+        
+        // Fetch projects for the company
+        if (actualCompanyId) {
+          const projectsResponse = await projectsAPI.list(actualCompanyId);
+          const fetchedProjects = projectsResponse.data.projects || [];
+          setProjects(fetchedProjects);
+          
+          // If projectId is provided in URL params, check if it exists in fetched projects
+          if (projectId) {
+            const projectIdNum = parseInt(projectId);
+            const projectExists = fetchedProjects.some(p => p.id === projectIdNum);
+            
+            // If project doesn't exist in the list, reset the projectId in form data
+            if (!projectExists) {
+              setFormData(prev => ({
+                ...prev,
+                projectId: null
+              }));
+            }
+          }
         }
       } catch (err) {
         console.error('Failed to fetch data:', err);
@@ -163,7 +201,7 @@ export default function ARContentForm() {
     };
     
     fetchData();
-  }, [formData.companyId]);
+  }, [companyId, projectId]); // Depend on companyId and projectId from URL params
 
   // Handle company change
   const handleCompanyChange = (companyId: number) => {
@@ -175,6 +213,25 @@ export default function ARContentForm() {
       creatingNewProject: false,
     });
   };
+
+  // Fetch projects when companyId changes
+  useEffect(() => {
+    const fetchProjects = async () => {
+      if (formData.companyId) {
+        try {
+          const projectsResponse = await projectsAPI.list(formData.companyId);
+          setProjects(projectsResponse.data.projects || []);
+        } catch (err) {
+          console.error('Failed to fetch projects:', err);
+          addToast('Failed to load projects', 'error');
+        }
+      } else {
+        setProjects([]);
+      }
+    };
+
+    fetchProjects();
+  }, [formData.companyId]);
 
   // Handle portrait file change
   const handlePortraitChange = (e: React.ChangeEvent<HTMLInputElement>) => {
