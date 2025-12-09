@@ -2,7 +2,7 @@ import axios from 'axios';
 
 const api = axios.create({
   baseURL: '/api',
-  timeout: 10000,
+  timeout: 30000, // Увеличиваем таймаут до 30 секунд
   headers: {
     'Content-Type': 'application/json',
   },
@@ -52,7 +52,7 @@ export const arContentAPI = {
 };
 
 export const companiesAPI = {
-  list: () => api.get('/companies'),
+  list: (includeDefault: boolean = false) => api.get(`/companies?include_default=${includeDefault}`),
   get: (id: number) => api.get(`/companies/${id}`),
   create: (data: any) => api.post('/companies', data),
   update: (id: number, data: any) => api.put(`/companies/${id}`, data),

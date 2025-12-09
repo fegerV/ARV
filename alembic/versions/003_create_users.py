@@ -1,7 +1,7 @@
 """Create users table
 
 Revision ID: 003_create_users
-Revises: 002
+Revises: 002_add_storage_companies_relationship
 Create Date: 2025-12-05 14:00:00
 
 """
@@ -11,7 +11,7 @@ from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
 revision = '003_create_users'
-down_revision = '002'  # Adjust based on your last migration
+down_revision = '002_add_storage_companies_relationship'  # Adjust based on your last migration
 branch_labels = None
 depends_on = None
 

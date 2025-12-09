@@ -11,6 +11,41 @@ from app.models.company import Company
 router = APIRouter()
 
 
+@router.get("/companies/{company_id}/projects")
+async def list_projects_for_company(company_id: int, db: AsyncSession = Depends(get_db)):
+    # Проверяем существование компании
+    company = await db.get(Company, company_id)
+    if not company:
+        raise HTTPException(status_code=404, detail="Company not found")
+    
+    # Получаем список проектов компании
+    stmt = select(Project).where(Project.company_id == company_id)
+    res = await db.execute(stmt)
+    projects = res.scalars().all()
+    
+    items = []
+    now = datetime.utcnow()
+    for p in projects:
+        days_left = None
+        if p.expires_at:
+            delta = p.expires_at - now
+            days_left = max(0, delta.days)
+        items.append({
+            "id": p.id,
+            "name": p.name,
+            "slug": p.slug,
+            "status": p.status,
+            "period": {
+                "starts_at": _iso(p.starts_at),
+                "expires_at": _iso(p.expires_at),
+                "days_left": days_left,
+            },
+            "folder_path": p.folder_path,
+            "project_type": p.project_type,
+        })
+    return {"projects": items}
+
+
 @router.post("/projects")
 async def create_project(payload: dict, db: AsyncSession = Depends(get_db)):
     required = ["company_id", "name", "slug"]
@@ -40,34 +75,11 @@ async def create_project(payload: dict, db: AsyncSession = Depends(get_db)):
     await db.refresh(proj)
     return {"id": proj.id, "slug": proj.slug}
 
+
 @router.post("/companies/{company_id}/projects")
 async def create_project_for_company(company_id: int, payload: dict, db: AsyncSession = Depends(get_db)):
     payload = {**payload, "company_id": company_id}
     return await create_project(payload, db)
-    stmt = select(Project).where(Project.company_id == company_id)
-    res = await db.execute(stmt)
-    projects = res.scalars().all()
-    items = []
-    now = datetime.utcnow()
-    for p in projects:
-        days_left = None
-        if p.expires_at:
-            delta = p.expires_at - now
-            days_left = max(0, delta.days)
-        items.append({
-            "id": p.id,
-            "name": p.name,
-            "slug": p.slug,
-            "status": p.status,
-            "period": {
-                "starts_at": _iso(p.starts_at),
-                "expires_at": _iso(p.expires_at),
-                "days_left": days_left,
-            },
-            "folder_path": p.folder_path,
-            "project_type": p.project_type,
-        })
-    return {"projects": items}
 
 
 @router.put("/projects/{project_id}")
@@ -103,26 +115,6 @@ async def extend_project(project_id: int, payload: dict, db: AsyncSession = Depe
     proj.expires_at = base + timedelta(days=days)
     await db.commit()
     return {"expires_at": proj.expires_at.isoformat()}
-    proj = await db.get(Project, project_id)
-    if not proj:
-        raise HTTPException(status_code=404, detail="Project not found")
-    return {
-        "id": proj.id,
-        "company_id": proj.company_id,
-        "name": proj.name,
-        "slug": proj.slug,
-        "folder_path": proj.folder_path,
-        "description": proj.description,
-        "project_type": proj.project_type,
-        "subscription_type": proj.subscription_type,
-        "starts_at": _iso(proj.starts_at),
-        "expires_at": _iso(proj.expires_at),
-        "auto_renew": bool(proj.auto_renew),
-        "status": proj.status,
-        "notify_before_expiry_days": proj.notify_before_expiry_days,
-        "tags": proj.tags,
-        "metadata": proj.project_metadata,
-    }
 
 
 def _parse_dt(v: Optional[str]):

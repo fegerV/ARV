@@ -6,13 +6,13 @@ from datetime import datetime
 from app.core.database import get_db
 from app.models.storage import StorageConnection
 from app.models.company import Company
-from app.schemas.storage import StorageConnectionCreate, StorageConnectionResponse, CompanyStorageSettings
+from app.schemas.storage import StorageConnectionCreate, StorageConnection, CompanyStorageSettings
 from app.services.storage.factory import get_provider
 
 router = APIRouter()
 
 
-@router.post("/storage/connections", response_model=StorageConnectionResponse)
+@router.post("/storage/connections", response_model=StorageConnection)
 async def create_connection(payload: StorageConnectionCreate, db: AsyncSession = Depends(get_db)):
     conn = StorageConnection(
         name=payload.name,

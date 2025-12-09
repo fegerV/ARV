@@ -7,7 +7,7 @@ celery_app = Celery(
     "vertex_ar",
     broker=settings.CELERY_BROKER_URL,
     backend=settings.CELERY_RESULT_BACKEND,
-    include=["app.tasks.marker_tasks", "app.tasks.notification_tasks", "app.tasks.expiry_tasks", "app.tasks.monitoring"],
+    include=["app.tasks.marker_tasks", "app.tasks.notification_tasks", "app.tasks.expiry_tasks", "app.tasks.monitoring", "app.tasks.preview_tasks"],
 )
 
 # Configure Celery
@@ -26,6 +26,8 @@ celery_app.conf.update(
         "notifications": {"exchange": "notifications", "routing_key": "notifications"},
         "default": {"exchange": "default", "routing_key": "default"},
     },
+    # Explicitly set the scheduler to avoid import issues
+    beat_scheduler="celery.beat:PersistentScheduler",
 )
 
 celery_app.conf.beat_schedule = {

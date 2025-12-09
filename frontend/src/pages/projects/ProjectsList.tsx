@@ -44,11 +44,82 @@ export default function ProjectsList() {
   
   // Fetch companies and projects
   useEffect(() => {
+    let isMounted = true;
+    
     const fetchData = async () => {
       setLoading(true);
       try {
-        // Fetch companies
-        const companiesResponse = await companiesAPI.list();
+        console.log('Fetching companies with include_default=true');
+        // Try cached companies first
+        const cachedCompanies = sessionStorage.getItem('cached_companies');
+        if (cachedCompanies) {
+          try {
+            const parsed = JSON.parse(cachedCompanies);
+            if (Date.now() - parsed.timestamp < 5 * 60 * 1000) { // 5 минут кэша
+              console.log('Using cached companies data');
+              if (isMounted) {
+                setCompanies(parsed.data);
+                
+                // Set initial selected company from cache
+                let defaultCompanyId: number | null = null;
+                if (companyId) {
+                  defaultCompanyId = parseInt(companyId);
+                } else {
+                  const vertexARCompany = parsed.data.find((company: Company) => 
+                    company.is_default === true || company.name === 'Vertex AR'
+                  );
+                  console.log('Searching for Vertex AR company in cache, found:', vertexARCompany);
+                  
+                  if (vertexARCompany) {
+                    defaultCompanyId = vertexARCompany.id;
+                  } else if (parsed.data.length > 0) {
+                    defaultCompanyId = parsed.data[0].id;
+                  }
+                }
+                console.log('Selected company ID from cache:', defaultCompanyId);
+                
+                if (defaultCompanyId) {
+                  setSelectedCompanyId(defaultCompanyId);
+                  
+                  // Fetch projects for this company
+                  console.log(`Fetching projects for company ${defaultCompanyId}`);
+                  try {
+                    const projectsResponse = await projectsAPI.list(defaultCompanyId);
+                    if (isMounted) {
+                      console.log('Projects response received:', projectsResponse.data?.projects?.length, 'projects');
+                      setProjects(projectsResponse.data.projects || []);
+                    }
+                  } catch (projectsError) {
+                    console.error('Failed to fetch projects:', projectsError);
+                    if (isMounted) {
+                      addToast('Failed to load projects', 'error');
+                    }
+                  }
+                  
+                  if (!companyId && isMounted) {
+                    navigate(`/companies/${defaultCompanyId}/projects`, { replace: true });
+                  }
+                }
+                setLoading(false);
+                return;
+              }
+            }
+          } catch (e) {
+            console.error('Failed to parse cached companies', e);
+          }
+        }
+        
+        // Fetch fresh companies data
+        const companiesResponse = await companiesAPI.list(true);
+        if (!isMounted) return;
+        
+        // Cache the data
+        sessionStorage.setItem('cached_companies', JSON.stringify({
+          data: companiesResponse.data,
+          timestamp: Date.now()
+        }));
+        
+        console.log('Companies response received:', companiesResponse.data?.length, 'companies');
         setCompanies(companiesResponse.data);
         
         // Set initial selected company
@@ -62,6 +133,7 @@ export default function ProjectsList() {
           const vertexARCompany = companiesResponse.data.find((company: Company) => 
             company.is_default === true || company.name === 'Vertex AR'
           );
+          console.log('Searching for Vertex AR company, found:', vertexARCompany);
           
           if (vertexARCompany) {
             defaultCompanyId = vertexARCompany.id;
@@ -70,29 +142,54 @@ export default function ProjectsList() {
             defaultCompanyId = companiesResponse.data[0].id;
           }
         }
+        console.log('Selected company ID:', defaultCompanyId);
         
         // Set the selected company and fetch its projects
         if (defaultCompanyId) {
           setSelectedCompanyId(defaultCompanyId);
           
           // Fetch projects for this company
-          const projectsResponse = await projectsAPI.list(defaultCompanyId);
-          setProjects(projectsResponse.data.projects || []);
+          console.log(`Fetching projects for company ${defaultCompanyId}`);
+          try {
+            const projectsResponse = await projectsAPI.list(defaultCompanyId);
+            if (!isMounted) return;
+            
+            console.log('Projects response received:', projectsResponse.data?.projects?.length, 'projects');
+            setProjects(projectsResponse.data.projects || []);
+          } catch (projectsError) {
+            console.error('Failed to fetch projects:', projectsError);
+            if (isMounted) {
+              addToast('Failed to load projects', 'error');
+            }
+          }
           
           // Update URL if needed
-          if (!companyId) {
+          if (!companyId && isMounted) {
             navigate(`/companies/${defaultCompanyId}/projects`, { replace: true });
           }
         }
       } catch (error) {
-        console.error('Failed to fetch data:', error);
-        addToast('Failed to load data', 'error');
+        console.error('Failed to fetch companies:', error);
+        console.error('Error details:', {
+          message: (error as any)?.message,
+          response: (error as any)?.response,
+          request: (error as any)?.request,
+        });
+        if (isMounted) {
+          addToast('Failed to load companies. Please check your connection and try again.', 'error');
+        }
       } finally {
-        setLoading(false);
+        if (isMounted) {
+          setLoading(false);
+        }
       }
     };
     
     fetchData();
+    
+    return () => {
+      isMounted = false;
+    };
   }, [companyId]);
 
   // Fetch projects when selected company changes
@@ -169,6 +266,8 @@ export default function ProjectsList() {
     
     try {
       setRefreshing(true);
+      // Clear cache
+      sessionStorage.removeItem('cached_companies');
       const projectsResponse = await projectsAPI.list(selectedCompanyId);
       setProjects(projectsResponse.data.projects || []);
     } catch (error) {
@@ -179,6 +278,50 @@ export default function ProjectsList() {
     }
   };
 
+  const handleRefreshCompanies = async () => {
+    try {
+      setLoading(true);
+      // Clear cache
+      sessionStorage.removeItem('cached_companies');
+      
+      // Fetch fresh companies data
+      const companiesResponse = await companiesAPI.list(true);
+      
+      // Cache the data
+      sessionStorage.setItem('cached_companies', JSON.stringify({
+        data: companiesResponse.data,
+        timestamp: Date.now()
+      }));
+      
+      setCompanies(companiesResponse.data);
+      
+      // If no company is selected or current selection is invalid, select default
+      if (!selectedCompanyId || !companiesResponse.data.some((c: Company) => c.id === selectedCompanyId)) {
+        const vertexARCompany = companiesResponse.data.find((company: Company) => 
+          company.is_default === true || company.name === 'Vertex AR'
+        );
+        
+        if (vertexARCompany) {
+          setSelectedCompanyId(vertexARCompany.id);
+          // Fetch projects for this company
+          try {
+            const projectsResponse = await projectsAPI.list(vertexARCompany.id);
+            setProjects(projectsResponse.data.projects || []);
+          } catch (projectsError) {
+            console.error('Failed to fetch projects:', projectsError);
+            addToast('Failed to load projects', 'error');
+          }
+          navigate(`/companies/${vertexARCompany.id}/projects`, { replace: true });
+        }
+      }
+    } catch (error) {
+      console.error('Failed to refresh companies:', error);
+      addToast('Failed to refresh companies', 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+  
   return (
     <Box>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
@@ -191,7 +334,16 @@ export default function ProjectsList() {
             disabled={!selectedCompanyId || refreshing}
             sx={{ mr: 2 }}
           >
-            Refresh
+            Refresh Projects
+          </Button>
+          <Button
+            variant="outlined"
+            startIcon={<RefreshIcon />}
+            onClick={handleRefreshCompanies}
+            disabled={loading}
+            sx={{ mr: 2 }}
+          >
+            Refresh Companies
           </Button>
           <Button
             variant="contained"

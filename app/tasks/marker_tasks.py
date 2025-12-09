@@ -11,6 +11,7 @@ from app.models.portrait import Portrait
 from app.models.company import Company
 from app.models.storage import StorageConnection
 from app.services.storage.factory import get_provider
+from app.services.marker_service import marker_service
 
 logger = structlog.get_logger()
 

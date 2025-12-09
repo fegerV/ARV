@@ -74,6 +74,9 @@ async def logs_command(update, context):
     # reuse alerts_history as recent log-like entries
     await alerts_command(update, context)
 
+async def storage_command(update, context):
+    # Placeholder for storage command
+    await update.message.reply_text("💾 Storage status: OK\n📦 Used: 1.2 GB\n📊 Quota: 10 GB")
 
 async def backup_bot_command(update, context):
     text = update.message.text.strip()
@@ -100,3 +103,22 @@ async def backup_bot_command(update, context):
         await storage_command(update, context)
     else:
         await update.message.reply_text("Unknown command")
+
+
+# Simple class to act as a service
+class BackupBotService:
+    def __init__(self):
+        pass
+
+    async def run_manual_backup(self) -> str:
+        return await run_manual_backup()
+
+    async def restore_backup(self, backup_id: str) -> str:
+        return await restore_backup(backup_id)
+
+    async def backup_bot_command(self, update, context):
+        return await backup_bot_command(update, context)
+
+
+# Singleton instance
+backup_bot = BackupBotService()

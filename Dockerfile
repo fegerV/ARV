@@ -10,15 +10,18 @@ ENV PYTHONUNBUFFERED=1 \
 RUN useradd -m -u 1000 appuser
 
 # Install system dependencies
-RUN apt-get update && apt-get install -y \
+RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc \
     g++ \
     libpq-dev \
     postgresql-client \
     curl \
-    nodejs \
-    npm \
+    ffmpeg \
     && rm -rf /var/lib/apt/lists/*
+
+# Install Node.js
+RUN curl -fsSL https://deb.nodesource.com/setup_18.x | bash - && \
+    apt-get install -y nodejs
 
 # Set working directory
 WORKDIR /app

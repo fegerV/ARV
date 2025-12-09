@@ -12,6 +12,17 @@ import redis.asyncio as redis
 import structlog
 
 from app.core.config import settings
+
+logger = structlog.get_logger()
+
+@dataclass
+class Alert:
+    severity: str  # "critical", "warning", "info"
+    title: str
+    message: str
+    metrics: dict
+    affected_services: List[str]
+
 async def publish_alerts(alerts: List[Alert]) -> None:
     try:
         r = redis.from_url(settings.REDIS_URL)
@@ -25,15 +36,6 @@ async def publish_alerts(alerts: List[Alert]) -> None:
         await r.aclose()
     except Exception as e:
         logger.error("publish_alerts_error", error=str(e))
-
-
-@dataclass
-class Alert:
-    severity: str  # "critical", "warning", "info"
-    title: str
-    message: str
-    metrics: dict
-    affected_services: List[str]
 
 
 ALERT_COOLDOWN_SECONDS = {
@@ -152,3 +154,28 @@ async def send_telegram_message(chat_id: str, message: str) -> None:
                 logger.error("telegram_alert_failed", status=resp.status_code)
     except Exception as e:
         logger.error("telegram_alert_error", error=str(e))
+
+
+# Simple class to act as a service
+class AlertService:
+    def __init__(self):
+        pass
+
+    async def publish_alerts(self, alerts: List[Alert]) -> None:
+        return await publish_alerts(alerts)
+
+    async def send_critical_alerts(self, alerts: List[Alert], metrics: dict) -> None:
+        return await send_critical_alerts(alerts, metrics)
+
+    async def send_admin_email(self, alerts: List[Alert], metrics: dict) -> None:
+        return await send_admin_email(alerts, metrics)
+
+    async def send_telegram_alerts(self, alerts: List[Alert], metrics: dict) -> None:
+        return await send_telegram_alerts(alerts, metrics)
+
+    async def send_telegram_message(self, chat_id: str, message: str) -> None:
+        return await send_telegram_message(chat_id, message)
+
+
+# Singleton instance
+alert_service = AlertService()

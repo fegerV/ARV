@@ -1,7 +1,7 @@
 """Add performance indexes for analytics, companies, projects, and rotation schedules
 
 Revision ID: 20251205_perf_idx
-Revises: 
+Revises: 005_add_company_folders_relationship
 Create Date: 2025-12-05
 """
 from alembic import op
@@ -9,7 +9,7 @@ import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
 revision = '20251205_perf_idx'
-down_revision = None
+down_revision = '005_add_company_folders_relationship'
 branch_labels = None
 depends_on = None
 

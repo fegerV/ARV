@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, Text, BigInteger
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, Text, BigInteger, ForeignKey
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import relationship
 from datetime import datetime
@@ -41,7 +41,7 @@ class StorageFolder(Base):
     __tablename__ = "storage_folders"
 
     id = Column(Integer, primary_key=True)
-    company_id = Column(Integer)
+    company_id = Column(Integer, ForeignKey("companies.id"))
 
     name = Column(String(255), nullable=False)
     path = Column(String(500), nullable=False)

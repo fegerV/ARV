@@ -78,3 +78,19 @@ async def send_expiry_warning_telegram(company_chat_id: str, project_name: str, 
     except Exception as e:
         logger.error("telegram_send_error", error=str(e))
         return False
+
+
+# Create a simple class to act as a service
+class NotificationService:
+    def __init__(self):
+        pass
+
+    def send_expiry_warning_email(self, project_name: str, company_email: str, expires_at_str: str, ar_items_count: int) -> bool:
+        return send_expiry_warning_email(project_name, company_email, expires_at_str, ar_items_count)
+
+    async def send_expiry_warning_telegram(self, company_chat_id: str, project_name: str, expires_at_str: str, ar_items_count: int) -> bool:
+        return await send_expiry_warning_telegram(company_chat_id, project_name, expires_at_str, ar_items_count)
+
+
+# Singleton instance
+notification_service = NotificationService()

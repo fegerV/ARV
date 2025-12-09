@@ -31,18 +31,19 @@ import ThemeToggle from '../components/common/ThemeToggle';
 import { useToast } from '../store/useToast';
 import api from '../services/api';
 import { format } from 'date-fns';
-import { ru } from 'date-fns/locale';
+// Removed unused import - ru locale not needed
+
+interface User {
+  id: number;
+  email: string;
+  full_name: string;
+  role: string;
+  last_login_at?: string;
+}
 
 interface LoginResponse {
   access_token: string;
-  token_type: string;
-  user: {
-    id: number;
-    email: string;
-    full_name: string;
-    role: string;
-    last_login_at?: string;
-  };
+  user: User;
 }
 
 interface LoginError {
@@ -62,7 +63,7 @@ export default function Login() {
   
   const navigate = useNavigate();
   const { login, isAuthenticated } = useAuthStore();
-  const { showToast } = useToast();
+  const { addToast: showToast } = useToast();
   const theme = useTheme();
 
   // Redirect if already authenticated
@@ -121,7 +122,7 @@ export default function Login() {
       if (errorData?.locked_until) {
         const lockTime = new Date(errorData.locked_until);
         setLockedUntil(lockTime);
-        setError(`Аккаунт временно заблокирован до ${format(lockTime, 'HH:mm:ss', { locale: ru })}`);
+        setError(`Аккаунт временно заблокирован до ${format(lockTime, 'HH:mm:ss')}`);
       } else if (errorData?.attempts_left !== undefined) {
         setAttemptsLeft(errorData.attempts_left);
         setError(errorData.detail || 'Неверный email или пароль');

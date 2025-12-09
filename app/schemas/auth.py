@@ -7,6 +7,13 @@ class Token(BaseModel):
     token_type: str
     user: 'UserResponse'
 
+class TokenData(BaseModel):
+    """Data encoded in JWT token"""
+    user_id: int
+    email: str
+    role: str
+    exp: datetime
+
 class UserResponse(BaseModel):
     id: int
     email: str

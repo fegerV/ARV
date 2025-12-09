@@ -183,7 +183,7 @@ export default function ARContentForm() {
           // If projectId is provided in URL params, check if it exists in fetched projects
           if (projectId) {
             const projectIdNum = parseInt(projectId);
-            const projectExists = fetchedProjects.some(p => p.id === projectIdNum);
+            const projectExists = fetchedProjects.some((p: Project) => p.id === projectIdNum);
             
             // If project doesn't exist in the list, reset the projectId in form data
             if (!projectExists) {

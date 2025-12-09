@@ -46,7 +46,7 @@ class StorageConnectionUpdate(BaseModel):
     credentials: Optional[Dict[str, Any]] = None
     metadata: Optional[Dict[str, Any]] = None
 
-class StorageConnectionResponse(StorageConnectionBase):
+class StorageConnection(StorageConnectionBase):
     id: int
     is_active: bool
     base_path: Optional[str] = None

@@ -40,29 +40,15 @@ async def create_company(
     if exists.scalar_one_or_none():
         raise HTTPException(status_code=400, detail=f"Company with slug '{slug}' already exists")
 
-    # Определяем storage_path
-    storage_path: str
-    if storage_conn.provider == "yandex_disk":
-        storage_path = company_data.storage_path or f"/Companies/{slug}"
-        provider = get_provider(storage_conn)
-        ok = await provider.create_folder(storage_path)
-        if not ok:
-            raise HTTPException(status_code=500, detail=f"Failed to create folder in Yandex Disk: {storage_path}")
-        # Create subfolders
-        for sub in ["portraits", "videos", "markers", "qr-codes", "thumbnails"]:
-            await provider.create_folder(f"{storage_path}/{sub}")
-    elif storage_conn.provider == "minio":
-        # Используем bucket = slug
-        storage_path = slug
-        provider = get_provider(storage_conn)
-        ok = await provider.create_folder(storage_path)
-        if not ok:
-            raise HTTPException(status_code=500, detail=f"Failed to create MinIO bucket: {storage_path}")
-        # Create subfolders as prefix objects
-        for sub in ["portraits", "videos", "markers", "qr-codes", "thumbnails"]:
-            await provider.create_folder(f"{storage_path}/{sub}")
-    else:
-        raise HTTPException(status_code=400, detail="Unsupported provider for client companies")
+    # Создаем папку в хранилище
+    storage_path = f"/Companies/{company_data.name}"
+    provider = get_provider(storage_conn)
+    result = await provider.create_folder(storage_path)
+    if not result.get("success"):
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to create folder in {storage_conn.provider}: {result.get('error')}",
+        )
 
     # Создаем компанию
     company = Company(
@@ -123,9 +109,8 @@ async def delete_company(company_id: int, db: AsyncSession = Depends(get_db)):
     await db.commit()
     return {"status": "deleted"}
 
-
-@router.get("/companies/{company_id}/analytics")
-async def company_analytics(company_id: int, db: AsyncSession = Depends(get_db)):
+@router.get("/{company_id}/analytics")
+async def company_analytics(company_id: int, db: AsyncSession = Depends(get_db)):    
     # Placeholder: counts will require joins to ar_view_sessions
     return {
         "company_id": company_id,

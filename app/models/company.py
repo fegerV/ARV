@@ -1,5 +1,6 @@
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, Text, BigInteger
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, Text, BigInteger, ForeignKey
 from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.orm import relationship
 from datetime import datetime
 from app.core.database import Base
 
@@ -17,7 +18,7 @@ class Company(Base):
     telegram_chat_id = Column(String(100))
 
     # Storage
-    storage_connection_id = Column(Integer)
+    storage_connection_id = Column(Integer, ForeignKey("storage_connections.id"))
     storage_path = Column(String(500))
 
     # Quotas & billing
@@ -38,3 +39,7 @@ class Company(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     created_by = Column(Integer)  # FK to users.id (omitted)
+
+    # Relationships
+    storage_connection = relationship("StorageConnection", back_populates="companies")
+    folders = relationship("StorageFolder", back_populates="company")
