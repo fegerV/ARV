@@ -7,8 +7,10 @@ import structlog
 from app.core.database import get_db
 from app.models.company import Company
 from app.models.storage import StorageConnection
+from app.models.user import User
 from app.schemas.company import CompanyCreate, CompanyResponse
 from app.services.storage.factory import get_provider
+from app.api.routes.auth import get_current_active_user
 
 router = APIRouter(tags=["companies"])
 
@@ -16,6 +18,7 @@ router = APIRouter(tags=["companies"])
 async def create_company(
     company_data: CompanyCreate,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
 ):
     logger = structlog.get_logger()
     # ВАЖНО: Требуем storage_connection_id
@@ -90,7 +93,12 @@ async def get_company(company_id: int, db: AsyncSession = Depends(get_db)):
     return c
 
 @router.put("/{company_id}")
-async def update_company(company_id: int, payload: dict, db: AsyncSession = Depends(get_db)):
+async def update_company(
+    company_id: int, 
+    payload: dict, 
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
     c = await db.get(Company, company_id)
     if not c:
         raise HTTPException(status_code=404, detail="Company not found")
@@ -101,7 +109,11 @@ async def update_company(company_id: int, payload: dict, db: AsyncSession = Depe
     return {"status": "updated"}
 
 @router.delete("/{company_id}")
-async def delete_company(company_id: int, db: AsyncSession = Depends(get_db)):
+async def delete_company(
+    company_id: int, 
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
     c = await db.get(Company, company_id)
     if not c:
         raise HTTPException(status_code=404, detail="Company not found")
