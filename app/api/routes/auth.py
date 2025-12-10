@@ -3,10 +3,10 @@ from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from datetime import datetime, timedelta
-from app.core.security import verify_password, create_access_token
+from app.core.security import verify_password, create_access_token, get_password_hash
 from app.core.database import get_db
 from app.models.user import User
-from app.schemas.auth import Token, UserResponse
+from app.schemas.auth import Token, UserResponse, RegisterRequest, RegisterResponse
 import structlog
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -136,8 +136,10 @@ async def login(
     user.last_login_at = datetime.utcnow()
     await db.commit()
     
-    # Create JWT token (15 minutes expiry)
-    access_token_expires = timedelta(minutes=15)
+    # Create JWT token with configured expiry
+    from app.core.config import get_settings
+    settings = get_settings()
+    access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token(
         data={"sub": user.email, "user_id": user.id},
         expires_delta=access_token_expires
@@ -161,3 +163,66 @@ async def logout(current_user: User = Depends(get_current_active_user)):
 async def read_users_me(current_user: User = Depends(get_current_active_user)):
     """Get current user info"""
     return UserResponse.from_orm(current_user)
+
+@router.post("/register", response_model=RegisterResponse)
+async def register_user(
+    request: Request,
+    user_data: RegisterRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """Register a new user (admin only)"""
+    # Check if current user is admin
+    if current_user.role != "admin":
+        logger.warning(
+            "unauthorized_registration_attempt", 
+            user_id=current_user.id, 
+            email=current_user.email,
+            requested_role=user_data.role.value
+        )
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only administrators can create new users"
+        )
+    
+    # Check if email already exists
+    result = await db.execute(select(User).where(User.email == user_data.email))
+    existing_user = result.scalar_one_or_none()
+    
+    if existing_user:
+        logger.warning(
+            "duplicate_email_registration_attempt",
+            email=user_data.email,
+            attempted_by=current_user.email
+        )
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Email already registered"
+        )
+    
+    # Create new user
+    hashed_password = get_password_hash(user_data.password)
+    new_user = User(
+        email=user_data.email,
+        hashed_password=hashed_password,
+        full_name=user_data.full_name,
+        role=user_data.role,
+        is_active=True
+    )
+    
+    db.add(new_user)
+    await db.commit()
+    await db.refresh(new_user)
+    
+    logger.info(
+        "user_registered",
+        user_id=new_user.id,
+        email=new_user.email,
+        role=new_user.role.value,
+        created_by=current_user.email
+    )
+    
+    return RegisterResponse(
+        user=UserResponse.from_orm(new_user),
+        message="User created successfully"
+    )

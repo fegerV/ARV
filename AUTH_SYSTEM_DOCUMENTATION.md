@@ -4,8 +4,10 @@ Production-ready Login Page с JWT, rate limiting, темами и валида�
 
 ## 🎯 Features
 
-- ✅ **JWT Authentication**: Access tokens с 15-минутным expiry
+- ✅ **JWT Authentication**: Access tokens с настраиваемым expiry (настройка ACCESS_TOKEN_EXPIRE_MINUTES)
 - ✅ **Rate Limiting**: 5 попыток за 15 минут, затем блокировка
+- ✅ **Admin Registration**: POST /api/auth/register - создание пользователей только админами
+- ✅ **Password Validation**: Сложные пароли (8+ символов, uppercase, lowercase, digits)
 - ✅ **Dark/Light Theme**: Полная интеграция с theme system
 - ✅ **Password Visibility Toggle**: Show/Hide password
 - ✅ **Loading States**: Skeleton loaders + disabled inputs
@@ -13,7 +15,7 @@ Production-ready Login Page с JWT, rate limiting, темами и валида�
 - ✅ **Protected Routes**: Automatic redirect для неавторизованных
 - ✅ **Persistent Auth**: LocalStorage persistence с Zustand
 - ✅ **Logout**: Кнопка выхода в Sidebar
-- ✅ **Security**: bcrypt password hashing, secure tokens
+- ✅ **Security**: bcrypt password hashing, настраиваемый JWT algorithm
 
 ---
 
@@ -24,12 +26,13 @@ Auth Flow:
 1. User enters email/password → Login.tsx
 2. POST /api/auth/login (OAuth2PasswordRequestForm)
 3. Backend verifies credentials + checks rate limit
-4. Generate JWT token (15 min expiry)
+4. Generate JWT token (настраиваемый expiry via ACCESS_TOKEN_EXPIRE_MINUTES)
 5. Return token + user data
 6. Frontend stores in localStorage + Zustand
 7. All API requests include Authorization: Bearer <token>
 8. Protected routes check isAuthenticated
-9. Logout clears localStorage + redirects to /login
+9. Admin can create users via POST /api/auth/register
+10. Logout clears localStorage + redirects to /login
 ```
 
 ---
@@ -75,23 +78,27 @@ Auth Flow:
    - Fields: id, email, hashed_password, full_name, role
    - Rate limiting: login_attempts, locked_until
 
-2. **`app/schemas/auth.py`** (28 lines)
-   - Pydantic schemas: Token, UserResponse, LoginError
-   - EmailStr validation
+2. **`app/schemas/auth.py`** (60+ lines)
+   - Pydantic schemas: Token, UserResponse, LoginError, RegisterRequest, RegisterResponse
+   - EmailStr validation, password complexity validation
+   - UserRole enum integration
 
 3. **`app/core/security.py`** (38 lines)
    - `verify_password()` - bcrypt verification
    - `get_password_hash()` - bcrypt hashing
-   - `create_access_token()` - JWT generation
+   - `create_access_token()` - JWT generation с настраиваемым expiry/algorithm
    - `decode_token()` - JWT validation
 
-4. **`app/api/routes/auth.py`** (164 lines)
-   - `POST /auth/login` - Authentication endpoint
+4. **`app/api/routes/auth.py`** (227+ lines)
+   - `POST /auth/login` - Authentication endpoint с настраиваемым expiry
    - `POST /auth/logout` - Logout (log event)
    - `GET /auth/me` - Current user info
+   - `POST /auth/register` - Admin-only user registration
    - `get_current_user()` - JWT dependency
    - `get_current_active_user()` - Active user check
    - Rate limiting logic (5 attempts, 15 min lockout)
+   - Email uniqueness validation
+   - Admin permission checks
 
 5. **`alembic/versions/003_create_users.py`** (58 lines)
    - Migration для users таблицы
@@ -402,6 +409,60 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 ```
 
 **Note**: JWT is stateless, logout только логирует событие.
+
+---
+
+### POST /api/auth/register
+
+**Request** (Admin only):
+```http
+POST /api/auth/register HTTP/1.1
+Content-Type: application/json
+Authorization: Bearer <admin_token>
+
+{
+  "email": "newuser@company.com",
+  "password": "SecurePass123",
+  "full_name": "New User",
+  "role": "viewer"
+}
+```
+
+**Response (Success)**:
+```json
+{
+  "user": {
+    "id": 2,
+    "email": "newuser@company.com",
+    "full_name": "New User",
+    "role": "viewer",
+    "last_login_at": null
+  },
+  "message": "User created successfully"
+}
+```
+
+**Response (Unauthorized)**:
+```json
+{
+  "detail": "Only administrators can create new users"
+}
+```
+
+**Response (Duplicate Email)**:
+```json
+{
+  "detail": "Email already registered"
+}
+```
+
+**Password Requirements**:
+- Minimum 8 characters
+- At least one uppercase letter
+- At least one lowercase letter
+- At least one digit
+
+**Note**: Only authenticated admin users can create new accounts.
 
 ---
 
