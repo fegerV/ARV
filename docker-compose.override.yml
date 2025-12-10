@@ -40,6 +40,4 @@ services:
     networks:
       - vertex_net
 
-networks:
-  vertex_net:
-    external: true
+# Network configuration is inherited from main docker-compose.yml
