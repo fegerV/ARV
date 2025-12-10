@@ -108,6 +108,50 @@ cd frontend
 npm run test
 ```
 
+## 🐳 Docker Networking Diagnostics
+
+### Network Diagnostics Tool
+
+The platform includes a comprehensive network diagnostics script to help troubleshoot Docker Compose networking issues:
+
+```bash
+# Run network diagnostics
+./scripts/diagnose_docker_network.sh
+```
+
+This script provides:
+- Docker daemon and network status
+- Container network configuration and IP addresses
+- DNS resolution tests between services
+- Cross-container connectivity tests
+- Service health status
+- Troubleshooting tips and quick reference commands
+
+### Common Network Issues
+
+1. **Services can't resolve each other**: Ensure all services are on the `vertex_net` network
+2. **Health checks failing**: Check service dependencies and logs with `docker compose logs <service>`
+3. **Port conflicts**: Verify no other services are using the same ports
+4. **Network not found**: The network is created automatically when running `docker compose up`
+
+### Network Architecture
+
+All services communicate via Docker DNS using service names:
+- `postgres` → PostgreSQL database (port 5432)
+- `redis` → Redis cache (port 6379)  
+- `app` → FastAPI backend (port 8000)
+- `celery-worker` → Celery task workers
+- `celery-beat` → Celery task scheduler
+- `nginx` → Reverse proxy and static file server
+- `postgres-exporter` → Prometheus metrics exporter
+- `prometheus` → Metrics collection
+- `grafana` → Metrics visualization
+
+The startup order is enforced through health checks:
+```
+postgres → redis → app → celery-worker/beat → nginx
+```
+
 ## 🌍 Environment Variables
 
 Основные переменные окружения (полный список в `.env.example`):

@@ -1,5 +1,12 @@
 version: '3.8'
 
+networks:
+  vertex_net:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
+
 services:
   postgres:
     image: postgres:15-alpine
@@ -12,6 +19,8 @@ services:
       - ./scripts/init-db.sh:/docker-entrypoint-initdb.d/init-db.sh:ro
     ports:
       - "5432:5432"
+    networks:
+      - vertex_net
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U vertex_ar"]
       interval: 10s
@@ -22,11 +31,16 @@ services:
     image: redis:7-alpine
     ports:
       - "6379:6379"
+    networks:
+      - vertex_net
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
       timeout: 3s
       retries: 3
+    depends_on:
+      postgres:
+        condition: service_healthy
 
   app:
     build:
@@ -41,6 +55,8 @@ services:
       - DATABASE_URL=postgresql+asyncpg://vertex_ar:password@postgres:5432/vertex_ar
       - REDIS_URL=redis://redis:6379/0
       - SECRET_KEY=your-super-secret-key-change-in-production
+    networks:
+      - vertex_net
     depends_on:
       postgres:
         condition: service_healthy
@@ -59,10 +75,14 @@ services:
     command: celery -A app.tasks.celery_app worker --loglevel=info
     volumes:
       - .:/app
+    networks:
+      - vertex_net
     depends_on:
       redis:
         condition: service_healthy
       postgres:
+        condition: service_healthy
+      app:
         condition: service_healthy
     environment:
       - DATABASE_URL=postgresql+asyncpg://vertex_ar:password@postgres:5432/vertex_ar
@@ -81,10 +101,14 @@ services:
     command: celery -A app.tasks.celery_app beat --loglevel=info --pidfile=/tmp/celerybeat.pid --schedule=/tmp/celerybeat-schedule
     volumes:
       - .:/app
+    networks:
+      - vertex_net
     depends_on:
       redis:
         condition: service_healthy
       postgres:
+        condition: service_healthy
+      app:
         condition: service_healthy
     environment:
       - DATABASE_URL=postgresql+asyncpg://vertex_ar:password@postgres:5432/vertex_ar
@@ -105,8 +129,16 @@ services:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
       # - ./storage/content:/usr/share/nginx/html/storage:ro
       - ./frontend/dist:/usr/share/nginx/html:ro
+    networks:
+      - vertex_net
     depends_on:
-      - app
+      app:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
   postgres-exporter:
     image: prometheuscommunity/postgres-exporter:latest
@@ -114,8 +146,11 @@ services:
       DATA_SOURCE_NAME: postgresql://vertex_ar:password@postgres:5432/vertex_ar?sslmode=disable
     ports:
       - "9187:9187"
+    networks:
+      - vertex_net
     depends_on:
-      - postgres
+      postgres:
+        condition: service_healthy
 
   prometheus:
     image: prom/prometheus:latest
@@ -124,6 +159,13 @@ services:
     volumes:
       - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - ./prometheus/alert.rules.yml:/etc/prometheus/alert.rules.yml:ro
+    networks:
+      - vertex_net
+    depends_on:
+      postgres-exporter:
+        condition: service_started
+      app:
+        condition: service_healthy
 
   grafana:
     image: grafana/grafana:latest
@@ -133,8 +175,11 @@ services:
       - ./grafana/provisioning:/etc/grafana/provisioning:ro
     environment:
       - GF_SECURITY_ADMIN_PASSWORD=admin
+    networks:
+      - vertex_net
     depends_on:
-      - prometheus
+      prometheus:
+        condition: service_started
 
 volumes:
   postgres_data:
