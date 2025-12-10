@@ -507,12 +507,43 @@ VALUES (
 # Install dependencies
 pip install passlib[bcrypt] python-jose[cryptography] python-multipart
 
-# Run migration
+# Run migration (автоматически создает администратора и компанию по умолчанию)
 alembic upgrade head
 
 # Start server
 uvicorn app.main:app --reload
 ```
+
+### 🌱 Автоматическое создание администратора (Seeding)
+
+При первом запуске система автоматически создает:
+
+**Администратор по умолчанию**:
+- Email: `admin@vertexar.com`
+- Пароль: `admin123`
+- Роль: `admin`
+- Хеш пароля: bcrypt (`$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewY5GyYIxF2PQaDi`)
+
+**Компания по умолчанию**:
+- Название: "Vertex AR"
+- Slug: "vertex-ar"
+- Локальное хранилище: `/app/storage/content`
+
+**Процесс создания**:
+1. При выполнении `alembic upgrade head` запускается миграция `20251218_initial_complete_migration.py`
+2. Проверяется наличие администратора с email `admin@vertexar.com`
+3. Если администратор не существует - создается запись в таблице `users`
+4. Создается подключение к локальному хранилищу (если отсутствует)
+5. Создается компания "Vertex AR" с привязкой к хранилищу
+
+**Логирование процесса**:
+```
+application_startup
+database_initialized
+defaults_seeded
+```
+
+**Примечание**: В текущей версии учетные данные администратора жестко заданы в миграции. Переменные окружения `ADMIN_EMAIL` и `ADMIN_DEFAULT_PASSWORD` запланированы для использования в будущих версиях.
 
 ### 2. Frontend Setup
 
@@ -584,6 +615,165 @@ def test_jwt_token():
     from app.core.security import decode_token
     payload = decode_token(token)
     assert payload["sub"] == "admin@vertexar.com"
+```
+
+---
+
+## 🛠️ Troubleshooting First-Run Authorization
+
+### 📋 Common Issues and Solutions
+
+#### 1. Администратор не создается
+**Симптомы**:
+- Ошибка входа: "Неверный email или пароль"
+- В таблице `users` нет записей
+
+**Решение**:
+```bash
+# Проверьте статус миграций
+docker compose exec app alembic current
+
+# Проверьте наличие администратора
+docker compose exec app python -c "
+import asyncio
+from sqlalchemy.ext.asyncio import AsyncSession
+from app.core.database import AsyncSessionLocal
+from app.models.user import User
+from sqlalchemy import select
+
+async def check_admin():
+    async with AsyncSessionLocal() as session:
+        result = await session.execute(select(User).where(User.email == 'admin@vertexar.com'))
+        admin = result.scalar_one_or_none()
+        if admin:
+            print(f'Admin found: {admin.email}, role: {admin.role}')
+        else:
+            print('Admin not found!')
+
+asyncio.run(check_admin())
+"
+
+# Если администратор не найден - повторно примените миграции
+docker compose exec app alembic upgrade head
+```
+
+#### 2. Проблемы с хешированием паролей
+**Симптомы**:
+- ImportError: `from passlib.context import CryptContext`
+- Ошибка при верификации пароля
+
+**Решение**:
+```bash
+# Проверьте зависимость
+pip show passlib[bcrypt]
+
+# Установите недостающие зависимости
+pip install passlib[bcrypt] python-jose[cryptography] python-multipart
+
+# Проверьте работу хеширования
+docker compose exec app python -c "
+from app.core.security import get_password_hash, verify_password
+hash = get_password_hash('test123')
+print(f'Hash: {hash}')
+print(f'Verify: {verify_password(\"test123\", hash)}')
+"
+```
+
+#### 3. Проблемы с JWT токенами
+**Симптомы**:
+- Ошибка: "Could not validate credentials"
+- Токен не декодируется
+
+**Решение**:
+```bash
+# Проверьте SECRET_KEY в .env
+grep SECRET_KEY .env
+
+# Проверьте создание токена
+docker compose exec app python -c "
+from app.core.security import create_access_token, decode_token
+token = create_access_token({'sub': 'test@test.com'})
+print(f'Token: {token}')
+payload = decode_token(token)
+print(f'Payload: {payload}')
+"
+```
+
+#### 4. Проблемы с логированием
+**Где искать логи авторизации**:
+
+**Docker logs**:
+```bash
+# Логи приложения
+docker compose logs app
+
+# Логи авторизации (фильтр)
+docker compose logs app | grep -E "(login|auth|User)"
+```
+
+**Structured logging output**:
+```json
+{
+  "event": "User login successful",
+  "user_id": 1,
+  "email": "admin@vertexar.com",
+  "level": "info",
+  "timestamp": "2025-12-18T14:30:00Z"
+}
+```
+
+**Включение детального логирования БД**:
+```bash
+# Включите логирование запросов в .env
+DB_ECHO=true
+
+# Перезапустите приложение
+docker compose restart app
+```
+
+#### 5. Проблемы с миграциями
+**Симптомы**:
+- Таблица `users` не существует
+- Администратор не создан
+
+**Решение**:
+```bash
+# Проверьте статус миграций
+docker compose exec app alembic current
+
+# Проверьте историю миграций
+docker compose exec app alembic history
+
+# Повторно примените миграции
+docker compose exec app alembic upgrade head
+
+# При проблемах - сбросьте и создайте заново
+docker compose exec app alembic downgrade base
+docker compose exec app alembic upgrade head
+```
+
+### 📋 Проверка работоспособности системы
+
+```bash
+# 1. Проверка здоровья приложения
+curl http://localhost:8000/api/health/status
+
+# 2. Проверка входа администратора
+curl -X POST http://localhost:8000/api/auth/login \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -d "username=admin@vertexar.com&password=admin123"
+
+# 3. Проверка создания пользователя (через API)
+TOKEN="<token-from-step-2>"
+curl -X POST http://localhost:8000/api/auth/register \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "test@example.com",
+    "password": "TestPass123",
+    "full_name": "Test User",
+    "role": "viewer"
+  }'
 ```
 
 ---
