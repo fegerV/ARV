@@ -241,6 +241,7 @@ from app.api.routes import oauth as oauth_router
 from app.api.routes import public as public_router
 from app.api.routes import health as health_router
 from app.api.routes import alerts_ws as alerts_ws_router
+from app.api.routes import auth as auth_router
 
 # Include routers with appropriate prefixes
 app.include_router(companies_router.router, prefix="/api/companies", tags=["Companies"])
@@ -260,6 +261,7 @@ app.include_router(oauth_router.router)
 app.include_router(public_router.router, prefix="/api", tags=["Public"])
 app.include_router(health_router.router)
 app.include_router(alerts_ws_router.router)
+app.include_router(auth_router.router, prefix="/api", tags=["Authentication"])
 
 
 # Public AR Viewer endpoint
