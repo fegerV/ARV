@@ -17,6 +17,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     postgresql-client \
     curl \
     ffmpeg \
+    libffi-dev \
+    libssl-dev \
+    build-essential \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Node.js
