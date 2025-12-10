@@ -55,13 +55,14 @@ services:
   celery-worker:
     build:
       context: .
-      dockerfile: Dockerfile
-    command: celery -A app.tasks.celery_app worker --loglevel=info
+      dockerfile: Dockerfile.celery-worker
     volumes:
       - .:/app
     depends_on:
-      - redis
-      - postgres
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
     environment:
       - DATABASE_URL=postgresql+asyncpg://vertex_ar:password@postgres:5432/vertex_ar
       - REDIS_URL=redis://redis:6379/0
