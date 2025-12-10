@@ -4,6 +4,8 @@
 
 Система генерации превью автоматически создает уменьшенные копии изображений и кадры из видеофайлов для отображения в интерфейсе администратора. Система работает асинхронно с использованием Celery для предотвращения блокировки основного потока приложения.
 
+Система поддерживает различные типы хранилищ через абстрактный интерфейс провайдеров, что позволяет гибко настраивать место хранения миниатюр в зависимости от конфигурации клиента.
+
 ## Архитектура
 
 ### Компоненты системы
@@ -24,7 +26,10 @@
    - `generate_video_thumbnail` - задача для генерации превью видео
    - `generate_image_thumbnail` - задача для генерации превью изображения
 
-5. **API endpoints** (`app/api/routes/ar_content.py`)
+5. **Фабрика провайдеров** (`app/services/storage/factory.py`)
+   - `get_provider` - фабричная функция для получения провайдера по конфигурации хранения компании
+
+6. **API endpoints** (`app/api/routes/ar_content.py`)
    - Автоматический запуск задач генерации превью при загрузке контента
 
 ## Как это работает
@@ -81,11 +86,22 @@ class ThumbnailService:
 
 ## Интеграция с хранилищем
 
-Система поддерживает различные типы хранилищ через factory pattern:
+Система поддерживает различные типы хранилищ через абстрактный интерфейс провайдеров:
 
 1. **Локальное хранилище** - файлы хранятся на локальном диске
 2. **MinIO** - объектное хранилище S3-совместимое
 3. **Yandex Disk** - облачное хранилище через OAuth
+
+### Провайдеры хранилища
+
+Каждый провайдер реализует единый интерфейс `StorageProvider` с методами:
+- `upload_file` - загрузка файла в хранилище
+- `download_file` - скачивание файла из хранилища
+- `file_exists` - проверка существования файла
+- `delete_file` - удаление файла
+- `get_file_url` - получение публичного URL файла
+
+При генерации миниатюр система автоматически определяет провайдер на основе конфигурации компании и использует его для сохранения миниатюр.
 
 ## Обработка ошибок
 
@@ -105,12 +121,36 @@ class ThumbnailService:
 - Ошибки и исключения
 - Время выполнения операций
 
+### Метрики Prometheus
+
+Система экспортирует следующие метрики в Prometheus:
+
+1. **thumbnail_generation_total** - количество попыток генерации миниатюр, помечено типом (image/video) и статусом (success/failure)
+2. **thumbnail_generation_duration_seconds** - время, затраченное на генерацию миниатюр, помечено типом
+3. **thumbnail_upload_total** - количество загрузок миниатюр, помечено провайдером и статусом
+4. **thumbnail_upload_duration_seconds** - время, затраченное на загрузку миниатюр, помечено провайдером
+5. **thumbnail_task_execution_total** - количество выполнений задач Celery, помечено типом задачи и статусом
+6. **thumbnail_task_execution_duration_seconds** - время выполнения задач Celery, помечено типом задачи
+
+Эти метрики позволяют отслеживать производительность системы и выявлять проблемы.
+
 ## Тестирование
 
 Для тестирования системы доступны следующие скрипты:
 
 1. `test_thumbnail_system.py` - комплексный тест всех функций
 2. `test_thumbnail_generation.py` - базовый тест генерации
+
+### Unit-тесты
+
+В каталоге `tests/unit/` находятся unit-тесты для отдельных компонентов системы:
+
+1. `test_thumbnail_service.py` - тесты сервиса генерации миниатюр
+2. `test_storage_providers.py` - тесты провайдеров хранилища
+3. `test_storage_factory.py` - тесты фабрики провайдеров
+4. `test_prometheus_metrics.py` - тесты метрик Prometheus
+
+Тесты покрывают основные сценарии использования и обработку ошибок.
 
 ## Развертывание
 
@@ -139,6 +179,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 ```python
 from app.services.thumbnail_service import thumbnail_service
 
+# Без провайдера (сохранение в локальное хранилище)
 result = await thumbnail_service.generate_image_thumbnail(
     image_path="/path/to/image.jpg",
     output_dir="storage/content/thumbnails",
@@ -147,6 +188,15 @@ result = await thumbnail_service.generate_image_thumbnail(
 
 if result["status"] == "ready":
     print(f"Превью создано: {result['thumbnail_url']}")
+
+# С провайдером (загрузка в удаленное хранилище)
+provider = get_provider(storage_connection)  # Получение провайдера из подключения
+result = await thumbnail_service.generate_image_thumbnail(
+    image_path="/path/to/image.jpg",
+    thumbnail_name="my_image_thumb.jpg",
+    provider=provider,
+    company_id=123
+)
 ```
 
 ### Создание превью для видео
@@ -154,6 +204,7 @@ if result["status"] == "ready":
 ```python
 from app.services.thumbnail_service import thumbnail_service
 
+# Без провайдера (сохранение в локальное хранилище)
 result = await thumbnail_service.generate_video_thumbnail(
     video_path="/path/to/video.mp4",
     output_dir="storage/content/thumbnails",
@@ -163,6 +214,16 @@ result = await thumbnail_service.generate_video_thumbnail(
 
 if result["status"] == "ready":
     print(f"Превью создано: {result['thumbnail_url']}")
+
+# С провайдером (загрузка в удаленное хранилище)
+provider = get_provider(storage_connection)  # Получение провайдера из подключения
+result = await thumbnail_service.generate_video_thumbnail(
+    video_path="/path/to/video.mp4",
+    thumbnail_name="my_video_thumb.jpg",
+    time_position=5.0,
+    provider=provider,
+    company_id=123
+)
 ```
 
 ## Расширение функциональности

@@ -139,6 +139,64 @@ TELEGRAM_BOT_TOKEN=your-bot-token
 - [x] Health check endpoints
 - [x] Structured logging
 
+## 🌐 Docker Networking Diagnostics
+
+The platform includes comprehensive Docker networking diagnostics to help troubleshoot connectivity issues between services.
+
+### Diagnostic Script
+
+A POSIX-compliant diagnostic script is available at `scripts/diagnose_docker_network.sh` that provides:
+
+- Docker daemon and network status checking
+- Container IP address listing
+- DNS resolution tests between services
+- Cross-container connectivity tests
+- Service health status monitoring
+- Troubleshooting tips and quick reference commands
+
+### Running the Diagnostic Script
+
+```bash
+# Make the script executable (Linux/Mac)
+chmod +x scripts/diagnose_docker_network.sh
+
+# Run the diagnostic
+./scripts/diagnose_docker_network.sh
+```
+
+### Network Architecture
+
+All services communicate via Docker DNS on the shared `vertex_net` network:
+
+- Single named bridge network: `vertex_net` (subnet 172.20.0.0/16)
+- All services attached: postgres, redis, app, celery-worker, celery-beat, nginx, postgres-exporter, prometheus, grafana
+- Service discovery via DNS instead of hard-coded IPs
+
+### Startup Dependency Chain
+
+Services start in the following order with health checks ensuring reliability:
+
+```
+postgres → redis → app → celery-worker/beat → nginx
+postgres-exporter depends on postgres (healthy)
+prometheus depends on app (healthy) and postgres-exporter (started)
+grafana depends on prometheus (started)
+```
+
+### Common Issues and Solutions
+
+1. **Containers can't resolve each other by service name**:
+   - Ensure all services are attached to the same network
+   - Restart services: `docker compose down && docker compose up -d`
+
+2. **Health checks failing**:
+   - Check service logs: `docker compose logs <service>`
+   - Verify service configuration and dependencies
+
+3. **Services not starting in correct order**:
+   - Check `depends_on` conditions in docker-compose.yml
+   - Ensure health checks are properly configured
+
 ## 📝 License
 
 Proprietary - All rights reserved

@@ -12,20 +12,50 @@ services:
       ENVIRONMENT: development
     ports:
       - "8000:8000"
+    networks:
+      - vertex_net
 
   celery-worker:
     volumes:
       - .:/app
       - ./storage/content:/app/storage/content
+    networks:
+      - vertex_net
 
   celery-beat:
     volumes:
       - .:/app
+    networks:
+      - vertex_net
 
   postgres:
     ports:
       - "5432:5432"
+    networks:
+      - vertex_net
 
   redis:
     ports:
       - "6379:6379"
+    networks:
+      - vertex_net
+
+  nginx:
+    networks:
+      - vertex_net
+
+  postgres-exporter:
+    networks:
+      - vertex_net
+
+  prometheus:
+    networks:
+      - vertex_net
+
+  grafana:
+    networks:
+      - vertex_net
+
+networks:
+  vertex_net:
+    external: true
