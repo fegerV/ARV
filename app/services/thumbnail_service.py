@@ -6,7 +6,7 @@ from PIL import Image
 import os
 
 from app.core.config import settings
-from app.core.storage import minio_client
+from app.core.storage import get_minio_client
 
 
 logger = structlog.get_logger()
@@ -18,6 +18,36 @@ class ThumbnailService:
     def __init__(self):
         self.thumbnail_size = (320, 240)  # Ширина x Высота
         self.quality = 85  # Качество JPEG
+
+    def _save_thumbnail(
+        self,
+        thumbnail_data: bytes,
+        bucket: str,
+        filename: str,
+        content_type: str = "image/webp"
+    ) -> str:
+        """Save thumbnail to storage and return URL."""
+        # Save to temporary file first
+        temp_path = f"/tmp/{filename}"
+        with open(temp_path, "wb") as f:
+            f.write(thumbnail_data)
+            
+        try:
+            # Get minio client with lazy initialization
+            minio_client = get_minio_client()
+            
+            # Upload to storage
+            url = minio_client.upload_file(
+                temp_path,
+                bucket,
+                filename,
+                content_type
+            )
+            return url
+        finally:
+            # Clean up temporary file
+            if os.path.exists(temp_path):
+                os.remove(temp_path)
 
     async def generate_image_thumbnail(
         self,

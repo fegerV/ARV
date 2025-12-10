@@ -1,7 +1,5 @@
 from pathlib import Path
 from datetime import timedelta
-from minio import Minio
-from minio.error import S3Error
 from app.core.config import settings
 import structlog
 
@@ -10,6 +8,10 @@ logger = structlog.get_logger()
 
 class MinIOClient:
     def __init__(self) -> None:
+        # Import minio only when needed to avoid initialization errors
+        from minio import Minio
+        from minio.error import S3Error
+        
         self.client = Minio(
             settings.MINIO_ENDPOINT,
             access_key=settings.MINIO_ACCESS_KEY,
@@ -20,6 +22,9 @@ class MinIOClient:
 
     def _ensure_buckets(self) -> None:
         """Ensure required buckets exist and have public read policy."""
+        # Import S3Error only when needed
+        from minio.error import S3Error
+        
         buckets = [
             getattr(settings, "MINIO_BUCKET_VIDEOS", None),
             getattr(settings, "MINIO_BUCKET_MARKERS", None),
@@ -82,6 +87,9 @@ class MinIOClient:
         content_type: str = "application/octet-stream",
     ) -> str:
         """Upload a local file to MinIO and return public URL."""
+        # Import S3Error only when needed
+        from minio.error import S3Error
+        
         try:
             self.client.fput_object(
                 bucket,
@@ -97,6 +105,9 @@ class MinIOClient:
 
     def get_presigned_url(self, bucket: str, object_name: str, expires_hours: int = 1) -> str:
         """Get a presigned GET URL for an object."""
+        # Import S3Error only when needed
+        from minio.error import S3Error
+        
         try:
             return self.client.presigned_get_object(bucket, object_name, expires=timedelta(hours=expires_hours))
         except S3Error as e:
@@ -104,5 +115,12 @@ class MinIOClient:
             raise RuntimeError(f"MinIO presigned URL failed: {e}")
 
 
-# Singleton instance
-minio_client = MinIOClient()
+# Singleton instance - initialize only when needed
+minio_client = None
+
+def get_minio_client():
+    """Get or create MinIO client instance."""
+    global minio_client
+    if minio_client is None:
+        minio_client = MinIOClient()
+    return minio_client

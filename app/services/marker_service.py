@@ -4,7 +4,7 @@ from typing import Optional
 import structlog
 
 from app.core.config import settings
-from app.core.storage import minio_client
+from app.core.storage import get_minio_client
 
 
 logger = structlog.get_logger()
@@ -117,6 +117,31 @@ class MindARMarkerService:
         except Exception as e:
             logger.error("metadata_extraction_failed", error=str(e))
             return {}
+
+    def save_marker(self, project_id: int, marker_data: bytes) -> str:
+        """Save generated marker file and return URL."""
+        # Get minio client with lazy initialization
+        minio_client = get_minio_client()
+        
+        filename = f"marker_{project_id}.mind"
+        temp_path = f"/tmp/{filename}"
+        
+        # Save marker data to temporary file
+        with open(temp_path, "wb") as f:
+            f.write(marker_data)
+            
+        try:
+            # Upload to MinIO
+            url = minio_client.upload_file(
+                temp_path,
+                settings.MINIO_BUCKET_MARKERS,
+                filename
+            )
+            return url
+        finally:
+            # Clean up temporary file
+            if os.path.exists(temp_path):
+                os.remove(temp_path)
 
     async def validate_marker(self, marker_path: str) -> bool:
         """Проверка валидности маркера"""

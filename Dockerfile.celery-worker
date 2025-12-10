@@ -1,0 +1,51 @@
+FROM python:3.11-slim
+
+# Set environment variables
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1
+
+# Create non-root user
+RUN useradd -m -u 1000 appuser
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    gcc \
+    g++ \
+    libpq-dev \
+    postgresql-client \
+    curl \
+    ffmpeg \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Node.js and npm
+RUN curl -fsSL https://deb.nodesource.com/setup_18.x | bash - && \
+    apt-get install -y nodejs
+
+# Set working directory
+WORKDIR /app
+
+# Copy requirements and install Python dependencies
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy application code
+COPY app/ ./app/
+COPY alembic/ ./alembic/
+COPY alembic.ini .
+COPY scripts/ ./scripts/
+
+# Create storage directory
+RUN mkdir -p /app/storage/content && \
+    chown -R appuser:appuser /app
+
+# Switch to non-root user
+USER appuser
+
+# Health check for Celery worker
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+    CMD ["/app/scripts/healthcheck_celery_worker.sh"]
+
+# Default command for Celery worker
+CMD ["celery", "-A", "app.tasks.celery_app", "worker", "--loglevel=info"]
