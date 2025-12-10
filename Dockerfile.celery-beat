@@ -47,5 +47,5 @@ USER appuser
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
     CMD ["/app/scripts/healthcheck_celery_beat.sh"]
 
-# Default command for Celery beat
-CMD ["celery", "-A", "app.tasks.celery_app", "beat", "--loglevel=info"]
+# Default command for Celery beat with explicit PID and schedule file paths
+CMD ["celery", "-A", "app.tasks.celery_app", "beat", "--loglevel=info", "--pidfile=/tmp/celerybeat.pid", "--schedule=/tmp/celerybeat-schedule"]

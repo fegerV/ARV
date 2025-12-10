@@ -67,12 +67,18 @@ services:
     environment:
       - DATABASE_URL=postgresql+asyncpg://vertex_ar:password@postgres:5432/vertex_ar
       - REDIS_URL=redis://redis:6379/0
+    healthcheck:
+      test: ["CMD", "/app/scripts/healthcheck_celery_worker.sh"]
+      interval: 30s
+      timeout: 10s
+      start_period: 60s
+      retries: 3
 
   celery-beat:
     build:
       context: .
       dockerfile: Dockerfile.celery-beat
-    command: celery -A app.tasks.celery_app beat --loglevel=info
+    command: celery -A app.tasks.celery_app beat --loglevel=info --pidfile=/tmp/celerybeat.pid --schedule=/tmp/celerybeat-schedule
     volumes:
       - .:/app
     depends_on:
@@ -83,6 +89,12 @@ services:
     environment:
       - DATABASE_URL=postgresql+asyncpg://vertex_ar:password@postgres:5432/vertex_ar
       - REDIS_URL=redis://redis:6379/0
+    healthcheck:
+      test: ["CMD", "/app/scripts/healthcheck_celery_beat.sh"]
+      interval: 30s
+      timeout: 10s
+      start_period: 60s
+      retries: 3
 
   nginx:
     image: nginx:alpine
