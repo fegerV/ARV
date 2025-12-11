@@ -1,5 +1,4 @@
-from typing import Optional, List
-from datetime import datetime
+from typing import List
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
@@ -7,130 +6,134 @@ from sqlalchemy import select
 from app.core.database import get_db
 from app.models.project import Project
 from app.models.company import Company
+from app.schemas.project import ProjectCreate, ProjectUpdate, ProjectResponse
 
 router = APIRouter()
 
 
-@router.get("/companies/{company_id}/projects")
+@router.get("/companies/{company_id}/projects", response_model=List[ProjectResponse])
 async def list_projects_for_company(company_id: int, db: AsyncSession = Depends(get_db)):
-    # Проверяем существование компании
+    # Validate parent company exists
     company = await db.get(Company, company_id)
     if not company:
         raise HTTPException(status_code=404, detail="Company not found")
     
-    # Получаем список проектов компании
+    # Get projects for the company
     stmt = select(Project).where(Project.company_id == company_id)
-    res = await db.execute(stmt)
-    projects = res.scalars().all()
+    result = await db.execute(stmt)
+    projects = result.scalars().all()
     
-    items = []
-    now = datetime.utcnow()
-    for p in projects:
-        days_left = None
-        if p.expires_at:
-            delta = p.expires_at - now
-            days_left = max(0, delta.days)
-        items.append({
-            "id": p.id,
-            "name": p.name,
-            "slug": p.slug,
-            "status": p.status,
-            "period": {
-                "starts_at": _iso(p.starts_at),
-                "expires_at": _iso(p.expires_at),
-                "days_left": days_left,
-            },
-            "folder_path": p.folder_path,
-            "project_type": p.project_type,
-        })
-    return {"projects": items}
+    return projects
 
 
-@router.post("/projects")
-async def create_project(payload: dict, db: AsyncSession = Depends(get_db)):
-    required = ["company_id", "name", "slug"]
-    for r in required:
-        if r not in payload:
-            raise HTTPException(status_code=400, detail=f"Missing field: {r}")
-
-    proj = Project(
-        company_id=payload["company_id"],
-        name=payload["name"],
-        slug=payload["slug"],
-        folder_path=payload.get("folder_path"),
-        description=payload.get("description"),
-        project_type=payload.get("project_type"),
-        subscription_type=payload.get("subscription_type", "monthly"),
-        starts_at=_parse_dt(payload.get("starts_at")),
-        expires_at=_parse_dt(payload.get("expires_at")),
-        auto_renew=1 if payload.get("auto_renew") else 0,
-        status=payload.get("status", "active"),
-        notify_before_expiry_days=payload.get("notify_before_expiry_days", 7),
-        tags=_parse_tags(payload.get("tags")),
-        metadata=payload.get("metadata", {}),
+@router.post("/companies/{company_id}/projects", response_model=ProjectResponse)
+async def create_project_for_company(
+    company_id: int, 
+    project_data: ProjectCreate, 
+    db: AsyncSession = Depends(get_db)
+):
+    # Validate parent company exists
+    company = await db.get(Company, company_id)
+    if not company:
+        raise HTTPException(status_code=404, detail="Company not found")
+    
+    # Create new project
+    project = Project(
+        company_id=company_id,
+        name=project_data.name,
+        description=project_data.description
     )
-    db.add(proj)
-    await db.flush()
+    
+    db.add(project)
     await db.commit()
-    await db.refresh(proj)
-    return {"id": proj.id, "slug": proj.slug}
+    await db.refresh(project)
+    
+    return project
 
 
-@router.post("/companies/{company_id}/projects")
-async def create_project_for_company(company_id: int, payload: dict, db: AsyncSession = Depends(get_db)):
-    payload = {**payload, "company_id": company_id}
-    return await create_project(payload, db)
-
-
-@router.put("/projects/{project_id}")
-async def update_project(project_id: int, payload: dict, db: AsyncSession = Depends(get_db)):
-    proj = await db.get(Project, project_id)
-    if not proj:
+@router.get("/companies/{company_id}/projects/{project_id}", response_model=ProjectResponse)
+async def get_project_for_company(
+    company_id: int, 
+    project_id: int, 
+    db: AsyncSession = Depends(get_db)
+):
+    # Validate parent company exists
+    company = await db.get(Company, company_id)
+    if not company:
+        raise HTTPException(status_code=404, detail="Company not found")
+    
+    # Get project that belongs to this company
+    stmt = select(Project).where(
+        Project.id == project_id, 
+        Project.company_id == company_id
+    )
+    result = await db.execute(stmt)
+    project = result.scalar_one_or_none()
+    
+    if not project:
         raise HTTPException(status_code=404, detail="Project not found")
-    for k, v in payload.items():
-        if hasattr(proj, k):
-            setattr(proj, k, v)
-    await db.commit()
-    return {"status": "updated"}
+    
+    return project
 
 
-@router.delete("/projects/{project_id}")
-async def delete_project(project_id: int, db: AsyncSession = Depends(get_db)):
-    proj = await db.get(Project, project_id)
-    if not proj:
+@router.put("/companies/{company_id}/projects/{project_id}", response_model=ProjectResponse)
+async def update_project_for_company(
+    company_id: int, 
+    project_id: int, 
+    project_data: ProjectUpdate, 
+    db: AsyncSession = Depends(get_db)
+):
+    # Validate parent company exists
+    company = await db.get(Company, company_id)
+    if not company:
+        raise HTTPException(status_code=404, detail="Company not found")
+    
+    # Get project that belongs to this company
+    stmt = select(Project).where(
+        Project.id == project_id, 
+        Project.company_id == company_id
+    )
+    result = await db.execute(stmt)
+    project = result.scalar_one_or_none()
+    
+    if not project:
         raise HTTPException(status_code=404, detail="Project not found")
-    await db.delete(proj)
+    
+    # Update project fields
+    if project_data.name is not None:
+        project.name = project_data.name
+    if project_data.description is not None:
+        project.description = project_data.description
+    
     await db.commit()
+    await db.refresh(project)
+    
+    return project
+
+
+@router.delete("/companies/{company_id}/projects/{project_id}")
+async def delete_project_for_company(
+    company_id: int, 
+    project_id: int, 
+    db: AsyncSession = Depends(get_db)
+):
+    # Validate parent company exists
+    company = await db.get(Company, company_id)
+    if not company:
+        raise HTTPException(status_code=404, detail="Company not found")
+    
+    # Get project that belongs to this company
+    stmt = select(Project).where(
+        Project.id == project_id, 
+        Project.company_id == company_id
+    )
+    result = await db.execute(stmt)
+    project = result.scalar_one_or_none()
+    
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+    
+    await db.delete(project)
+    await db.commit()
+    
     return {"status": "deleted"}
-
-
-@router.post("/projects/{project_id}/extend")
-async def extend_project(project_id: int, payload: dict, db: AsyncSession = Depends(get_db)):
-    days: int = int(payload.get("days", 30))
-    proj = await db.get(Project, project_id)
-    if not proj:
-        raise HTTPException(status_code=404, detail="Project not found")
-    from datetime import timedelta, datetime as dt
-    base = proj.expires_at or dt.utcnow()
-    proj.expires_at = base + timedelta(days=days)
-    await db.commit()
-    return {"expires_at": proj.expires_at.isoformat()}
-
-
-def _parse_dt(v: Optional[str]):
-    if not v:
-        return None
-    try:
-        return datetime.fromisoformat(v)
-    except Exception:
-        return None
-
-
-def _iso(v: Optional[datetime]):
-    return v.isoformat() if v else None
-
-
-def _parse_tags(v: Optional[str]) -> Optional[List[str]]:
-    if not v:
-        return None
-    return [t.strip() for t in v.split(",") if t.strip()]
