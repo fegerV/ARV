@@ -9,7 +9,7 @@ from app.models.user import User
 from app.schemas.auth import Token, UserResponse, RegisterRequest, RegisterResponse
 import structlog
 
-router = APIRouter(prefix="/auth", tags=["auth"])
+router = APIRouter(prefix="/auth", tags=["Auth"])
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login")
 logger = structlog.get_logger()
 

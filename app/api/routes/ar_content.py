@@ -19,7 +19,7 @@ from app.tasks.preview_tasks import generate_video_thumbnail, generate_image_thu
 
 logger = structlog.get_logger()
 
-router = APIRouter()
+router = APIRouter(prefix="/ar-content", tags=["AR Content"])
 
 
 def _build_public_url(saved: Path) -> str:
@@ -28,7 +28,7 @@ def _build_public_url(saved: Path) -> str:
     return f"/storage/{rel.as_posix()}"
 
 
-@router.post("/ar-content")
+@router.post("/")
 async def create_ar_content(
     company_id: int = Form(...),
     project_id: int = Form(...),
@@ -92,7 +92,7 @@ async def create_ar_content(
     }
 
 
-@router.get("/ar-content")
+@router.get("/")
 async def list_all_ar_content(db: AsyncSession = Depends(get_db)):
     """List all AR content across all projects and companies"""
     from app.models.project import Project
@@ -165,7 +165,7 @@ async def list_ar_content_for_project(project_id: int, db: AsyncSession = Depend
     return {"items": items}
 
 
-@router.post("/ar-content/{content_id}/videos")
+@router.post("/{content_id}/videos")
 async def upload_video(
     content_id: int,
     file: UploadFile = File(...),
@@ -218,7 +218,7 @@ async def upload_video(
     }
 
 
-@router.post("/ar-content/{content_id}/generate-marker")
+@router.post("/{content_id}/generate-marker")
 async def trigger_marker_generation(content_id: int, db: AsyncSession = Depends(get_db)):
     ac = await db.get(ARContent, content_id)
     if not ac:
@@ -263,7 +263,7 @@ async def get_ar_content(unique_id: str, db: AsyncSession = Depends(get_db)):
     }
 
 
-@router.get("/ar-content/{content_id}")
+@router.get("/{content_id}")
 async def get_ar_content_detail(content_id: int, db: AsyncSession = Depends(get_db)):
     # Get AR content
     ac = await db.get(ARContent, content_id)

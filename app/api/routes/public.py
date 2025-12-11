@@ -7,7 +7,7 @@ from app.models.ar_content import ARContent
 from app.models.video import Video
 from app.services.video_scheduler import get_active_video
 
-router = APIRouter()
+router = APIRouter(prefix="/public", tags=["Public"])
 @router.get("/ar/{unique_id}/active-video")
 async def get_active_video_endpoint(unique_id: str, db: AsyncSession = Depends(get_db)):
     stmt = select(ARContent).where(ARContent.unique_id == unique_id)

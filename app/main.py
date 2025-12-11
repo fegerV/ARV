@@ -243,25 +243,84 @@ from app.api.routes import health as health_router
 from app.api.routes import alerts_ws as alerts_ws_router
 from app.api.routes import auth as auth_router
 
-# Include routers with appropriate prefixes
-app.include_router(companies_router.router, prefix="/api/companies", tags=["Companies"])
-# app.include_router(projects.router, prefix="/api/projects", tags=["Projects"])
-# app.include_router(ar_content.router, prefix="/api/ar-content", tags=["AR Content"])
-# app.include_router(analytics.router, prefix="/api/analytics", tags=["Analytics"]) 
-app.include_router(portraits_router.router, prefix="/api", tags=["Portraits"])
-app.include_router(storage_router.router, prefix="/api", tags=["Storage"]) 
-app.include_router(projects_router.router, prefix="/api", tags=["Projects"]) 
-app.include_router(ar_content_router.router, prefix="/api", tags=["AR Content"]) 
-# Removed duplicate companies router inclusion
-app.include_router(videos_router.router, prefix="/api", tags=["Videos"]) 
-app.include_router(rotation_router.router, prefix="/api", tags=["Rotation"]) 
-app.include_router(analytics_router.router, prefix="/api", tags=["Analytics"]) 
-app.include_router(notifications_router.router, prefix="/api", tags=["Notifications"]) 
-app.include_router(oauth_router.router)
-app.include_router(public_router.router, prefix="/api", tags=["Public"])
-app.include_router(health_router.router)
-app.include_router(alerts_ws_router.router)
-app.include_router(auth_router.router, prefix="/api", tags=["Authentication"])
+# Define OpenAPI tags for proper hierarchy rendering
+openapi_tags = [
+    {
+        "name": "Companies",
+        "description": "Company management operations",
+    },
+    {
+        "name": "Projects", 
+        "description": "Project management operations",
+    },
+    {
+        "name": "AR Content",
+        "description": "AR content and media management",
+    },
+    {
+        "name": "Auth",
+        "description": "Authentication and authorization",
+    },
+    {
+        "name": "Storage",
+        "description": "Storage connection and file management",
+    },
+    {
+        "name": "Analytics",
+        "description": "Analytics and reporting",
+    },
+    {
+        "name": "Notifications",
+        "description": "Notification management",
+    },
+    {
+        "name": "OAuth",
+        "description": "OAuth integration endpoints",
+    },
+    {
+        "name": "Public",
+        "description": "Public API endpoints",
+    },
+    {
+        "name": "Health",
+        "description": "Health check and monitoring",
+    },
+    {
+        "name": "WebSocket",
+        "description": "WebSocket connections",
+    },
+    {
+        "name": "Portraits",
+        "description": "Portrait management",
+    },
+    {
+        "name": "Videos",
+        "description": "Video management",
+    },
+    {
+        "name": "Rotation",
+        "description": "Video rotation scheduling",
+    },
+]
+
+# Update FastAPI app with OpenAPI tags
+app.openapi_tags = openapi_tags
+
+# Include routers with standardized /api prefix
+app.include_router(companies_router.router, prefix="/api")
+app.include_router(projects_router.router, prefix="/api")
+app.include_router(ar_content_router.router, prefix="/api")
+app.include_router(auth_router.router, prefix="/api")
+app.include_router(storage_router.router, prefix="/api")
+app.include_router(analytics_router.router, prefix="/api")
+app.include_router(notifications_router.router, prefix="/api")
+app.include_router(oauth_router.router, prefix="/api")
+app.include_router(public_router.router, prefix="/api")
+app.include_router(health_router.router, prefix="/api")
+app.include_router(alerts_ws_router.router, prefix="/api")
+app.include_router(portraits_router.router, prefix="/api")
+app.include_router(videos_router.router, prefix="/api")
+app.include_router(rotation_router.router, prefix="/api")
 
 
 # Public AR Viewer endpoint

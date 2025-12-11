@@ -7,7 +7,7 @@ from app.core.database import get_db
 from app.models.notification import Notification
 from app.tasks.notification_tasks import send_email_notification, send_telegram_notification
 
-router = APIRouter()
+router = APIRouter(prefix="/notifications", tags=["Notifications"])
 
 
 @router.get("/notifications")

@@ -10,7 +10,7 @@ from app.models.ar_content import ARContent
 from app.models.project import Project
 from app.models.company import Company
 
-router = APIRouter()
+router = APIRouter(prefix="/analytics", tags=["Analytics"])
 
 
 @router.get("/analytics/overview")

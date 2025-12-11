@@ -10,7 +10,7 @@ from app.core.database import get_db
 from app.core.config import get_settings
 from app.models.storage import StorageConnection
 
-router = APIRouter(prefix="/api/oauth/yandex", tags=["oauth"])
+router = APIRouter(prefix="/oauth/yandex", tags=["OAuth"])
 settings = get_settings()
 
 # Временное хранилище state для защиты от CSRF (в production заменить на Redis)

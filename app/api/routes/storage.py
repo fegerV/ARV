@@ -7,9 +7,9 @@ from app.core.database import get_db
 from app.models.storage import StorageConnection
 from app.models.company import Company
 from app.schemas.storage import StorageConnectionCreate, StorageConnection, CompanyStorageSettings
-from app.services.storage.factory import get_provider
+# from app.services.storage.factory import get_provider
 
-router = APIRouter()
+router = APIRouter(prefix="/storage", tags=["Storage"])
 
 
 @router.post("/storage/connections", response_model=StorageConnection)
@@ -38,15 +38,18 @@ async def test_connection(connection_id: int, db: AsyncSession = Depends(get_db)
     if not conn:
         raise HTTPException(status_code=404, detail="Connection not found")
 
-    provider = get_provider(conn)
-    result = await provider.test_connection()
+    # provider = get_provider(conn)
+    # result = await provider.test_connection()
 
-    conn.last_tested_at = datetime.utcnow()
-    conn.test_status = result.get("status")
-    conn.test_error = result.get("error")
-    await db.commit()
+    # conn.last_tested_at = datetime.utcnow()
+    # conn.test_status = result.get("status")
+    # conn.test_error = result.get("error")
+    # await db.commit()
 
-    return result
+    # return result
+    
+    # Placeholder return until storage provider is implemented
+    return {"status": "pending", "message": "Storage provider not implemented"}
 
 
 @router.put("/companies/{company_id}/storage")

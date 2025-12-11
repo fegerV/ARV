@@ -9,7 +9,7 @@ from app.models.portrait import Portrait
 from app.tasks.marker_tasks import generate_mind_marker_task
 import aiofiles
 
-router = APIRouter()
+router = APIRouter(prefix="/portraits", tags=["Portraits"])
 
 
 def build_image_url(storage_base: str, saved_path: Path) -> str:
@@ -19,7 +19,7 @@ def build_image_url(storage_base: str, saved_path: Path) -> str:
     return f"/storage/{rel.as_posix()}"
 
 
-@router.post("/portraits/upload", status_code=status.HTTP_201_CREATED)
+@router.post("/upload", status_code=status.HTTP_201_CREATED)
 async def upload_portrait(
     file: UploadFile = File(...),
     company_id: int = Form(...),
@@ -68,7 +68,7 @@ async def upload_portrait(
     }
 
 
-@router.get("/portraits/{portrait_id}")
+@router.get("/{portrait_id}")
 async def get_portrait(portrait_id: int, db: AsyncSession = Depends(get_db)):
     portrait = await db.get(Portrait, portrait_id)
     if not portrait:
@@ -83,7 +83,7 @@ async def get_portrait(portrait_id: int, db: AsyncSession = Depends(get_db)):
     }
 
 
-@router.get("/portraits/by-unique/{unique_id}")
+@router.get("/by-unique/{unique_id}")
 async def get_portrait_by_unique(unique_id: str, db: AsyncSession = Depends(get_db)):
     # Simple lookup by unique_id; raw SQLAlchemy 2.0 select is omitted for brevity
     from sqlalchemy import select
@@ -109,7 +109,7 @@ async def get_active_video(portrait_id: int):
     raise HTTPException(status_code=404, detail="Active video not implemented")
 
 
-@router.get("/portraits/by-unique/{unique_id}/active-video")
+@router.get("/by-unique/{unique_id}/active-video")
 async def get_active_video_by_unique(unique_id: str):
     # Placeholder
     raise HTTPException(status_code=404, detail="Active video not implemented")
