@@ -9,10 +9,10 @@ from app.models.company import Company
 from app.models.storage import StorageConnection
 from app.models.user import User
 from app.schemas.company import CompanyCreate, CompanyResponse
-from app.services.storage.factory import get_provider
+# from app.services.storage.factory import get_provider
 from app.api.routes.auth import get_current_active_user
 
-router = APIRouter(tags=["companies"])
+router = APIRouter(prefix="/companies", tags=["Companies"])
 
 @router.post("/", response_model=CompanyResponse)
 async def create_company(
@@ -45,13 +45,13 @@ async def create_company(
 
     # Создаем папку в хранилище
     storage_path = f"/Companies/{company_data.name}"
-    provider = get_provider(storage_conn)
-    result = await provider.create_folder(storage_path)
-    if not result.get("success"):
-        raise HTTPException(
-            status_code=500,
-            detail=f"Failed to create folder in {storage_conn.provider}: {result.get('error')}",
-        )
+    # provider = get_provider(storage_conn)
+    # result = await provider.create_folder(storage_path)
+    # if not result.get("success"):
+    #     raise HTTPException(
+    #         status_code=500,
+    #         detail=f"Failed to create folder in {storage_conn.provider}: {result.get('error')}",
+    #     )
 
     # Создаем компанию
     company = Company(

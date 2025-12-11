@@ -8,7 +8,7 @@ from app.core.database import get_db
 from app.models.project import Project
 from app.models.company import Company
 
-router = APIRouter()
+router = APIRouter(prefix="/projects", tags=["Projects"])
 
 
 @router.get("/companies/{company_id}/projects")
@@ -46,7 +46,7 @@ async def list_projects_for_company(company_id: int, db: AsyncSession = Depends(
     return {"projects": items}
 
 
-@router.post("/projects")
+@router.post("/")
 async def create_project(payload: dict, db: AsyncSession = Depends(get_db)):
     required = ["company_id", "name", "slug"]
     for r in required:
@@ -82,7 +82,7 @@ async def create_project_for_company(company_id: int, payload: dict, db: AsyncSe
     return await create_project(payload, db)
 
 
-@router.put("/projects/{project_id}")
+@router.put("/{project_id}")
 async def update_project(project_id: int, payload: dict, db: AsyncSession = Depends(get_db)):
     proj = await db.get(Project, project_id)
     if not proj:
@@ -94,7 +94,7 @@ async def update_project(project_id: int, payload: dict, db: AsyncSession = Depe
     return {"status": "updated"}
 
 
-@router.delete("/projects/{project_id}")
+@router.delete("/{project_id}")
 async def delete_project(project_id: int, db: AsyncSession = Depends(get_db)):
     proj = await db.get(Project, project_id)
     if not proj:
@@ -104,7 +104,7 @@ async def delete_project(project_id: int, db: AsyncSession = Depends(get_db)):
     return {"status": "deleted"}
 
 
-@router.post("/projects/{project_id}/extend")
+@router.post("/{project_id}/extend")
 async def extend_project(project_id: int, payload: dict, db: AsyncSession = Depends(get_db)):
     days: int = int(payload.get("days", 30))
     proj = await db.get(Project, project_id)

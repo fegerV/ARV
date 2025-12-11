@@ -6,7 +6,7 @@ from fastapi import APIRouter, WebSocket
 
 from app.core.config import settings
 
-router = APIRouter()
+router = APIRouter(prefix="/ws", tags=["WebSocket"])
 logger = structlog.get_logger()
 
 

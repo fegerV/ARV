@@ -6,7 +6,7 @@ from sqlalchemy import select
 from app.core.database import get_db
 from app.models.video_rotation_schedule import VideoRotationSchedule
 
-router = APIRouter()
+router = APIRouter(prefix="/rotation", tags=["Rotation"])
 
 
 @router.post("/ar-content/{content_id}/rotation")

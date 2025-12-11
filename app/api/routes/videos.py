@@ -7,7 +7,7 @@ from app.core.database import get_db
 from app.models.video import Video
 from app.models.ar_content import ARContent
 
-router = APIRouter()
+router = APIRouter(prefix="/videos", tags=["Videos"])
 
 
 @router.get("/ar-content/{content_id}/videos")
