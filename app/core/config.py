@@ -82,7 +82,7 @@ class Settings(BaseSettings):
     # Yandex Disk
     YANDEX_OAUTH_CLIENT_ID: str = ""
     YANDEX_OAUTH_CLIENT_SECRET: str = ""
-    YANDEX_OAUTH_REDIRECT_URI: str = "http://localhost:8000/api/oauth/yandex/callback"
+    YANDEX_OAUTH_REDIRECT_URI: str = "http://localhost:3000/storage/oauth/callback"
     
     # Email
     SMTP_HOST: str = "smtp.gmail.com"
