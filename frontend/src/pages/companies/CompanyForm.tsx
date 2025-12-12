@@ -12,10 +12,12 @@ import {
   InputLabel,
   Select,
   MenuItem,
+  Divider,
 } from '@mui/material';
 import { ArrowBack as BackIcon, Save as SaveIcon } from '@mui/icons-material';
 import { companiesAPI } from '../../services/api';
 import { useToast } from '../../store/useToast';
+import { YandexDiskAuth } from '../../components/storage';
 
 interface CompanyData {
   name: string;
@@ -32,6 +34,7 @@ export default function CompanyForm() {
   const { addToast } = useToast();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showOAuth, setShowOAuth] = useState(false);
   const [formData, setFormData] = useState<CompanyData>({
     name: '',
     slug: '',
@@ -47,6 +50,23 @@ export default function CompanyForm() {
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, '-')
       .replace(/^-|-$/g, '');
+  };
+
+  const handleYandexAuthorized = (response: { success: boolean; connectionId?: number; error?: string }) => {
+    if (response.success && response.connectionId) {
+      addToast('Yandex Disk connection created successfully!', 'success');
+      setFormData(prev => ({
+        ...prev,
+        storage_connection_id: response.connectionId!,
+      }));
+      setShowOAuth(false);
+    } else {
+      addToast(response.error || 'Yandex Disk authorization failed', 'error');
+    }
+  };
+
+  const handleYandexError = (error: string) => {
+    addToast(`Yandex Disk authorization error: ${error}`, 'error');
   };
 
   const handleChange = (field: keyof CompanyData, value: string) => {
@@ -78,7 +98,7 @@ export default function CompanyForm() {
       }
 
       if (!formData.storage_connection_id) {
-        setError('Storage connection is required. Please create a storage connection first (MinIO or Yandex Disk).');
+        setError('Storage connection is required. Please create a storage connection first.');
         setLoading(false);
         return;
       }
@@ -189,22 +209,68 @@ export default function CompanyForm() {
             disabled={loading}
           />
 
-          <TextField
-            fullWidth
-            label="Storage Connection ID"
-            type="number"
-            value={formData.storage_connection_id || ''}
-            onChange={(e) => {
-              setFormData((prev) => ({
-                ...prev,
-                storage_connection_id: e.target.value ? parseInt(e.target.value) : null,
-              }));
-            }}
-            margin="normal"
-            required
-            disabled={loading}
-            helperText="Create a Yandex Disk or MinIO storage connection first in Settings"
-          />
+          <Box sx={{ mb: 2 }}>
+            <Typography variant="subtitle1" gutterBottom>
+              Storage Configuration
+            </Typography>
+            <Alert severity="info" sx={{ mb: 2 }}>
+              New companies require external storage. You can either:
+              <ul>
+                <li>Enter an existing storage connection ID</li>
+                <li>Create a new Yandex Disk connection using OAuth</li>
+              </ul>
+            </Alert>
+          </Box>
+
+          {formData.storage_connection_id ? (
+            <Alert severity="success" sx={{ mb: 2 }}>
+              Storage connection configured: ID {formData.storage_connection_id}
+            </Alert>
+          ) : (
+            <Alert severity="warning" sx={{ mb: 2 }}>
+              Storage connection is required before creating a company.
+            </Alert>
+          )}
+
+          <Box sx={{ display: 'flex', gap: 2, mb: 2, alignItems: 'center' }}>
+            <TextField
+              fullWidth
+              label="Storage Connection ID"
+              type="number"
+              value={formData.storage_connection_id || ''}
+              onChange={(e) => {
+                setFormData((prev) => ({
+                  ...prev,
+                  storage_connection_id: e.target.value ? parseInt(e.target.value) : null,
+                }));
+              }}
+              margin="normal"
+              disabled={loading}
+              helperText="Enter existing connection ID or create a new one below"
+            />
+            <Button
+              variant="outlined"
+              onClick={() => setShowOAuth(!showOAuth)}
+              sx={{ mt: 2, height: 'fit-content' }}
+            >
+              {showOAuth ? 'Hide' : 'Create'} Yandex Connection
+            </Button>
+          </Box>
+
+          {showOAuth && (
+            <Box sx={{ mb: 2, p: 2, border: '1px solid #ddd', borderRadius: 1 }}>
+              <Typography variant="subtitle2" gutterBottom>
+               Create Yandex Disk Connection
+              </Typography>
+              <YandexDiskAuth
+                connectionName={`${formData.name || 'New Company'} Storage`}
+                onAuthorized={handleYandexAuthorized}
+                onError={handleYandexError}
+                disabled={!formData.name.trim()}
+                variant="outlined"
+              />
+            </Box>
+          )}
 
           <TextField
             fullWidth

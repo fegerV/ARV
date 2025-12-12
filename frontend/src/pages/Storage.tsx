@@ -22,36 +22,61 @@ import {
   MenuItem,
   FormControl,
   InputLabel,
+  Divider,
 } from '@mui/material';
 import { CloudUpload as UploadIcon, Settings as SettingsIcon, Close as CloseIcon } from '@mui/icons-material';
-import { useState } from 'react';
-
-const storageConnections = [
-  { id: 1, provider: 'Local Storage', company: 'Vertex AR', status: 'active', usage: '85GB', limit: '500GB' },
-  { id: 2, provider: 'MinIO', company: 'Company A', status: 'active', usage: '120GB', limit: '1TB' },
-  { id: 3, provider: 'Yandex Disk', company: 'Company B', status: 'active', usage: '45GB', limit: '500GB' },
-  { id: 4, provider: 'MinIO', company: 'Company C', status: 'inactive', usage: '0GB', limit: '1TB' },
-];
-
-const storageStats = [
-  { title: 'Total Storage', value: '250GB', limit: '2.5TB' },
-  { title: 'Used Storage', value: '250GB', percent: 10 },
-  { title: 'Active Connections', value: '3' },
-  { title: 'Backup Status', value: 'OK', status: 'success' },
-];
+import React, { useState, useEffect } from 'react';
+import { YandexDiskAuth } from '../components/storage';
+import { storageAPI, StorageConnection } from '../services/api';
+import { useToast } from '../store/useToast';
 
 export default function Storage() {
+  const { addToast } = useToast();
   const [openDialog, setOpenDialog] = useState(false);
-  const [selectedConnection, setSelectedConnection] = useState<any>(null);
+  const [selectedConnection, setSelectedConnection] = useState<StorageConnection | null>(null);
   const [newConnectionDialog, setNewConnectionDialog] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [storageConnections, setStorageConnections] = useState<StorageConnection[]>([]);
   const [newConnection, setNewConnection] = useState({
     name: '',
-    provider: 'minio',
+    provider: 'minio' as 'local_disk' | 'minio' | 'yandex_disk',
     credentials: '',
   });
 
   const handleConfigureStorage = () => {
     setNewConnectionDialog(true);
+  };
+
+  const loadStorageConnections = async () => {
+    try {
+      setLoading(true);
+      const response = await storageAPI.list();
+      setStorageConnections(response.data);
+    } catch (error) {
+      console.error('Failed to load storage connections:', error);
+      addToast('Failed to load storage connections', 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Load connections on component mount
+  useEffect(() => {
+    loadStorageConnections();
+  }, []);
+
+  const handleYandexAuthorized = (response: { success: boolean; connectionId?: number; error?: string }) => {
+    if (response.success && response.connectionId) {
+      addToast('Yandex Disk connection created successfully!', 'success');
+      setNewConnectionDialog(false);
+      loadStorageConnections(); // Refresh the connections list
+    } else {
+      addToast(response.error || 'Yandex Disk authorization failed', 'error');
+    }
+  };
+
+  const handleYandexError = (error: string) => {
+    addToast(`Yandex Disk authorization error: ${error}`, 'error');
   };
 
   const handleCloseDialog = () => {
@@ -261,23 +286,40 @@ export default function Storage() {
             <InputLabel>Provider</InputLabel>
             <Select
               value={newConnection.provider}
-              onChange={(e) => setNewConnection({...newConnection, provider: e.target.value as string})}
+              onChange={(e) => setNewConnection({...newConnection, provider: e.target.value as 'local_disk' | 'minio' | 'yandex_disk'})}
               label="Provider"
             >
               <MenuItem value="minio">MinIO</MenuItem>
               <MenuItem value="yandex_disk">Yandex Disk</MenuItem>
             </Select>
           </FormControl>
-          <TextField
-            fullWidth
-            label="Credentials"
-            placeholder="Enter credentials (JSON format)"
-            value={newConnection.credentials}
-            onChange={(e) => setNewConnection({...newConnection, credentials: e.target.value})}
-            margin="normal"
-            multiline
-            rows={4}
-          />
+
+          {newConnection.provider === 'yandex_disk' ? (
+            <Box sx={{ mt: 2 }}>
+              <Divider sx={{ mb: 2 }} />
+              <Typography variant="body2" color="textSecondary" paragraph>
+                For Yandex Disk, click the button below to authorize access through OAuth.
+              </Typography>
+              <YandexDiskAuth
+                connectionName={newConnection.name || 'Yandex Disk Connection'}
+                onAuthorized={handleYandexAuthorized}
+                onError={handleYandexError}
+                disabled={!newConnection.name.trim()}
+              />
+            </Box>
+          ) : (
+            <TextField
+              fullWidth
+              label="Credentials"
+              placeholder="Enter credentials (JSON format)"
+              value={newConnection.credentials}
+              onChange={(e) => setNewConnection({...newConnection, credentials: e.target.value})}
+              margin="normal"
+              multiline
+              rows={4}
+              helperText="For MinIO, provide access key, secret key, and endpoint"
+            />
+          )}
         </Box>
       </DialogContent>
       <DialogActions>

@@ -6,6 +6,7 @@ from typing import Optional
 from datetime import datetime
 import httpx
 import logging
+from urllib.parse import quote_plus
 
 from app.core.database import get_db
 from app.core.config import get_settings
@@ -180,7 +181,8 @@ async def yandex_oauth_callback(
         # Schedule cleanup of expired states
         background_tasks.add_task(oauth_state_store.cleanup_expired_states)
 
-        redirect_url = f"{settings.ADMIN_FRONTEND_URL}/storage/connections/{connection.id}?success=true"
+        # Redirect to frontend OAuth callback page with success parameters
+        redirect_url = f"{settings.ADMIN_FRONTEND_URL}/oauth/yandex/callback?success=true&connectionId={connection.id}"
         return RedirectResponse(url=redirect_url)
         
     except httpx.RequestError as e:
@@ -188,22 +190,20 @@ async def yandex_oauth_callback(
             "Network error during OAuth callback",
             extra={"error": str(e), "connection_name": connection_name}
         )
-        raise HTTPException(
-            status_code=503,
-            detail="Network error during authentication. Please try again."
-        )
-    except HTTPException:
-        # Re-raise HTTP exceptions
-        raise
+        error_message = "Network error during authentication. Please try again."
+        redirect_url = f"{settings.ADMIN_FRONTEND_URL}/oauth/yandex/callback?success=false&error={quote_plus(error_message)}"
+        return RedirectResponse(url=redirect_url)
+    except HTTPException as e:
+        # Re-raise HTTP exceptions for proper status codes
+        raise e
     except Exception as e:
         logger.error(
             "Unexpected error during OAuth callback",
             extra={"error": str(e), "connection_name": connection_name}
         )
-        raise HTTPException(
-            status_code=500,
-            detail="An unexpected error occurred during authentication."
-        )
+        error_message = "An unexpected error occurred during authentication."
+        redirect_url = f"{settings.ADMIN_FRONTEND_URL}/oauth/yandex/callback?success=false&error={quote_plus(error_message)}"
+        return RedirectResponse(url=redirect_url)
 
 @router.get("/{connection_id}/folders")
 async def list_yandex_folders(

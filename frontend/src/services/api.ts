@@ -81,3 +81,71 @@ export const analyticsAPI = {
   overview: () => api.get('/analytics/overview'),
   arContent: (id: number, days: number = 30) => api.get(`/analytics/ar-content/${id}?days=${days}`),
 };
+
+// Storage Connections API
+export interface StorageConnection {
+  id: number;
+  name: string;
+  provider: 'local_disk' | 'minio' | 'yandex_disk';
+  is_active: boolean;
+  base_path?: string;
+  is_default?: boolean;
+  last_tested_at?: string;
+  test_status?: string;
+  test_error?: string;
+  created_at: string;
+  updated_at: string;
+  metadata?: Record<string, any>;
+}
+
+export interface StorageConnectionCreate {
+  name: string;
+  provider: 'local_disk' | 'minio' | 'yandex_disk';
+  base_path?: string;
+  is_default?: boolean;
+  credentials?: Record<string, any>;
+  metadata?: Record<string, any>;
+}
+
+export interface StorageConnectionUpdate {
+  name?: string;
+  is_active?: boolean;
+  credentials?: Record<string, any>;
+  metadata?: Record<string, any>;
+}
+
+export interface YandexDiskFolder {
+  name: string;
+  path: string;
+  type: string;
+  created: string;
+  modified: string;
+  last_modified: string;
+}
+
+export interface YandexDiskFoldersResponse {
+  current_path: string;
+  folders: YandexDiskFolder[];
+  parent_path: string;
+  has_parent: boolean;
+}
+
+export const storageAPI = {
+  // Storage Connections
+  list: () => api.get<StorageConnection[]>('/storage/connections'),
+  get: (id: number) => api.get<StorageConnection>(`/storage/connections/${id}`),
+  create: (data: StorageConnectionCreate) => api.post<StorageConnection>('/storage/connections', data),
+  update: (id: number, data: StorageConnectionUpdate) => api.put<StorageConnection>(`/storage/connections/${id}`, data),
+  delete: (id: number) => api.delete(`/storage/connections/${id}`),
+  test: (id: number) => api.post<{ status: string; message: string }>(`/storage/connections/${id}/test`),
+
+  // Yandex Disk specific
+  yandex: {
+    listFolders: (connectionId: number, path: string = '/') => 
+      api.get<YandexDiskFoldersResponse>(`/api/oauth/yandex/${connectionId}/folders?path=${encodeURIComponent(path)}`),
+    createFolder: (connectionId: number, folderPath: string) =>
+      api.post<{ status: string; message: string; path: string }>(
+        `/api/oauth/yandex/${connectionId}/create-folder?folder_path=${encodeURIComponent(folderPath)}`
+      ),
+  },
+};

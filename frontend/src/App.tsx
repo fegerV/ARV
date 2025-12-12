@@ -18,6 +18,7 @@ import Analytics from './pages/Analytics';
 import Storage from './pages/Storage';
 import Notifications from './pages/Notifications';
 import Settings from './pages/Settings';
+import YandexDiskCallback from './pages/oauth/YandexDiskCallback';
 
 function App() {
   // Initialize keyboard shortcuts (Ctrl+T, Ctrl+B for theme toggle)
@@ -29,6 +30,9 @@ function App() {
       <Routes>
         {/* Public Routes */}
         <Route path="/login" element={<Login />} />
+        
+        {/* OAuth Callback Routes (public - accessed from popup) */}
+        <Route path="/oauth/yandex/callback" element={<YandexDiskCallback />} />
         
         {/* Protected Routes */}
         <Route
