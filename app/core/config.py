@@ -107,6 +107,28 @@ class Settings(BaseSettings):
     CELERY_TASK_TRACK_STARTED: bool = True
     CELERY_TASK_TIME_LIMIT: int = 300  # 5 minutes
     
+    # Storage
+    STORAGE_PROVIDER: str = Field(default="local")  # local, minio, yandex_disk
+    STORAGE_ENABLE_CACHING: bool = Field(default=True)
+    STORAGE_CACHE_TTL: int = Field(default=3600)  # 1 hour
+    
+    # Local Storage
+    LOCAL_STORAGE_PATH: str = Field(default="/app/storage/content")
+    LOCAL_STORAGE_PUBLIC_URL: str = Field(default="http://localhost:8000/storage")
+    
+    # MinIO Configuration
+    MINIO_ENDPOINT: str = Field(default="localhost:9000")
+    MINIO_ROOT_USER: str = Field(default="minioadmin")
+    MINIO_ROOT_PASSWORD: str = Field(default="minioadmin")
+    MINIO_BUCKET_NAME: str = Field(default="vertex-ar")
+    MINIO_USE_SSL: bool = Field(default=False)
+    MINIO_REGION: str = Field(default="us-east-1")
+    
+    # Yandex Disk Configuration
+    YANDEX_OAUTH_TOKEN: str = Field(default="")
+    YANDEX_APP_ID: str = Field(default="")
+    YANDEX_ROOT_FOLDER: str = Field(default="/VertexAR")
+    
     # Monitoring
     SENTRY_DSN: str = ""
     PROMETHEUS_MULTIPROC_DIR: str = "/tmp/prometheus_multiproc"

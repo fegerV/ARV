@@ -40,14 +40,25 @@ export default api;
 // API methods
 export const arContentAPI = {
   listAll: () => api.get('/ar-content'),
+  list: (companyId: number, projectId: number) => api.get(`/companies/${companyId}/projects/${projectId}/ar-content`),
   getDetail: (id: number) => api.get(`/ar-content/${id}`),
-  create: (data: FormData) => api.post('/ar-content', data, {
+  get: (companyId: number, projectId: number, contentId: number) => api.get(`/companies/${companyId}/projects/${projectId}/ar-content/${contentId}`),
+  create: (companyId: number, projectId: number, formData: FormData) => api.post(`/companies/${companyId}/projects/${projectId}/ar-content/new`, formData, {
     headers: {
       'Content-Type': 'multipart/form-data',
     },
   }),
-  update: (id: number, data: any) => api.put(`/ar-content/${id}`, data),
-  delete: (id: number) => api.delete(`/ar-content/${id}`),
+  update: (companyId: number, projectId: number, contentId: number, data: any) => api.put(`/companies/${companyId}/projects/${projectId}/ar-content/${contentId}`, data),
+  patchVideo: (companyId: number, projectId: number, contentId: number, videoFile: File) => {
+    const formData = new FormData();
+    formData.append('video', videoFile);
+    return api.patch(`/companies/${companyId}/projects/${projectId}/ar-content/${contentId}/video`, formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+  },
+  delete: (companyId: number, projectId: number, contentId: number) => api.delete(`/companies/${companyId}/projects/${projectId}/ar-content/${contentId}`),
   generateMarker: (id: number) => api.post(`/ar-content/${id}/generate-marker`),
 };
 

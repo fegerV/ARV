@@ -6,9 +6,6 @@ import {
   Paper,
   TextField,
   Button,
-  Stepper,
-  Step,
-  StepLabel,
   Alert,
   CircularProgress,
   Card,
@@ -25,34 +22,25 @@ import {
   FormLabel,
   Checkbox,
   FormGroup,
+  Grid,
+  Divider,
+  IconButton,
 } from '@mui/material';
 import { 
   ArrowBack as BackIcon, 
   Save as SaveIcon,
   Upload as UploadIcon,
-  PlayArrow as PlayIcon,
-  Schedule as ScheduleIcon,
+  Delete as DeleteIcon,
   QrCode as QrCodeIcon,
   CheckCircle as CheckIcon,
-  Add as AddIcon,
   Business as BusinessIcon,
   Folder as FolderIcon,
+  Image as ImageIcon,
+  VideoLibrary as VideoIcon,
 } from '@mui/icons-material';
 import { arContentAPI, companiesAPI, projectsAPI } from '../../services/api';
 import { useToast } from '../../store/useToast';
 
-// Define step types
-const steps = [
-  'Company & Customer',
-  'Project Selection',
-  'Upload Media',
-  'Generate Marker',
-  'Video Schedule',
-  'Playback Duration',
-  'Publish'
-];
-
-// Wizard form data interface
 interface ARContentFormData {
   // Customer info
   customerName: string;
@@ -67,9 +55,13 @@ interface ARContentFormData {
   newProjectName: string;
   creatingNewProject: boolean;
   
+  // Content info
+  name: string;
+  description: string;
+  
   // Media
-  portrait: File | null;
-  videos: File[];
+  image: File | null;
+  video: File | null;
   
   // Schedule
   scheduleType: 'daily' | 'weekly' | 'monthly' | 'custom';
@@ -78,13 +70,10 @@ interface ARContentFormData {
   // Playback duration
   playbackDuration: '1_year' | '3_years' | '5_years';
   
-  // Content
-  title: string;
-  description: string;
+  // Status
   isActive: boolean;
 }
 
-// Company interface
 interface Company {
   id: number;
   name: string;
@@ -92,11 +81,20 @@ interface Company {
   is_default?: boolean;
 }
 
-// Project interface
 interface Project {
   id: number;
   name: string;
   slug: string;
+}
+
+interface CreationResponse {
+  id: number;
+  unique_id: string;
+  unique_link: string;
+  image_url?: string;
+  video_url?: string;
+  qr_code_url?: string;
+  preview_url?: string;
 }
 
 export default function ARContentForm() {
@@ -104,9 +102,9 @@ export default function ARContentForm() {
   const { projectId, companyId } = useParams<{ projectId: string; companyId: string }>();
   const { addToast } = useToast();
   
-  const [activeStep, setActiveStep] = useState(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [creationResponse, setCreationResponse] = useState<CreationResponse | null>(null);
   
   // Data for dropdowns
   const [companies, setCompanies] = useState<Company[]>([]);
@@ -119,16 +117,20 @@ export default function ARContentForm() {
     customerEmail: '',
     
     // Company info
-    companyId: companyId ? parseInt(companyId) : null, // Will be set to default company after loading
+    companyId: companyId ? parseInt(companyId) : null,
     
     // Project info
     projectId: projectId ? parseInt(projectId) : null,
     newProjectName: '',
     creatingNewProject: false,
     
+    // Content info
+    name: '',
+    description: '',
+    
     // Media
-    portrait: null,
-    videos: [],
+    image: null,
+    video: null,
     
     // Schedule
     scheduleType: 'daily',
@@ -137,9 +139,7 @@ export default function ARContentForm() {
     // Playback duration
     playbackDuration: '3_years',
     
-    // Content
-    title: '',
-    description: '',
+    // Status
     isActive: true,
   });
 
@@ -233,119 +233,69 @@ export default function ARContentForm() {
     fetchProjects();
   }, [formData.companyId]);
 
-  // Handle portrait file change
-  const handlePortraitChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Handle image file change
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
-      setFormData({ ...formData, portrait: e.target.files[0] });
+      setFormData({ ...formData, image: e.target.files[0] });
       setError(null);
     }
   };
 
-  // Handle videos file change
-  const handleVideosChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files) {
-      const newVideos = Array.from(e.target.files);
-      setFormData({ ...formData, videos: [...formData.videos, ...newVideos] });
+  // Handle video file change
+  const handleVideoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      setFormData({ ...formData, video: e.target.files[0] });
       setError(null);
     }
   };
 
-  // Remove a video
-  const removeVideo = (index: number) => {
-    const newVideos = [...formData.videos];
-    newVideos.splice(index, 1);
-    setFormData({ ...formData, videos: newVideos });
-  };
-
-  // Handle next step
-  const handleNext = () => {
-    // Validate current step before proceeding
-    if (activeStep === 0) {
-      // Validate customer info
-      if (!formData.customerName.trim()) {
-        setError('Customer name is required');
-        return;
+  // Validate form
+  const validateForm = (): string | null => {
+    if (!formData.name.trim()) {
+      return 'Content name is required';
+    }
+    
+    if (!formData.customerName.trim()) {
+      return 'Customer name is required';
+    }
+    
+    if (!formData.customerEmail.trim()) {
+      return 'Customer email is required';
+    }
+    
+    if (!formData.companyId) {
+      return 'Please select a company';
+    }
+    
+    if (formData.creatingNewProject) {
+      if (!formData.newProjectName.trim()) {
+        return 'Project name is required';
       }
-      if (!formData.customerEmail.trim()) {
-        setError('Customer email is required');
-        return;
-      }
-      if (!formData.companyId) {
-        setError('Please select a company');
-        return;
+    } else {
+      if (!formData.projectId) {
+        return 'Please select a project or create a new one';
       }
     }
     
-    if (activeStep === 1) {
-      // Validate project selection
-      if (formData.creatingNewProject) {
-        if (!formData.newProjectName.trim()) {
-          setError('Project name is required');
-          return;
-        }
-      } else {
-        if (!formData.projectId) {
-          setError('Please select a project or create a new one');
-          return;
-        }
-      }
+    if (!formData.image) {
+      return 'Please upload an image';
     }
     
-    if (activeStep === 2) {
-      // Validate media upload
-      if (!formData.portrait) {
-        setError('Please upload a portrait image');
-        return;
-      }
-      
-      if (formData.videos.length === 0) {
-        setError('Please upload at least one video');
-        return;
-      }
-    }
-    
-    setError(null);
-    setActiveStep((prevActiveStep) => prevActiveStep + 1);
-  };
-
-  // Handle back step
-  const handleBack = () => {
-    setError(null);
-    setActiveStep((prevActiveStep) => prevActiveStep - 1);
+    return null;
   };
 
   // Handle form submission
   const handleSubmit = async () => {
+    const validationError = validateForm();
+    if (validationError) {
+      setError(validationError);
+      return;
+    }
+    
     setLoading(true);
     setError(null);
     
     try {
-      // Validate required fields
-      if (!formData.title.trim()) {
-        setError('Title is required');
-        setLoading(false);
-        return;
-      }
-      
-      if (!formData.portrait) {
-        setError('Portrait image is required');
-        setLoading(false);
-        return;
-      }
-      
-      if (formData.videos.length === 0) {
-        setError('At least one video is required');
-        setLoading(false);
-        return;
-      }
-      
-      // Ensure we have a companyId
-      if (!formData.companyId) {
-        setError('Company information is missing');
-        setLoading(false);
-        return;
-      }
-      
       // If creating a new project, do that first
       let finalProjectId = formData.projectId;
       if (formData.creatingNewProject && formData.newProjectName.trim() && formData.companyId) {
@@ -364,62 +314,46 @@ export default function ARContentForm() {
         }
       }
 
+      // Ensure we have both companyId and projectId
+      if (!formData.companyId || !finalProjectId) {
+        setError('Company and project information is missing');
+        setLoading(false);
+        return;
+      }
+
       // Prepare form data for upload
       const uploadData = new FormData();
-      uploadData.append('title', formData.title);
+      uploadData.append('name', formData.name);
       uploadData.append('description', formData.description);
       
-      // Add company_id
-      uploadData.append('company_id', formData.companyId.toString());
+      // Add customer info as metadata
+      const metadata = {
+        customer_name: formData.customerName,
+        customer_phone: formData.customerPhone,
+        customer_email: formData.customerEmail,
+        schedule_type: formData.scheduleType,
+        schedule_time: formData.scheduleTime,
+        playback_duration: formData.playbackDuration,
+      };
+      uploadData.append('content_metadata', JSON.stringify(metadata));
       
-      // Add project_id if available
-      if (finalProjectId) {
-        uploadData.append('project_id', finalProjectId.toString());
+      // Add image (required)
+      if (formData.image) {
+        uploadData.append('image', formData.image);
       }
       
-      // Add customer info
-      uploadData.append('customer_name', formData.customerName);
-      uploadData.append('customer_phone', formData.customerPhone);
-      uploadData.append('customer_email', formData.customerEmail);
-      
-      // Add portrait
-      if (formData.portrait) {
-        uploadData.append('portrait', formData.portrait);
+      // Add video (optional)
+      if (formData.video) {
+        uploadData.append('video', formData.video);
       }
-      
-      // Add videos
-      formData.videos.forEach((video, index) => {
-        uploadData.append(`videos`, video);
-      });
-      
-      // Add schedule info
-      uploadData.append('schedule_type', formData.scheduleType);
-      uploadData.append('schedule_time', formData.scheduleTime);
-      
-      // Add playback duration (convert to days)
-      const durationDays = {
-        '1_year': 365,
-        '3_years': 1095,
-        '5_years': 1825,
-      }[formData.playbackDuration];
-      uploadData.append('playback_duration_days', durationDays.toString());
-      
-      // Add active status
-      uploadData.append('is_active', formData.isActive.toString());
 
       // Call API to create AR content
-      await arContentAPI.create(uploadData);
+      const response = await arContentAPI.create(formData.companyId, finalProjectId, uploadData);
+      const responseData = response.data as CreationResponse;
       
+      setCreationResponse(responseData);
       addToast('AR content created successfully!', 'success');
       
-      // Navigate back to the appropriate list
-      if (finalProjectId) {
-        navigate(`/projects/${finalProjectId}/content`);
-      } else if (formData.companyId) {
-        navigate(`/companies/${formData.companyId}/projects`);
-      } else {
-        navigate('/ar-content');
-      }
     } catch (err: any) {
       console.error('AR content creation error:', err);
       const errorMsg = err?.response?.data?.detail || err?.message || 'Failed to create AR content';
@@ -430,12 +364,322 @@ export default function ARContentForm() {
     }
   };
 
-  // Get step content
-  const getStepContent = (step: number) => {
-    switch (step) {
-      case 0: // Company & Customer Info
-        return (
-          <Box>
+  // If creation was successful, show success screen
+  if (creationResponse) {
+    return (
+      <Box>
+        <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
+          <Button
+            startIcon={<BackIcon />}
+            onClick={() => {
+              if (projectId) {
+                navigate(`/projects/${projectId}/content`);
+              } else if (companyId) {
+                navigate(`/companies/${companyId}/projects`);
+              } else {
+                navigate('/ar-content');
+              }
+            }}
+            sx={{ mr: 2 }}
+          >
+            Back
+          </Button>
+          <Typography variant="h4">AR Content Created Successfully!</Typography>
+        </Box>
+
+        <Paper sx={{ p: 4, textAlign: 'center' }}>
+          <CheckIcon sx={{ fontSize: 80, color: 'success.main', mb: 2 }} />
+          
+          <Typography variant="h5" gutterBottom>
+            Your AR content is now live
+          </Typography>
+          
+          <Typography variant="body1" color="textSecondary" sx={{ mb: 4 }}>
+            Share the unique link or QR code below with your customers
+          </Typography>
+          
+          <Grid container spacing={3}>
+            <Grid item xs={12} md={6}>
+              <Card>
+                <CardContent>
+                  <Typography variant="h6" gutterBottom>Unique Link</Typography>
+                  <TextField
+                    fullWidth
+                    value={creationResponse.unique_link}
+                    InputProps={{
+                      readOnly: true,
+                    }}
+                    sx={{ mb: 2 }}
+                  />
+                  <Button
+                    variant="outlined"
+                    fullWidth
+                    onClick={() => {
+                      navigator.clipboard.writeText(creationResponse.unique_link);
+                      addToast('Link copied to clipboard!', 'success');
+                    }}
+                  >
+                    Copy Link
+                  </Button>
+                </CardContent>
+              </Card>
+            </Grid>
+            
+            <Grid item xs={12} md={6}>
+              <Card>
+                <CardContent>
+                  <Typography variant="h6" gutterBottom>QR Code</Typography>
+                  {creationResponse.qr_code_url && (
+                    <Box sx={{ mb: 2, textAlign: 'center' }}>
+                      <img 
+                        src={creationResponse.qr_code_url} 
+                        alt="QR Code" 
+                        style={{ maxWidth: '200px', maxHeight: '200px' }}
+                      />
+                    </Box>
+                  )}
+                  <Button
+                    variant="outlined"
+                    fullWidth
+                    onClick={() => {
+                      if (creationResponse.qr_code_url) {
+                        const link = document.createElement('a');
+                        link.href = creationResponse.qr_code_url;
+                        link.download = 'qr-code.png';
+                        link.click();
+                      }
+                    }}
+                  >
+                    Download QR Code
+                  </Button>
+                </CardContent>
+              </Card>
+            </Grid>
+          </Grid>
+          
+          <Box sx={{ mt: 4 }}>
+            <Button
+              variant="contained"
+              size="large"
+              onClick={() => {
+                if (projectId) {
+                  navigate(`/projects/${projectId}/content`);
+                } else if (companyId) {
+                  navigate(`/companies/${companyId}/projects`);
+                } else {
+                  navigate('/ar-content');
+                }
+              }}
+            >
+              Continue to Content List
+            </Button>
+          </Box>
+        </Paper>
+      </Box>
+    );
+  }
+
+  // If no companies exist, show empty state
+  if (companies.length === 0 && !loading) {
+    return (
+      <Box>
+        <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
+          <Button
+            startIcon={<BackIcon />}
+            onClick={() => navigate('/ar-content')}
+            sx={{ mr: 2 }}
+          >
+            Back
+          </Button>
+          <Typography variant="h4">Create New AR Content</Typography>
+        </Box>
+
+        <Paper sx={{ p: 4, textAlign: 'center' }}>
+          <Typography variant="h6" gutterBottom>No Companies Available</Typography>
+          <Typography variant="body1" color="textSecondary" sx={{ mb: 3 }}>
+            You need to create a company before you can create AR content.
+          </Typography>
+          <Button
+            variant="contained"
+            onClick={() => navigate('/companies/new')}
+          >
+            Create Company
+          </Button>
+        </Paper>
+      </Box>
+    );
+  }
+
+  // If no projects exist for selected company, show empty state
+  if (formData.companyId && projects.length === 0 && !loading && !formData.creatingNewProject) {
+    return (
+      <Box>
+        <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
+          <Button
+            startIcon={<BackIcon />}
+            onClick={() => navigate('/ar-content')}
+            sx={{ mr: 2 }}
+          >
+            Back
+          </Button>
+          <Typography variant="h4">Create New AR Content</Typography>
+        </Box>
+
+        <Paper sx={{ p: 4, textAlign: 'center' }}>
+          <Typography variant="h6" gutterBottom>No Projects Available</Typography>
+          <Typography variant="body1" color="textSecondary" sx={{ mb: 3 }}>
+            You need to create a project for the selected company before you can create AR content.
+          </Typography>
+          <Button
+            variant="contained"
+            onClick={() => setFormData({ ...formData, creatingNewProject: true })}
+          >
+            Create New Project
+          </Button>
+          <Button
+            variant="outlined"
+            onClick={() => navigate('/companies')}
+            sx={{ ml: 2 }}
+          >
+            Choose Different Company
+          </Button>
+        </Paper>
+      </Box>
+    );
+  }
+
+  return (
+    <Box>
+      <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
+        <Button
+          startIcon={<BackIcon />}
+          onClick={() => {
+            if (projectId) {
+              navigate(`/projects/${projectId}/content`);
+            } else {
+              navigate('/ar-content');
+            }
+          }}
+          sx={{ mr: 2 }}
+        >
+          Back
+        </Button>
+        <Typography variant="h4">Create New AR Content</Typography>
+      </Box>
+
+      <Paper sx={{ p: 3 }}>
+        {error && (
+          <Alert severity="error" sx={{ mb: 3 }}>
+            {error}
+          </Alert>
+        )}
+
+        <Grid container spacing={3}>
+          {/* Company Selection */}
+          <Grid item xs={12} md={6}>
+            <Typography variant="h6" gutterBottom>Company Selection</Typography>
+            <FormControl fullWidth margin="normal" required>
+              <InputLabel>Select Company</InputLabel>
+              <Select
+                value={formData.companyId || ''}
+                onChange={(e) => handleCompanyChange(Number(e.target.value))}
+                disabled={loading}
+                label="Select Company"
+              >
+                {companies.map((company) => (
+                  <MenuItem key={company.id} value={company.id}>
+                    <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                      <BusinessIcon sx={{ mr: 1 }} fontSize="small" />
+                      {company.name}
+                      {company.is_default && (
+                        <Chip 
+                          label="Default" 
+                          size="small" 
+                          color="primary" 
+                          variant="outlined" 
+                          sx={{ ml: 1 }}
+                        />
+                      )}
+                    </Box>
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+          </Grid>
+
+          {/* Project Selection */}
+          <Grid item xs={12} md={6}>
+            <Typography variant="h6" gutterBottom>Project Selection</Typography>
+            <FormControl component="fieldset" sx={{ width: '100%', mb: 2 }}>
+              <RadioGroup
+                value={formData.creatingNewProject ? 'new' : 'existing'}
+                onChange={(e) => setFormData({ 
+                  ...formData, 
+                  creatingNewProject: e.target.value === 'new',
+                  projectId: null,
+                  newProjectName: ''
+                })}
+              >
+                <FormControlLabel 
+                  value="existing" 
+                  control={<Radio />} 
+                  label="Select Existing Project" 
+                  disabled={loading} 
+                />
+                <FormControlLabel 
+                  value="new" 
+                  control={<Radio />} 
+                  label="Create New Project" 
+                  disabled={loading} 
+                />
+              </RadioGroup>
+            </FormControl>
+            
+            {!formData.creatingNewProject ? (
+              <FormControl fullWidth margin="normal" required>
+                <InputLabel>Select Project</InputLabel>
+                <Select
+                  value={formData.projectId || ''}
+                  onChange={(e) => setFormData({ ...formData, projectId: Number(e.target.value) })}
+                  disabled={loading}
+                  label="Select Project"
+                >
+                  {projects.map((project) => (
+                    <MenuItem key={project.id} value={project.id}>
+                      <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                        <FolderIcon sx={{ mr: 1 }} fontSize="small" />
+                        {project.name}
+                      </Box>
+                    </MenuItem>
+                  ))}
+                </Select>
+                
+                {projects.length === 0 && (
+                  <Alert severity="info" sx={{ mt: 2 }}>
+                    No projects found for this company. Please create a new project.
+                  </Alert>
+                )}
+              </FormControl>
+            ) : (
+              <TextField
+                fullWidth
+                label="New Project Name"
+                value={formData.newProjectName}
+                onChange={(e) => setFormData({ ...formData, newProjectName: e.target.value })}
+                margin="normal"
+                required
+                disabled={loading}
+                helperText="Enter a name for your new project"
+              />
+            )}
+          </Grid>
+
+          <Grid item xs={12}>
+            <Divider sx={{ my: 2 }} />
+          </Grid>
+
+          {/* Customer Information */}
+          <Grid item xs={12} md={6}>
             <Typography variant="h6" gutterBottom>Customer Information</Typography>
             
             <TextField
@@ -467,132 +711,66 @@ export default function ARContentForm() {
               required
               disabled={loading}
             />
+          </Grid>
+
+          {/* Content Information */}
+          <Grid item xs={12} md={6}>
+            <Typography variant="h6" gutterBottom>Content Details</Typography>
             
-            <Typography variant="h6" gutterBottom sx={{ mt: 3 }}>Company Selection</Typography>
+            <TextField
+              fullWidth
+              label="Content Name"
+              value={formData.name}
+              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+              margin="normal"
+              required
+              disabled={loading}
+            />
             
-            <FormControl fullWidth margin="normal" required>
-              <InputLabel>Select Company</InputLabel>
-              <Select
-                value={formData.companyId || ''}
-                onChange={(e) => handleCompanyChange(Number(e.target.value))}
-                disabled={loading}
-                label="Select Company"
-              >
-                {companies.map((company) => (
-                  <MenuItem key={company.id} value={company.id}>
-                    <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                      <BusinessIcon sx={{ mr: 1 }} fontSize="small" />
-                      {company.name}
-                      {company.is_default && (
-                        <Chip 
-                          label="Default" 
-                          size="small" 
-                          color="primary" 
-                          variant="outlined" 
-                          sx={{ ml: 1 }}
-                        />
-                      )}
-                    </Box>
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-          </Box>
-        );
-      
-      case 1: // Project Selection
-        return (
-          <Box>
-            <Typography variant="h6" gutterBottom>Project Selection</Typography>
+            <TextField
+              fullWidth
+              label="Description"
+              value={formData.description}
+              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+              margin="normal"
+              multiline
+              rows={3}
+              disabled={loading}
+            />
+          </Grid>
+
+          <Grid item xs={12}>
+            <Divider sx={{ my: 2 }} />
+          </Grid>
+
+          {/* Upload Media */}
+          <Grid item xs={12} md={6}>
+            <Typography variant="h6" gutterBottom>Upload Media</Typography>
             
-            <FormControl component="fieldset" sx={{ width: '100%', mb: 2 }}>
-              <RadioGroup
-                value={formData.creatingNewProject ? 'new' : 'existing'}
-                onChange={(e) => setFormData({ 
-                  ...formData, 
-                  creatingNewProject: e.target.value === 'new',
-                  projectId: null,
-                  newProjectName: ''
-                })}
-              >
-                <FormControlLabel 
-                  value="existing" 
-                  control={<Radio />} 
-                  label="Select Existing Project" 
-                  disabled={loading} 
-                />
-                <FormControlLabel 
-                  value="new" 
-                  control={<Radio />} 
-                  label="Create New Project" 
-                  disabled={loading} 
-                />
-              </RadioGroup>
-            </FormControl>
-            
-            {!formData.creatingNewProject ? (
-              <Box>
-                <FormControl fullWidth margin="normal" required>
-                  <InputLabel>Select Project</InputLabel>
-                  <Select
-                    value={formData.projectId || ''}
-                    onChange={(e) => setFormData({ ...formData, projectId: Number(e.target.value) })}
-                    disabled={loading}
-                    label="Select Project"
-                  >
-                    {projects.map((project) => (
-                      <MenuItem key={project.id} value={project.id}>
-                        <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                          <FolderIcon sx={{ mr: 1 }} fontSize="small" />
-                          {project.name}
-                        </Box>
-                      </MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-                
-                {projects.length === 0 && (
-                  <Alert severity="info" sx={{ mt: 2 }}>
-                    No projects found for this company. Please create a new project.
-                  </Alert>
-                )}
-              </Box>
-            ) : (
-              <TextField
-                fullWidth
-                label="New Project Name"
-                value={formData.newProjectName}
-                onChange={(e) => setFormData({ ...formData, newProjectName: e.target.value })}
-                margin="normal"
-                required
-                disabled={loading}
-                helperText="Enter a name for your new project"
-              />
-            )}
-          </Box>
-        );
-      
-      case 2: // Upload Media
-        return (
-          <Box>
-            <Typography variant="h6" gutterBottom>Upload Portrait Image</Typography>
-            <Typography variant="body2" color="textSecondary" sx={{ mb: 2 }}>
-              Upload a high-quality image for AR recognition. Supported formats: JPG, PNG (recommended 1920x1080)
-            </Typography>
-            
-            {formData.portrait ? (
+            {/* Image Upload */}
+            <Typography variant="subtitle1" gutterBottom>Image</Typography>
+            {formData.image ? (
               <Card sx={{ mb: 2 }}>
                 <CardMedia
                   component="img"
                   height="200"
-                  image={URL.createObjectURL(formData.portrait)}
-                  alt="Portrait preview"
+                  image={URL.createObjectURL(formData.image)}
+                  alt="Image preview"
                 />
-                <CardContent>
-                  <Typography variant="subtitle2">{formData.portrait.name}</Typography>
-                  <Typography variant="body2" color="textSecondary">
-                    {(formData.portrait.size / 1024 / 1024).toFixed(2)} MB
-                  </Typography>
+                <CardContent sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <Box>
+                    <Typography variant="subtitle2">{formData.image.name}</Typography>
+                    <Typography variant="body2" color="textSecondary">
+                      {(formData.image.size / 1024 / 1024).toFixed(2)} MB
+                    </Typography>
+                  </Box>
+                  <IconButton
+                    color="error"
+                    onClick={() => setFormData({ ...formData, image: null })}
+                    disabled={loading}
+                  >
+                    <DeleteIcon />
+                  </IconButton>
                 </CardContent>
               </Card>
             ) : (
@@ -608,111 +786,106 @@ export default function ARContentForm() {
                 <input
                   accept="image/*"
                   type="file"
-                  onChange={handlePortraitChange}
+                  onChange={handleImageChange}
                   style={{ display: 'none' }}
-                  id="portrait-upload"
+                  id="image-upload"
                   disabled={loading}
                 />
-                <label htmlFor="portrait-upload">
+                <label htmlFor="image-upload">
                   <Button
                     variant="outlined"
                     component="span"
-                    startIcon={<UploadIcon />}
+                    startIcon={<ImageIcon />}
                     disabled={loading}
                   >
-                    Select Portrait Image
+                    Select Image
                   </Button>
                 </label>
               </Box>
             )}
+          </Grid>
+
+          {/* Video Upload */}
+          <Grid item xs={12} md={6}>
+            <Typography variant="h6" gutterBottom>&nbsp;</Typography>
             
-            <Typography variant="h6" gutterBottom sx={{ mt: 3 }}>Upload Videos</Typography>
-            <Typography variant="body2" color="textSecondary" sx={{ mb: 2 }}>
-              Upload one or more videos for AR playback. Supported formats: MP4, MOV, AVI
-            </Typography>
-            
-            <Box
-              sx={{
-                border: '2px dashed grey',
-                borderRadius: 2,
-                p: 4,
-                textAlign: 'center',
-                mb: 2,
-              }}
-            >
-              <input
-                accept="video/*"
-                type="file"
-                onChange={handleVideosChange}
-                style={{ display: 'none' }}
-                id="videos-upload"
-                multiple
-                disabled={loading}
-              />
-              <label htmlFor="videos-upload">
-                <Button
-                  variant="outlined"
-                  component="span"
-                  startIcon={<UploadIcon />}
+            <Typography variant="subtitle1" gutterBottom>Video</Typography>
+            {formData.video ? (
+              <Card sx={{ mb: 2 }}>
+                <CardContent sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <Box>
+                    <Typography variant="subtitle2">{formData.video.name}</Typography>
+                    <Typography variant="body2" color="textSecondary">
+                      {(formData.video.size / 1024 / 1024).toFixed(2)} MB
+                    </Typography>
+                  </Box>
+                  <IconButton
+                    color="error"
+                    onClick={() => setFormData({ ...formData, video: null })}
+                    disabled={loading}
+                  >
+                    <DeleteIcon />
+                  </IconButton>
+                </CardContent>
+              </Card>
+            ) : (
+              <Box
+                sx={{
+                  border: '2px dashed grey',
+                  borderRadius: 2,
+                  p: 4,
+                  textAlign: 'center',
+                  mb: 2,
+                }}
+              >
+                <input
+                  accept="video/*"
+                  type="file"
+                  onChange={handleVideoChange}
+                  style={{ display: 'none' }}
+                  id="video-upload"
                   disabled={loading}
-                >
-                  Select Videos
-                </Button>
-              </label>
-            </Box>
-            
-            {formData.videos.length > 0 && (
-              <Box sx={{ mt: 2 }}>
-                <Typography variant="subtitle1" gutterBottom>
-                  Selected Videos ({formData.videos.length})
-                </Typography>
-                {formData.videos.map((video, index) => (
-                  <Card key={index} sx={{ mb: 1 }}>
-                    <CardContent sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <Box>
-                        <Typography variant="subtitle2">{video.name}</Typography>
-                        <Typography variant="body2" color="textSecondary">
-                          {(video.size / 1024 / 1024).toFixed(2)} MB
-                        </Typography>
-                      </Box>
-                      <Button
-                        size="small"
-                        color="error"
-                        onClick={() => removeVideo(index)}
-                        disabled={loading}
-                      >
-                        Remove
-                      </Button>
-                    </CardContent>
-                  </Card>
-                ))}
+                />
+                <label htmlFor="video-upload">
+                  <Button
+                    variant="outlined"
+                    component="span"
+                    startIcon={<VideoIcon />}
+                    disabled={loading}
+                  >
+                    Select Video
+                  </Button>
+                </label>
               </Box>
             )}
-          </Box>
-        );
-      
-      case 3: // Generate Marker
-        return (
-          <Box sx={{ textAlign: 'center', py: 4 }}>
-            <QrCodeIcon sx={{ fontSize: 80, color: 'primary.main', mb: 2 }} />
-            <Typography variant="h6" gutterBottom>Marker Generation</Typography>
-            <Typography variant="body1" color="textSecondary" sx={{ mb: 3 }}>
+          </Grid>
+
+          <Grid item xs={12}>
+            <Divider sx={{ my: 2 }} />
+          </Grid>
+
+          {/* Generate Marker */}
+          <Grid item xs={12}>
+            <Typography variant="h6" gutterBottom>Generate Marker</Typography>
+            <Alert severity="info" sx={{ mb: 2 }}>
               The AR marker will be automatically generated after content creation. 
               You can also manually regenerate it later if needed.
-            </Typography>
-            <Alert severity="info">
-              Marker generation happens in the background and may take a few minutes to complete.
             </Alert>
-          </Box>
-        );
-      
-      case 4: // Video Schedule
-        return (
-          <Box>
-            <Typography variant="h6" gutterBottom>Video Rotation Schedule</Typography>
-            <Typography variant="body2" color="textSecondary" sx={{ mb: 3 }}>
-              Configure when and how your videos should play in the AR experience.
-            </Typography>
+            <Box sx={{ textAlign: 'center', py: 2 }}>
+              <QrCodeIcon sx={{ fontSize: 60, color: 'primary.main' }} />
+              <Typography variant="body2" color="textSecondary" sx={{ mt: 1 }}>
+                Marker generation happens in the background and may take a few minutes to complete.
+              </Typography>
+            </Box>
+          </Grid>
+
+          <Grid item xs={12}>
+            <Divider sx={{ my: 2 }} />
+          </Grid>
+
+          {/* Video Schedule */}
+          <Grid item xs={12} md={6}>
+            <Typography variant="h6" gutterBottom>Video Schedule</Typography>
             
             <FormControl component="fieldset" sx={{ width: '100%', mb: 3 }}>
               <FormLabel component="legend">Schedule Type</FormLabel>
@@ -752,16 +925,11 @@ export default function ARContentForm() {
                 helperText="Enter a cron expression (e.g., 0 9 * * 1 for every Monday at 9 AM)"
               />
             )}
-          </Box>
-        );
-      
-      case 5: // Playback Duration
-        return (
-          <Box>
+          </Grid>
+
+          {/* Playback Duration */}
+          <Grid item xs={12} md={6}>
             <Typography variant="h6" gutterBottom>Playback Duration</Typography>
-            <Typography variant="body2" color="textSecondary" sx={{ mb: 3 }}>
-              Select how long the AR content should remain active and playable.
-            </Typography>
             
             <FormControl component="fieldset" sx={{ width: '100%' }}>
               <RadioGroup
@@ -800,68 +968,15 @@ export default function ARContentForm() {
                 />
               </RadioGroup>
             </FormControl>
-          </Box>
-        );
-      
-      case 6: // Publish
-        return (
-          <Box>
-            <Typography variant="h6" gutterBottom>Review & Publish</Typography>
-            
-            <Card sx={{ mb: 2 }}>
-              <CardContent>
-                <Typography variant="h6" gutterBottom>Content Details</Typography>
-                <Typography variant="body1"><strong>Title:</strong> {formData.title || 'Not set'}</Typography>
-                <Typography variant="body1"><strong>Description:</strong> {formData.description || 'Not set'}</Typography>
-              </CardContent>
-            </Card>
-            
-            <Card sx={{ mb: 2 }}>
-              <CardContent>
-                <Typography variant="h6" gutterBottom>Customer Information</Typography>
-                <Typography variant="body1"><strong>Name:</strong> {formData.customerName || 'Not set'}</Typography>
-                <Typography variant="body1"><strong>Email:</strong> {formData.customerEmail || 'Not set'}</Typography>
-                <Typography variant="body1"><strong>Phone:</strong> {formData.customerPhone || 'Not set'}</Typography>
-              </CardContent>
-            </Card>
-            
-            <Card sx={{ mb: 2 }}>
-              <CardContent>
-                <Typography variant="h6" gutterBottom>Company & Project</Typography>
-                <Typography variant="body1">
-                  <strong>Company:</strong> {companies.find(c => c.id === formData.companyId)?.name || 'Not set'}
-                </Typography>
-                {formData.creatingNewProject ? (
-                  <Typography variant="body1"><strong>New Project:</strong> {formData.newProjectName}</Typography>
-                ) : (
-                  <Typography variant="body1">
-                    <strong>Project:</strong> {projects.find(p => p.id === formData.projectId)?.name || 'Not set'}
-                  </Typography>
-                )}
-              </CardContent>
-            </Card>
-            
-            <Card sx={{ mb: 2 }}>
-              <CardContent>
-                <Typography variant="h6" gutterBottom>Media</Typography>
-                <Typography variant="body1"><strong>Portrait:</strong> {formData.portrait ? 'Selected' : 'Not selected'}</Typography>
-                <Typography variant="body1"><strong>Videos:</strong> {formData.videos.length} selected</Typography>
-              </CardContent>
-            </Card>
-            
-            <Card sx={{ mb: 2 }}>
-              <CardContent>
-                <Typography variant="h6" gutterBottom>Schedule</Typography>
-                <Typography variant="body1"><strong>Type:</strong> {formData.scheduleType}</Typography>
-                <Typography variant="body1"><strong>Time:</strong> {formData.scheduleTime}</Typography>
-                <Typography variant="body1"><strong>Duration:</strong> {
-                  formData.playbackDuration === '1_year' ? '1 Year' :
-                  formData.playbackDuration === '3_years' ? '3 Years' : '5 Years'
-                }</Typography>
-              </CardContent>
-            </Card>
-            
-            <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+          </Grid>
+
+          <Grid item xs={12}>
+            <Divider sx={{ my: 2 }} />
+          </Grid>
+
+          {/* Status */}
+          <Grid item xs={12}>
+            <Box sx={{ display: 'flex', alignItems: 'center' }}>
               <Checkbox
                 checked={formData.isActive}
                 onChange={(e) => setFormData({ ...formData, isActive: e.target.checked })}
@@ -871,79 +986,37 @@ export default function ARContentForm() {
                 Publish and activate immediately
               </label>
             </Box>
-          </Box>
-        );
-      
-      default:
-        return 'Unknown step';
-    }
-  };
+          </Grid>
 
-  return (
-    <Box>
-      <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
-        <Button
-          startIcon={<BackIcon />}
-          onClick={() => {
-            if (projectId) {
-              navigate(`/projects/${projectId}/content`);
-            } else {
-              navigate('/ar-content');
-            }
-          }}
-          sx={{ mr: 2 }}
-        >
-          Back
-        </Button>
-        <Typography variant="h4">Create New AR Content</Typography>
-      </Box>
-
-      <Paper sx={{ p: 3 }}>
-        <Stepper activeStep={activeStep} alternativeLabel sx={{ mb: 4 }}>
-          {steps.map((label) => (
-            <Step key={label}>
-              <StepLabel>{label}</StepLabel>
-            </Step>
-          ))}
-        </Stepper>
-
-        {error && (
-          <Alert severity="error" sx={{ mb: 2 }}>
-            {error}
-          </Alert>
-        )}
-
-        {getStepContent(activeStep)}
-
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 4 }}>
-          <Button
-            disabled={activeStep === 0 || loading}
-            onClick={handleBack}
-          >
-            Back
-          </Button>
-          
-          {activeStep === steps.length - 1 ? (
-            <Button
-              variant="contained"
-              color="primary"
-              onClick={handleSubmit}
-              startIcon={loading ? <CircularProgress size={20} /> : <SaveIcon />}
-              disabled={loading}
-            >
-              {loading ? 'Creating...' : 'Create AR Content'}
-            </Button>
-          ) : (
-            <Button
-              variant="contained"
-              color="primary"
-              onClick={handleNext}
-              endIcon={<BackIcon style={{ transform: 'rotate(180deg)' }} />}
-            >
-              Next
-            </Button>
-          )}
-        </Box>
+          <Grid item xs={12}>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 3 }}>
+              <Button
+                variant="outlined"
+                onClick={() => {
+                  if (projectId) {
+                    navigate(`/projects/${projectId}/content`);
+                  } else {
+                    navigate('/ar-content');
+                  }
+                }}
+                disabled={loading}
+              >
+                Cancel
+              </Button>
+              
+              <Button
+                variant="contained"
+                color="primary"
+                onClick={handleSubmit}
+                startIcon={loading ? <CircularProgress size={20} /> : <SaveIcon />}
+                disabled={loading}
+                size="large"
+              >
+                {loading ? 'Creating...' : 'Create AR Content'}
+              </Button>
+            </Box>
+          </Grid>
+        </Grid>
       </Paper>
     </Box>
   );
