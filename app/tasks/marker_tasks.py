@@ -9,7 +9,7 @@ from app.core.database import AsyncSessionLocal
 from app.models.ar_content import ARContent
 from app.models.company import Company
 from app.models.storage import StorageConnection
-from app.services.storage.factory import get_provider
+# from app.services.storage.factory import get_provider  # TODO: Implement when storage providers are ready
 
 logger = structlog.get_logger()
 
@@ -50,7 +50,8 @@ def generate_ar_content_marker_task(self, content_id: int):
             conn = await db.get(StorageConnection, company.storage_connection_id)
             if not conn:
                 raise ValueError(f"StorageConnection {company.storage_connection_id} not found")
-            provider = get_provider(conn)
+            # TODO: Implement when storage providers are ready
+            # provider = get_provider(conn)
 
             # Update status to processing
             ac.marker_status = "processing"
@@ -61,20 +62,22 @@ def generate_ar_content_marker_task(self, content_id: int):
             markers_folder = f"{base_path}/markers/mindar_targets"
 
             # Ensure folders exist
-            for folder in [ar_content_folder, markers_folder, f"{base_path}/videos", f"{base_path}/qr-codes", f"{base_path}/thumbnails"]:
-                try:
-                    await provider.create_folder(folder)
-                except Exception:
-                    pass
+            # TODO: Implement when storage providers are ready
+            # for folder in [ar_content_folder, markers_folder, f"{base_path}/videos", f"{base_path}/qr-codes", f"{base_path}/thumbnails"]:
+            #     try:
+            #         await provider.create_folder(folder)
+            #     except Exception:
+            #         pass
 
             # Upload original image into storage (optional if not already uploaded)
-            image_name = Path(ac.image_path).name
-            image_remote_path = f"{ar_content_folder}/{image_name}"
-            try:
-                await provider.upload_file(file_path=ac.image_path, destination_path=image_remote_path)
-            except Exception:
-                # ignore if fails; continue marker generation
-                pass
+            # TODO: Implement when storage providers are ready
+            # image_name = Path(ac.image_path).name
+            # image_remote_path = f"{ar_content_folder}/{image_name}"
+            # try:
+            #     await provider.upload_file(file_path=ac.image_path, destination_path=image_remote_path)
+            # except Exception:
+            #     # ignore if fails; continue marker generation
+            #     pass
 
             # Generate MindAR marker using compiler
             out_dir = Path("/tmp/mindar_markers") / str(ac.id)
@@ -94,21 +97,22 @@ def generate_ar_content_marker_task(self, content_id: int):
                 raise RuntimeError(f"Mind AR compilation failed: {stderr.decode()}")
 
             # Upload .mind to storage
-            mind_remote_path = f"{markers_folder}/{str(ac.unique_id)}.mind"
-            marker_url = await provider.upload_file(
-                file_path=str(out_file),
-                destination_path=mind_remote_path,
-                content_type="application/octet-stream",
-            )
+            # TODO: Implement when storage providers are ready
+            # mind_remote_path = f"{markers_folder}/{str(ac.unique_id)}.mind"
+            # marker_url = await provider.upload_file(
+            #     file_path=str(out_file),
+            #     destination_path=mind_remote_path,
+            #     content_type="application/octet-stream",
+            # )
 
             # Update DB
-            ac.marker_path = mind_remote_path
-            ac.marker_url = marker_url
+            ac.marker_path = f"{markers_folder}/{str(ac.unique_id)}.mind"
+            ac.marker_url = f"placeholder_url_for_marker_{ac.unique_id}"
             ac.marker_status = "ready"
             ac.marker_generated_at = datetime.utcnow()
             await db.commit()
 
-            return {"content_id": content_id, "marker_url": marker_url, "status": "success"}
+            return {"content_id": content_id, "marker_url": ac.marker_url, "status": "success"}
 
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)

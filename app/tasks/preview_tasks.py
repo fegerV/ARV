@@ -11,7 +11,7 @@ from app.models.video import Video
 from app.models.ar_content import ARContent
 from app.models.company import Company
 from app.models.storage import StorageConnection
-from app.services.storage.factory import get_provider
+# from app.services.storage.factory import get_provider  # TODO: Implement when storage providers are ready
 from app.services.thumbnail_service import thumbnail_service
 import time
 
@@ -64,20 +64,21 @@ def generate_video_thumbnail(self, video_id: int):
                 if not company:
                     raise ValueError(f"Company {ar_content.company_id} not found")
                 
+                # TODO: Implement when storage providers are ready
                 # Инициализируем провайдер как None
-                provider = None
+                # provider = None
                 
                 # Проверяем наличие подключения к хранилищу
-                if company.storage_connection_id:
-                    conn = await db.get(StorageConnection, company.storage_connection_id)
-                    if not conn:
-                        logger.warning("storage_connection_not_found", company_id=company.id, storage_connection_id=company.storage_connection_id)
-                    else:
-                        try:
-                            provider = get_provider(conn)
-                            logger.info("storage_provider_initialized", company_id=company.id, provider_type=conn.provider)
-                        except Exception as e:
-                            logger.error("storage_provider_init_failed", company_id=company.id, error=str(e))
+                # if company.storage_connection_id:
+                #     conn = await db.get(StorageConnection, company.storage_connection_id)
+                #     if not conn:
+                #         logger.warning("storage_connection_not_found", company_id=company.id, storage_connection_id=company.storage_connection_id)
+                #     else:
+                #         try:
+                #             provider = get_provider(conn)
+                #             logger.info("storage_provider_initialized", company_id=company.id, provider_type=conn.provider)
+                #         except Exception as e:
+                #             logger.error("storage_provider_init_failed", company_id=company.id, error=str(e))
                 else:
                     logger.warning("company_has_no_storage_connection", company_id=company.id)
                 
@@ -159,22 +160,23 @@ def generate_image_thumbnail(self, ar_content_id: int):
                 if not company:
                     raise ValueError(f"Company {ar_content.company_id} not found")
                 
+                # TODO: Implement when storage providers are ready
                 # Инициализируем провайдер как None
-                provider = None
+                # provider = None
                 
                 # Проверяем наличие подключения к хранилищу
-                if company.storage_connection_id:
-                    conn = await db.get(StorageConnection, company.storage_connection_id)
-                    if not conn:
-                        logger.warning("storage_connection_not_found", company_id=company.id, storage_connection_id=company.storage_connection_id)
-                    else:
-                        try:
-                            provider = get_provider(conn)
-                            logger.info("storage_provider_initialized", company_id=company.id, provider_type=conn.provider)
-                        except Exception as e:
-                            logger.error("storage_provider_init_failed", company_id=company.id, error=str(e))
-                else:
-                    logger.warning("company_has_no_storage_connection", company_id=company.id)
+                # if company.storage_connection_id:
+                #     conn = await db.get(StorageConnection, company.storage_connection_id)
+                #     if not conn:
+                #         logger.warning("storage_connection_not_found", company_id=company.id, storage_connection_id=company.storage_connection_id)
+                #     else:
+                #         try:
+                #             provider = get_provider(conn)
+                #             logger.info("storage_provider_initialized", company_id=company.id, provider_type=conn.provider)
+                #         except Exception as e:
+                #             logger.error("storage_provider_init_failed", company_id=company.id, error=str(e))
+                # else:
+                #     logger.warning("company_has_no_storage_connection", company_id=company.id)
                 
                 # Используем наш сервис для генерации превью
                 result = await thumbnail_service.generate_image_thumbnail(
