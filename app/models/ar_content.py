@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Text, Boolean, DateTime
+from sqlalchemy import Column, Integer, String, Text, Boolean, DateTime, UniqueConstraint
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from datetime import datetime
 from app.core.database import Base
@@ -6,45 +6,34 @@ from app.core.database import Base
 
 class ARContent(Base):
     __tablename__ = "ar_content"
+    __table_args__ = (
+        UniqueConstraint('unique_id', name='uq_ar_content_unique_id'),
+    )
 
     id = Column(Integer, primary_key=True)
-    project_id = Column(Integer, nullable=False)
-    company_id = Column(Integer, nullable=False)
+    company_id = Column(Integer, nullable=False, index=True)
+    project_id = Column(Integer, nullable=False, index=True)
 
-    unique_id = Column(UUID(as_uuid=True), nullable=False)
-    title = Column(String(255), nullable=False)
-    description = Column(Text)
-    
-    # Client information
-    client_name = Column(String(255))
-    client_phone = Column(String(50))
-    client_email = Column(String(255))
+    # Immutable unique identifier
+    unique_id = Column(UUID(as_uuid=True), nullable=False, unique=True, index=True)
 
+    # Basic information
+    name = Column(String(255), nullable=False)
+    content_metadata = Column(JSONB, default={})
+
+    # File paths and URLs
     image_path = Column(String(500), nullable=False)
     image_url = Column(String(500))
-    thumbnail_url = Column(String(500))
-
-    marker_path = Column(String(500))
-    marker_url = Column(String(500))
-    marker_status = Column(String(50), default="pending")
-    marker_generated_at = Column(DateTime)
-
-    active_video_id = Column(Integer)
-
-    video_rotation_enabled = Column(Boolean, default=False)
-    video_rotation_type = Column(String(50))
-
-    is_active = Column(Boolean, default=True)
-    published_at = Column(DateTime)
-    expires_at = Column(DateTime)
-
+    
+    video_path = Column(String(500))
+    video_url = Column(String(500))
+    
     qr_code_path = Column(String(500))
     qr_code_url = Column(String(500))
+    
+    preview_url = Column(String(500))
 
-    views_count = Column(Integer, default=0)
-    last_viewed_at = Column(DateTime)
-
-    content_metadata = Column("metadata", JSONB, default={})
-
+    # Status and timestamps
+    is_active = Column(Boolean, default=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

@@ -262,7 +262,14 @@ app.include_router(alerts_ws_router.router)
 app.include_router(auth_router.router, prefix="/api", tags=["Authentication"])
 
 
-# Public AR Viewer endpoint
+# Public AR Viewer endpoints
 @app.get("/ar/{unique_id}", tags=["AR"])
 async def ar_viewer(unique_id: str, request: Request):
+    """AR viewer template endpoint (legacy path)."""
+    return templates.TemplateResponse("ar_viewer.html", {"request": request, "unique_id": unique_id})
+
+
+@app.get("/ar-content/{unique_id}", tags=["AR"])
+async def ar_viewer_new(unique_id: str, request: Request):
+    """AR viewer template endpoint (new clean path)."""
     return templates.TemplateResponse("ar_viewer.html", {"request": request, "unique_id": unique_id})
