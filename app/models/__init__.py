@@ -6,6 +6,7 @@ from .project import Project
 from .folder import Folder
 from .client import Client
 from .video import Video
+from .video_schedule import VideoSchedule
 from .storage import StorageConnection, StorageFolder
 from .ar_content import ARContent
 from .video_rotation_schedule import VideoRotationSchedule
@@ -21,6 +22,7 @@ __all__ = [
     "Folder",
     "Client",
     "Video",
+    "VideoSchedule",
     "StorageConnection", "StorageFolder",
     "ARContent",
     "VideoRotationSchedule",

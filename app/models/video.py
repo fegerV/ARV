@@ -27,12 +27,13 @@ class Video(Base):
 
     # Status and scheduling
     status = Column(String(50), default="active")  # 'active', 'inactive', 'processing'
-    is_active = Column(Boolean, default=True)
+    is_active = Column(Boolean, default=False)  # Default to False, only one should be active
     
-    # Scheduling and rotation
-    schedule_start = Column(DateTime)
-    schedule_end = Column(DateTime)
-    rotation_type = Column(String(50))  # 'daily', 'weekly', 'monthly', 'custom'
+    # Subscription management
+    subscription_end = Column(DateTime)  # When access to this video expires
+    
+    # Rotation management - only these three values allowed
+    rotation_type = Column(String(20), default="none")  # 'none', 'sequential', 'cyclic'
     rotation_order = Column(Integer, default=0)
 
     # Timestamps
@@ -41,3 +42,4 @@ class Video(Base):
     
     # Relationships
     ar_content = relationship("ARContent", backref="videos")
+    schedules = relationship("VideoSchedule", back_populates="video", cascade="all, delete-orphan")

@@ -35,5 +35,7 @@ class ARContent(Base):
 
     # Status and timestamps
     is_active = Column(Boolean, default=True)
+    active_video_id = Column(Integer)  # Currently active video for this AR content
+    rotation_state = Column(Integer, default=0)  # Current index for rotation (0-based)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
