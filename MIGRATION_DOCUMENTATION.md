@@ -4,17 +4,21 @@
 
 This document describes the complete PostgreSQL migration for the Vertex AR B2B Platform. The migration creates all necessary tables, relationships, indexes, and default data to support a fully functional AR content management system.
 
+**IMPORTANT**: As of the December 23, 2025 schema overhaul, legacy `portraits` and `orders` tables have been removed. The system now uses an AR Content-centric architecture with proper relationships and optimized indexes.
+
 ## Migration Files
 
-### 1. Alembic Migration
-- **File**: `alembic/versions/20251218_initial_complete_migration.py`
-- **Type**: Alembic Python migration
+### 1. Alembic Migration Chain
+- **Latest Migration**: `alembic/versions/20251223_schema_migration_overhaul.py`
+- **Type**: Alembic Python migration for schema overhaul
 - **Usage**: `alembic upgrade head`
+- **Previous**: `20251220_rebuild_ar_content_api.py` → `20251218_initial_complete_migration.py`
 
 ### 2. Raw SQL Migration
 - **File**: `migrations/001_initial_complete_migration.sql`
-- **Type**: PostgreSQL SQL script
+- **Type**: PostgreSQL SQL script (updated for schema overhaul)
 - **Usage**: `psql -d vertex_ar -f migrations/001_initial_complete_migration.sql`
+- **Note**: This creates the final schema without legacy tables
 
 ## Database Schema
 
@@ -120,70 +124,54 @@ Client management for companies.
 **Relationships:**
 - `company_id` → `companies.id`
 
-#### 6. Orders (`orders`)
-Order management with subscription tracking.
+### Content Management
+
+#### 6. AR Content (`ar_content`)
+Central AR content entity with comprehensive metadata.
 
 **Key Fields:**
 - `id` (SERIAL PRIMARY KEY)
+- `project_id` (INTEGER NOT NULL)
 - `company_id` (INTEGER NOT NULL)
-- `client_id` (INTEGER)
-- `order_number` (VARCHAR(100) UNIQUE NOT NULL)
-- `content_type` (VARCHAR(100) NOT NULL)
-- `status` (VARCHAR(50) DEFAULT 'pending')
-- `payment_status` (VARCHAR(50) DEFAULT 'unpaid')
-- `amount` (DECIMAL(10,2) NOT NULL)
-- `subscription_end` (TIMESTAMP)
-
-**Relationships:**
-- `company_id` → `companies.id`
-- `client_id` → `clients.id`
-
-#### 7. Portraits (`portraits`)
-AR portrait content with lifecycle management.
-
-**Key Fields:**
-- `id` (SERIAL PRIMARY KEY)
 - `unique_id` (UUID UNIQUE NOT NULL)
-- `company_id` (INTEGER NOT NULL)
-- `client_id` (INTEGER)
-- `folder_id` (INTEGER)
-- `file_path` (VARCHAR(500) NOT NULL)
-- `public_url` (VARCHAR(500))
-- `status` (VARCHAR(50) DEFAULT 'active')
-- `subscription_end` (TIMESTAMP)
-- `lifecycle_status` (VARCHAR(50) DEFAULT 'active')
+- `name` (VARCHAR(255) NOT NULL)
+- `description` (TEXT)
 
-**Notification Tracking:**
-- `notified_7d` (BOOLEAN DEFAULT false)
-- `notified_24h` (BOOLEAN DEFAULT false)
-- `notified_expired` (BOOLEAN DEFAULT false)
+**File Paths and URLs:**
+- `image_path` (VARCHAR(500) NOT NULL)
+- `image_url` (VARCHAR(500))
+- `thumbnail_url` (VARCHAR(500))
+- `video_path` (VARCHAR(500))
+- `video_url` (VARCHAR(500))
+- `qr_code_path` (VARCHAR(500))
+- `qr_code_url` (VARCHAR(500))
+- `preview_url` (VARCHAR(500))
 
-**MindAR Integration:**
-- `marker_path` (VARCHAR(500))
-- `marker_url` (VARCHAR(500))
-- `marker_status` (VARCHAR(50) DEFAULT 'pending')
+**Status and Analytics:**
+- `is_active` (BOOLEAN DEFAULT true)
+- `published_at` (TIMESTAMP)
+- `expires_at` (TIMESTAMP)
+- `views_count` (INTEGER DEFAULT 0)
+- `last_viewed_at` (TIMESTAMP)
+
+**Metadata:**
+- `content_metadata` (JSONB DEFAULT '{}')
 
 **Relationships:**
+- `project_id` → `projects.id`
 - `company_id` → `companies.id`
-- `client_id` → `clients.id`
-- `folder_id` → `folders.id`
 
-#### 8. Videos (`videos`)
-Video content attached to portraits.
+#### 7. Videos (`videos`)
+Video content attached to AR content (updated from portraits).
 
 **Key Fields:**
 - `id` (SERIAL PRIMARY KEY)
-- `portrait_id` (INTEGER NOT NULL)
+- `ar_content_id` (INTEGER NOT NULL)
 - `file_path` (VARCHAR(500) NOT NULL)
 - `public_url` (VARCHAR(500))
-- `status` (VARCHAR(50) DEFAULT 'active')
-- `is_active` (BOOLEAN DEFAULT true)
-- `rotation_type` (VARCHAR(50))
-
-**Scheduling:**
-- `schedule_start` (TIMESTAMP)
-- `schedule_end` (TIMESTAMP)
-- `rotation_order` (INTEGER DEFAULT 0)
+- `video_path` (VARCHAR(500)) - Legacy compatibility
+- `video_url` (VARCHAR(500)) - Legacy compatibility
+- `thumbnail_url` (VARCHAR(500))
 
 **Video Metadata:**
 - `title` (VARCHAR(255))
@@ -191,13 +179,22 @@ Video content attached to portraits.
 - `width` (INTEGER)
 - `height` (INTEGER)
 - `size_bytes` (INTEGER)
+- `mime_type` (VARCHAR(100))
+
+**Status and Scheduling:**
+- `status` (VARCHAR(50) DEFAULT 'active')
+- `is_active` (BOOLEAN DEFAULT true)
+- `schedule_start` (TIMESTAMP)
+- `schedule_end` (TIMESTAMP)
+- `rotation_type` (VARCHAR(50))
+- `rotation_order` (INTEGER DEFAULT 0)
 
 **Relationships:**
-- `portrait_id` → `portraits.id`
+- `ar_content_id` → `ar_content.id` (CASCADE DELETE)
 
 ### Storage and Configuration
 
-#### 9. Storage Connections (`storage_connections`)
+#### 8. Storage Connections (`storage_connections`)
 Storage provider configurations.
 
 **Key Fields:**
@@ -209,24 +206,9 @@ Storage provider configurations.
 - `is_default` (BOOLEAN DEFAULT false)
 - `is_active` (BOOLEAN DEFAULT true)
 
-#### 10. Storage Folders (`storage_folders`)
-Physical storage folder tracking.
-
-**Key Fields:**
-- `id` (SERIAL PRIMARY KEY)
-- `company_id` (INTEGER NOT NULL)
-- `name` (VARCHAR(255) NOT NULL)
-- `path` (VARCHAR(500) NOT NULL)
-- `folder_type` (VARCHAR(50)) - 'portraits', 'videos', 'markers', 'custom'
-- `files_count` (INTEGER DEFAULT 0)
-- `total_size_bytes` (BIGINT DEFAULT 0)
-
-**Relationships:**
-- `company_id` → `companies.id`
-
 ### Email and Notifications
 
-#### 11. Email Queue (`email_queue`)
+#### 9. Email Queue (`email_queue`)
 Email processing queue with retry logic.
 
 **Key Fields:**
@@ -246,7 +228,7 @@ Email processing queue with retry logic.
 **Error Handling:**
 - `last_error` (TEXT)
 
-#### 12. Notifications (`notifications`)
+#### 10. Notifications (`notifications`)
 Multi-channel notification system.
 
 **Key Fields:**
@@ -274,7 +256,7 @@ Multi-channel notification system.
 
 ### Audit and Analytics
 
-#### 13. Audit Log (`audit_log`)
+#### 11. Audit Log (`audit_log`)
 Comprehensive audit trail for all operations.
 
 **Key Fields:**
@@ -620,6 +602,43 @@ VACUUM ANALYZE;
    - Configure alerting for critical metrics
    - Monitor table growth
 
+ ## Schema Overhaul Changes (December 23, 2025)
+
+### Removed Legacy Tables
+The following legacy tables have been completely removed:
+- **`portraits`** - Functionality migrated to `ar_content` table
+- **`orders`** - Order management functionality removed from core schema
+
+### Key Schema Changes
+
+#### 1. Videos Table Updates
+- **Foreign Key**: Changed from `portrait_id` → `ar_content_id`
+- **Cascade Delete**: Videos are automatically deleted when AR content is deleted
+- **Data Migration**: Best-effort migration from portraits to AR content where possible
+- **Indexes**: Updated to reference `ar_content_id` instead of `portrait_id`
+
+#### 2. AR Content Table Finalization
+- **Column Renaming**: `title` → `name` for consistency
+- **New Columns**: Added `video_path`, `video_url`, `qr_code_url`, `preview_url`, `content_metadata`
+- **Unique Constraint**: Enforced on `unique_id` field
+- **Performance Indexes**: Added composite index on `(company_id, project_id)` and `created_at`
+
+#### 3. Relationship Updates
+- **Central Entity**: `ar_content` is now the central content entity
+- **Simplified Hierarchy**: Company → Project → AR Content → Videos
+- **Clean Dependencies**: Removed complex portrait/order dependencies
+
+### Data Migration Notes
+- **Best Effort**: Migration attempts to map portrait data to AR content
+- **Data Loss**: Some legacy data relationships may not be recoverable
+- **Backup Recommended**: Always backup before running schema overhaul
+- **Testing**: Test migration in staging environment first
+
+### Rollback Considerations
+- **Partial Rollback**: Schema can be reverted but data recovery is limited
+- **Legacy Recreation**: Downgrade recreates basic table structures
+- **Data Recovery**: Manual intervention required for complete data restoration
+
 ## Support
 
 For questions or issues with this migration:
@@ -630,6 +649,7 @@ For questions or issues with this migration:
 
 ---
 
-**Migration Version**: 20251218_initial_complete_migration
-**Compatible PostgreSQL Versions**: 12+
-**Last Updated**: 2025-12-18
+**Migration Version**: 20251223_schema_migration_overhaul  
+**Compatible PostgreSQL Versions**: 12+  
+**Last Updated**: 2025-12-23  
+**Schema Status**: AR Content-centric (legacy tables removed)
