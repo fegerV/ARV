@@ -9,6 +9,7 @@ class VideoBase(BaseModel):
     video_path: str = Field(..., max_length=500)
     video_url: Optional[str] = Field(None, max_length=500)
     thumbnail_url: Optional[str] = Field(None, max_length=500)
+    preview_url: Optional[str] = Field(None, max_length=500)
     
     title: Optional[str] = Field(None, max_length=255)
     duration: Optional[float] = None
@@ -35,6 +36,7 @@ class VideoUpdate(BaseModel):
     video_path: Optional[str] = Field(None, max_length=500)
     video_url: Optional[str] = Field(None, max_length=500)
     thumbnail_url: Optional[str] = Field(None, max_length=500)
+    preview_url: Optional[str] = Field(None, max_length=500)
     
     title: Optional[str] = Field(None, max_length=255)
     duration: Optional[float] = None
