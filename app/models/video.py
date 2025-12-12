@@ -7,7 +7,7 @@ class Video(Base):
     __tablename__ = "videos"
 
     id = Column(Integer, primary_key=True)
-    ar_content_id = Column(Integer, ForeignKey("ar_contents.id"), nullable=False)  # Updated from portrait_id
+    ar_content_id = Column(Integer, ForeignKey("ar_content.id"), nullable=False)  # Updated from portrait_id
     
     # File information
     file_path = Column(String(500), nullable=False)  # Renamed from video_path for consistency
