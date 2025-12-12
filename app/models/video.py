@@ -7,7 +7,7 @@ class Video(Base):
     __tablename__ = "videos"
 
     id = Column(Integer, primary_key=True)
-    portrait_id = Column(Integer, ForeignKey("portraits.id"), nullable=False)  # Updated from ar_content_id
+    ar_content_id = Column(Integer, ForeignKey("ar_contents.id"), nullable=False)  # Updated from portrait_id
     
     # File information
     file_path = Column(String(500), nullable=False)  # Renamed from video_path for consistency
@@ -39,4 +39,4 @@ class Video(Base):
     updated_at = Column(DateTime)
     
     # Relationships
-    portrait = relationship("Portrait", backref="videos")
+    ar_content = relationship("ARContent", backref="videos")

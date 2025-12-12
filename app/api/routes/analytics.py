@@ -54,8 +54,8 @@ async def analytics_content(content_id: int, db: AsyncSession = Depends(get_db))
 
 @router.post("/analytics/ar-session")
 async def track_ar_session(payload: dict, db: AsyncSession = Depends(get_db)):
-    # Accept portrait_id as unique_id for ARContent (from viewer), or ar_content_id
-    unique_id: Optional[str] = payload.get("portrait_id") or payload.get("ar_content_unique_id")
+    # Accept ar_content_unique_id for ARContent (from viewer), or ar_content_id
+    unique_id: Optional[str] = payload.get("ar_content_unique_id")
     ar_content_id: Optional[int] = payload.get("ar_content_id")
     company_id: Optional[int] = None
     project_id: Optional[int] = None

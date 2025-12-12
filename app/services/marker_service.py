@@ -11,37 +11,37 @@ logger = structlog.get_logger()
 
 
 class MindARMarkerService:
-    """Сервис генерации Mind AR маркеров"""
+    """Service for generating Mind AR markers"""
 
     async def generate_marker(
         self,
-        portrait_id: int,
+        ar_content_id: int,
         image_path: str,
         output_dir: str = "storage/markers",
     ) -> dict:
         """
-        Генерация Mind AR target файла
+        Generate Mind AR target file
 
         Args:
-            portrait_id: ID портрета
-            image_path: путь к изображению портрета
-            output_dir: директория для сохранения маркеров
+            ar_content_id: ID of AR content
+            image_path: path to AR content image
+            output_dir: directory for saving markers
 
         Returns:
-            dict с информацией о маркере
+            dict with marker information
         """
-        log = logger.bind(portrait_id=portrait_id, image_path=image_path)
+        log = logger.bind(ar_content_id=ar_content_id, image_path=image_path)
         log.info("mind_ar_generation_started")
 
-        # Создаем директорию для маркера
-        marker_dir = Path(output_dir) / str(portrait_id)
+        # Create directory for marker
+        marker_dir = Path(output_dir) / str(ar_content_id)
         marker_dir.mkdir(parents=True, exist_ok=True)
 
-        # Путь к выходному файлу
+        # Path to output file
         output_file = marker_dir / "targets.mind"
 
         try:
-            # Запускаем Mind AR compiler
+            # Run Mind AR compiler
             cmd = [
                 "npx",
                 "mind-ar-js-compiler",
@@ -66,20 +66,20 @@ class MindARMarkerService:
                 log.error("mind_ar_compilation_failed", error=error_msg)
                 raise RuntimeError(f"Mind AR compilation failed: {error_msg}")
 
-            # Проверяем что файл создан
+            # Check that file was created
             if not output_file.exists():
                 raise FileNotFoundError(f"Marker file not created: {output_file}")
 
-            # Загружаем в MinIO
+            # Upload to MinIO
             bucket = getattr(settings, "MINIO_BUCKET_MARKERS", settings.MINIO_BUCKET_NAME)
             marker_url = minio_client.upload_file(
                 file_path=str(output_file),
                 bucket=bucket,
-                object_name=f"{portrait_id}/targets.mind",
+                object_name=f"{ar_content_id}/targets.mind",
                 content_type="application/octet-stream",
             )
 
-            # Получаем метаданные маркера
+            # Get marker metadata
             metadata = await self._extract_marker_metadata(output_file)
 
             log.info(
@@ -103,9 +103,9 @@ class MindARMarkerService:
             }
 
     async def _extract_marker_metadata(self, marker_file: Path) -> dict:
-        """Извлечение метаданных из .mind файла"""
+        """Extract metadata from .mind file"""
         try:
-            # .mind файл это бинарный формат, читаем размер
+            # .mind file is binary format, read size
             file_size = marker_file.stat().st_size
 
             return {
@@ -140,16 +140,17 @@ class MindARMarkerService:
             return url
         finally:
             # Clean up temporary file
+            import os
             if os.path.exists(temp_path):
                 os.remove(temp_path)
 
     async def validate_marker(self, marker_path: str) -> bool:
-        """Проверка валидности маркера"""
+        """Validate marker file"""
         path = Path(marker_path)
         if not path.exists():
             return False
 
-        # Mind AR файлы обычно 100-500KB
+        # Mind AR files are usually 100-500KB
         size = path.stat().st_size
         return 10_000 < size < 5_000_000  # 10KB - 5MB
 

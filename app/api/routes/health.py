@@ -10,7 +10,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.core.database import engine, AsyncSessionLocal
-from app.models.portrait import Portrait
 
 # Celery
 try:
@@ -88,20 +87,7 @@ async def health_status():
         "disk_percent": disk.percent,
     }
 
-    # 5. Marker generation failures (last hour, portraits)
-    try:
-        async with AsyncSessionLocal() as session:  # type: AsyncSession
-            one_hour_ago = datetime.utcnow() - timedelta(hours=1)
-            # Use created_at if available; fallback to count of failed overall
-            result = await session.execute(
-                select(Portrait).where(Portrait.marker_status == "failed")
-            )
-            failed_count = len(result.scalars().all())
-        checks["marker_failures_last_hour"] = failed_count
-    except Exception:
-        checks["marker_failures_last_hour"] = None
-
-    # 6. Overall status
+    # 5. Overall status
     unhealthy_components = [
         k for k, v in checks.items() if (v == "unhealthy" or (isinstance(v, dict) and v.get("status") == "unhealthy"))
     ]

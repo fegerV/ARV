@@ -5,8 +5,6 @@ from .company import Company
 from .project import Project
 from .folder import Folder
 from .client import Client
-from .order import Order
-from .portrait import Portrait
 from .video import Video
 from .storage import StorageConnection, StorageFolder
 from .ar_content import ARContent
@@ -22,8 +20,6 @@ __all__ = [
     "Project", 
     "Folder",
     "Client",
-    "Order",
-    "Portrait",
     "Video",
     "StorageConnection", "StorageFolder",
     "ARContent",
