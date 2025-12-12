@@ -1,103 +1,46 @@
 from datetime import datetime
 from typing import Optional, Dict, Any
 from pydantic import BaseModel, Field
+from uuid import UUID
 
 
 class ARContentBase(BaseModel):
-    title: str = Field(..., max_length=255)
-    description: Optional[str] = None
-    
-    # Client information
-    client_name: Optional[str] = Field(None, max_length=255)
-    client_phone: Optional[str] = Field(None, max_length=50)
-    client_email: Optional[str] = Field(None, max_length=255)
-    
-    # Image and thumbnail
-    image_path: str = Field(..., max_length=500)
-    image_url: Optional[str] = Field(None, max_length=500)
-    thumbnail_url: Optional[str] = Field(None, max_length=500)
-    
-    # Marker information
-    marker_path: Optional[str] = Field(None, max_length=500)
-    marker_url: Optional[str] = Field(None, max_length=500)
-    marker_status: str = "pending"
-    marker_generated_at: Optional[datetime] = None
-    
-    # Video rotation
-    video_rotation_enabled: bool = False
-    video_rotation_type: Optional[str] = None
-    
-    # Status and dates
-    is_active: bool = True
-    published_at: Optional[datetime] = None
-    expires_at: Optional[datetime] = None
-    
-    # QR code
-    qr_code_path: Optional[str] = Field(None, max_length=500)
-    qr_code_url: Optional[str] = Field(None, max_length=500)
-    
-    # Analytics
-    views_count: int = 0
-    last_viewed_at: Optional[datetime] = None
-    
-    # Metadata
+    name: str = Field(..., max_length=255)
     content_metadata: Dict[str, Any] = {}
 
 
 class ARContentCreate(ARContentBase):
-    project_id: int
     company_id: int
+    project_id: int
 
 
 class ARContentUpdate(BaseModel):
-    title: Optional[str] = Field(None, max_length=255)
-    description: Optional[str] = None
-    
-    # Client information
-    client_name: Optional[str] = Field(None, max_length=255)
-    client_phone: Optional[str] = Field(None, max_length=50)
-    client_email: Optional[str] = Field(None, max_length=255)
-    
-    # Image and thumbnail
-    image_path: Optional[str] = Field(None, max_length=500)
-    image_url: Optional[str] = Field(None, max_length=500)
-    thumbnail_url: Optional[str] = Field(None, max_length=500)
-    
-    # Marker information
-    marker_path: Optional[str] = Field(None, max_length=500)
-    marker_url: Optional[str] = Field(None, max_length=500)
-    marker_status: Optional[str] = None
-    marker_generated_at: Optional[datetime] = None
-    
-    # Video rotation
-    video_rotation_enabled: Optional[bool] = None
-    video_rotation_type: Optional[str] = None
-    
-    # Status and dates
-    is_active: Optional[bool] = None
-    published_at: Optional[datetime] = None
-    expires_at: Optional[datetime] = None
-    
-    # QR code
-    qr_code_path: Optional[str] = Field(None, max_length=500)
-    qr_code_url: Optional[str] = Field(None, max_length=500)
-    
-    # Analytics
-    views_count: Optional[int] = None
-    last_viewed_at: Optional[datetime] = None
-    
-    # Metadata
+    name: Optional[str] = Field(None, max_length=255)
     content_metadata: Optional[Dict[str, Any]] = None
+    is_active: Optional[bool] = None
+
+
+class ARContentVideoUpdate(BaseModel):
+    """Schema for updating only the video of AR content."""
+    pass  # Video is uploaded as file, this is just for the endpoint signature
 
 
 class ARContentInDBBase(ARContentBase):
     id: int
-    project_id: int
     company_id: int
-    unique_id: str
+    project_id: int
+    unique_id: UUID
     
-    active_video_id: Optional[int] = None
+    # File URLs
+    image_url: Optional[str] = None
+    video_url: Optional[str] = None
+    qr_code_url: Optional[str] = None
+    preview_url: Optional[str] = None
     
+    # Status
+    is_active: bool
+    
+    # Timestamps
     created_at: datetime
     updated_at: datetime
 
@@ -109,6 +52,25 @@ class ARContent(ARContentInDBBase):
     pass
 
 
-class ARContentWithVideos(ARContentInDBBase):
-    # This would include related videos if needed
-    pass
+class ARContentWithLinks(ARContent):
+    """AR Content with additional helper fields."""
+    unique_link: str
+    
+    class Config:
+        from_attributes = True
+
+
+class ARContentList(BaseModel):
+    """Response schema for AR content lists."""
+    items: list[ARContent]
+
+
+class ARContentCreateResponse(BaseModel):
+    """Response schema for AR content creation."""
+    id: int
+    unique_id: UUID
+    unique_link: str
+    image_url: Optional[str]
+    video_url: Optional[str] 
+    qr_code_url: Optional[str]
+    preview_url: Optional[str]

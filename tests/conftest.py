@@ -17,7 +17,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 from app.main import app
 from app.core.database import Base, get_db
 from app.core.config import get_settings
-from app.models import user, company, storage  # Import all models
+from app.models import user, company, storage, ar_content  # Import all models
 
 
 @pytest.fixture(scope="function")
@@ -122,7 +122,7 @@ async def admin_token(async_client):
         "password": "admin123"
     }
     
-    response = await client.post("/api/auth/login", data=login_data)
+    response = await async_client.post("/api/auth/login", data=login_data)
     assert response.status_code == 200
     
     return response.json()["access_token"]
