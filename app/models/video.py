@@ -15,6 +15,7 @@ class Video(Base):
     video_path = Column(String(500), nullable=False)  # Keep for compatibility
     video_url = Column(String(500))  # Keep for compatibility
     thumbnail_url = Column(String(500))
+    preview_url = Column(String(500))  # Preview generated from middle frame
 
     # Video metadata
     title = Column(String(255))
