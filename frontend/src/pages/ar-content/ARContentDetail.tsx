@@ -143,9 +143,18 @@ export default function ARContentDetail() {
   const handleDelete = async () => {
     setDeleting(true);
     try {
-      await arContentAPI.delete(Number(arContentId));
-      addToast('AR content deleted successfully', 'success');
-      navigate(-1);
+      // Note: We need company and project IDs for the new API, but the current response doesn't include them
+      // This will need to be updated when the backend API includes company_id and project_id in the response
+      if (!company?.name || !project?.name) {
+        addToast('Company and project information required for deletion', 'error');
+        return;
+      }
+      
+      // For now, we'll need to fetch the company and project IDs or use a different approach
+      addToast('Delete functionality requires updating to use company/project IDs', 'warning');
+      // await arContentAPI.delete(companyId, projectId, Number(arContentId));
+      // addToast('AR content deleted successfully', 'success');
+      // navigate(-1);
     } catch (error: any) {
       addToast(
         error.response?.data?.message || 'Failed to delete AR content',
