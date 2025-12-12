@@ -73,7 +73,7 @@ class YandexDiskFolder(BaseModel):
 class StorageFolderCreate(BaseModel):
     company_id: int
     name: str
-    folder_type: Literal["portraits", "videos", "markers", "custom"]
+    folder_type: Literal["ar_content", "videos", "markers", "custom"]
 
 class StorageFolderResponse(BaseModel):
     id: int

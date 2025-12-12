@@ -20,7 +20,7 @@ class Company(Base):
     # Storage
     storage_type = Column(String(50), default="local")  # 'local', 'minio', 'yandex_disk'
     yandex_disk_folder_id = Column(String(255))
-    content_types = Column(String(255))  # Comma-separated list: 'portrait,video,ar'
+    content_types = Column(String(255))  # Comma-separated list: 'ar_content,video'
     backup_provider = Column(String(50))  # 'none', 'local', 'minio', 'yandex_disk'
     backup_remote_path = Column(String(500))
     storage_connection_id = Column(Integer, ForeignKey("storage_connections.id"))

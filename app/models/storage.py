@@ -45,7 +45,7 @@ class StorageFolder(Base):
 
     name = Column(String(255), nullable=False)
     path = Column(String(500), nullable=False)
-    folder_type = Column(String(50))  # 'portraits', 'videos', 'markers', 'custom'
+    folder_type = Column(String(50))  # 'ar_content', 'videos', 'markers', 'custom'
 
     # Stats
     files_count = Column(Integer, default=0)

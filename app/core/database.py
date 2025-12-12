@@ -91,7 +91,7 @@ async def seed_defaults() -> None:
         try:
             from pathlib import Path
             base_dir = Path(getattr(settings, "STORAGE_BASE_PATH", "/app/storage/content"))
-            for sub in ["portraits", "videos", "markers", "qr-codes", "thumbnails"]:
+            for sub in ["ar-content", "videos", "markers", "qr-codes", "thumbnails"]:
                 (base_dir / sub).mkdir(parents=True, exist_ok=True)
         except Exception:
             pass

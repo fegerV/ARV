@@ -7,11 +7,9 @@ import asyncio
 from app.core.config import settings
 from app.core.database import AsyncSessionLocal
 from app.models.ar_content import ARContent
-from app.models.portrait import Portrait
 from app.models.company import Company
 from app.models.storage import StorageConnection
 from app.services.storage.factory import get_provider
-from app.services.marker_service import marker_service
 
 logger = structlog.get_logger()
 
@@ -19,7 +17,7 @@ logger = structlog.get_logger()
 @celery_app.task(name="app.tasks.marker_tasks.generate_ar_marker", bind=True)
 def generate_ar_marker(self, ar_content_id: str):
     """
-    Generate Mind AR marker file (.mind) from portrait image.
+    Generate Mind AR marker file (.mind) from AR content image.
     
     Args:
         ar_content_id: UUID of AR content
@@ -35,59 +33,6 @@ def generate_ar_marker(self, ar_content_id: str):
     logger.info("marker_generation_completed", ar_content_id=ar_content_id)
     
     return {"status": "completed", "ar_content_id": ar_content_id}
-
-
-@celery_app.task(bind=True, max_retries=3, name="app.tasks.marker_tasks.generate_mind_marker_task")
-def generate_mind_marker_task(self, portrait_id: int):
-    """
-    Асинхронная генерация Mind AR маркера
-    """
-    async def _generate():
-        async with AsyncSessionLocal() as db:
-            # Получаем портрет
-            portrait = await db.get(Portrait, portrait_id)
-            if not portrait:
-                raise ValueError(f"Portrait {portrait_id} not found")
-
-            # Обновляем статус
-            portrait.marker_status = "processing"
-            await db.commit()
-
-            try:
-                # Генерируем маркер
-                result = await marker_service.generate_marker(
-                    portrait_id=portrait.id,
-                    image_path=portrait.image_path,
-                )
-
-                # Сохраняем результат в БД
-                portrait.marker_path = result["marker_path"]
-                portrait.marker_url = result["marker_url"]
-                portrait.marker_status = result["status"]
-                portrait.portrait_metadata = result.get("metadata", {})
-
-                await db.commit()
-
-                return {
-                    "portrait_id": portrait_id,
-                    "marker_url": result["marker_url"],
-                    "status": "success",
-                }
-
-            except Exception as e:
-                portrait.marker_status = "failed"
-                await db.commit()
-
-                # Retry с exponential backoff
-                raise self.retry(exc=e, countdown=60 * 2 ** self.request.retries)
-
-    # Запускаем async функцию в новом event loop
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-    try:
-        return loop.run_until_complete(_generate())
-    finally:
-        loop.close()
 
 
 @celery_app.task(bind=True, max_retries=3, name="app.tasks.marker_tasks.generate_ar_content_marker_task")
@@ -112,11 +57,11 @@ def generate_ar_content_marker_task(self, content_id: int):
             await db.commit()
 
             base_path = (company.storage_path or "/").rstrip("/")
-            portraits_folder = f"{base_path}/portraits/original_images"
+            ar_content_folder = f"{base_path}/ar-content/original_images"
             markers_folder = f"{base_path}/markers/mindar_targets"
 
             # Ensure folders exist
-            for folder in [portraits_folder, markers_folder, f"{base_path}/videos", f"{base_path}/qr-codes", f"{base_path}/thumbnails"]:
+            for folder in [ar_content_folder, markers_folder, f"{base_path}/videos", f"{base_path}/qr-codes", f"{base_path}/thumbnails"]:
                 try:
                     await provider.create_folder(folder)
                 except Exception:
@@ -124,7 +69,7 @@ def generate_ar_content_marker_task(self, content_id: int):
 
             # Upload original image into storage (optional if not already uploaded)
             image_name = Path(ac.image_path).name
-            image_remote_path = f"{portraits_folder}/{image_name}"
+            image_remote_path = f"{ar_content_folder}/{image_name}"
             try:
                 await provider.upload_file(file_path=ac.image_path, destination_path=image_remote_path)
             except Exception:

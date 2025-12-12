@@ -231,7 +231,6 @@ async def root():
 from app.api.routes import companies as companies_router
 from app.api.routes import projects as projects_router
 from app.api.routes import ar_content as ar_content_router
-from app.api.routes import portraits as portraits_router
 from app.api.routes import storage as storage_router
 from app.api.routes import videos as videos_router
 from app.api.routes import rotation as rotation_router
@@ -248,7 +247,6 @@ app.include_router(companies_router.router, prefix="/api/companies", tags=["Comp
 # app.include_router(projects.router, prefix="/api/projects", tags=["Projects"])
 # app.include_router(ar_content.router, prefix="/api/ar-content", tags=["AR Content"])
 # app.include_router(analytics.router, prefix="/api/analytics", tags=["Analytics"]) 
-app.include_router(portraits_router.router, prefix="/api", tags=["Portraits"])
 app.include_router(storage_router.router, prefix="/api", tags=["Storage"]) 
 app.include_router(projects_router.router, prefix="/api", tags=["Projects"]) 
 app.include_router(ar_content_router.router, prefix="/api", tags=["AR Content"]) 
@@ -267,4 +265,4 @@ app.include_router(auth_router.router, prefix="/api", tags=["Authentication"])
 # Public AR Viewer endpoint
 @app.get("/ar/{unique_id}", tags=["AR"])
 async def ar_viewer(unique_id: str, request: Request):
-    return templates.TemplateResponse("ar_viewer.html", {"request": request, "portrait_id": unique_id})
+    return templates.TemplateResponse("ar_viewer.html", {"request": request, "unique_id": unique_id})
