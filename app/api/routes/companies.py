@@ -1,123 +1,269 @@
-from typing import List
-from fastapi import APIRouter, Depends, HTTPException
+from typing import List, Optional
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, func, or_
 import structlog
 
 from app.core.database import get_db
 from app.models.company import Company
-from app.models.storage import StorageConnection
+from app.models.project import Project
+from app.models.ar_content import ARContent
 from app.models.user import User
-from app.schemas.company import CompanyCreate, CompanyResponse
+from app.schemas.company_api import (
+    CompanyCreate, CompanyUpdate, CompanyListItem, CompanyDetail, 
+    CompanyLinks, PaginatedCompaniesResponse
+)
 from app.api.routes.auth import get_current_active_user
 
 router = APIRouter(tags=["companies"])
 
-@router.post("/", response_model=CompanyResponse)
+
+def _generate_company_links(company_id: int) -> CompanyLinks:
+    """Generate HATEOAS links for a company"""
+    return CompanyLinks(
+        edit=f"/api/companies/{company_id}",
+        delete=f"/api/companies/{company_id}",
+        view_content=f"/api/companies/{company_id}/ar-content"
+    )
+
+
+@router.get("/", response_model=PaginatedCompaniesResponse)
+async def list_companies(
+    page: int = Query(default=1, ge=1, description="Page number"),
+    page_size: int = Query(default=20, ge=1, le=100, description="Number of items per page"),
+    search: Optional[str] = Query(default=None, description="Search by name or email"),
+    status: Optional[str] = Query(default=None, description="Filter by status"),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """List companies with pagination and filtering"""
+    logger = structlog.get_logger()
+    
+    # Build base query
+    query = select(Company)
+    count_query = select(func.count()).select_from(Company)
+    
+    # Apply filters
+    where_conditions = []
+    
+    if search:
+        search_condition = or_(
+            Company.name.ilike(f"%{search}%"),
+            Company.contact_email.ilike(f"%{search}%")
+        )
+        where_conditions.append(search_condition)
+    
+    if status:
+        where_conditions.append(Company.status == status)
+    
+    if where_conditions:
+        query = query.where(*where_conditions)
+        count_query = count_query.where(*where_conditions)
+    
+    # Get total count
+    total_result = await db.execute(count_query)
+    total = total_result.scalar()
+    
+    # Calculate pagination
+    offset = (page - 1) * page_size
+    total_pages = (total + page_size - 1) // page_size
+    
+    # Apply pagination and ordering
+    query = query.order_by(Company.created_at.desc()).offset(offset).limit(page_size)
+    
+    # Execute query
+    result = await db.execute(query)
+    companies = result.scalars().all()
+    
+    # Build response items
+    items = []
+    for company in companies:
+        # Load projects count efficiently
+        projects_count_query = select(func.count()).select_from(Project).where(Project.company_id == company.id)
+        projects_count_result = await db.execute(projects_count_query)
+        projects_count = projects_count_result.scalar()
+        
+        item = CompanyListItem(
+            id=str(company.id),
+            name=company.name,
+            contact_email=company.contact_email,
+            storage_provider="Local",  # Always "Local" as per requirements
+            status=company.status,
+            projects_count=projects_count,
+            created_at=company.created_at,
+            _links=_generate_company_links(company.id)
+        )
+        items.append(item)
+    
+    logger.info("companies_listed", total=total, page=page, page_size=page_size)
+    
+    return PaginatedCompaniesResponse(
+        items=items,
+        total=total,
+        page=page,
+        page_size=page_size,
+        total_pages=total_pages
+    )
+
+
+@router.get("/{company_id}", response_model=CompanyDetail)
+async def get_company(
+    company_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """Get detailed company information"""
+    logger = structlog.get_logger()
+    
+    # Get company
+    company = await db.get(Company, company_id)
+    if not company:
+        raise HTTPException(status_code=404, detail="Company not found")
+    
+    # Get projects count
+    projects_count_query = select(func.count()).select_from(Project).where(Project.company_id == company.id)
+    projects_count_result = await db.execute(projects_count_query)
+    projects_count = projects_count_result.scalar()
+    
+    # Get AR content count
+    ar_content_query = (
+        select(func.count())
+        .select_from(ARContent)
+        .join(Project)
+        .where(Project.company_id == company_id)
+    )
+    ar_content_result = await db.execute(ar_content_query)
+    ar_content_count = ar_content_result.scalar()
+    
+    return CompanyDetail(
+        id=str(company.id),
+        name=company.name,
+        contact_email=company.contact_email,
+        storage_provider="Local",  # Always "Local" as per requirements
+        status=company.status,
+        projects_count=projects_count,
+        ar_content_count=ar_content_count,
+        created_at=company.created_at,
+        _links=_generate_company_links(company_id)
+    )
+
+
+@router.post("/", response_model=CompanyDetail)
 async def create_company(
     company_data: CompanyCreate,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_active_user),
+    current_user: User = Depends(get_current_active_user)
 ):
+    """Create a new company"""
     logger = structlog.get_logger()
-    # Require storage_connection_id
-    storage_conn = await db.get(StorageConnection, company_data.storage_connection_id)
-    if not storage_conn:
-        raise HTTPException(status_code=404, detail="Storage connection not found")
-    if getattr(storage_conn, "is_default", False):
-        raise HTTPException(
-            status_code=400,
-            detail="Cannot use default Vertex AR storage for client companies. Please create a new storage connection.",
-        )
-
-    # Generate slug
-    slug = company_data.name.lower().replace(" ", "-")
-    slug = "".join(c for c in slug if c.isalnum() or c == "-")
-
-    # Check uniqueness
-    exists = await db.execute(select(Company).where(Company.slug == slug))
-    if exists.scalar_one_or_none():
-        raise HTTPException(status_code=400, detail=f"Company with slug '{slug}' already exists")
-
-    # Create folder in storage
-    storage_path = f"/Companies/{company_data.name}"
-    # For local storage, the folder will be created when needed
-    # No explicit folder creation required for local disk storage
+    
     # Create company
     company = Company(
         name=company_data.name,
-        slug=slug,
         contact_email=company_data.contact_email,
-        contact_phone=company_data.contact_phone,
-        telegram_chat_id=company_data.telegram_chat_id,
-        storage_connection_id=company_data.storage_connection_id,
-        storage_path=storage_path,
-        subscription_tier=company_data.subscription_tier,
-        subscription_expires_at=company_data.subscription_expires_at,
-        storage_quota_gb=company_data.storage_quota_gb,
-        projects_limit=company_data.projects_limit,
-        notes=company_data.notes,
-        is_default=False,
+        status=company_data.status
     )
+    
     db.add(company)
     await db.commit()
     await db.refresh(company)
+    
+    logger.info("company_created", company_id=company.id, name=company.name)
+    
+    return CompanyDetail(
+        id=str(company.id),
+        name=company.name,
+        contact_email=company.contact_email,
+        storage_provider="Local",
+        status=company.status,
+        projects_count=0,
+        ar_content_count=0,
+        created_at=company.created_at,
+        _links=_generate_company_links(company.id)
+    )
 
-    logger.info("company_created", company_id=company.id, name=company.name, storage_provider=storage_conn.provider)
-    return company
 
-@router.get("/", response_model=List[CompanyResponse])
-async def list_companies(include_default: bool = False, db: AsyncSession = Depends(get_db)):
-    query = select(Company)
-    if not include_default:
-        query = query.where(Company.is_default == False)
-    query = query.order_by(Company.created_at.desc())
-    res = await db.execute(query)
-    return res.scalars().all()
-
-@router.get("/{company_id}", response_model=CompanyResponse)
-async def get_company(company_id: int, db: AsyncSession = Depends(get_db)):
-    c = await db.get(Company, company_id)
-    if not c:
-        raise HTTPException(status_code=404, detail="Company not found")
-    return c
-
-@router.put("/{company_id}")
+@router.put("/{company_id}", response_model=CompanyDetail)
 async def update_company(
-    company_id: int, 
-    payload: dict, 
+    company_id: int,
+    company_data: CompanyUpdate,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
 ):
-    c = await db.get(Company, company_id)
-    if not c:
+    """Update company information"""
+    logger = structlog.get_logger()
+    
+    # Get company
+    company = await db.get(Company, company_id)
+    if not company:
         raise HTTPException(status_code=404, detail="Company not found")
-    for k, v in payload.items():
-        if hasattr(c, k):
-            setattr(c, k, v)
+    
+    # Update fields
+    update_data = company_data.dict(exclude_unset=True)
+    for field, value in update_data.items():
+        setattr(company, field, value)
+    
     await db.commit()
-    return {"status": "updated"}
+    await db.refresh(company)
+    
+    # Get counts for response
+    projects_count_query = select(func.count()).select_from(Project).where(Project.company_id == company.id)
+    projects_count_result = await db.execute(projects_count_query)
+    projects_count = projects_count_result.scalar()
+    
+    ar_content_query = (
+        select(func.count())
+        .select_from(ARContent)
+        .join(Project)
+        .where(Project.company_id == company_id)
+    )
+    ar_content_result = await db.execute(ar_content_query)
+    ar_content_count = ar_content_result.scalar()
+    
+    logger.info("company_updated", company_id=company.id)
+    
+    return CompanyDetail(
+        id=str(company.id),
+        name=company.name,
+        contact_email=company.contact_email,
+        storage_provider="Local",
+        status=company.status,
+        projects_count=projects_count,
+        ar_content_count=ar_content_count,
+        created_at=company.created_at,
+        _links=_generate_company_links(company_id)
+    )
+
 
 @router.delete("/{company_id}")
 async def delete_company(
-    company_id: int, 
+    company_id: int,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
 ):
-    c = await db.get(Company, company_id)
-    if not c:
+    """Delete a company (with dependency checks)"""
+    logger = structlog.get_logger()
+    
+    # Get company
+    company = await db.get(Company, company_id)
+    if not company:
         raise HTTPException(status_code=404, detail="Company not found")
-    await db.delete(c)
+    
+    # Check for dependencies
+    projects_count_query = select(func.count()).select_from(Project).where(Project.company_id == company.id)
+    projects_count_result = await db.execute(projects_count_query)
+    projects_count = projects_count_result.scalar()
+    
+    if projects_count > 0:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Cannot delete company with {projects_count} projects. Delete projects first."
+        )
+    
+    # Delete company
+    await db.delete(company)
     await db.commit()
+    
+    logger.info("company_deleted", company_id=company_id, name=company.name)
+    
     return {"status": "deleted"}
-
-@router.get("/{company_id}/analytics")
-async def company_analytics(company_id: int, db: AsyncSession = Depends(get_db)):    
-    # Placeholder: counts will require joins to ar_view_sessions
-    return {
-        "company_id": company_id,
-        "total_views": 0,
-        "unique_sessions": 0,
-        "active_projects": 0,
-        "active_content": 0,
-    }
