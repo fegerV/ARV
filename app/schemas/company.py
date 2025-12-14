@@ -10,15 +10,6 @@ class CompanyBase(BaseModel):
     contact_phone: Optional[str] = None
     telegram_chat_id: Optional[str] = None
     
-    # Storage (REQUIRED for new client companies)
-    storage_connection_id: int = Field(
-        ..., description="ID of storage connection. Local storage connection is not available for client companies."
-    )
-    storage_path: Optional[str] = Field(
-        None,
-        description="Storage path for the company. Auto-generated if not specified.",
-    )
-    
     # Subscription
     subscription_tier: str = Field(default="basic")
     subscription_expires_at: Optional[datetime] = None
@@ -30,8 +21,10 @@ class CompanyBase(BaseModel):
     # Notes
     notes: Optional[str] = None
 
+
 class CompanyCreate(CompanyBase):
     pass
+
 
 class CompanyUpdate(BaseModel):
     name: Optional[str] = Field(None, min_length=1, max_length=255)
@@ -40,10 +33,6 @@ class CompanyUpdate(BaseModel):
     contact_email: Optional[EmailStr] = None
     contact_phone: Optional[str] = None
     telegram_chat_id: Optional[str] = None
-    
-    # Storage
-    storage_connection_id: Optional[int] = None
-    storage_path: Optional[str] = None
     
     # Subscription
     subscription_tier: Optional[str] = None
@@ -58,6 +47,7 @@ class CompanyUpdate(BaseModel):
     
     # Status
     is_active: Optional[bool] = None
+
 
 class Company(CompanyBase):
     id: int
@@ -81,4 +71,5 @@ class Company(CompanyBase):
 
 
 class CompanyResponse(Company):
-    pass
+    projects_count: Optional[int] = None
+    ar_content_count: Optional[int] = None

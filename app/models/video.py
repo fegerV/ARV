@@ -1,21 +1,22 @@
 from sqlalchemy import Column, Integer, String, Float, Boolean, DateTime, ForeignKey
 from sqlalchemy.orm import relationship
 from app.core.database import Base
+from datetime import datetime
 
 
 class Video(Base):
     __tablename__ = "videos"
 
     id = Column(Integer, primary_key=True)
-    ar_content_id = Column(Integer, ForeignKey("ar_content.id"), nullable=False)  # Updated from portrait_id
+    ar_content_id = Column(Integer, ForeignKey("ar_content.id"), nullable=False)
     
     # File information
-    file_path = Column(String(500), nullable=False)  # Renamed from video_path for consistency
-    public_url = Column(String(500))  # Public access URL
-    video_path = Column(String(500), nullable=False)  # Keep for compatibility
-    video_url = Column(String(500))  # Keep for compatibility
+    file_path = Column(String(500), nullable=False)
+    public_url = Column(String(500))
+    video_path = Column(String(500), nullable=False)
+    video_url = Column(String(500))
     thumbnail_url = Column(String(500))
-    preview_url = Column(String(500))  # Preview generated from middle frame
+    preview_url = Column(String(500))
 
     # Video metadata
     title = Column(String(255))
@@ -25,21 +26,24 @@ class Video(Base):
     size_bytes = Column(Integer)
     mime_type = Column(String(100))
 
-    # Status and scheduling
-    status = Column(String(50), default="active")  # 'active', 'inactive', 'processing'
-    is_active = Column(Boolean, default=False)  # Default to False, only one should be active
+    # Status
+    status = Column(String(50), default="active")
+    is_active = Column(Boolean, default=False)  # Contextual flag for active video
     
     # Subscription management
-    subscription_end = Column(DateTime)  # When access to this video expires
+    subscription_end = Column(DateTime)
     
-    # Rotation management - only these three values allowed
-    rotation_type = Column(String(20), default="none")  # 'none', 'sequential', 'cyclic'
+    # Rotation management
+    rotation_type = Column(String(20), default="none")
     rotation_order = Column(Integer, default=0)
 
     # Timestamps
-    created_at = Column(DateTime)
-    updated_at = Column(DateTime)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
     # Relationships
-    ar_content = relationship("ARContent", backref="videos")
+    ar_content = relationship("ARContent", back_populates="videos")
     schedules = relationship("VideoSchedule", back_populates="video", cascade="all, delete-orphan")
+
+    def __repr__(self):
+        return f"<Video(id={self.id}, title='{self.title}', ar_content_id={self.ar_content_id}, is_active={self.is_active})>"
