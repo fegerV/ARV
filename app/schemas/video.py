@@ -1,66 +1,32 @@
-from datetime import datetime
 from typing import Optional
+from uuid import UUID
 from pydantic import BaseModel, Field
 
 
-class VideoBase(BaseModel):
-    ar_content_id: int
+class VideoCreate(BaseModel):
+    ar_content_id: UUID
+    filename: str = Field(..., min_length=1, description="Video filename from file upload")
+    set_as_active: Optional[bool] = Field(default=False, description="Set this video as the active one")
     
-    video_path: str = Field(..., max_length=500)
-    video_url: Optional[str] = Field(None, max_length=500)
-    thumbnail_url: Optional[str] = Field(None, max_length=500)
-    preview_url: Optional[str] = Field(None, max_length=500)
-    
-    title: Optional[str] = Field(None, max_length=255)
-    duration: Optional[float] = None
-    width: Optional[int] = None
-    height: Optional[int] = None
-    size_bytes: Optional[int] = None
-    mime_type: Optional[str] = Field(None, max_length=100)
-    
-    is_active: bool = False
-    
-    schedule_start: Optional[datetime] = None
-    schedule_end: Optional[datetime] = None
-    
-    rotation_order: int = 0
-
-
-class VideoCreate(VideoBase):
-    pass
-
-
-class VideoUpdate(BaseModel):
-    ar_content_id: Optional[int] = None
-    
-    video_path: Optional[str] = Field(None, max_length=500)
-    video_url: Optional[str] = Field(None, max_length=500)
-    thumbnail_url: Optional[str] = Field(None, max_length=500)
-    preview_url: Optional[str] = Field(None, max_length=500)
-    
-    title: Optional[str] = Field(None, max_length=255)
-    duration: Optional[float] = None
-    width: Optional[int] = None
-    height: Optional[int] = None
-    size_bytes: Optional[int] = None
-    mime_type: Optional[str] = Field(None, max_length=100)
-    
-    is_active: Optional[bool] = None
-    
-    schedule_start: Optional[datetime] = None
-    schedule_end: Optional[datetime] = None
-    
-    rotation_order: Optional[int] = None
-
-
-class VideoInDBBase(VideoBase):
-    id: int
-    created_at: datetime
-    updated_at: datetime
-
     class Config:
         from_attributes = True
 
 
-class Video(VideoInDBBase):
-    pass
+class VideoUpdate(BaseModel):
+    video_status: Optional[str] = None
+    
+    class Config:
+        from_attributes = True
+
+
+class VideoResponse(BaseModel):
+    id: UUID
+    ar_content_id: UUID
+    filename: str
+    duration: Optional[int] = None
+    size: Optional[int] = None
+    video_status: str
+    created_at: str
+    
+    class Config:
+        from_attributes = True
