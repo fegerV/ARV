@@ -30,8 +30,7 @@ class StorageConnection(Base):
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     created_by = Column(Integer, nullable=True)  # FK omitted until users table exists
 
-    # Relationships
-    companies = relationship("Company", back_populates="storage_connection")
+    # Relationships - removed as Company model no longer has storage_connection
 
 
 class StorageFolder(Base):
@@ -51,5 +50,4 @@ class StorageFolder(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
-    # Relationships
-    company = relationship("Company", back_populates="folders")
+    # Relationships - removed as Company model no longer has folders

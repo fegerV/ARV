@@ -1,5 +1,6 @@
-from sqlalchemy import Column, Integer, String, Text, Boolean, DateTime, UniqueConstraint
+from sqlalchemy import Column, Integer, String, Text, Boolean, DateTime, UniqueConstraint, ForeignKey
 from sqlalchemy.dialects.postgresql import JSONB, UUID
+from sqlalchemy.orm import relationship
 from datetime import datetime
 from app.core.database import Base
 
@@ -11,8 +12,8 @@ class ARContent(Base):
     )
 
     id = Column(Integer, primary_key=True)
-    company_id = Column(Integer, nullable=False, index=True)
-    project_id = Column(Integer, nullable=False, index=True)
+    company_id = Column(Integer, ForeignKey("companies.id"), nullable=False, index=True)
+    project_id = Column(Integer, ForeignKey("projects.id"), nullable=False, index=True)
 
     # Immutable unique identifier
     unique_id = Column(UUID(as_uuid=True), nullable=False, unique=True, index=True)
@@ -39,3 +40,6 @@ class ARContent(Base):
     rotation_state = Column(Integer, default=0)  # Current index for rotation (0-based)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    # Relationships
+    project = relationship("Project", back_populates="ar_contents")

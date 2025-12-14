@@ -1,84 +1,50 @@
-from pydantic import BaseModel, Field, EmailStr
+from pydantic import BaseModel, Field, EmailStr, validator
 from typing import Optional
 from datetime import datetime
+from app.enums import CompanyStatus
 
-class CompanyBase(BaseModel):
-    name: str = Field(..., min_length=1, max_length=255)
-    
-    # Contacts
-    contact_email: Optional[EmailStr] = None
-    contact_phone: Optional[str] = None
-    telegram_chat_id: Optional[str] = None
-    
-    # Storage (REQUIRED for new client companies)
-    storage_connection_id: int = Field(
-        ..., description="ID of storage connection. Local storage connection is not available for client companies."
-    )
-    storage_path: Optional[str] = Field(
-        None,
-        description="Storage path for the company. Auto-generated if not specified.",
-    )
-    
-    # Subscription
-    subscription_tier: str = Field(default="basic")
-    subscription_expires_at: Optional[datetime] = None
-    
-    # Quotas
-    storage_quota_gb: int = Field(default=10, ge=1, le=1000)
-    projects_limit: int = Field(default=50, ge=1, le=500)
-    
-    # Notes
-    notes: Optional[str] = None
 
-class CompanyCreate(CompanyBase):
-    pass
+class CompanyCreate(BaseModel):
+    """Schema for creating a new company"""
+    name: str = Field(..., min_length=1, max_length=255, description="Company name")
+    contact_email: EmailStr = Field(..., description="Contact email address")
+    status: Optional[CompanyStatus] = Field(default=CompanyStatus.ACTIVE, description="Company status")
 
-class CompanyUpdate(BaseModel):
-    name: Optional[str] = Field(None, min_length=1, max_length=255)
-    
-    # Contacts
-    contact_email: Optional[EmailStr] = None
-    contact_phone: Optional[str] = None
-    telegram_chat_id: Optional[str] = None
-    
-    # Storage
-    storage_connection_id: Optional[int] = None
-    storage_path: Optional[str] = None
-    
-    # Subscription
-    subscription_tier: Optional[str] = None
-    subscription_expires_at: Optional[datetime] = None
-    
-    # Quotas
-    storage_quota_gb: Optional[int] = Field(None, ge=1, le=1000)
-    projects_limit: Optional[int] = Field(None, ge=1, le=500)
-    
-    # Notes
-    notes: Optional[str] = None
-    
-    # Status
-    is_active: Optional[bool] = None
+    @validator('status')
+    def validate_status(cls, v):
+        if v is None:
+            return CompanyStatus.ACTIVE
+        return v
 
-class Company(CompanyBase):
-    id: int
-    slug: str
-    
-    # Storage
-    is_default: bool
-    
-    # Quotas
-    storage_used_bytes: int
-    
-    # Status
-    is_active: bool
-    
-    # Timestamps
-    created_at: datetime
-    updated_at: datetime
-    
     class Config:
         from_attributes = True
 
 
-class CompanyResponse(Company):
-    pass
+class CompanyUpdate(BaseModel):
+    """Schema for updating an existing company"""
+    name: Optional[str] = Field(None, min_length=1, max_length=255, description="Company name")
+    contact_email: Optional[EmailStr] = Field(None, description="Contact email address")
+    status: Optional[CompanyStatus] = Field(None, description="Company status")
+
+    @validator('status')
+    def validate_status(cls, v):
+        if v is not None and not isinstance(v, CompanyStatus):
+            raise ValueError('Status must be a valid CompanyStatus enum value')
+        return v
+
+    class Config:
+        from_attributes = True
+
+
+class CompanyResponse(BaseModel):
+    """Schema for company response with computed properties"""
+    id: str
+    name: str
+    contact_email: Optional[str]
+    status: CompanyStatus
+    projects_count: int = Field(..., description="Number of projects for this company")
+    ar_content_count: int = Field(..., description="Total AR content across all projects")
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
