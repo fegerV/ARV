@@ -62,7 +62,7 @@ def build_unique_link(unique_id: uuid.UUID) -> str:
     Returns:
         Public link URL
     """
-    return f"/ar-content/{unique_id}"
+    return f"/view/{unique_id}"
 
 
 async def generate_qr_code(unique_id: uuid.UUID, storage_path: Path) -> str:
@@ -75,15 +75,16 @@ async def generate_qr_code(unique_id: uuid.UUID, storage_path: Path) -> str:
     Returns:
         Public URL of the generated QR code
     """
-    # Create QR code with the unique link
+    # Create QR code with the full public URL (so the QR works outside of current domain context)
     unique_link = build_unique_link(unique_id)
+    unique_url = f"{settings.PUBLIC_URL.rstrip('/')}{unique_link}"
     qr = qrcode.QRCode(
         version=1,
         error_correction=qrcode.constants.ERROR_CORRECT_L,
         box_size=10,
         border=4,
     )
-    qr.add_data(unique_link)
+    qr.add_data(unique_url)
     qr.make(fit=True)
     
     # Generate QR code image

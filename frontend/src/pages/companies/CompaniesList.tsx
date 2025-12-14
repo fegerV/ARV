@@ -1,24 +1,37 @@
-import { Box, Typography, Button, Paper, Table, TableHead, TableBody, TableRow, TableCell, Chip } from '@mui/material';
-import { Add as AddIcon } from '@mui/icons-material';
+import { useEffect, useState } from 'react';
+import { Box, Typography, Button, Paper, Table, TableHead, TableBody, TableRow, TableCell, Chip, IconButton, CircularProgress } from '@mui/material';
+import { Add as AddIcon, Edit as EditIcon, Folder as FolderIcon } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
+import { companiesAPI } from '../../services/api';
 
-// Mock data for companies including the default Vertex AR company
-const mockCompanies = [
-  {
-    id: 1,
-    name: 'Vertex AR',
-    slug: 'vertex-ar',
-    contact_email: 'admin@vertexar.com',
-    storage_provider: 'Local Storage',
-    is_default: true,
-    status: 'active',
-    projects_count: 5,
-    created_at: '2025-01-01',
-  },
-];
+interface CompanyListItem {
+  id: string;
+  name: string;
+  contact_email?: string;
+  storage_provider: string;
+  status: string;
+  projects_count: number;
+  created_at: string;
+}
 
 export default function CompaniesList() {
   const navigate = useNavigate();
+
+  const [loading, setLoading] = useState(false);
+  const [items, setItems] = useState<CompanyListItem[]>([]);
+
+  useEffect(() => {
+    const load = async () => {
+      setLoading(true);
+      try {
+        const res = await companiesAPI.list({ page: 1, page_size: 50 });
+        setItems(res.data?.items || []);
+      } finally {
+        setLoading(false);
+      }
+    };
+    load();
+  }, []);
 
   return (
     <Box>
@@ -34,6 +47,11 @@ export default function CompaniesList() {
       </Box>
 
       <Paper sx={{ p: 3 }}>
+        {loading ? (
+          <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
+            <CircularProgress />
+          </Box>
+        ) : (
         <Table>
           <TableHead>
             <TableRow>
@@ -43,27 +61,17 @@ export default function CompaniesList() {
               <TableCell>Status</TableCell>
               <TableCell>Projects</TableCell>
               <TableCell>Created</TableCell>
+              <TableCell>Actions</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
-            {mockCompanies.map((company) => (
+            {items.map((company) => (
               <TableRow key={company.id} hover>
                 <TableCell>
-                  <Typography variant="subtitle2">
-                    {company.name}
-                    {company.is_default && (
-                      <Chip 
-                        label="Default" 
-                        size="small" 
-                        color="primary" 
-                        variant="outlined" 
-                        sx={{ ml: 1 }}
-                      />
-                    )}
-                  </Typography>
+                  <Typography variant="subtitle2">{company.name}</Typography>
                 </TableCell>
                 <TableCell>{company.contact_email}</TableCell>
-                <TableCell>{company.storage_provider}</TableCell>
+                <TableCell>{company.storage_provider || 'Local'}</TableCell>
                 <TableCell>
                   <Chip 
                     label={company.status} 
@@ -73,10 +81,19 @@ export default function CompaniesList() {
                 </TableCell>
                 <TableCell>{company.projects_count}</TableCell>
                 <TableCell>{company.created_at}</TableCell>
+                <TableCell>
+                  <IconButton onClick={() => navigate(`/companies/${company.id}`)} size="small" title="Edit">
+                    <EditIcon fontSize="small" />
+                  </IconButton>
+                  <IconButton onClick={() => navigate(`/companies/${company.id}/projects`)} size="small" title="Open Projects">
+                    <FolderIcon fontSize="small" />
+                  </IconButton>
+                </TableCell>
               </TableRow>
             ))}
           </TableBody>
         </Table>
+        )}
       </Paper>
     </Box>
   );

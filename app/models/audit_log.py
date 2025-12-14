@@ -1,4 +1,5 @@
 from sqlalchemy import Column, Integer, String, DateTime, Text, ForeignKey
+from sqlalchemy import JSON
 from sqlalchemy.orm import relationship
 from sqlalchemy.dialects.postgresql import JSONB
 from datetime import datetime
@@ -18,7 +19,7 @@ class AuditLog(Base):
     action = Column(String(100), nullable=False)  # 'create', 'update', 'delete', 'login', etc.
     
     # Change details
-    changes = Column(JSONB, default={})  # Before/after values
+    changes = Column(JSON().with_variant(JSONB, "postgresql"), default={})  # Before/after values
     field_name = Column(String(100))  # Specific field that changed
     
     # Actor information

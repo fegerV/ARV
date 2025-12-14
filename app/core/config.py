@@ -42,10 +42,6 @@ class Settings(BaseSettings):
     DB_MAX_OVERFLOW: int = 10
     DB_ECHO: bool = False
     
-    # Redis
-    REDIS_URL: str = Field(default="redis://localhost:6379/0")
-    REDIS_MAX_CONNECTIONS: int = 50
-    
     # Security
     SECRET_KEY: str = Field(default="change-this-to-a-secure-random-key-min-32-chars")
     ALGORITHM: str = "HS256"
@@ -63,6 +59,11 @@ class Settings(BaseSettings):
         ]
     )
     CORS_ALLOW_CREDENTIALS: bool = True
+
+    PUBLIC_URL: str = Field(default="http://localhost:8000")
+
+    # Media
+    MEDIA_ROOT: str = "/app/storage/content"
     
     # Storage
     STORAGE_BASE_PATH: str = "/app/storage/content"
@@ -88,11 +89,8 @@ class Settings(BaseSettings):
     ADMIN_DEFAULT_PASSWORD: str = "ChangeMe123!"
     ADMIN_FRONTEND_URL: str = "http://localhost:3000"
     
-    # Celery
-    CELERY_BROKER_URL: str = Field(default="redis://localhost:6379/0")
-    CELERY_RESULT_BACKEND: str = Field(default="redis://localhost:6379/0")
-    CELERY_TASK_TRACK_STARTED: bool = True
-    CELERY_TASK_TIME_LIMIT: int = 300  # 5 minutes
+    # Background tasks configuration
+    MAX_BACKGROUND_WORKERS: int = 4
     
     # Monitoring
     SENTRY_DSN: str = ""

@@ -41,21 +41,24 @@ import { useToast } from '../../store/useToast';
 import { downloadQRAsPNG, downloadQRAsSVG, downloadQRAsPDF } from '../../utils/qrCodeExport';
 
 interface ARContentDetailProps {
-  id: number;
-  title: string;
-  uniqueId: string;
-  imageUrl: string;
-  imageWidth: number;
-  imageHeight: number;
-  imageSize: number;
-  mimeType: string;
-  markerStatus: 'pending' | 'processing' | 'ready' | 'failed';
-  markerFileName?: string;
-  markerSize?: number;
-  markerFeaturePoints?: number;
-  markerGenerationTime?: number;
-  createdAt: string;
-  createdBy: string;
+  id: string;
+  order_number: string;
+  company_name: string;
+  project_name: string;
+  created_at: string;
+  status: string;
+  customer_name?: string;
+  customer_phone?: string;
+  customer_email?: string;
+  duration_years: number;
+  photo_url?: string;
+  thumbnail_url?: string;
+  active_video_title?: string | null;
+  active_video_url?: string | null;
+  views_count: number;
+  views_30_days?: number;
+  public_url?: string;
+  qr_code_url?: string;
 }
 
 interface VideoInfo {
@@ -89,10 +92,7 @@ export default function ARContentDetail() {
   const qrCanvasRef = useRef<HTMLCanvasElement>(null);
   
   const [content, setContent] = useState<ARContentDetailProps | null>(null);
-  const [videos, setVideos] = useState<VideoInfo[]>([]);
-  const [stats, setStats] = useState<Stats | null>(null);
-  const [company, setCompany] = useState<{ name: string } | null>(null);
-  const [project, setProject] = useState<{ name: string } | null>(null);
+  const [videos, setVideos] = useState<any[]>([]);
   
   const [loading, setLoading] = useState(true);
   const [generatingMarker, setGeneratingMarker] = useState(false);
@@ -111,16 +111,10 @@ export default function ARContentDetail() {
   const fetchContentDetail = async () => {
     setLoading(true);
     try {
-      const response = await arContentAPI.getDetail(Number(arContentId));
+      const response = await arContentAPI.getDetail(String(arContentId));
       const data = response.data;
-      
-      setContent(data.arContent);
+      setContent(data);
       setVideos(data.videos || []);
-      setStats(data.stats);
-      setCompany(data.company);
-      setProject(data.project);
-      
-      addToast('Content loaded successfully', 'success');
     } catch (error: any) {
       addToast(
         error.response?.data?.message || 'Failed to load AR content',
@@ -143,18 +137,7 @@ export default function ARContentDetail() {
   const handleDelete = async () => {
     setDeleting(true);
     try {
-      // Note: We need company and project IDs for the new API, but the current response doesn't include them
-      // This will need to be updated when the backend API includes company_id and project_id in the response
-      if (!company?.name || !project?.name) {
-        addToast('Company and project information required for deletion', 'error');
-        return;
-      }
-      
-      // For now, we'll need to fetch the company and project IDs or use a different approach
-      addToast('Delete functionality requires updating to use company/project IDs', 'warning');
-      // await arContentAPI.delete(companyId, projectId, Number(arContentId));
-      // addToast('AR content deleted successfully', 'success');
-      // navigate(-1);
+      addToast('Delete is not wired yet', 'warning');
     } catch (error: any) {
       addToast(
         error.response?.data?.message || 'Failed to delete AR content',
@@ -176,11 +159,7 @@ export default function ARContentDetail() {
     
     setGeneratingMarker(true);
     try {
-      await arContentAPI.generateMarker(Number(arContentId));
-      addToast('Marker generation started', 'success');
-      
-      // Refresh the content to show updated status
-      await fetchContentDetail();
+      addToast('Marker generation is not wired yet', 'warning');
     } catch (error: any) {
       addToast(
         error.response?.data?.message || 'Failed to start marker generation',
@@ -211,8 +190,8 @@ export default function ARContentDetail() {
         return;
       }
 
-      const filename = `qr-${content.uniqueId}.${format}`;
-      const arUrl = `https://ar.vertexar.com/view/${content.uniqueId}`;
+      const filename = `qr-${content.order_number}.${format}`;
+      const arUrl = content.public_url || '';
 
       switch (format) {
         case 'png':
@@ -254,7 +233,7 @@ export default function ARContentDetail() {
 
   if (!content) return <Typography>AR content not found</Typography>;
 
-  const arUrl = `https://ar.vertexar.com/view/${content.uniqueId}`;
+  const arUrl = content.public_url || '';
 
   return (
     <Box sx={{ maxWidth: 1200, mx: 'auto' }}>
@@ -265,7 +244,7 @@ export default function ARContentDetail() {
             <BackIcon />
           </IconButton>
           <Typography variant="h4">
-            🎬 {content.title}
+            Заказ {content.order_number}
           </Typography>
         </Box>
         <Box sx={{ display: 'flex', gap: 1 }}>
@@ -289,10 +268,10 @@ export default function ARContentDetail() {
       {/* Company & Project Info */}
       <Paper sx={{ p: 2, mb: 3 }}>
         <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
-          <Chip label={`🏢 ${company?.name}`} />
-          <Chip label={`📁 ${project?.name}`} />
-          <Chip label={`👤 ${content.createdBy}`} color="primary" />
-          <Chip label={`📅 ${format(new Date(content.createdAt), 'dd.MM.yyyy HH:mm')}`} />
+          <Chip label={`🏢 ${content.company_name}`} />
+          <Chip label={`📁 ${content.project_name}`} />
+          <Chip label={`📅 ${format(new Date(content.created_at), 'dd.MM.yyyy HH:mm')}`} />
+          <Chip label={`⏳ ${content.duration_years}y`} />
         </Box>
       </Paper>
 
@@ -312,7 +291,7 @@ export default function ARContentDetail() {
             onClick={() => setPortraitLightbox(true)}
           >
             <img 
-              src={content.imageUrl} 
+              src={content.photo_url || ''} 
               alt="Portrait" 
               style={{ width: '100%', height: '100%', objectFit: 'contain' }}
             />
@@ -324,38 +303,17 @@ export default function ARContentDetail() {
         
         <Grid item xs={12} md={6}>
           <Paper sx={{ p: 3 }}>
-            <Typography variant="h6" gutterBottom>📊 Информация о файле</Typography>
-            <Box sx={{ mb: 3 }}>
-              <Typography variant="body2">📏 Размер: {content.imageWidth}×{content.imageHeight} px</Typography>
-              <Typography variant="body2">🏷️ Формат: {content.mimeType}</Typography>
-              <Typography variant="body2">📁 Размер: {formatBytes(content.imageSize)}</Typography>
+            <Typography variant="h6" gutterBottom>👤 Заказчик</Typography>
+            <Box sx={{ mb: 2 }}>
+              <Typography variant="body2">Имя: {content.customer_name || '—'}</Typography>
+              <Typography variant="body2">Телефон: {content.customer_phone || '—'}</Typography>
+              <Typography variant="body2">Email: {content.customer_email || '—'}</Typography>
             </Box>
-            
+
             <Divider sx={{ my: 2 }} />
-            
-            <Typography variant="h6" gutterBottom>🎯 NFT Маркеры</Typography>
-            <Box>
-              <Chip 
-                label={content.markerStatus === 'ready' ? '✅ Сгенерирован' : '⏳ Генерация'} 
-                color={content.markerStatus === 'ready' ? 'success' : 'default'}
-                sx={{ mb: 1 }}
-              />
-              {content.markerStatus !== 'ready' && (
-                <Button 
-                  variant="outlined" 
-                  size="small" 
-                  onClick={handleGenerateMarker}
-                  disabled={generatingMarker}
-                  startIcon={generatingMarker ? <CircularProgress size={16} /> : null}
-                  sx={{ ml: 1 }}
-                >
-                  {generatingMarker ? 'Генерация...' : 'Сгенерировать'}
-                </Button>
-              )}
-              <Typography variant="body2">📁 {content.markerFileName} ({formatBytes(content.markerSize || 0)})</Typography>
-              <Typography variant="body2">🔍 {content.markerFeaturePoints?.toLocaleString()} feature points</Typography>
-              <Typography variant="body2">⏱️ Генерация: {content.markerGenerationTime}s</Typography>
-            </Box>
+
+            <Typography variant="h6" gutterBottom>🎬 Видео</Typography>
+            <Typography variant="body2">Активное: {content.active_video_title || '—'}</Typography>
           </Paper>
         </Grid>
       </Grid>
@@ -495,52 +453,6 @@ export default function ARContentDetail() {
         </Box>
       </Paper>
 
-      {/* Statistics */}
-      {stats && (
-        <Paper sx={{ p: 3, mb: 4 }}>
-          <Typography variant="h6" gutterBottom>📊 Статистика просмотров (30 дней)</Typography>
-          <Grid container spacing={2}>
-            <Grid item xs={12} sm={6} md={3}>
-              <Box>
-                <Typography variant="h4">{stats.totalViews.toLocaleString()}</Typography>
-                <Typography variant="body2" color="text.secondary">👁️ Всего просмотров</Typography>
-              </Box>
-            </Grid>
-            <Grid item xs={12} sm={6} md={3}>
-              <Box>
-                <Typography variant="h4">{stats.uniqueSessions.toLocaleString()}</Typography>
-                <Typography variant="body2" color="text.secondary">👤 Уникальных сессий</Typography>
-              </Box>
-            </Grid>
-            <Grid item xs={12} sm={6} md={3}>
-              <Box>
-                <Typography variant="h4">{stats.avgSessionDuration}s</Typography>
-                <Typography variant="body2" color="text.secondary">⏱️ Средняя сессия</Typography>
-              </Box>
-            </Grid>
-            <Grid item xs={12} sm={6} md={3}>
-              <Box>
-                <Typography variant="h4">{stats.avgFps}</Typography>
-                <Typography variant="body2" color="text.secondary">📈 Средний FPS</Typography>
-              </Box>
-            </Grid>
-          </Grid>
-
-          <Divider sx={{ my: 2 }} />
-
-          <Typography variant="body2" gutterBottom>📱 Устройства:</Typography>
-          <Box sx={{ display: 'flex', gap: 2 }}>
-            {stats.deviceBreakdown.map((device) => (
-              <Chip 
-                key={device.device}
-                label={`${device.device} ${device.percentage}%`}
-                variant="outlined"
-              />
-            ))}
-          </Box>
-        </Paper>
-      )}
-
       {/* Actions */}
       <Box sx={{ display: 'flex', gap: 2, justifyContent: 'flex-start' }}>
         <Button variant="outlined" startIcon={<BackIcon />} onClick={() => navigate(-1)}>
@@ -560,7 +472,7 @@ export default function ARContentDetail() {
       >
         <DialogTitle>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <Typography>📸 Портрет (оригинал {content.imageWidth}×{content.imageHeight})</Typography>
+            <Typography>📸 Портрет</Typography>
             <Box>
               <IconButton onClick={() => setZoom(Math.max(50, zoom - 25))}>
                 <ZoomOutIcon />
@@ -578,23 +490,10 @@ export default function ARContentDetail() {
         <DialogContent>
           <Box sx={{ textAlign: 'center', overflow: 'auto' }}>
             <img 
-              src={content.imageUrl} 
+              src={content.photo_url || ''} 
               alt="Portrait full size"
               style={{ width: `${zoom}%`, maxWidth: 'none' }}
             />
-          </Box>
-          <Box sx={{ mt: 2 }}>
-            <Typography variant="body2">📁 Файл: {content.mimeType.split('/')[1]} ({formatBytes(content.imageSize)})</Typography>
-            <Typography variant="body2">📏 Размер: {content.imageWidth}×{content.imageHeight} px</Typography>
-            <Typography variant="body2">🎯 Качество NFT: {content.markerFeaturePoints} feature points (отлично)</Typography>
-          </Box>
-          <Box sx={{ mt: 2, display: 'flex', gap: 1 }}>
-            <Button variant="outlined" startIcon={<DownloadIcon />}>
-              Скачать оригинал
-            </Button>
-            <Button variant="outlined" startIcon={<EditIcon />}>
-              Редактировать
-            </Button>
           </Box>
         </DialogContent>
       </Dialog>
@@ -700,7 +599,7 @@ export default function ARContentDetail() {
         <DialogTitle>Подтвердите удаление</DialogTitle>
         <DialogContent>
           <Typography>
-            Вы уверены, что хотите удалить AR контент "{content.title}"?
+            Вы уверены, что хотите удалить заказ "{content.order_number}"?
             Это действие нельзя отменить.
           </Typography>
         </DialogContent>

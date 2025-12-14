@@ -8,7 +8,6 @@ import httpx
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
-import redis.asyncio as redis
 import structlog
 
 from app.core.config import settings
@@ -24,18 +23,8 @@ class Alert:
     affected_services: List[str]
 
 async def publish_alerts(alerts: List[Alert]) -> None:
-    try:
-        r = redis.from_url(settings.REDIS_URL)
-        for a in alerts:
-            msg = {"severity": a.severity, "title": a.title, "message": a.message, "services": a.affected_services}
-            payload = json.dumps(msg)
-            await r.publish("alerts", payload)
-            # store a short history for /alerts and /logs commands
-            await r.lpush("alerts_history", payload)
-            await r.ltrim("alerts_history", 0, 99)
-        await r.aclose()
-    except Exception as e:
-        logger.error("publish_alerts_error", error=str(e))
+    # Redis removed: no-op (keep API stable)
+    return None
 
 
 ALERT_COOLDOWN_SECONDS = {
@@ -46,21 +35,8 @@ ALERT_COOLDOWN_SECONDS = {
 
 
 async def send_critical_alerts(alerts: List[Alert], metrics: dict) -> None:
-    """Отправка критических алертов с cooldown через Redis."""
-    # Filter by cooldown
-    pending_alerts: List[Alert] = []
-    try:
-        r = redis.from_url(settings.REDIS_URL)
-        for alert in alerts:
-            key = f"alert:{alert.severity}:{alert.title}"
-            exists = await r.exists(key)
-            if not exists:
-                pending_alerts.append(alert)
-                await r.set(key, "1", ex=ALERT_COOLDOWN_SECONDS.get(alert.severity, 300))
-        await r.aclose()
-    except Exception as e:
-        logger.error("alert_cooldown_error", error=str(e))
-        pending_alerts = alerts  # fallback: send anyway
+    """Отправка критических алертов (без Redis cooldown)."""
+    pending_alerts: List[Alert] = alerts
 
     if not pending_alerts:
         return
@@ -69,7 +45,6 @@ async def send_critical_alerts(alerts: List[Alert], metrics: dict) -> None:
     await send_admin_email(pending_alerts, metrics)
     # Telegram
     await send_telegram_alerts(pending_alerts, metrics)
-    # WebSocket broadcast via Redis pubsub
     await publish_alerts(pending_alerts)
 
 
@@ -91,7 +66,6 @@ async def send_admin_email(alerts: List[Alert], metrics: dict) -> None:
     <ul>
       <li>CPU: {metrics.get('cpu_percent', 'n/a')}%</li>
       <li>Memory: {metrics.get('memory_percent', 'n/a')}%</li>
-      <li>Queue: {metrics.get('celery_queue_length', 'n/a')}</li>
       <li>API Health: {metrics.get('api_health', 'n/a')}</li>
     </ul>
 
@@ -126,7 +100,6 @@ async def send_telegram_alerts(alerts: List[Alert], metrics: dict) -> None:
 <strong>Metrics:</strong>
 CPU: {metrics.get('cpu_percent', 'n/a')}%
 RAM: {metrics.get('memory_percent', 'n/a')}%
-Queue: {metrics.get('celery_queue_length', 'n/a')}
 API: {metrics.get('api_health', 'n/a')}
 
 <a href="{settings.ADMIN_FRONTEND_URL}">📊 Dashboard</a>

@@ -39,31 +39,18 @@ export default api;
 
 // API methods
 export const arContentAPI = {
-  listAll: () => api.get('/ar-content'),
-  list: (companyId: number, projectId: number) => api.get(`/companies/${companyId}/projects/${projectId}/ar-content`),
-  getDetail: (id: number) => api.get(`/ar-content/${id}`),
-  get: (companyId: number, projectId: number, contentId: number) => api.get(`/companies/${companyId}/projects/${projectId}/ar-content/${contentId}`),
-  create: (companyId: number, projectId: number, formData: FormData) => api.post(`/companies/${companyId}/projects/${projectId}/ar-content/new`, formData, {
+  listAll: (params?: { page?: number; page_size?: number; company_id?: number; project_id?: string; status?: string; search?: string }) =>
+    api.get('/ar-content', { params }),
+  getDetail: (id: string) => api.get(`/ar-content/${id}`),
+  create: (formData: FormData) => api.post('/ar-content', formData, {
     headers: {
       'Content-Type': 'multipart/form-data',
     },
   }),
-  update: (companyId: number, projectId: number, contentId: number, data: any) => api.put(`/companies/${companyId}/projects/${projectId}/ar-content/${contentId}`, data),
-  patchVideo: (companyId: number, projectId: number, contentId: number, videoFile: File) => {
-    const formData = new FormData();
-    formData.append('video', videoFile);
-    return api.patch(`/companies/${companyId}/projects/${projectId}/ar-content/${contentId}/video`, formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
-    });
-  },
-  delete: (companyId: number, projectId: number, contentId: number) => api.delete(`/companies/${companyId}/projects/${projectId}/ar-content/${contentId}`),
-  generateMarker: (id: number) => api.post(`/ar-content/${id}/generate-marker`),
 };
 
 export const companiesAPI = {
-  list: (includeDefault: boolean = false) => api.get(`/companies?include_default=${includeDefault}`),
+  list: (params?: { page?: number; page_size?: number; search?: string; status?: string }) => api.get('/companies', { params }),
   get: (id: number) => api.get(`/companies/${id}`),
   create: (data: any) => api.post('/companies', data),
   update: (id: number, data: any) => api.put(`/companies/${id}`, data),
@@ -71,15 +58,28 @@ export const companiesAPI = {
 };
 
 export const projectsAPI = {
-  list: (companyId: number) => api.get(`/companies/${companyId}/projects`),
+  listByCompany: (companyId: number, params?: { page?: number; page_size?: number }) =>
+    api.get(`/companies/${companyId}/projects`, { params }),
+  listAll: (params?: { page?: number; page_size?: number; company_id?: number }) =>
+    api.get('/projects', { params }),
   get: (id: number) => api.get(`/projects/${id}`),
-  create: (companyId: number, data: any) => api.post(`/companies/${companyId}/projects`, data),
+  create: (data: any) => api.post('/projects', data),
+  update: (id: number, data: any) => api.put(`/projects/${id}`, data),
   delete: (id: number) => api.delete(`/projects/${id}`),
 };
 
 export const analyticsAPI = {
-  overview: () => api.get('/analytics/overview'),
-  arContent: (id: number, days: number = 30) => api.get(`/analytics/ar-content/${id}?days=${days}`),
+  summary: () => api.get('/analytics/summary'),
+  company: (companyId: number) => api.get(`/analytics/company/${companyId}`),
+};
+
+export const notificationsAPI = {
+  list: (limit: number = 50) => api.get('/notifications', { params: { limit } }),
+  markRead: (ids: number[]) => api.post('/notifications/mark-read', ids),
+};
+
+export const settingsAPI = {
+  get: () => api.get('/settings'),
 };
 
 // Storage Connections API

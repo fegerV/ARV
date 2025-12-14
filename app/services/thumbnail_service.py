@@ -89,7 +89,7 @@ class ThumbnailService:
     async def generate_image_thumbnail(
         self,
         image_path: str,
-        output_dir: str = "storage/content/thumbnails",
+        output_dir: Optional[str] = None,
         thumbnail_name: Optional[str] = None,
         provider=None,
         company_id: Optional[int] = None
@@ -114,6 +114,9 @@ class ThumbnailService:
         log.info("image_thumbnail_generation_started")
         
         try:
+            if output_dir is None:
+                output_dir = str(Path(settings.MEDIA_ROOT) / "thumbnails")
+
             # Определяем имя файла превью
             if not thumbnail_name:
                 image_filename = Path(image_path).stem
@@ -159,7 +162,7 @@ class ThumbnailService:
                     raise FileNotFoundError(f"Thumbnail file not created: {output_file}")
                 
                 thumbnail_path = str(output_file)
-                thumbnail_url = f"/storage/content/thumbnails/{thumbnail_name}"
+                thumbnail_url = f"/storage/thumbnails/{thumbnail_name}"
             
             # Record metrics
             duration = time.time() - start_time
@@ -193,7 +196,7 @@ class ThumbnailService:
     async def generate_video_thumbnail(
         self,
         video_path: str,
-        output_dir: str = "storage/content/thumbnails",
+        output_dir: Optional[str] = None,
         thumbnail_name: Optional[str] = None,
         time_position: float = 1.0,  # секунда видео для создания превью
         provider=None,
@@ -220,6 +223,9 @@ class ThumbnailService:
         log.info("video_thumbnail_generation_started")
 
         try:
+            if output_dir is None:
+                output_dir = str(Path(settings.MEDIA_ROOT) / "thumbnails")
+
             # Определяем имя файла превью
             if not thumbnail_name:
                 video_filename = Path(video_path).stem
@@ -303,7 +309,7 @@ class ThumbnailService:
                     raise FileNotFoundError(f"Thumbnail file not created: {output_file}")
                 
                 thumbnail_path = str(output_file)
-                thumbnail_url = f"/storage/content/thumbnails/{thumbnail_name}"
+                thumbnail_url = f"/storage/thumbnails/{thumbnail_name}"
 
             # Record metrics
             duration = time.time() - start_time

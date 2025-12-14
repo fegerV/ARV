@@ -1,4 +1,5 @@
 from sqlalchemy import Column, Integer, String, Boolean, DateTime, Text
+from sqlalchemy import JSON
 from sqlalchemy.dialects.postgresql import JSONB
 from datetime import datetime
 from app.core.database import Base
@@ -26,6 +27,6 @@ class Notification(Base):
     subject = Column(String(500))
     message = Column(Text)
 
-    notification_metadata = Column("metadata", JSONB, default={})
+    notification_metadata = Column("metadata", JSON().with_variant(JSONB, "postgresql"), default={})
 
     created_at = Column(DateTime, default=datetime.utcnow)

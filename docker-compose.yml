@@ -27,146 +27,29 @@ services:
     networks:
       - vertex_net
 
-  redis:
-    image: redis:7-alpine
-    ports:
-      - "6379:6379"
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 3s
-      retries: 3
-    networks:
-      - vertex_net
-
   app:
     build:
       context: .
       dockerfile: Dockerfile
-    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    command: gunicorn -k uvicorn.workers.UvicornWorker -w 2 --bind 0.0.0.0:8000 app.main:app
     volumes:
       - .:/app
+      - ./storage:/app/storage
     ports:
       - "8000:8000"
     environment:
       - DATABASE_URL=postgresql+asyncpg://vertex_ar:password@postgres:5432/vertex_ar
-      - REDIS_URL=redis://redis:6379/0
-      - SECRET_KEY=your-super-secret-key-change-in-production
+      - PUBLIC_URL=http://localhost:8000
+      - MEDIA_ROOT=/app/storage/content
+      - LOG_LEVEL=INFO
     depends_on:
       postgres:
-        condition: service_healthy
-      redis:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/api/health/status"]
       interval: 30s
       timeout: 10s
       retries: 3
-    networks:
-      - vertex_net
-
-  celery-worker:
-    build:
-      context: .
-      dockerfile: Dockerfile.celery-worker
-    command: celery -A app.tasks.celery_app worker --loglevel=info
-    volumes:
-      - .:/app
-    depends_on:
-      app:
-        condition: service_healthy
-    environment:
-      - DATABASE_URL=postgresql+asyncpg://vertex_ar:password@postgres:5432/vertex_ar
-      - REDIS_URL=redis://redis:6379/0
-    healthcheck:
-      test: ["CMD", "/app/scripts/healthcheck_celery_worker.sh"]
-      interval: 30s
-      timeout: 10s
-      start_period: 60s
-      retries: 3
-    networks:
-      - vertex_net
-
-  celery-beat:
-    build:
-      context: .
-      dockerfile: Dockerfile.celery-beat
-    command: celery -A app.tasks.celery_app beat --loglevel=info --pidfile=/tmp/celerybeat.pid --schedule=/tmp/celerybeat-schedule
-    volumes:
-      - .:/app
-    depends_on:
-      app:
-        condition: service_healthy
-    environment:
-      - DATABASE_URL=postgresql+asyncpg://vertex_ar:password@postgres:5432/vertex_ar
-      - REDIS_URL=redis://redis:6379/0
-    healthcheck:
-      test: ["CMD", "/app/scripts/healthcheck_celery_beat.sh"]
-      interval: 30s
-      timeout: 10s
-      start_period: 60s
-      retries: 3
-    networks:
-      - vertex_net
-
-  nginx:
-    image: nginx:alpine
-    ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
-      # - ./storage/content:/usr/share/nginx/html/storage:ro
-      - ./frontend/dist:/usr/share/nginx/html:ro
-    depends_on:
-      app:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:80/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-    networks:
-      - vertex_net
-
-  postgres-exporter:
-    image: prometheuscommunity/postgres-exporter:latest
-    environment:
-      DATA_SOURCE_NAME: postgresql://vertex_ar:password@postgres:5432/vertex_ar?sslmode=disable
-    ports:
-      - "9187:9187"
-    depends_on:
-      postgres:
-        condition: service_healthy
-    networks:
-      - vertex_net
-
-  prometheus:
-    image: prom/prometheus:latest
-    ports:
-      - "9090:9090"
-    volumes:
-      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
-      - ./prometheus/alert.rules.yml:/etc/prometheus/alert.rules.yml:ro
-    depends_on:
-      app:
-        condition: service_started
-      postgres-exporter:
-        condition: service_started
-    networks:
-      - vertex_net
-
-  grafana:
-    image: grafana/grafana:latest
-    ports:
-      - "3001:3000"
-    volumes:
-      - ./grafana/provisioning:/etc/grafana/provisioning:ro
-    environment:
-      - GF_SECURITY_ADMIN_PASSWORD=admin
-    depends_on:
-      prometheus:
-        condition: service_started
     networks:
       - vertex_net
 

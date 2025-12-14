@@ -2,7 +2,6 @@ from datetime import datetime, timedelta
 import os
 import structlog
 import psutil
-import redis.asyncio as redis
 from fastapi import APIRouter
 from starlette.responses import Response
 from sqlalchemy import text, select
@@ -10,12 +9,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.core.database import engine, AsyncSessionLocal
-
-# Celery
-try:
-    from app.tasks.celery_app import celery_app
-except Exception:
-    celery_app = None
 
 # Prometheus
 try:
@@ -46,38 +39,7 @@ async def health_status():
         checks["database"] = "unhealthy"
         checks["database_error"] = str(e)
 
-    # 2. Redis
-    try:
-        r = redis.from_url(settings.REDIS_URL)
-        await r.ping()
-        await r.aclose()
-        checks["redis"] = "healthy"
-    except Exception as e:
-        checks["redis"] = "unhealthy"
-        checks["redis_error"] = str(e)
-
-    # 3. Celery queue/worker status (best-effort)
-    celery_info = {"status": "unknown", "queue_length": 0, "workers_alive": 0}
-    try:
-        if celery_app:
-            insp = celery_app.control.inspect()
-            active = insp.active() or {}
-            scheduled = insp.scheduled() or {}
-            reserved = insp.reserved() or {}
-            celery_info["workers_alive"] = len((insp.ping() or {}).keys())
-            celery_info["queue_length"] = sum(
-                len(active.get(w, [])) + len(scheduled.get(w, [])) + len(reserved.get(w, []))
-                for w in set(list(active.keys()) + list(scheduled.keys()) + list(reserved.keys()))
-            )
-            celery_info["status"] = "healthy" if celery_info["workers_alive"] > 0 else "unhealthy"
-        else:
-            celery_info["status"] = "unhealthy"
-    except Exception as e:
-        celery_info["status"] = "unhealthy"
-        celery_info["error"] = str(e)
-    checks["celery"] = celery_info
-
-    # 4. System resources
+    # 3. System resources
     cpu_percent = psutil.cpu_percent(interval=0.5)
     vm = psutil.virtual_memory()
     disk = psutil.disk_usage("/")

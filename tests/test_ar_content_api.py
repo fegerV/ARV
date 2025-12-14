@@ -4,6 +4,8 @@ Integration tests for AR Content API endpoints.
 import pytest
 import io
 import uuid
+import os
+from pathlib import Path
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
@@ -26,6 +28,60 @@ async def test_list_ar_content_empty(async_client: AsyncClient, db: AsyncSession
     assert data["page"] == 1
     assert data["page_size"] == 20
     assert data["total_pages"] == 0
+
+
+@pytest.mark.asyncio
+async def test_create_ar_content_uploads_files_to_media_root(async_client: AsyncClient, db: AsyncSession, sample_company, sample_project):
+    # Create minimal PNG and MP4 payloads (content doesn't need to be valid video for file-save test)
+    photo_bytes = b"\x89PNG\r\n\x1a\n" + (b"0" * 32)
+    video_bytes = b"\x00\x00\x00\x18ftypmp42" + (b"0" * 64)
+
+    data = {
+        "company_id": str(sample_company.id),
+        "project_id": str(sample_project.id),
+        "customer_name": "Uploader",
+        "duration_years": "1",
+    }
+    files = {
+        "photo_file": ("photo.png", io.BytesIO(photo_bytes), "image/png"),
+        "video_file": ("video.mp4", io.BytesIO(video_bytes), "video/mp4"),
+    }
+
+    res = await async_client.post("/api/ar-content", data=data, files=files)
+    assert res.status_code == 200
+    created = res.json()
+    content_id = created["id"]
+
+    # Verify DB record has paths set
+    row = await db.execute(select(ARContent).where(ARContent.id == content_id))
+    ac = row.scalar_one()
+    assert ac.photo_path
+    assert ac.video_path
+
+    # Verify files exist in MEDIA_ROOT
+    media_root = os.environ.get("MEDIA_ROOT")
+    assert media_root
+    assert Path(ac.photo_path).exists()
+    assert Path(ac.video_path).exists()
+    assert str(Path(ac.photo_path)).startswith(str(Path(media_root)))
+    assert str(Path(ac.video_path)).startswith(str(Path(media_root)))
+
+
+@pytest.mark.asyncio
+async def test_marker_endpoint_serves_targets_mind(async_client: AsyncClient):
+    media_root = os.environ.get("MEDIA_ROOT")
+    assert media_root
+
+    # Create fake marker file
+    content_id = "test-content-id"
+    marker_path = Path(media_root) / "markers" / content_id / "targets.mind"
+    marker_path.parent.mkdir(parents=True, exist_ok=True)
+    marker_bytes = b"MIND" + (b"0" * 32)
+    marker_path.write_bytes(marker_bytes)
+
+    res = await async_client.get(f"/api/ar-content/{content_id}/marker")
+    assert res.status_code == 200
+    assert res.content == marker_bytes
 
 
 @pytest.mark.asyncio

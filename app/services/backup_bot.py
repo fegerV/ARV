@@ -1,7 +1,6 @@
 import asyncio
 import structlog
 import httpx
-import redis.asyncio as redis
 import json
 
 from app.core.config import settings
@@ -11,7 +10,7 @@ logger = structlog.get_logger()
 async def run_manual_backup() -> str:
     # Placeholder: trigger docker compose backup services
     logger.info("manual_backup_triggered")
-    return "Backup triggered (postgres/redis/minio)"
+    return "Backup triggered (postgres)"
 
 async def restore_backup(backup_id: str) -> str:
     logger.info("restore_backup_triggered", backup_id=backup_id)
@@ -34,36 +33,17 @@ async def status_command(update, context):
 async def metrics_command(update, context):
     data = await _get_health()
     sys = data.get("system", {})
-    celery = data.get("celery", {})
     db = data.get("database", "unknown")
-    redis_status = data.get("redis", "unknown")
     msg = (
         f"CPU: {sys.get('cpu_percent','n/a')}%\n"
         f"RAM: {sys.get('memory_percent','n/a')}%\n"
         f"Disk: {sys.get('disk_percent','n/a')}%\n"
-        f"Queue: {celery.get('queue_length','n/a')}\n"
-        f"DB: {db}\nRedis: {redis_status}"
+        f"DB: {db}"
     )
     await update.message.reply_text(msg)
 
 async def alerts_command(update, context):
-    try:
-        r = redis.from_url(settings.REDIS_URL)
-        items = await r.lrange("alerts_history", 0, 9)
-        await r.aclose()
-        if not items:
-            await update.message.reply_text("No recent alerts")
-            return
-        lines = []
-        for it in items:
-            try:
-                obj = json.loads(it.decode())
-                lines.append(f"• [{obj.get('severity','')}] {obj.get('title','')}: {obj.get('message','')}")
-            except Exception:
-                lines.append(str(it))
-        await update.message.reply_text("\n".join(lines))
-    except Exception:
-        await update.message.reply_text("Error reading alerts")
+    await update.message.reply_text("Alerts history is unavailable (Redis disabled)")
 
 async def health_command(update, context):
     data = await _get_health()

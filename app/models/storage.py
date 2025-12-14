@@ -1,4 +1,5 @@
 from sqlalchemy import Column, Integer, String, Boolean, DateTime, Text, BigInteger, ForeignKey
+from sqlalchemy import JSON
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import relationship
 from datetime import datetime
@@ -24,7 +25,7 @@ class StorageConnection(Base):
     test_status = Column(String(50))
     test_error = Column(Text)
 
-    storage_metadata = Column("metadata", JSONB, default={})
+    storage_metadata = Column("metadata", JSON().with_variant(JSONB, "postgresql"), default={})
 
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

@@ -63,7 +63,6 @@ vertex-ar/
 │   ├── schemas/           # Pydantic схемы
 │   ├── api/               # API endpoints
 │   ├── services/          # Бизнес-логика
-│   ├── tasks/             # Celery задачи
 │   └── utils/             # Вспомогательные функции
 ├── frontend/              # React Admin Panel
 ├── alembic/               # Миграции базы данных
@@ -72,26 +71,20 @@ vertex-ar/
 ├── scripts/               # Служебные скрипты
 ├── docker-compose.yml     # Производственная конфигурация
 ├── docker-compose.override.yml  # Development настройки
-└── docs/                  # Документация
 ```
 
 ## 🛠 Технологии
 
 - **Backend**: FastAPI 0.109, SQLAlchemy 2.0 async, PostgreSQL 15
 - **Frontend**: React 18, TypeScript, Material-UI 5, TailwindCSS
-- **Queue**: Celery 5.3, Redis 7
+- **Background Tasks**: FastAPI BackgroundTasks
 - **AR Engine**: Mind AR 1.2.5, Three.js 0.158
 - **Storage**: Local/MinIO/Yandex Disk
 - **Monitoring**: Prometheus, Grafana, Sentry
 
 ## 📚 Документация
 
-- [Архитектура системы](docs/01-architecture.md)
-- [API Reference](docs/02-api-reference.md)
-- [Deployment](docs/03-deployment.md)
-- [Monitoring](docs/04-monitoring.md)
-- [Backup & Recovery](docs/05-backup-recovery.md)
-- [Developer Onboarding](docs/06-onboarding.md)
+Проект упрощён до монолита (FastAPI + локальное хранилище + React Admin). Исторические файлы-отчёты по миграциям/рефакторингу сохранены в корне репозитория и в `frontend/`, но **источником правды** считается этот `README.md`.
 
 ## 🔧 Разработка
 
@@ -128,24 +121,20 @@ npm run test
 
 ## 🌍 Environment Variables
 
-Основные переменные окружения (полный список в `.env.example`):
+Основные переменные окружения (см. `.env.example`):
 
 ```env
 # Database
 DATABASE_URL=postgresql+asyncpg://vertex_ar:password@postgres:5432/vertex_ar
 
-# Redis
-REDIS_URL=redis://redis:6379/0
+# Public URL (для QR-кодов)
+PUBLIC_URL=http://localhost:8000
 
-# Security
-SECRET_KEY=your-super-secret-key-change-in-production
+# Media root (локальное хранилище)
+MEDIA_ROOT=/app/storage/content
 
-# Storage
-STORAGE_TYPE=local  # local, minio, yandex_disk
-
-# Notifications
-SMTP_HOST=smtp.gmail.com
-TELEGRAM_BOT_TOKEN=your-bot-token
+# Logging
+LOG_LEVEL=INFO
 ```
 
 ## 🎯 Phase 1 (Current) - Core Infrastructure
@@ -187,15 +176,15 @@ chmod +x scripts/diagnose_docker_network.sh
 All services communicate via Docker DNS on the shared `vertex_net` network:
 
 - Single named bridge network: `vertex_net` (subnet 172.20.0.0/16)
-- All services attached: postgres, redis, app, celery-worker, celery-beat, nginx, postgres-exporter, prometheus, grafana
-- Service discovery via DNS instead of hard-coded IPs
+- All services attached: postgres, redis, app, postgres-exporter, prometheus, grafana
+- Service discovery via Docker DNS instead of hard-coded IPs
 
 ### Startup Dependency Chain
 
 Services start in the following order with health checks ensuring reliability:
 
 ```
-postgres → redis → app → celery-worker/beat → nginx
+postgres → redis → app
 postgres-exporter depends on postgres (healthy)
 prometheus depends on app (healthy) and postgres-exporter (started)
 grafana depends on prometheus (started)

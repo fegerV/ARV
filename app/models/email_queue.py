@@ -1,4 +1,5 @@
 from sqlalchemy import Column, Integer, String, DateTime, Text, Boolean
+from sqlalchemy import JSON
 from sqlalchemy.dialects.postgresql import JSONB
 from datetime import datetime
 from app.core.database import Base
@@ -19,7 +20,7 @@ class EmailQueue(Base):
     
     # Template information
     template_id = Column(String(100))
-    variables = Column(JSONB, default={})
+    variables = Column(JSON().with_variant(JSONB, "postgresql"), default={})
     
     # Status tracking
     status = Column(String(50), default="pending")  # pending, sent, failed, cancelled

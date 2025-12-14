@@ -48,30 +48,24 @@ import { arContentAPI } from '../../services/api';
 import { useToast } from '../../store/useToast';
 
 interface ARContentItem {
-  id: number;
-  unique_id: string;
+  id: string;
   order_number: string;
-  title: string;
-  marker_status: string;
-  image_url: string;
+  company_name: string;
+  company_id: string;
+  project_id: string;
+  project_name: string;
   created_at: string;
-  is_active: boolean;
-  client_name: string;
-  client_phone: string;
-  client_email: string;
-  views: number;
-  project: {
-    id: number;
-    name: string;
-  };
-  company: {
-    id: number;
-    name: string;
-  };
-  active_video: {
-    id: number;
-    title: string;
-  };
+  status: string;
+  customer_name?: string;
+  customer_phone?: string;
+  customer_email?: string;
+  thumbnail_url?: string;
+  active_video_title?: string | null;
+  views_count: number;
+  views_30_days?: number;
+  public_url?: string;
+  has_qr_code?: boolean;
+  qr_code_url?: string;
 }
 
 // No mock data needed - using real API
@@ -99,12 +93,10 @@ export default function ARContentList() {
   const fetchContentList = async () => {
     try {
       setLoading(true);
-      
-      const response = await arContentAPI.listAll();
+
+      const response = await arContentAPI.listAll({ page: 1, page_size: 200 });
       setContentList(response.data.items || []);
       setFilteredContentList(response.data.items || []);
-      
-      addToast('AR content loaded successfully', 'success');
     } catch (error) {
       console.error('Error fetching AR content:', error);
       addToast('Failed to load AR content', 'error');
@@ -122,24 +114,23 @@ export default function ARContentList() {
       const term = searchTerm.toLowerCase();
       filtered = filtered.filter(item => 
         item.order_number.toLowerCase().includes(term) ||
-        item.title.toLowerCase().includes(term) ||
-        (item.client_name && item.client_name.toLowerCase().includes(term)) ||
-        (item.client_email && item.client_email.toLowerCase().includes(term)) ||
-        item.client_phone.includes(term) ||
-        item.company.name.toLowerCase().includes(term) ||
-        item.project.name.toLowerCase().includes(term) ||
-        (item.active_video.title && item.active_video.title.toLowerCase().includes(term))
+        (item.customer_name && item.customer_name.toLowerCase().includes(term)) ||
+        (item.customer_email && item.customer_email.toLowerCase().includes(term)) ||
+        (item.customer_phone && item.customer_phone.toLowerCase().includes(term)) ||
+        item.company_name.toLowerCase().includes(term) ||
+        item.project_name.toLowerCase().includes(term) ||
+        ((item.active_video_title || '').toLowerCase().includes(term))
       );
     }
     
     // Apply company filter
     if (selectedCompanies.length > 0) {
-      filtered = filtered.filter(item => selectedCompanies.includes(item.company.name));
+      filtered = filtered.filter(item => selectedCompanies.includes(item.company_name));
     }
     
     // Apply status filter
     if (selectedStatuses.length > 0) {
-      filtered = filtered.filter(item => selectedStatuses.includes(item.marker_status));
+      filtered = filtered.filter(item => selectedStatuses.includes(item.status));
     }
     
     setFilteredContentList(filtered);
@@ -160,14 +151,12 @@ export default function ARContentList() {
   };
 
   const handleCopyLink = (uniqueId: string) => {
-    const link = `${window.location.origin}/ar/${uniqueId}`;
-    navigator.clipboard.writeText(link);
+    navigator.clipboard.writeText(uniqueId);
     addToast('Link copied to clipboard', 'success');
   };
 
   const handleOpenLink = (uniqueId: string) => {
-    const link = `${window.location.origin}/ar/${uniqueId}`;
-    window.open(link, '_blank');
+    window.open(uniqueId, '_blank');
   };
 
   const handleShowQR = (content: ARContentItem) => {
@@ -180,17 +169,14 @@ export default function ARContentList() {
     setSelectedContent(null);
   };
 
-  const handleEdit = (id: number) => {
+  const handleEdit = (id: string) => {
     navigate(`/ar-content/${id}`);
   };
 
-  const handleDelete = async (id: number) => {
+  const handleDelete = async (id: string) => {
     if (window.confirm('Are you sure you want to delete this AR content? This action cannot be undone.')) {
       try {
-        // Note: The new API requires companyId and projectId, but we don't have them here
-        // This will need to be updated when we have that information available
-        // For now, we'll use the old API method if it exists, or show an error
-        addToast('Delete functionality requires company and project information. Please edit the item to delete.', 'warning');
+        addToast('Delete is not wired yet (no DELETE endpoint for flat AR content in UI)', 'warning');
       } catch (error) {
         console.error('Error deleting AR content:', error);
         addToast('Failed to delete AR content', 'error');
@@ -204,18 +190,20 @@ export default function ARContentList() {
   };
 
   // Get unique companies and statuses for filters
-  const uniqueCompanies = Array.from(new Set(contentList.map(item => item.company.name)));
-  const uniqueStatuses = Array.from(new Set(contentList.map(item => item.marker_status)));
+  const uniqueCompanies = Array.from(new Set(contentList.map(item => item.company_name)));
+  const uniqueStatuses = Array.from(new Set(contentList.map(item => item.status)));
 
   // Status chip rendering
   const getStatusChip = (status: string) => {
     switch (status) {
       case 'ready':
-        return <Chip icon={<CheckCircleIcon />} label="Ready" color="success" size="small" />;
+      case 'generated':
+        return <Chip icon={<CheckCircleIcon />} label={status} color="success" size="small" />;
       case 'processing':
-        return <Chip icon={<HourglassEmptyIcon />} label="Processing" color="warning" size="small" />;
+      case 'pending':
+        return <Chip icon={<HourglassEmptyIcon />} label={status} color="warning" size="small" />;
       case 'failed':
-        return <Chip icon={<ErrorIcon />} label="Failed" color="error" size="small" />;
+        return <Chip icon={<ErrorIcon />} label={status} color="error" size="small" />;
       default:
         return <Chip label={status} size="small" />;
     }
@@ -256,7 +244,7 @@ export default function ARContentList() {
           <TextField
             placeholder="Search..."
             value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
+            onChange={(e: any) => setSearchTerm(e.target.value)}
             InputProps={{
               startAdornment: (
                 <InputAdornment position="start">
@@ -273,9 +261,9 @@ export default function ARContentList() {
             <Select
               multiple
               value={selectedCompanies}
-              onChange={(e) => setSelectedCompanies(e.target.value as string[])}
+              onChange={(e: any) => setSelectedCompanies(e.target.value as string[])}
               input={<OutlinedInput label="Companies" />}
-              renderValue={(selected) => (selected as string[]).join(', ')}
+              renderValue={(selected: any) => (selected as string[]).join(', ')}
             >
               {uniqueCompanies.map((company) => (
                 <MenuItem key={company} value={company}>
@@ -292,9 +280,9 @@ export default function ARContentList() {
             <Select
               multiple
               value={selectedStatuses}
-              onChange={(e) => setSelectedStatuses(e.target.value as string[])}
+              onChange={(e: any) => setSelectedStatuses(e.target.value as string[])}
               input={<OutlinedInput label="Statuses" />}
-              renderValue={(selected) => (selected as string[]).join(', ')}
+              renderValue={(selected: any) => (selected as string[]).join(', ')}
             >
               {uniqueStatuses.map((status) => (
                 <MenuItem key={status} value={status}>
@@ -322,98 +310,64 @@ export default function ARContentList() {
           <Table>
             <TableHead>
               <TableRow>
-                <TableCell>Компания</TableCell>
-                <TableCell>Номер заказа</TableCell>
-                <TableCell>Дата создания</TableCell>
-                <TableCell>Статус</TableCell>
-                <TableCell>Фото</TableCell>
-                <TableCell>Активное видео</TableCell>
-                <TableCell>Имя заказчика</TableCell>
-                <TableCell>Телефон</TableCell>
-                <TableCell>Email</TableCell>
-                <TableCell>Просмотры</TableCell>
-                <TableCell>Ссылка</TableCell>
-                <TableCell>QR-код</TableCell>
+                <TableCell>Company</TableCell>
+                <TableCell>Order Number</TableCell>
+                <TableCell>Created At</TableCell>
+                <TableCell>Status</TableCell>
+                <TableCell>Thumbnail</TableCell>
+                <TableCell>Active Video</TableCell>
+                <TableCell>Customer</TableCell>
+                <TableCell>Views</TableCell>
+                <TableCell>Link</TableCell>
+                <TableCell>QR Code</TableCell>
                 <TableCell>Actions</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
-              {paginatedContent.map((content) => (
-                <TableRow key={content.id} hover>
+              {paginatedContent.map((item) => (
+                <TableRow key={item.id} hover>
+                  <TableCell>{item.company_name}</TableCell>
                   <TableCell>
-                    <Chip label={content.company.name} size="small" />
+                    <Typography variant="subtitle2">{item.order_number}</Typography>
                   </TableCell>
-                  <TableCell>{content.order_number}</TableCell>
+                  <TableCell>{new Date(item.created_at).toLocaleDateString()}</TableCell>
+                  <TableCell>{getStatusChip(item.status)}</TableCell>
                   <TableCell>
-                    {content.created_at 
-                      ? new Date(content.created_at).toLocaleDateString('ru-RU') 
-                      : 'N/A'}
+                    <Avatar
+                      variant="rounded"
+                      src={item.thumbnail_url}
+                      sx={{ width: 40, height: 40 }}
+                    />
                   </TableCell>
-                  <TableCell>{getStatusChip(content.marker_status)}</TableCell>
+                  <TableCell>{item.active_video_title || '—'}</TableCell>
                   <TableCell>
-                    {content.image_url ? (
-                      <Avatar 
-                        src={content.image_url} 
-                        variant="rounded" 
-                        sx={{ width: 50, height: 50 }} 
-                      />
-                    ) : (
-                      <Avatar variant="rounded" sx={{ width: 50, height: 50 }}>
-                        ?
-                      </Avatar>
-                    )}
+                    <Typography variant="body2">{item.customer_name || '—'}</Typography>
+                    <Typography variant="caption" color="textSecondary">{item.customer_phone || ''}</Typography>
+                    <Typography variant="caption" color="textSecondary" sx={{ display: 'block' }}>{item.customer_email || ''}</Typography>
                   </TableCell>
+                  <TableCell>{item.views_30_days ?? item.views_count}</TableCell>
                   <TableCell>
-                    {content.active_video.title || 'Не выбрано'}
-                  </TableCell>
-                  <TableCell>{content.client_name || 'N/A'}</TableCell>
-                  <TableCell>{content.client_phone || 'N/A'}</TableCell>
-                  <TableCell>{content.client_email || 'N/A'}</TableCell>
-                  <TableCell>{content.views}</TableCell>
-                  <TableCell>
-                    <Tooltip title="Copy link">
-                      <IconButton 
-                        size="small" 
-                        onClick={() => handleCopyLink(content.unique_id)}
-                      >
-                        <CopyIcon />
-                      </IconButton>
-                    </Tooltip>
-                    <Tooltip title="Open link">
-                      <IconButton 
-                        size="small" 
-                        onClick={() => handleOpenLink(content.unique_id)}
-                      >
-                        <OpenIcon />
-                      </IconButton>
-                    </Tooltip>
+                    <IconButton size="small" onClick={() => handleCopyLink(item.public_url || '')} disabled={!item.public_url}>
+                      <CopyIcon fontSize="small" />
+                    </IconButton>
+                    <IconButton size="small" onClick={() => handleOpenLink(item.public_url || '')} disabled={!item.public_url}>
+                      <OpenIcon fontSize="small" />
+                    </IconButton>
                   </TableCell>
                   <TableCell>
-                    <Tooltip title="Show QR code">
-                      <IconButton 
-                        size="small" 
-                        onClick={() => handleShowQR(content)}
-                      >
-                        <QrCodeIcon />
-                      </IconButton>
-                    </Tooltip>
+                    <IconButton size="small" onClick={() => handleShowQR(item)} disabled={!item.qr_code_url}>
+                      <QrCodeIcon fontSize="small" />
+                    </IconButton>
                   </TableCell>
                   <TableCell>
                     <Tooltip title="Edit">
-                      <IconButton 
-                        size="small" 
-                        onClick={() => handleEdit(content.id)}
-                      >
-                        <EditIcon />
+                      <IconButton size="small" onClick={() => handleEdit(item.id)}>
+                        <EditIcon fontSize="small" />
                       </IconButton>
                     </Tooltip>
                     <Tooltip title="Delete">
-                      <IconButton 
-                        size="small" 
-                        onClick={() => handleDelete(content.id)}
-                        color="error"
-                      >
-                        <DeleteIcon />
+                      <IconButton size="small" onClick={() => handleDelete(item.id)}>
+                        <DeleteIcon fontSize="small" />
                       </IconButton>
                     </Tooltip>
                   </TableCell>
@@ -444,21 +398,20 @@ export default function ARContentList() {
       </Paper>
 
       {/* QR Code Dialog */}
-      {selectedContent && (
-        <Dialog open={qrDialogOpen} onClose={handleCloseQR} maxWidth="sm" fullWidth>
-          <DialogTitle>QR Code for {selectedContent.title}</DialogTitle>
-          <DialogContent sx={{ display: 'flex', justifyContent: 'center', py: 3 }}>
-            <QRCode 
-              value={`${window.location.origin}/ar/${selectedContent.unique_id}`} 
-              size={256}
-              level="H"
-            />
-          </DialogContent>
-          <DialogActions>
-            <Button onClick={handleCloseQR}>Close</Button>
-          </DialogActions>
-        </Dialog>
-      )}
+      <Dialog open={qrDialogOpen} onClose={handleCloseQR} maxWidth="sm" fullWidth>
+        <DialogTitle>QR Code</DialogTitle>
+        <DialogContent sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, py: 3 }}>
+          {selectedContent && (
+            <>
+              <QRCode value={selectedContent.public_url || ''} size={200} />
+              <Typography variant="body2" color="textSecondary">{selectedContent.public_url}</Typography>
+            </>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCloseQR}>Close</Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 }

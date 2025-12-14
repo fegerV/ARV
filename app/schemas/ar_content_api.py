@@ -21,9 +21,14 @@ class ARContentListItem(BaseModel):
     customer_phone: Optional[str] = None
     customer_email: Optional[str] = None
     photo_url: Optional[str] = None
+    thumbnail_url: Optional[str] = None
     active_video_url: Optional[str] = None
+    active_video_title: Optional[str] = None
     views_count: int
+    views_30_days: Optional[int] = None
     public_link: str
+    public_url: Optional[str] = None
+    has_qr_code: Optional[bool] = None
     qr_code_url: Optional[str] = None
     _links: Dict[str, str]
 
@@ -104,9 +109,14 @@ class ARContentDetailResponse(BaseModel):
     customer_email: Optional[str] = None
     duration_years: int
     photo_url: Optional[str] = None
+    thumbnail_url: Optional[str] = None
     active_video_url: Optional[str] = None
+    active_video_title: Optional[str] = None
     views_count: int
+    views_30_days: Optional[int] = None
     public_link: str
+    public_url: Optional[str] = None
+    has_qr_code: Optional[bool] = None
     qr_code_url: Optional[str] = None
     marker_url: Optional[str] = None
     marker_preview_url: Optional[str] = None

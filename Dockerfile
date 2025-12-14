@@ -1,15 +1,16 @@
 FROM python:3.11-slim
 
-# Set environment variables
+# Установка переменных окружения
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     PIP_NO_CACHE_DIR=1 \
-    PIP_DISABLE_PIP_VERSION_CHECK=1
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    PYTHONPATH=/app
 
-# Create non-root user
+# Создаем непривилегированного пользователя
 RUN useradd -m -u 1000 appuser
 
-# Install system dependencies
+# Устанавливаем системные зависимости
 RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc \
     g++ \
@@ -22,32 +23,33 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Node.js
+# Устанавливаем Node.js для сборки фронтенда
 RUN curl -fsSL https://deb.nodesource.com/setup_18.x | bash - && \
-    apt-get install -y nodejs
+    apt-get install -y nodejs && \
+    npm install -g mind-ar-js-compiler
 
-# Set working directory
+# Устанавливаем рабочую директорию
 WORKDIR /app
 
-# Copy requirements and install Python dependencies
+# Копируем зависимости и устанавливаем их
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
-RUN npm install -g mind-ar-js-compiler
 
-# Copy application code
-COPY app/ ./app/
-COPY alembic/ ./alembic/
-COPY alembic.ini .
-COPY scripts/ ./scripts/
+# Копируем исходный код приложения
+COPY . .
 
-# Create storage directory
-RUN mkdir -p /app/storage/content && \
-    chown -R appuser:appuser /app
+# Создаем директории для хранения файлов
+RUN mkdir -p /app/storage/content \
+    /app/storage/thumbnails \
+    /app/storage/markers \
+    /app/storage/videos \
+    /app/storage/temp \
+    && chown -R appuser:appuser /app/storage
 
-# Switch to non-root user
+# Переключаемся на непривилегированного пользователя
 USER appuser
 
-# Expose port
+# Открываем порт
 EXPOSE 8000
 
 # Health check

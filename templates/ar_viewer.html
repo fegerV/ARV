@@ -77,7 +77,7 @@
     <script src="https://cdn.jsdelivr.net/npm/three@0.158.0/build/three.min.js"></script>
     
     <script>
-        const PORTRAIT_UID = "{{ portrait_id }}";  // Jinja2 variable
+        const PORTRAIT_UID = "{{ unique_id }}";  // Jinja2 variable
         const API_BASE = window.location.origin;
         
         async function initAR() {
@@ -162,7 +162,7 @@
                     renderer.render(scene, camera);
                 });
                 
-                // Analytics
+                // Аналитика
                 trackARSession(PORTRAIT_UID);
                 
             } catch (error) {
@@ -179,12 +179,12 @@
             const sessionId = generateUUID();
             const startTime = Date.now();
             
-            fetch(`${API_BASE}/api/analytics/ar-session`, {
+            fetch(`${API_BASE}/api/mobile/sessions`, {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify({
-                    portrait_id: portraitId,
                     session_id: sessionId,
+                    ar_content_unique_id: portraitId,
                     user_agent: navigator.userAgent,
                     device_type: detectDeviceType()
                 })
@@ -193,8 +193,13 @@
             // Длительность при закрытии
             window.addEventListener('beforeunload', () => {
                 const duration = Math.round((Date.now() - startTime) / 1000);
-                navigator.sendBeacon(`${API_BASE}/api/analytics/ar-session/${sessionId}/end`, 
-                    JSON.stringify({duration_seconds: duration})
+                navigator.sendBeacon(
+                    `${API_BASE}/api/mobile/analytics`,
+                    JSON.stringify({
+                        session_id: sessionId,
+                        duration_seconds: duration,
+                        video_played: true
+                    })
                 );
             });
         }

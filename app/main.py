@@ -1,4 +1,5 @@
 import sys
+import os
 import structlog
 from datetime import datetime
 from contextlib import asynccontextmanager
@@ -7,6 +8,7 @@ from typing import AsyncGenerator
 from fastapi import FastAPI, Request, status
 from fastapi.responses import JSONResponse
 from fastapi.templating import Jinja2Templates
+from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.exceptions import RequestValidationError
 from prometheus_client import Summary
@@ -99,10 +101,17 @@ templates = Jinja2Templates(directory="templates")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origins_list,
+    allow_origin_regex=r'https?://(localhost|127\.0\.0\.1)(:\d+)?',
     allow_credentials=settings.CORS_ALLOW_CREDENTIALS,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Serve static files
+os.makedirs(settings.MEDIA_ROOT, exist_ok=True)
+os.makedirs("static", exist_ok=True)
+app.mount("/storage", StaticFiles(directory=settings.MEDIA_ROOT), name="storage")
+app.mount("/static", StaticFiles(directory="static"), name="static")
 
 
 # Request logging middleware
@@ -237,6 +246,7 @@ from app.api.routes import videos as videos_router
 from app.api.routes import rotation as rotation_router
 from app.api.routes import analytics as analytics_router
 from app.api.routes import notifications as notifications_router
+from app.api.routes import settings as settings_router
 from app.api.routes import oauth as oauth_router
 from app.api.routes import public as public_router
 from app.api.routes import health as health_router
@@ -259,6 +269,7 @@ app.include_router(videos_router.router, prefix="/api", tags=["Videos"])
 app.include_router(rotation_router.router, prefix="/api", tags=["Rotation"]) 
 app.include_router(analytics_router.router, prefix="/api", tags=["Analytics"]) 
 app.include_router(notifications_router.router, prefix="/api", tags=["Notifications"]) 
+app.include_router(settings_router.router, prefix="/api", tags=["Settings"])
 app.include_router(oauth_router.router)
 app.include_router(public_router.router, prefix="/api", tags=["Public"])
 app.include_router(health_router.router)
@@ -277,4 +288,16 @@ async def ar_viewer(unique_id: str, request: Request):
 @app.get("/ar-content/{unique_id}", tags=["AR"])
 async def ar_viewer_new(unique_id: str, request: Request):
     """AR viewer template endpoint (new clean path)."""
+    return templates.TemplateResponse("ar_viewer.html", {"request": request, "unique_id": unique_id})
+
+
+@app.get("/view/{unique_id}", tags=["AR"])
+async def ar_viewer_public(unique_id: str, request: Request):
+    """AR viewer template endpoint (public canonical path)."""
+    return templates.TemplateResponse("ar_viewer.html", {"request": request, "unique_id": unique_id})
+
+
+@app.get("/ar/view/{unique_id}", tags=["AR"])
+async def ar_viewer_public_alias(unique_id: str, request: Request):
+    """AR viewer template endpoint (alias for backward compatibility)."""
     return templates.TemplateResponse("ar_viewer.html", {"request": request, "unique_id": unique_id})

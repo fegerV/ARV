@@ -1,11 +1,13 @@
 """
 Integration tests for video upload functionality.
 """
+import os
 import pytest
 import tempfile
 import asyncio
 from pathlib import Path
 from unittest.mock import Mock, patch, AsyncMock
+import uuid
 from fastapi.testclient import TestClient
 from fastapi import UploadFile
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -19,6 +21,62 @@ from app.core.database import get_db
 
 class TestVideoUploadIntegration:
     """Integration tests for video upload functionality."""
+
+    @pytest.mark.asyncio
+    async def test_upload_video_generates_thumbnail_and_updates_db(self, async_client, db, ar_content_factory):
+        ar_content = await ar_content_factory(db)
+
+        fake_video_bytes = b"fake video content for testing"
+
+        async def _mock_generate_video_thumbnail(self, video_path: str, output_dir=None, thumbnail_name=None, **kwargs):
+            from pathlib import Path
+
+            media_root = os.environ["MEDIA_ROOT"]
+            out_dir = Path(media_root) / "thumbnails"
+            out_dir.mkdir(parents=True, exist_ok=True)
+
+            name = thumbnail_name or "thumb.jpg"
+            out_path = out_dir / name
+            out_path.write_bytes(b"fake jpeg")
+
+            return {
+                "status": "ready",
+                "thumbnail_path": str(out_path),
+                "thumbnail_url": f"/storage/thumbnails/{out_path.name}",
+            }
+
+        with patch(
+            "app.api.routes.videos.get_video_metadata",
+            new=AsyncMock(
+                return_value={
+                    "duration": 12.0,
+                    "width": 1920,
+                    "height": 1080,
+                    "size_bytes": len(fake_video_bytes),
+                    "mime_type": "video/mp4",
+                }
+            ),
+        ):
+            with patch(
+                "app.api.routes.videos.ThumbnailService.generate_video_thumbnail",
+                new=_mock_generate_video_thumbnail,
+            ):
+                files = {
+                    "videos": ("test_video.mp4", fake_video_bytes, "video/mp4"),
+                }
+                resp = await async_client.post(f"/api/ar-content/{ar_content.id}/videos", files=files)
+                assert resp.status_code == 200
+
+        video_id = uuid.UUID(resp.json()["videos"][0]["id"])
+        v = await db.get(Video, video_id)
+        assert v is not None
+        assert v.thumbnail_url is not None
+        assert v.thumbnail_url.startswith("/storage/thumbnails/")
+        assert v.status == "ready"
+
+        thumb_name = v.thumbnail_url.split("/")[-1]
+        thumb_path = Path(os.environ["MEDIA_ROOT"]) / "thumbnails" / thumb_name
+        assert thumb_path.exists()
 
     @pytest.fixture
     def client(self):

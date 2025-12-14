@@ -56,9 +56,26 @@ async def seed_defaults() -> None:
     from sqlalchemy import select
     from app.models.storage import StorageConnection
     from app.models.company import Company
+    from app.models.user import User, UserRole
+    from app.core.security import get_password_hash
+    from app.enums import CompanyStatus
     from pathlib import Path
     
     async with AsyncSessionLocal() as session:
+        # Default admin user
+        res_user = await session.execute(select(User).where(User.email == settings.ADMIN_EMAIL))
+        admin_user = res_user.scalar_one_or_none()
+        if not admin_user:
+            admin_user = User(
+                email=settings.ADMIN_EMAIL,
+                hashed_password=get_password_hash(settings.ADMIN_DEFAULT_PASSWORD),
+                full_name="Vertex AR Admin",
+                role=UserRole.ADMIN,
+                is_active=True,
+            )
+            session.add(admin_user)
+            await session.flush()
+
         # Default local storage connection
         res = await session.execute(select(StorageConnection).where(StorageConnection.is_default == True))
         default_conn = res.scalar_one_or_none()
@@ -69,23 +86,18 @@ async def seed_defaults() -> None:
                 base_path=settings.LOCAL_STORAGE_PATH,
                 is_active=True,
                 is_default=True,
-                credentials={},
             )
             session.add(default_conn)
             await session.flush()
 
         # Default company
-        res2 = await session.execute(select(Company).where(Company.slug == "vertex-ar"))
+        res2 = await session.execute(select(Company).where(Company.name == "Vertex AR"))
         default_company = res2.scalar_one_or_none()
         if not default_company:
             default_company = Company(
                 name="Vertex AR",
-                slug="vertex-ar",
-                storage_connection_id=default_conn.id,
-                storage_path="/",
-                is_default=True,
-                is_active=True,
-                notes="Default Vertex AR company with local storage.",
+                contact_email=settings.ADMIN_EMAIL,
+                status=CompanyStatus.ACTIVE,
             )
             session.add(default_company)
 

@@ -7,16 +7,22 @@ import sys
 import pytest
 import asyncio
 from typing import AsyncGenerator
+import tempfile
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
 from sqlalchemy.pool import StaticPool
 from httpx import AsyncClient
 
+
+_pytest_media_root = tempfile.mkdtemp(prefix="arv_test_media_")
+os.environ["MEDIA_ROOT"] = _pytest_media_root
+os.environ["LOCAL_STORAGE_PATH"] = _pytest_media_root
+os.environ["STORAGE_BASE_PATH"] = _pytest_media_root
+os.makedirs(_pytest_media_root, exist_ok=True)
+
 # Add project root to path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
-from app.main import app
 from app.core.database import Base, get_db
-from app.core.config import get_settings
 from app.models import user, company, storage, ar_content  # Import all models
 from app.models.company import Company
 from app.models.project import Project
@@ -62,6 +68,12 @@ async def test_session(test_engine):
         yield session
 
 
+@pytest.fixture(scope="function")
+async def db(test_session):
+    """Alias fixture used by existing tests."""
+    yield test_session
+
+
 async def seed_test_data(session_factory):
     """Seed test database with default data."""
     from app.core.security import get_password_hash
@@ -104,6 +116,14 @@ async def seed_test_data(session_factory):
 @pytest.fixture(scope="function")
 async def async_client(test_session):
     """Create a test client."""
+    # IMPORTANT: app reads settings on import, so env must be set before importing app
+    temp_media_root = tempfile.mkdtemp(prefix="arv_test_media_")
+    os.environ["MEDIA_ROOT"] = temp_media_root
+    os.environ["LOCAL_STORAGE_PATH"] = temp_media_root
+    os.environ["STORAGE_BASE_PATH"] = temp_media_root
+
+    from app.main import app
+
     async def override_get_db():
         yield test_session
     
@@ -162,7 +182,13 @@ def project_factory():
         import uuid
         unique_id = str(uuid.uuid4())[:8]
         if company_id is None:
-            company = await _create_company(session)
+            company = Company(
+                name=f"Test Company {unique_id}",
+                contact_email=f"test{unique_id}@example.com",
+                status=CompanyStatus.ACTIVE,
+            )
+            session.add(company)
+            await session.flush()
             company_id = company.id
             
         project = Project(
@@ -189,7 +215,23 @@ def ar_content_factory():
         import uuid
         unique_id = str(uuid.uuid4())[:8]
         if project_id is None:
-            project = await _create_project(session)
+            # Create company + project inline
+            company = Company(
+                name=f"Test Company {unique_id}",
+                contact_email=f"test{unique_id}@example.com",
+                status=CompanyStatus.ACTIVE,
+            )
+            session.add(company)
+            await session.flush()
+
+            project = Project(
+                name=f"Test Project {unique_id}",
+                company_id=company.id,
+                status=ProjectStatus.ACTIVE,
+            )
+            session.add(project)
+            await session.flush()
+
             project_id = project.id
             
         ar_content = ARContent(
@@ -242,7 +284,31 @@ def video_factory():
         import uuid
         unique_id = str(uuid.uuid4())[:8]
         if ar_content_id is None:
-            ar_content = await _create_ar_content(session)
+            # Create minimal AR content inline
+            company = Company(
+                name=f"Test Company {unique_id}",
+                contact_email=f"test{unique_id}@example.com",
+                status=CompanyStatus.ACTIVE,
+            )
+            session.add(company)
+            await session.flush()
+
+            project = Project(
+                name=f"Test Project {unique_id}",
+                company_id=company.id,
+                status=ProjectStatus.ACTIVE,
+            )
+            session.add(project)
+            await session.flush()
+
+            ar_content = ARContent(
+                project_id=project.id,
+                order_number=f"ORDER-{unique_id}",
+                customer_name=f"Test Customer {unique_id}",
+                status=ArContentStatus.PENDING,
+            )
+            session.add(ar_content)
+            await session.flush()
             ar_content_id = ar_content.id
             
         video = Video(

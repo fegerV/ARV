@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, ForeignKey
+from sqlalchemy import Column, Integer, String, ForeignKey, Boolean, DateTime
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 from app.models.base import BaseModel
@@ -12,13 +12,28 @@ class Video(BaseModel):
     
     # File information
     filename = Column(String(255), nullable=False)
+    video_path = Column(String(500), nullable=True)
+    video_url = Column(String(500), nullable=True)
+
+    thumbnail_path = Column(String(500), nullable=True)
+    thumbnail_url = Column(String(500), nullable=True)
+    preview_url = Column(String(500), nullable=True)
     
     # Video metadata
     duration = Column(Integer)  # Duration in seconds
-    size = Column(Integer)  # Size in bytes
+    width = Column(Integer)
+    height = Column(Integer)
+    size_bytes = Column(Integer)  # Size in bytes
+    mime_type = Column(String(100))
     
     # Status
-    video_status = Column(String(50), default=VideoStatus.UPLOADED, nullable=False)
+    status = Column(String(50), default=VideoStatus.UPLOADED, nullable=False)
+
+    # Playback/rotation
+    is_active = Column(Boolean, default=False, nullable=False)
+    rotation_type = Column(String(20), default="none", nullable=False)
+    rotation_order = Column(Integer, default=0, nullable=False)
+    subscription_end = Column(DateTime, nullable=True)
     
     # Relationships
     ar_content = relationship("ARContent", back_populates="videos", foreign_keys=[ar_content_id])

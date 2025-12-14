@@ -1,4 +1,5 @@
 from sqlalchemy import Column, Integer, String, ForeignKey, Index, CheckConstraint
+from sqlalchemy import JSON
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import relationship
 from app.models.base import BaseModel
@@ -31,7 +32,7 @@ class ARContent(BaseModel):
     
     # Status and metadata
     status = Column(String(50), default=ArContentStatus.PENDING, nullable=False)
-    content_metadata = Column(JSONB, nullable=True)
+    content_metadata = Column(JSON().with_variant(JSONB, "postgresql"), nullable=True)
     
     # File storage paths and URLs
     photo_path = Column(String(500), nullable=True)
@@ -57,7 +58,7 @@ class ARContent(BaseModel):
     @property
     def public_link(self) -> str:
         """Generate public link for AR viewer"""
-        return f"/ar-content/{self.unique_id}"
+        return f"/view/{self.unique_id}"
     
     @property
     def qr_code_path(self) -> str:

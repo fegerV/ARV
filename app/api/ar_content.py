@@ -5,9 +5,10 @@ import uuid
 import re
 from pathlib import Path
 from typing import Optional, List
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from fastapi import APIRouter, UploadFile, File, Form, Depends, HTTPException, Query
+from fastapi.responses import FileResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, and_, or_
 from sqlalchemy.orm import selectinload
@@ -19,6 +20,7 @@ from app.models.ar_content import ARContent
 from app.models.video import Video
 from app.models.project import Project
 from app.models.company import Company
+from app.models.ar_view_session import ARViewSession
 from app.schemas.ar_content_api import (
     ARContentListResponse,
     ARContentDetailResponse,
@@ -139,22 +141,39 @@ async def list_ar_content(
     # Execute query
     result = await db.execute(base_query)
     rows = result.all()
+
+    since_30d = datetime.utcnow() - timedelta(days=30)
+    content_ids = [ar_content.id for ar_content, _, _ in rows]
+    views_30d_by_content: dict = {}
+    if content_ids:
+        views_stmt = (
+            select(ARViewSession.ar_content_id, func.count().label("views_30d"))
+            .where(ARViewSession.created_at >= since_30d)
+            .where(ARViewSession.ar_content_id.in_(content_ids))
+            .group_by(ARViewSession.ar_content_id)
+        )
+        views_res = await db.execute(views_stmt)
+        views_30d_by_content = {row[0]: row[1] for row in views_res.all()}
     
     # Build response items
     items = []
     for ar_content, company, project in rows:
-        # Get active video thumbnail
-        active_video_url = None
+        active_video_url = getattr(ar_content, 'video_url', None)
+        active_video_title = None
         if ar_content.active_video_id:
             video_stmt = select(Video).where(Video.id == ar_content.active_video_id)
             video_result = await db.execute(video_stmt)
             active_video = video_result.scalar_one_or_none()
             if active_video:
-                # For now, return video URL as thumbnail (TODO: implement actual thumbnails)
-                active_video_url = f"/storage/thumbnails/{active_video.id}.jpg"
+                active_video_title = active_video.filename
         
-        # Get first frame as photo URL (using image_url if available)
-        photo_url = getattr(ar_content, 'image_url', None)
+        photo_url = getattr(ar_content, 'photo_url', None)
+        thumbnail_url = photo_url
+        qr_code_url = getattr(ar_content, 'qr_code_url', None)
+        has_qr_code = bool(qr_code_url)
+        public_link = ar_content.public_link
+        public_url = f"{settings.PUBLIC_URL.rstrip('/')}{public_link}"
+        views_30_days = views_30d_by_content.get(ar_content.id, 0)
         
         item = {
             "id": str(ar_content.id),
@@ -169,10 +188,15 @@ async def list_ar_content(
             "customer_phone": ar_content.customer_phone,
             "customer_email": ar_content.customer_email,
             "photo_url": photo_url,
+            "thumbnail_url": thumbnail_url,
             "active_video_url": active_video_url,
+            "active_video_title": active_video_title,
             "views_count": ar_content.views_count,
-            "public_link": ar_content.public_link,
-            "qr_code_url": getattr(ar_content, 'qr_code_url', None),
+            "views_30_days": views_30_days,
+            "public_link": public_link,
+            "public_url": public_url,
+            "has_qr_code": has_qr_code,
+            "qr_code_url": qr_code_url,
             "_links": {
                 "view": f"/api/ar-content/{ar_content.id}",
                 "edit": f"/api/ar-content/{ar_content.id}",
@@ -188,6 +212,71 @@ async def list_ar_content(
         page_size=page_size,
         total_pages=(total + page_size - 1) // page_size
     )
+
+
+@router.get("/ar-content/by-unique/{unique_id}", tags=["AR Content"])
+async def get_ar_content_by_unique_id(unique_id: str, db: AsyncSession = Depends(get_db)):
+    """Public-viewer helper endpoint: resolve AR content by unique_id."""
+    stmt = (
+        select(ARContent)
+        .options(selectinload(ARContent.project).selectinload(Project.company))
+        .where(ARContent.unique_id == unique_id)
+    )
+    res = await db.execute(stmt)
+    ar_content = res.scalar_one_or_none()
+
+    if not ar_content or not ar_content.is_active:
+        raise HTTPException(status_code=404, detail="AR content not found")
+
+    # Marker: currently modeled as API endpoints (placeholder until stored fields exist)
+    marker_url = f"/api/ar-content/{ar_content.id}/marker"
+    marker_preview_url = f"/api/ar-content/{ar_content.id}/marker/preview"
+    marker_status = "ready"  # minimal: assume ready if content exists
+
+    # Active video: prefer active_video_id, else legacy video_url
+    active_video_url = ar_content.video_url
+    if ar_content.active_video_id:
+        vres = await db.execute(select(Video).where(Video.id == ar_content.active_video_id))
+        v = vres.scalar_one_or_none()
+        if v and v.video_url:
+            active_video_url = v.video_url
+
+    return {
+        "id": str(ar_content.id),
+        "unique_id": str(ar_content.unique_id),
+        "order_number": ar_content.order_number,
+        "photo_url": ar_content.photo_url,
+        "marker_status": marker_status,
+        "marker_url": marker_url,
+        "marker_preview_url": marker_preview_url,
+        "active_video_url": active_video_url,
+    }
+
+
+@router.get("/ar-content/{content_id}/marker", tags=["AR Content"])
+async def get_ar_content_marker(content_id: str):
+    """Return MindAR marker (.mind) file for public viewer.
+
+    Minimal implementation: looks for a local file under MEDIA_ROOT/markers/{content_id}/targets.mind.
+    """
+    marker_path = Path(settings.MEDIA_ROOT) / "markers" / str(content_id) / "targets.mind"
+    if not marker_path.exists():
+        raise HTTPException(status_code=404, detail="Marker not found")
+
+    return FileResponse(
+        path=str(marker_path),
+        media_type="application/octet-stream",
+        filename="targets.mind",
+    )
+
+
+@router.get("/ar-content/{content_id}/marker/preview", tags=["AR Content"])
+async def get_ar_content_marker_preview(content_id: str):
+    """Marker preview placeholder.
+
+    Keeping endpoint for UI/viewer compatibility.
+    """
+    raise HTTPException(status_code=404, detail="Marker preview not implemented")
 
 
 @router.post("/ar-content", response_model=ARContentCreateResponse, tags=["AR Content"])
@@ -313,10 +402,21 @@ async def get_ar_content_details(content_id: str, db: AsyncSession = Depends(get
         raise HTTPException(status_code=404, detail="AR content not found")
     
     ar_content, company, project = row
+
+    since_30d = datetime.utcnow() - timedelta(days=30)
+    views_stmt = select(func.count()).select_from(ARViewSession).where(
+        ARViewSession.ar_content_id == ar_content.id,
+        ARViewSession.created_at >= since_30d,
+    )
+    views_res = await db.execute(views_stmt)
+    views_30_days = views_res.scalar() or 0
     
     # Get videos
     videos = []
+    active_video_title = None
     for video in ar_content.videos:
+        if str(video.id) == str(ar_content.active_video_id):
+            active_video_title = video.filename
         video_item = {
             "id": str(video.id),
             "filename": video.filename,
@@ -353,9 +453,14 @@ async def get_ar_content_details(content_id: str, db: AsyncSession = Depends(get
         customer_email=ar_content.customer_email,
         duration_years=ar_content.duration_years,
         photo_url=getattr(ar_content, 'photo_url', None),
+        thumbnail_url=getattr(ar_content, 'photo_url', None),
         active_video_url=getattr(ar_content, 'video_url', None),
+        active_video_title=active_video_title,
         views_count=ar_content.views_count,
+        views_30_days=views_30_days,
         public_link=ar_content.public_link,
+        public_url=f"{settings.PUBLIC_URL.rstrip('/')}{ar_content.public_link}",
+        has_qr_code=bool(getattr(ar_content, 'qr_code_url', None)),
         qr_code_url=getattr(ar_content, 'qr_code_url', None),
         marker_url=f"/api/ar-content/{content_id}/marker",
         marker_preview_url=f"/api/ar-content/{content_id}/marker/preview",
