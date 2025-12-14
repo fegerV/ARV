@@ -1,12 +1,13 @@
-from sqlalchemy import Column, Integer, String, Time, DateTime, ARRAY
-from app.core.database import Base
+from sqlalchemy import Column, Integer, String, Time, DateTime, ARRAY, ForeignKey
+from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.orm import relationship
+from app.models.base import BaseModel
 
 
-class VideoRotationSchedule(Base):
+class VideoRotationSchedule(BaseModel):
     __tablename__ = "video_rotation_schedules"
 
-    id = Column(Integer, primary_key=True)
-    ar_content_id = Column(Integer, nullable=False)
+    ar_content_id = Column(UUID(as_uuid=True), ForeignKey("ar_contents.id"), nullable=False)
 
     rotation_type = Column(String(50), nullable=False)
 
@@ -22,4 +23,5 @@ class VideoRotationSchedule(Base):
     last_rotation_at = Column(DateTime)
     next_rotation_at = Column(DateTime)
 
-    created_at = Column(DateTime)
+    # Relationships
+    ar_content = relationship("ARContent")

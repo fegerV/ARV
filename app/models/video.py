@@ -1,13 +1,14 @@
 from sqlalchemy import Column, Integer, String, Float, Boolean, DateTime, ForeignKey
+from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
-from app.core.database import Base
+from app.models.base import BaseModel
+from app.enums import VideoStatus
 
 
-class Video(Base):
+class Video(BaseModel):
     __tablename__ = "videos"
 
-    id = Column(Integer, primary_key=True)
-    ar_content_id = Column(Integer, ForeignKey("ar_content.id"), nullable=False)  # Updated from portrait_id
+    ar_content_id = Column(UUID(as_uuid=True), ForeignKey("ar_contents.id"), nullable=False)
     
     # File information
     file_path = Column(String(500), nullable=False)  # Renamed from video_path for consistency
@@ -26,7 +27,7 @@ class Video(Base):
     mime_type = Column(String(100))
 
     # Status and scheduling
-    status = Column(String(50), default="active")  # 'active', 'inactive', 'processing'
+    status = Column(String(50), default=VideoStatus.UPLOADED, nullable=False)  # Use VideoStatus enum
     is_active = Column(Boolean, default=False)  # Default to False, only one should be active
     
     # Subscription management
@@ -35,11 +36,7 @@ class Video(Base):
     # Rotation management - only these three values allowed
     rotation_type = Column(String(20), default="none")  # 'none', 'sequential', 'cyclic'
     rotation_order = Column(Integer, default=0)
-
-    # Timestamps
-    created_at = Column(DateTime)
-    updated_at = Column(DateTime)
     
     # Relationships
-    ar_content = relationship("ARContent", backref="videos")
+    ar_content = relationship("ARContent", back_populates="videos", foreign_keys=[ar_content_id])
     schedules = relationship("VideoSchedule", back_populates="video", cascade="all, delete-orphan")
