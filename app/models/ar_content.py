@@ -4,6 +4,7 @@ from sqlalchemy.orm import relationship
 from app.models.base import BaseModel
 from app.enums import ArContentStatus
 import re
+import uuid
 
 
 class ARContent(BaseModel):
@@ -14,6 +15,9 @@ class ARContent(BaseModel):
     # Foreign Keys
     project_id = Column(UUID(as_uuid=True), ForeignKey("projects.id"), nullable=False, index=True)
     active_video_id = Column(UUID(as_uuid=True), ForeignKey("videos.id"), nullable=True)
+    
+    # Unique identifier for public links
+    unique_id = Column(UUID(as_uuid=True), default=uuid.uuid4, nullable=False, unique=True)
     
     # Order and customer information
     order_number = Column(String(50), nullable=False)
@@ -29,8 +33,17 @@ class ARContent(BaseModel):
     status = Column(String(50), default=ArContentStatus.PENDING, nullable=False)
     content_metadata = Column(JSONB, nullable=True)
     
+    # File storage paths and URLs
+    photo_path = Column(String(500), nullable=True)
+    photo_url = Column(String(500), nullable=True)
+    video_path = Column(String(500), nullable=True)
+    video_url = Column(String(500), nullable=True)
+    qr_code_path = Column(String(500), nullable=True)
+    qr_code_url = Column(String(500), nullable=True)
+    
     # Constraints
     __table_args__ = (
+        Index('ix_ar_content_unique_id', 'unique_id', unique=True),
         Index('ix_ar_content_project_order', 'project_id', 'order_number', unique=True),
         CheckConstraint('duration_years IN (1, 3, 5)', name='check_duration_years'),
         CheckConstraint('views_count >= 0', name='check_views_count_non_negative'),
@@ -44,7 +57,7 @@ class ARContent(BaseModel):
     @property
     def public_link(self) -> str:
         """Generate public link for AR viewer"""
-        return f"/ar/{self.id}"
+        return f"/ar-content/{self.unique_id}"
     
     @property
     def qr_code_path(self) -> str:
