@@ -20,7 +20,6 @@ billiard==4.2.4
 vine==5.1.0
 # FFmpeg Python bindings for video processing
 ffmpeg-python==0.2.0
-minio==7.2.3
 httpx==0.26.0
 structlog==24.1.0
 python-dotenv==1.0.0

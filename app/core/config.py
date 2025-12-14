@@ -65,24 +65,11 @@ class Settings(BaseSettings):
     CORS_ALLOW_CREDENTIALS: bool = True
     
     # Storage
-    STORAGE_TYPE: str = "local"  # local, minio, yandex_disk
     STORAGE_BASE_PATH: str = "/app/storage/content"
     
-    # MinIO
-    MINIO_ENDPOINT: str = "minio:9000"
-    MINIO_ACCESS_KEY: str = "minioadmin"
-    MINIO_SECRET_KEY: str = "minioadmin"
-    MINIO_BUCKET_NAME: str = "vertex-ar"
-    # Separate buckets (optional)
-    MINIO_BUCKET_VIDEOS: str = "ar-videos"
-    MINIO_BUCKET_MARKERS: str = "ar-markers"
-    MINIO_BUCKET_THUMBNAILS: str = "ar-thumbnails"
-    MINIO_SECURE: bool = False
-    
-    # Yandex Disk
-    YANDEX_OAUTH_CLIENT_ID: str = ""
-    YANDEX_OAUTH_CLIENT_SECRET: str = ""
-    YANDEX_OAUTH_REDIRECT_URI: str = "http://localhost:3000/storage/oauth/callback"
+    # Local Storage
+    LOCAL_STORAGE_PATH: str = "/app/storage/content"
+    LOCAL_STORAGE_PUBLIC_URL: str = "http://localhost:8000/storage"
     
     # Email
     SMTP_HOST: str = "smtp.gmail.com"
@@ -106,28 +93,6 @@ class Settings(BaseSettings):
     CELERY_RESULT_BACKEND: str = Field(default="redis://localhost:6379/0")
     CELERY_TASK_TRACK_STARTED: bool = True
     CELERY_TASK_TIME_LIMIT: int = 300  # 5 minutes
-    
-    # Storage
-    STORAGE_PROVIDER: str = Field(default="local")  # local, minio, yandex_disk
-    STORAGE_ENABLE_CACHING: bool = Field(default=True)
-    STORAGE_CACHE_TTL: int = Field(default=3600)  # 1 hour
-    
-    # Local Storage
-    LOCAL_STORAGE_PATH: str = Field(default="/app/storage/content")
-    LOCAL_STORAGE_PUBLIC_URL: str = Field(default="http://localhost:8000/storage")
-    
-    # MinIO Configuration
-    MINIO_ENDPOINT: str = Field(default="localhost:9000")
-    MINIO_ROOT_USER: str = Field(default="minioadmin")
-    MINIO_ROOT_PASSWORD: str = Field(default="minioadmin")
-    MINIO_BUCKET_NAME: str = Field(default="vertex-ar")
-    MINIO_USE_SSL: bool = Field(default=False)
-    MINIO_REGION: str = Field(default="us-east-1")
-    
-    # Yandex Disk Configuration
-    YANDEX_OAUTH_TOKEN: str = Field(default="")
-    YANDEX_APP_ID: str = Field(default="")
-    YANDEX_ROOT_FOLDER: str = Field(default="/VertexAR")
     
     # Monitoring
     SENTRY_DSN: str = ""

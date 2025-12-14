@@ -4,7 +4,7 @@ from typing import Optional
 import structlog
 
 from app.core.config import settings
-from app.core.storage import get_minio_client
+from app.core.storage import get_storage_provider_instance
 
 
 logger = structlog.get_logger()
@@ -70,13 +70,12 @@ class MindARMarkerService:
             if not output_file.exists():
                 raise FileNotFoundError(f"Marker file not created: {output_file}")
 
-            # Upload to MinIO
-            bucket = getattr(settings, "MINIO_BUCKET_MARKERS", settings.MINIO_BUCKET_NAME)
-            marker_url = minio_client.upload_file(
-                file_path=str(output_file),
-                bucket=bucket,
-                object_name=f"{ar_content_id}/targets.mind",
-                content_type="application/octet-stream",
+            # Upload to storage
+            storage_provider = get_storage_provider_instance()
+            marker_storage_path = f"markers/{ar_content_id}/targets.mind"
+            marker_url = await storage_provider.save_file(
+                source_path=str(output_file),
+                destination_path=marker_storage_path
             )
 
             # Get marker metadata
@@ -120,27 +119,32 @@ class MindARMarkerService:
 
     def save_marker(self, project_id: int, marker_data: bytes) -> str:
         """Save generated marker file and return URL."""
-        # Get minio client with lazy initialization
-        minio_client = get_minio_client()
+        import tempfile
+        import os
         
-        filename = f"marker_{project_id}.mind"
-        temp_path = f"/tmp/{filename}"
+        # Create temporary file
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".mind") as temp_file:
+            temp_file.write(marker_data)
+            temp_path = temp_file.name
         
-        # Save marker data to temporary file
-        with open(temp_path, "wb") as f:
-            f.write(marker_data)
-            
         try:
-            # Upload to MinIO
-            url = minio_client.upload_file(
-                temp_path,
-                settings.MINIO_BUCKET_MARKERS,
-                filename
-            )
-            return url
+            # Save to storage using the provider
+            storage_provider = get_storage_provider_instance()
+            marker_storage_path = f"markers/marker_{project_id}.mind"
+            
+            # Use the async save_file method
+            import asyncio
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            try:
+                url = loop.run_until_complete(
+                    storage_provider.save_file(temp_path, marker_storage_path)
+                )
+                return url
+            finally:
+                loop.close()
         finally:
             # Clean up temporary file
-            import os
             if os.path.exists(temp_path):
                 os.remove(temp_path)
 

@@ -10,13 +10,10 @@ class StorageConnection(Base):
 
     id = Column(Integer, primary_key=True)
     name = Column(String(255), unique=True, nullable=False)
-    provider = Column(String(50), nullable=False)  # 'local_disk', 'minio', 'yandex_disk'
+    provider = Column(String(50), nullable=False, default="local_disk")  # Simplified to only local_disk
 
-    # Provider-specific configuration (local_disk may not require credentials)
-    credentials = Column(JSONB, nullable=True, default={})
-
-    # For local_disk
-    base_path = Column(String(500))
+    # For local_disk storage
+    base_path = Column(String(500), nullable=False)
 
     # Default connection (only for Vertex AR)
     is_default = Column(Boolean, default=False)
@@ -45,7 +42,7 @@ class StorageFolder(Base):
 
     name = Column(String(255), nullable=False)
     path = Column(String(500), nullable=False)
-    folder_type = Column(String(50))  # 'ar_content', 'videos', 'markers', 'custom'
+    folder_type = Column(String(50))  # 'ar_content', 'videos', 'markers', 'thumbnails', 'qr-codes'
 
     # Stats
     files_count = Column(Integer, default=0)

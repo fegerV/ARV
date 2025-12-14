@@ -12,17 +12,11 @@ class CompanyBase(BaseModel):
     
     # Storage (REQUIRED for new client companies)
     storage_connection_id: int = Field(
-        ..., description=(
-            "ID подключения к хранилищу (MinIO или Yandex Disk). "
-            "Локальное хранилище Vertex AR недоступно для клиентов."
-        ),
+        ..., description="ID of storage connection. Local storage connection is not available for client companies."
     )
     storage_path: Optional[str] = Field(
         None,
-        description=(
-            "Папка в Yandex Disk (например /Companies/MyCompany) "
-            "или bucket name для MinIO. Auto-generated если не указан."
-        ),
+        description="Storage path for the company. Auto-generated if not specified.",
     )
     
     # Subscription

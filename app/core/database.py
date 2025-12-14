@@ -56,15 +56,17 @@ async def seed_defaults() -> None:
     from sqlalchemy import select
     from app.models.storage import StorageConnection
     from app.models.company import Company
+    from pathlib import Path
+    
     async with AsyncSessionLocal() as session:
-        # Default storage connection
+        # Default local storage connection
         res = await session.execute(select(StorageConnection).where(StorageConnection.is_default == True))
         default_conn = res.scalar_one_or_none()
         if not default_conn:
             default_conn = StorageConnection(
                 name="Vertex AR Local Storage",
                 provider="local_disk",
-                base_path=getattr(settings, "STORAGE_BASE_PATH", "/app/storage/content"),
+                base_path=settings.LOCAL_STORAGE_PATH,
                 is_active=True,
                 is_default=True,
                 credentials={},
@@ -83,18 +85,25 @@ async def seed_defaults() -> None:
                 storage_path="/",
                 is_default=True,
                 is_active=True,
-                notes="Основная компания Vertex AR. Локальное хранилище.",
+                notes="Default Vertex AR company with local storage.",
             )
             session.add(default_company)
 
         # Create base folder structure for local storage
         try:
-            from pathlib import Path
-            base_dir = Path(getattr(settings, "STORAGE_BASE_PATH", "/app/storage/content"))
+            base_dir = Path(settings.LOCAL_STORAGE_PATH)
             for sub in ["ar-content", "videos", "markers", "qr-codes", "thumbnails"]:
                 (base_dir / sub).mkdir(parents=True, exist_ok=True)
-        except Exception:
-            pass
+            
+            # Create company structure
+            companies_dir = base_dir / "companies"
+            companies_dir.mkdir(parents=True, exist_ok=True)
+            
+            logger = __import__('structlog').get_logger()
+            logger.info("local_storage_structure_created", base_path=str(base_dir))
+        except Exception as e:
+            logger = __import__('structlog').get_logger()
+            logger.warning("failed_to_create_storage_structure", error=str(e))
 
         await session.commit()
 async def close_db() -> None:

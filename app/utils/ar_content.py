@@ -10,6 +10,7 @@ import io
 import aiofiles
 
 from app.core.config import settings
+from app.core.storage import get_storage_provider_instance
 
 
 def build_ar_content_storage_path(company_id: int, project_id: int, unique_id: uuid.UUID) -> Path:
@@ -32,17 +33,24 @@ def build_ar_content_storage_path(company_id: int, project_id: int, unique_id: u
 
 
 def build_public_url(storage_path: Path) -> str:
-    """Convert a storage path to a public URL.
+    """Convert a storage path to a public URL using the storage provider.
     
     Args:
         storage_path: The absolute storage path
         
     Returns:
-        Public URL starting with /storage/
+        Public URL for accessing the file
     """
-    base_path = Path(settings.STORAGE_BASE_PATH)
-    relative_path = storage_path.relative_to(base_path)
-    return f"/storage/{relative_path.as_posix()}"
+    storage_provider = get_storage_provider_instance()
+    
+    # Convert absolute path to relative path
+    base_path = Path(settings.LOCAL_STORAGE_PATH)
+    try:
+        relative_path = storage_path.relative_to(base_path)
+        return storage_provider.get_public_url(str(relative_path))
+    except ValueError:
+        # If path is not under base_path, fall back to simple URL building
+        return f"/storage/{storage_path.name}"
 
 
 def build_unique_link(unique_id: uuid.UUID) -> str:
