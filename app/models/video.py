@@ -22,3 +22,4 @@ class Video(BaseModel):
     
     # Relationships
     ar_content = relationship("ARContent", back_populates="videos", foreign_keys=[ar_content_id])
+    schedules = relationship("VideoSchedule", back_populates="video", cascade="all, delete-orphan")
