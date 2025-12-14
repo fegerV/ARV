@@ -1,45 +1,38 @@
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, Text, BigInteger, ForeignKey
-from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy import Column, String
 from sqlalchemy.orm import relationship
-from datetime import datetime
-from app.core.database import Base
+from app.models.base import BaseModel
+from app.enums import CompanyStatus
 
 
-class Company(Base):
+class Company(BaseModel):
+    """Company model with basic information and relationships"""
+    
     __tablename__ = "companies"
 
-    id = Column(Integer, primary_key=True)
-    name = Column(String(255), unique=True, nullable=False)
-    slug = Column(String(255), unique=True, nullable=False)
-
-    # Contacts
+    # Basic information
+    name = Column(String(255), nullable=False)
     contact_email = Column(String(255))
-    contact_phone = Column(String(50))
-    telegram_chat_id = Column(String(100))
-
-    # Storage
-    storage_connection_id = Column(Integer, ForeignKey("storage_connections.id"))
-    storage_path = Column(String(500))
-
-    # Quotas & billing
-    subscription_tier = Column(String(50), default="basic")
-    storage_quota_gb = Column(Integer, default=10)
-    storage_used_bytes = Column(BigInteger, default=0)
-    projects_limit = Column(Integer, default=50)
-
-    # Status
-    is_active = Column(Boolean, default=True)
-    is_default = Column(Boolean, default=False)
-    subscription_expires_at = Column(DateTime)
-
-    # Notes & metadata
-    notes = Column(Text)
-    company_metadata = Column("metadata", JSONB, default={})
-
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-    created_by = Column(Integer)  # FK to users.id (omitted)
+    status = Column(String(50), default=CompanyStatus.ACTIVE, nullable=False)
 
     # Relationships
-    storage_connection = relationship("StorageConnection", back_populates="companies")
-    folders = relationship("StorageFolder", back_populates="company")
+    projects = relationship("Project", back_populates="company", cascade="all, delete-orphan")
+
+    @property
+    def projects_count(self) -> int:
+        """Count of projects for this company"""
+        return len(self.projects) if self.projects else 0
+
+    @property
+    def ar_content_count(self) -> int:
+        """Count of AR content across all projects for this company"""
+        if not self.projects:
+            return 0
+        
+        total = 0
+        for project in self.projects:
+            if hasattr(project, 'ar_contents') and project.ar_contents:
+                total += len(project.ar_contents)
+        return total
+
+    def __repr__(self) -> str:
+        return f"<Company id={self.id} name={self.name} status={self.status}>"
