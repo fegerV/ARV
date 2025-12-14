@@ -205,6 +205,32 @@ def ar_content_factory():
 
 
 @pytest.fixture(scope="function")
+async def sample_company(db: AsyncSession):
+    """Create a sample company for testing."""
+    company = Company(
+        name="Test Company",
+        contact_email="test@example.com"
+    )
+    db.add(company)
+    await db.commit()
+    await db.refresh(company)
+    return company
+
+
+@pytest.fixture(scope="function")
+async def sample_project(db: AsyncSession, sample_company):
+    """Create a sample project for testing."""
+    project = Project(
+        name="Test Project",
+        company_id=sample_company.id
+    )
+    db.add(project)
+    await db.commit()
+    await db.refresh(project)
+    return project
+
+
+@pytest.fixture(scope="function")
 def video_factory():
     """Factory to create test videos."""
     async def _create_video(
