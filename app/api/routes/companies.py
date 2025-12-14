@@ -9,7 +9,6 @@ from app.models.company import Company
 from app.models.storage import StorageConnection
 from app.models.user import User
 from app.schemas.company import CompanyCreate, CompanyResponse
-# from app.services.storage.factory import get_provider  # TODO: Implement when storage providers are ready
 from app.api.routes.auth import get_current_active_user
 
 router = APIRouter(tags=["companies"])
@@ -21,40 +20,30 @@ async def create_company(
     current_user: User = Depends(get_current_active_user),
 ):
     logger = structlog.get_logger()
-    # ВАЖНО: Требуем storage_connection_id
+    # Require storage_connection_id
     storage_conn = await db.get(StorageConnection, company_data.storage_connection_id)
     if not storage_conn:
         raise HTTPException(status_code=404, detail="Storage connection not found")
     if getattr(storage_conn, "is_default", False):
         raise HTTPException(
             status_code=400,
-            detail=(
-                "Cannot use default Vertex AR storage for client companies. "
-                "Please create a new storage connection (MinIO or Yandex Disk)."
-            ),
+            detail="Cannot use default Vertex AR storage for client companies. Please create a new storage connection.",
         )
 
-    # Генерируем slug
+    # Generate slug
     slug = company_data.name.lower().replace(" ", "-")
     slug = "".join(c for c in slug if c.isalnum() or c == "-")
 
-    # Проверяем уникальность
+    # Check uniqueness
     exists = await db.execute(select(Company).where(Company.slug == slug))
     if exists.scalar_one_or_none():
         raise HTTPException(status_code=400, detail=f"Company with slug '{slug}' already exists")
 
-    # Создаем папку в хранилище
+    # Create folder in storage
     storage_path = f"/Companies/{company_data.name}"
-    # TODO: Implement when storage providers are ready
-    # provider = get_provider(storage_conn)
-    # result = await provider.create_folder(storage_path)
-    # if not result.get("success"):
-    #     raise HTTPException(
-    #         status_code=500,
-    #         detail=f"Failed to create folder in {storage_conn.provider}: {result.get('error')}",
-    #     )
-
-    # Создаем компанию
+    # For local storage, the folder will be created when needed
+    # No explicit folder creation required for local disk storage
+    # Create company
     company = Company(
         name=company_data.name,
         slug=slug,
