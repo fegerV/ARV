@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, Text, BigInteger, ForeignKey
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, Text, BigInteger, ForeignKey, select, func
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import relationship
 from datetime import datetime
@@ -16,10 +16,6 @@ class Company(Base):
     contact_email = Column(String(255))
     contact_phone = Column(String(50))
     telegram_chat_id = Column(String(100))
-
-    # Storage
-    storage_connection_id = Column(Integer, ForeignKey("storage_connections.id"))
-    storage_path = Column(String(500))
 
     # Quotas & billing
     subscription_tier = Column(String(50), default="basic")
@@ -41,5 +37,24 @@ class Company(Base):
     created_by = Column(Integer)  # FK to users.id (omitted)
 
     # Relationships
-    storage_connection = relationship("StorageConnection", back_populates="companies")
-    folders = relationship("StorageFolder", back_populates="company")
+    projects = relationship("Project", back_populates="company", cascade="all, delete-orphan")
+    ar_contents = relationship("ARContent", back_populates="company", cascade="all, delete-orphan")
+
+    @property
+    def projects_count(self) -> int:
+        """Computed property for number of projects"""
+        if hasattr(self, '_projects_count'):
+            return self._projects_count
+        # This would be computed in a query with a subquery
+        return len(self.projects) if self.projects else 0
+
+    @property
+    def ar_content_count(self) -> int:
+        """Computed property for number of AR content items"""
+        if hasattr(self, '_ar_content_count'):
+            return self._ar_content_count
+        # This would be computed in a query with a subquery
+        return len(self.ar_contents) if self.ar_contents else 0
+
+    def __repr__(self):
+        return f"<Company(id={self.id}, name='{self.name}', slug='{self.slug}', active={self.is_active})>"

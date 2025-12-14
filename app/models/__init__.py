@@ -2,13 +2,13 @@
 
 from .user import User, UserRole
 from .company import Company
-from .project import Project
+from .project import Project, ProjectStatus
 from .folder import Folder
 from .client import Client
 from .video import Video
 from .video_schedule import VideoSchedule
 from .storage import StorageConnection, StorageFolder
-from .ar_content import ARContent
+from .ar_content import ARContent, ARContentStatus
 from .video_rotation_schedule import VideoRotationSchedule
 from .ar_view_session import ARViewSession
 from .notification import Notification
@@ -18,13 +18,13 @@ from .audit_log import AuditLog
 __all__ = [
     "User", "UserRole",
     "Company",
-    "Project", 
+    "Project", "ProjectStatus", 
     "Folder",
     "Client",
     "Video",
     "VideoSchedule",
     "StorageConnection", "StorageFolder",
-    "ARContent",
+    "ARContent", "ARContentStatus",
     "VideoRotationSchedule",
     "ARViewSession", 
     "Notification",
