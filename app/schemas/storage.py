@@ -70,5 +70,18 @@ class StorageUsageStats(BaseModel):
     total_files: int
     total_size_bytes: int
     total_size_mb: float
-    path: str
-    exists: bool
+    base_path: str
+
+
+# ============ Storage Health Status ============
+
+class StorageHealthStatus(BaseModel):
+    status: str
+    base_path: str
+    total_disk_space_gb: float
+    used_disk_space_gb: float
+    free_disk_space_gb: float
+    disk_usage_percent: float
+    storage_files_count: int
+    storage_size_mb: float
+    is_writable: bool

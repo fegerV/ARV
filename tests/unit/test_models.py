@@ -1,5 +1,11 @@
 """
 Unit tests for models to verify relationships and computed properties.
+
+Tests include:
+- Computed properties (projects_count, ar_content_count)
+- Default statuses
+- Relationships and cascade operations
+- Enum validation
 """
 
 import pytest
@@ -537,3 +543,124 @@ class TestRelationshipQueries:
             total_videos += len(content.videos)
             
         assert total_videos == 4  # 2 content items × 2 videos each
+
+
+@pytest.mark.asyncio
+class TestDefaultStatuses:
+    """Test that models have correct default statuses"""
+
+    async def test_company_default_status(self, test_session: AsyncSession):
+        """Test Company model has correct default status"""
+        company = Company(name="Test Company")
+        test_session.add(company)
+        await test_session.commit()
+        await test_session.refresh(company)
+        
+        assert company.status == CompanyStatus.ACTIVE
+
+    async def test_project_default_status(self, test_session: AsyncSession, company_factory):
+        """Test Project model has correct default status"""
+        company = await company_factory(test_session)
+        
+        project = Project(name="Test Project", company_id=company.id)
+        test_session.add(project)
+        await test_session.commit()
+        await test_session.refresh(project)
+        
+        assert project.status == ProjectStatus.ACTIVE
+
+    async def test_ar_content_default_status(self, test_session: AsyncSession, project_factory):
+        """Test ARContent model has correct default status"""
+        project = await project_factory(test_session)
+        
+        ar_content = ARContent(
+            project_id=project.id,
+            order_number="TEST-001",
+            customer_name="Test Customer"
+        )
+        test_session.add(ar_content)
+        await test_session.commit()
+        await test_session.refresh(ar_content)
+        
+        assert ar_content.status == ArContentStatus.PENDING
+
+    async def test_video_default_status(self, test_session: AsyncSession, ar_content_factory):
+        """Test Video model has correct default status"""
+        ar_content = await ar_content_factory(test_session)
+        
+        video = Video(
+            ar_content_id=ar_content.id,
+            filename="test_video.mp4"
+        )
+        test_session.add(video)
+        await test_session.commit()
+        await test_session.refresh(video)
+        
+        assert video.video_status == VideoStatus.UPLOADED
+
+
+@pytest.mark.asyncio
+class TestComputedProperties:
+    """Test computed properties work correctly"""
+
+    async def test_company_computed_properties_empty(self, test_session: AsyncSession, company_factory):
+        """Test Company computed properties with no projects/content"""
+        company = await company_factory(test_session)
+        await test_session.commit()
+        
+        assert company.projects_count == 0
+        assert company.ar_content_count == 0
+
+    async def test_company_computed_properties_with_data(self, test_session: AsyncSession, company_factory, project_factory, ar_content_factory):
+        """Test Company computed properties with projects and content"""
+        company = await company_factory(test_session)
+        
+        # Create 2 projects
+        project1 = await project_factory(test_session, company_id=company.id)
+        project2 = await project_factory(test_session, company_id=company.id)
+        
+        # Create AR content (3 in project1, 2 in project2)
+        for i in range(3):
+            await ar_content_factory(test_session, project_id=project1.id, order_number=f"PROJ1-{i+1:03d}")
+        for i in range(2):
+            await ar_content_factory(test_session, project_id=project2.id, order_number=f"PROJ2-{i+1:03d}")
+        
+        await test_session.commit()
+        
+        assert company.projects_count == 2
+        assert company.ar_content_count == 5
+
+    async def test_project_computed_properties_empty(self, test_session: AsyncSession, project_factory):
+        """Test Project computed properties with no AR content"""
+        project = await project_factory(test_session)
+        await test_session.commit()
+        
+        assert project.ar_content_count == 0
+
+    async def test_project_computed_properties_with_content(self, test_session: AsyncSession, project_factory, ar_content_factory):
+        """Test Project computed properties with AR content"""
+        project = await project_factory(test_session)
+        
+        # Create 4 AR content items
+        for i in range(4):
+            await ar_content_factory(test_session, project_id=project.id, order_number=f"CONTENT-{i+1:03d}")
+        
+        await test_session.commit()
+        
+        assert project.ar_content_count == 4
+
+    async def test_ar_content_public_link_property(self, test_session: AsyncSession, ar_content_factory):
+        """Test ARContent public_link property"""
+        ar_content = await ar_content_factory(test_session)
+        await test_session.commit()
+        
+        expected_link = f"/ar-content/{ar_content.unique_id}"
+        assert ar_content.public_link == expected_link
+
+    async def test_ar_content_company_id_property(self, test_session: AsyncSession, ar_content_factory):
+        """Test ARContent company_id property"""
+        ar_content = await ar_content_factory(test_session)
+        await test_session.commit()
+        await test_session.refresh(ar_content)
+        
+        assert ar_content.company_id == ar_content.project.company_id
