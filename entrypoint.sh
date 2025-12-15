@@ -16,6 +16,10 @@ done
 echo "Running database migrations..."
 alembic upgrade head
 
+# Seed initial data
+echo "Seeding initial database data..."
+python scripts/seed_db.py
+
 # Start the application
 echo "Starting application..."
 exec "$@"
