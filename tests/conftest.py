@@ -4,7 +4,7 @@ Test configuration and fixtures for Vertex AR platform tests.
 
 import asyncio
 import pytest
-from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
+from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 from sqlalchemy.sql import text
 from app.core.database import Base
 from app.core.config import settings

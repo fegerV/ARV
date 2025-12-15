@@ -1,0 +1,25 @@
+version: '3.8'
+
+networks:
+  vertex_net:
+    driver: bridge
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: vertex_ar_test
+      POSTGRES_USER: vertex_ar
+      POSTGRES_PASSWORD: password
+    ports:
+      - "5433:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U vertex_ar -d vertex_ar_test"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - vertex_net
+
+volumes:
+  postgres_test_data:
