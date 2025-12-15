@@ -21,7 +21,6 @@ import {
   FormControlLabel,
   FormLabel,
   Checkbox,
-  FormGroup,
   Grid,
   Divider,
   IconButton,
@@ -29,7 +28,6 @@ import {
 import { 
   ArrowBack as BackIcon, 
   Save as SaveIcon,
-  Upload as UploadIcon,
   Delete as DeleteIcon,
   QrCode as QrCodeIcon,
   CheckCircle as CheckIcon,
@@ -48,10 +46,10 @@ interface ARContentFormData {
   customerEmail: string;
   
   // Company info
-  companyId: number | null;
+  companyId: string | null;
   
   // Project info
-  projectId: number | null;
+  projectId: string | null;
   newProjectName: string;
   creatingNewProject: boolean;
   
@@ -75,20 +73,20 @@ interface ARContentFormData {
 }
 
 interface Company {
-  id: number;
+  id: string;
   name: string;
   contact_email: string;
   is_default?: boolean;
 }
 
 interface Project {
-  id: number;
+  id: string;
   name: string;
-  slug: string;
+  slug?: string;
 }
 
 interface CreationResponse {
-  id: number;
+  id: string;
   unique_id: string;
   unique_link: string;
   image_url?: string;
@@ -105,6 +103,7 @@ export default function ARContentForm() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [creationResponse, setCreationResponse] = useState<CreationResponse | null>(null);
+  const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null);
   
   // Data for dropdowns
   const [companies, setCompanies] = useState<Company[]>([]);
@@ -117,10 +116,10 @@ export default function ARContentForm() {
     customerEmail: '',
     
     // Company info
-    companyId: companyId ? parseInt(companyId) : null,
+    companyId: companyId || null,
     
     // Project info
-    projectId: projectId ? parseInt(projectId) : null,
+    projectId: projectId || null,
     newProjectName: '',
     creatingNewProject: false,
     
@@ -148,51 +147,25 @@ export default function ARContentForm() {
     const fetchData = async () => {
       try {
         // Fetch companies (including default)
-        const companiesResponse = await companiesAPI.list(true);
-        setCompanies(companiesResponse.data);
-        
+        const companiesResponse = await companiesAPI.list();
+        const fetchedCompanies = (companiesResponse as any).data?.items || (companiesResponse as any).data || [];
+        setCompanies(fetchedCompanies);
+
         // Set company ID from URL params or default company
-        let actualCompanyId = formData.companyId;
-        
-        if (!actualCompanyId && companiesResponse.data.length > 0) {
-          // If companyId is provided in URL params, use it
-          if (companyId) {
-            actualCompanyId = parseInt(companyId);
-          } else {
-            // Otherwise find the Vertex AR company (default company)
-            const vertexARCompany = companiesResponse.data.find((company: Company) => 
-              company.is_default === true || company.name === 'Vertex AR'
-            );
-            
-            actualCompanyId = vertexARCompany ? vertexARCompany.id : companiesResponse.data[0].id;
-          }
-          
-          // Update form data with company ID
-          setFormData(prev => ({
-            ...prev,
-            companyId: actualCompanyId
-          }));
-        }
-        
-        // Fetch projects for the company
-        if (actualCompanyId) {
-          const projectsResponse = await projectsAPI.list(actualCompanyId);
-          const fetchedProjects = projectsResponse.data.projects || [];
-          setProjects(fetchedProjects);
-          
-          // If projectId is provided in URL params, check if it exists in fetched projects
-          if (projectId) {
-            const projectIdNum = parseInt(projectId);
-            const projectExists = fetchedProjects.some((p: Project) => p.id === projectIdNum);
-            
-            // If project doesn't exist in the list, reset the projectId in form data
-            if (!projectExists) {
-              setFormData(prev => ({
-                ...prev,
-                projectId: null
-              }));
-            }
-          }
+        if (fetchedCompanies.length > 0) {
+          const defaultCompanyId = (() => {
+            if (companyId) return companyId;
+            const vertexARCompany = fetchedCompanies.find((company: Company) => company.name === 'Vertex AR');
+            return vertexARCompany ? vertexARCompany.id : fetchedCompanies[0].id;
+          })();
+
+          setFormData(prev => {
+            if (prev.companyId) return prev;
+            return {
+              ...prev,
+              companyId: defaultCompanyId,
+            };
+          });
         }
       } catch (err) {
         console.error('Failed to fetch data:', err);
@@ -201,17 +174,17 @@ export default function ARContentForm() {
     };
     
     fetchData();
-  }, [companyId, projectId]); // Depend on companyId and projectId from URL params
+  }, [companyId, addToast]); // companyId влияет на дефолтный выбор компании
 
   // Handle company change
-  const handleCompanyChange = (companyId: number) => {
-    setFormData({
-      ...formData,
+  const handleCompanyChange = (companyId: string) => {
+    setFormData(prev => ({
+      ...prev,
       companyId,
       projectId: null, // Reset project when company changes
       newProjectName: '',
       creatingNewProject: false,
-    });
+    }));
   };
 
   // Fetch projects when companyId changes
@@ -219,8 +192,20 @@ export default function ARContentForm() {
     const fetchProjects = async () => {
       if (formData.companyId) {
         try {
-          const projectsResponse = await projectsAPI.list(formData.companyId);
-          setProjects(projectsResponse.data.projects || []);
+          const projectsResponse = await projectsAPI.listByCompany(formData.companyId);
+          const fetchedProjects = (projectsResponse as any).data?.items || [];
+          setProjects(fetchedProjects);
+
+          // Если projectId задан в URL, но его нет в списке компании — сбрасываем
+          if (projectId) {
+            const projectExists = fetchedProjects.some((p: Project) => p.id === projectId);
+            if (!projectExists) {
+              setFormData(prev => ({
+                ...prev,
+                projectId: null,
+              }));
+            }
+          }
         } catch (err) {
           console.error('Failed to fetch projects:', err);
           addToast('Failed to load projects', 'error');
@@ -231,12 +216,27 @@ export default function ARContentForm() {
     };
 
     fetchProjects();
-  }, [formData.companyId]);
+  }, [formData.companyId, projectId, addToast]);
+
+  // Image preview URL (avoid leaking object URLs)
+  useEffect(() => {
+    if (!formData.image) {
+      setImagePreviewUrl(null);
+      return;
+    }
+
+    const url = URL.createObjectURL(formData.image);
+    setImagePreviewUrl(url);
+
+    return () => {
+      URL.revokeObjectURL(url);
+    };
+  }, [formData.image]);
 
   // Handle image file change
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
-      setFormData({ ...formData, image: e.target.files[0] });
+      setFormData(prev => ({ ...prev, image: e.target.files![0] }));
       setError(null);
     }
   };
@@ -244,7 +244,7 @@ export default function ARContentForm() {
   // Handle video file change
   const handleVideoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
-      setFormData({ ...formData, video: e.target.files[0] });
+      setFormData(prev => ({ ...prev, video: e.target.files![0] }));
       setError(null);
     }
   };
@@ -300,12 +300,11 @@ export default function ARContentForm() {
       let finalProjectId = formData.projectId;
       if (formData.creatingNewProject && formData.newProjectName.trim() && formData.companyId) {
         try {
-          const projectResponse = await projectsAPI.create(formData.companyId, {
+          const projectResponse = await projectsAPI.create({
+            company_id: formData.companyId,
             name: formData.newProjectName,
-            description: `Project for ${formData.customerName}`,
-            slug: formData.newProjectName.toLowerCase().replace(/\s+/g, '-'),
           });
-          finalProjectId = projectResponse.data.id;
+          finalProjectId = (projectResponse as any).data?.id;
         } catch (projectErr) {
           const errorMsg = (projectErr as any)?.response?.data?.detail || 'Failed to create project';
           setError(`Project creation failed: ${errorMsg}`);
@@ -348,7 +347,7 @@ export default function ARContentForm() {
       }
 
       // Call API to create AR content
-      const response = await arContentAPI.create(formData.companyId, finalProjectId, uploadData);
+      const response = await arContentAPI.createForProject(formData.companyId, finalProjectId, uploadData);
       const responseData = response.data as CreationResponse;
       
       setCreationResponse(responseData);
@@ -582,7 +581,7 @@ export default function ARContentForm() {
               <InputLabel>Select Company</InputLabel>
               <Select
                 value={formData.companyId || ''}
-                onChange={(e) => handleCompanyChange(Number(e.target.value))}
+                onChange={(e) => handleCompanyChange(String(e.target.value))}
                 disabled={loading}
                 label="Select Company"
               >
@@ -640,7 +639,7 @@ export default function ARContentForm() {
                 <InputLabel>Select Project</InputLabel>
                 <Select
                   value={formData.projectId || ''}
-                  onChange={(e) => setFormData({ ...formData, projectId: Number(e.target.value) })}
+                  onChange={(e) => setFormData({ ...formData, projectId: String(e.target.value) })}
                   disabled={loading}
                   label="Select Project"
                 >
@@ -754,7 +753,7 @@ export default function ARContentForm() {
                 <CardMedia
                   component="img"
                   height="200"
-                  image={URL.createObjectURL(formData.image)}
+                  image={imagePreviewUrl || ''}
                   alt="Image preview"
                 />
                 <CardContent sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -766,7 +765,7 @@ export default function ARContentForm() {
                   </Box>
                   <IconButton
                     color="error"
-                    onClick={() => setFormData({ ...formData, image: null })}
+                    onClick={() => setFormData(prev => ({ ...prev, image: null }))}
                     disabled={loading}
                   >
                     <DeleteIcon />
@@ -821,7 +820,7 @@ export default function ARContentForm() {
                   </Box>
                   <IconButton
                     color="error"
-                    onClick={() => setFormData({ ...formData, video: null })}
+                    onClick={() => setFormData(prev => ({ ...prev, video: null }))}
                     disabled={loading}
                   >
                     <DeleteIcon />

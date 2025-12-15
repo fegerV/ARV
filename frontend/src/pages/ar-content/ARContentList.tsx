@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, type ChangeEvent } from 'react';
 import { 
   Box, 
   Typography, 
@@ -27,8 +27,11 @@ import {
   DialogContent,
   DialogActions,
   Tooltip,
-  Avatar
+  Avatar,
+  CircularProgress,
+  Alert,
 } from '@mui/material';
+import type { SelectChangeEvent } from '@mui/material';
 import { 
   Add as AddIcon, 
   Search as SearchIcon,
@@ -40,7 +43,8 @@ import {
   CheckCircle as CheckCircleIcon,
   HourglassEmpty as HourglassEmptyIcon,
   Error as ErrorIcon,
-  CloudDownload as ExportIcon
+  CloudDownload as ExportIcon,
+  Refresh as RefreshIcon,
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import QRCode from 'qrcode.react';
@@ -77,6 +81,7 @@ export default function ARContentList() {
   const [contentList, setContentList] = useState<ARContentItem[]>([]);
   const [filteredContentList, setFilteredContentList] = useState<ARContentItem[]>([]);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [searchTerm, setSearchTerm] = useState('');
@@ -85,25 +90,28 @@ export default function ARContentList() {
   const [qrDialogOpen, setQrDialogOpen] = useState(false);
   const [selectedContent, setSelectedContent] = useState<ARContentItem | null>(null);
   
-  // Load data
-  useEffect(() => {
-    fetchContentList();
-  }, []);
-
-  const fetchContentList = async () => {
+  const fetchContentList = useCallback(async () => {
     try {
       setLoading(true);
+      setError(null);
 
       const response = await arContentAPI.listAll({ page: 1, page_size: 200 });
       setContentList(response.data.items || []);
       setFilteredContentList(response.data.items || []);
     } catch (error) {
       console.error('Error fetching AR content:', error);
-      addToast('Failed to load AR content', 'error');
+      const msg = (error as any)?.response?.data?.detail || (error as any)?.response?.data?.message || 'Failed to load AR content';
+      setError(msg);
+      addToast(msg, 'error');
     } finally {
       setLoading(false);
     }
-  };
+  }, [addToast]);
+
+  // Load data
+  useEffect(() => {
+    fetchContentList();
+  }, [fetchContentList]);
 
   // Filter content based on search term, selected companies, and statuses
   useEffect(() => {
@@ -112,7 +120,7 @@ export default function ARContentList() {
     // Apply search filter
     if (searchTerm) {
       const term = searchTerm.toLowerCase();
-      filtered = filtered.filter(item => 
+      filtered = filtered.filter((item: ARContentItem) => 
         item.order_number.toLowerCase().includes(term) ||
         (item.customer_name && item.customer_name.toLowerCase().includes(term)) ||
         (item.customer_email && item.customer_email.toLowerCase().includes(term)) ||
@@ -125,12 +133,12 @@ export default function ARContentList() {
     
     // Apply company filter
     if (selectedCompanies.length > 0) {
-      filtered = filtered.filter(item => selectedCompanies.includes(item.company_name));
+      filtered = filtered.filter((item: ARContentItem) => selectedCompanies.includes(item.company_name));
     }
     
     // Apply status filter
     if (selectedStatuses.length > 0) {
-      filtered = filtered.filter(item => selectedStatuses.includes(item.status));
+      filtered = filtered.filter((item: ARContentItem) => selectedStatuses.includes(item.status));
     }
     
     setFilteredContentList(filtered);
@@ -145,21 +153,37 @@ export default function ARContentList() {
     setPage(newPage);
   };
 
-  const handleChangeRowsPerPage = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleChangeRowsPerPage = (event: ChangeEvent<HTMLInputElement>) => {
     setRowsPerPage(parseInt(event.target.value, 10));
     setPage(0);
   };
 
-  const handleCopyLink = (uniqueId: string) => {
-    navigator.clipboard.writeText(uniqueId);
-    addToast('Link copied to clipboard', 'success');
+  const handleCopyLink = async (url: string) => {
+    if (!url) {
+      addToast('Link is missing', 'error');
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(url);
+      addToast('Link copied to clipboard', 'success');
+    } catch {
+      addToast('Failed to copy link', 'error');
+    }
   };
 
-  const handleOpenLink = (uniqueId: string) => {
-    window.open(uniqueId, '_blank');
+  const handleOpenLink = (url: string) => {
+    if (!url) {
+      addToast('Link is missing', 'error');
+      return;
+    }
+    window.open(url, '_blank', 'noopener,noreferrer');
   };
 
   const handleShowQR = (content: ARContentItem) => {
+    if (!content.public_url) {
+      addToast('Link is missing — QR cannot be shown', 'error');
+      return;
+    }
     setSelectedContent(content);
     setQrDialogOpen(true);
   };
@@ -189,9 +213,13 @@ export default function ARContentList() {
     addToast('Export functionality not implemented yet', 'warning');
   };
 
+  const handleRefresh = async () => {
+    await fetchContentList();
+  };
+
   // Get unique companies and statuses for filters
-  const uniqueCompanies = Array.from(new Set(contentList.map(item => item.company_name)));
-  const uniqueStatuses = Array.from(new Set(contentList.map(item => item.status)));
+  const uniqueCompanies = Array.from(new Set(contentList.map((item: ARContentItem) => item.company_name)));
+  const uniqueStatuses = Array.from(new Set(contentList.map((item: ARContentItem) => item.status)));
 
   // Status chip rendering
   const getStatusChip = (status: string) => {
@@ -215,27 +243,36 @@ export default function ARContentList() {
     page * rowsPerPage + rowsPerPage
   );
 
-  if (loading) {
-    return (
-      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '60vh' }}>
-        <Typography>Loading AR content...</Typography>
-      </Box>
-    );
-  }
-
   return (
     <Box>
       {/* Header */}
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
         <Typography variant="h4">All AR Content</Typography>
-        <Button
-          variant="contained"
-          startIcon={<AddIcon />}
-          onClick={handleNewContent}
-        >
-          New AR Content
-        </Button>
+        <Box sx={{ display: 'flex', gap: 1 }}>
+          <Button
+            variant="outlined"
+            startIcon={loading ? <CircularProgress size={18} /> : <RefreshIcon />}
+            onClick={handleRefresh}
+            disabled={loading}
+          >
+            Refresh
+          </Button>
+          <Button
+            variant="contained"
+            startIcon={<AddIcon />}
+            onClick={handleNewContent}
+            disabled={loading}
+          >
+            New AR Content
+          </Button>
+        </Box>
       </Box>
+
+      {error && (
+        <Alert severity="error" sx={{ mb: 2 }}>
+          {error}
+        </Alert>
+      )}
 
       {/* Filters and Search */}
       <Paper sx={{ p: 2, mb: 3 }}>
@@ -244,7 +281,7 @@ export default function ARContentList() {
           <TextField
             placeholder="Search..."
             value={searchTerm}
-            onChange={(e: any) => setSearchTerm(e.target.value)}
+            onChange={(e: ChangeEvent<HTMLInputElement>) => setSearchTerm(e.target.value)}
             InputProps={{
               startAdornment: (
                 <InputAdornment position="start">
@@ -261,7 +298,7 @@ export default function ARContentList() {
             <Select
               multiple
               value={selectedCompanies}
-              onChange={(e: any) => setSelectedCompanies(e.target.value as string[])}
+              onChange={(e: SelectChangeEvent<typeof selectedCompanies>) => setSelectedCompanies(e.target.value as string[])}
               input={<OutlinedInput label="Companies" />}
               renderValue={(selected: any) => (selected as string[]).join(', ')}
             >
@@ -280,7 +317,7 @@ export default function ARContentList() {
             <Select
               multiple
               value={selectedStatuses}
-              onChange={(e: any) => setSelectedStatuses(e.target.value as string[])}
+              onChange={(e: SelectChangeEvent<typeof selectedStatuses>) => setSelectedStatuses(e.target.value as string[])}
               input={<OutlinedInput label="Statuses" />}
               renderValue={(selected: any) => (selected as string[]).join(', ')}
             >
@@ -306,6 +343,11 @@ export default function ARContentList() {
 
       {/* Content Table */}
       <Paper sx={{ width: '100%', overflow: 'hidden' }}>
+        {loading ? (
+          <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
+            <CircularProgress />
+          </Box>
+        ) : (
         <TableContainer>
           <Table>
             <TableHead>
@@ -324,7 +366,7 @@ export default function ARContentList() {
               </TableRow>
             </TableHead>
             <TableBody>
-              {paginatedContent.map((item) => (
+              {paginatedContent.map((item: ARContentItem) => (
                 <TableRow key={item.id} hover>
                   <TableCell>{item.company_name}</TableCell>
                   <TableCell>
@@ -355,7 +397,7 @@ export default function ARContentList() {
                     </IconButton>
                   </TableCell>
                   <TableCell>
-                    <IconButton size="small" onClick={() => handleShowQR(item)} disabled={!item.qr_code_url}>
+                    <IconButton size="small" onClick={() => handleShowQR(item)} disabled={!item.public_url}>
                       <QrCodeIcon fontSize="small" />
                     </IconButton>
                   </TableCell>
@@ -395,6 +437,7 @@ export default function ARContentList() {
           onPageChange={handleChangePage}
           onRowsPerPageChange={handleChangeRowsPerPage}
         />
+        )}
       </Paper>
 
       {/* QR Code Dialog */}
@@ -409,6 +452,12 @@ export default function ARContentList() {
           )}
         </DialogContent>
         <DialogActions>
+          <Button
+            onClick={() => handleCopyLink(selectedContent?.public_url || '')}
+            disabled={!selectedContent?.public_url}
+          >
+            Copy Link
+          </Button>
           <Button onClick={handleCloseQR}>Close</Button>
         </DialogActions>
       </Dialog>

@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react';
-import { Box, Typography, Button, Paper, Table, TableHead, TableBody, TableRow, TableCell, Chip, IconButton, CircularProgress } from '@mui/material';
+import { format } from 'date-fns';
+import { Box, Typography, Button, Paper, Table, TableHead, TableBody, TableRow, TableCell, Chip, IconButton, CircularProgress, Alert } from '@mui/material';
 import { Add as AddIcon, Edit as EditIcon, Folder as FolderIcon } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import { companiesAPI } from '../../services/api';
+import { useToast } from '../../store/useToast';
 
 interface CompanyListItem {
   id: string;
@@ -16,22 +18,29 @@ interface CompanyListItem {
 
 export default function CompaniesList() {
   const navigate = useNavigate();
+  const { addToast } = useToast();
 
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [items, setItems] = useState<CompanyListItem[]>([]);
 
   useEffect(() => {
     const load = async () => {
       setLoading(true);
+      setError(null);
       try {
         const res = await companiesAPI.list({ page: 1, page_size: 50 });
         setItems(res.data?.items || []);
+      } catch (err: any) {
+        const msg = err?.response?.data?.detail || err?.response?.data?.message || 'Failed to load companies';
+        setError(msg);
+        addToast(msg, 'error');
       } finally {
         setLoading(false);
       }
     };
     load();
-  }, []);
+  }, [addToast]);
 
   return (
     <Box>
@@ -47,10 +56,17 @@ export default function CompaniesList() {
       </Box>
 
       <Paper sx={{ p: 3 }}>
+        {error && (
+          <Alert severity="error" sx={{ mb: 2 }}>
+            {error}
+          </Alert>
+        )}
         {loading ? (
           <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
             <CircularProgress />
           </Box>
+        ) : items.length === 0 ? (
+          <Typography color="text.secondary">No companies</Typography>
         ) : (
         <Table>
           <TableHead>
@@ -80,7 +96,9 @@ export default function CompaniesList() {
                   />
                 </TableCell>
                 <TableCell>{company.projects_count}</TableCell>
-                <TableCell>{company.created_at}</TableCell>
+                <TableCell>
+                  {company.created_at ? format(new Date(company.created_at), 'dd.MM.yyyy HH:mm') : '—'}
+                </TableCell>
                 <TableCell>
                   <IconButton onClick={() => navigate(`/companies/${company.id}`)} size="small" title="Edit">
                     <EditIcon fontSize="small" />

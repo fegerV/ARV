@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   Box,
@@ -92,7 +92,7 @@ export default function ARContentDetail() {
   const qrCanvasRef = useRef<HTMLCanvasElement>(null);
   
   const [content, setContent] = useState<ARContentDetailProps | null>(null);
-  const [videos, setVideos] = useState<any[]>([]);
+  const [videos, setVideos] = useState<VideoInfo[]>([]);
   
   const [loading, setLoading] = useState(true);
   const [generatingMarker, setGeneratingMarker] = useState(false);
@@ -104,17 +104,13 @@ export default function ARContentDetail() {
   const [zoom, setZoom] = useState(100);
   const [downloadingQR, setDownloadingQR] = useState(false);
 
-  useEffect(() => {
-    fetchContentDetail();
-  }, [arContentId]);
-
-  const fetchContentDetail = async () => {
+  const fetchContentDetail = useCallback(async () => {
     setLoading(true);
     try {
       const response = await arContentAPI.getDetail(String(arContentId));
       const data = response.data;
       setContent(data);
-      setVideos(data.videos || []);
+      setVideos((data.videos || []) as VideoInfo[]);
     } catch (error: any) {
       addToast(
         error.response?.data?.message || 'Failed to load AR content',
@@ -124,7 +120,11 @@ export default function ARContentDetail() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [arContentId, addToast]);
+
+  useEffect(() => {
+    fetchContentDetail();
+  }, [fetchContentDetail]);
 
   const formatBytes = (bytes: number): string => {
     if (bytes === 0) return '0 B';
@@ -172,6 +172,10 @@ export default function ARContentDetail() {
   };
 
   const copyToClipboard = (text: string) => {
+    if (!text) {
+      addToast('Ссылка недоступна', 'error');
+      return;
+    }
     navigator.clipboard.writeText(text).then(() => {
       addToast('Copied to clipboard!', 'success');
     }).catch(() => {
@@ -192,6 +196,10 @@ export default function ARContentDetail() {
 
       const filename = `qr-${content.order_number}.${format}`;
       const arUrl = content.public_url || '';
+      if (!arUrl) {
+        addToast('Ссылка недоступна — QR-код нельзя скачать', 'error');
+        return;
+      }
 
       switch (format) {
         case 'png':
@@ -234,6 +242,7 @@ export default function ARContentDetail() {
   if (!content) return <Typography>AR content not found</Typography>;
 
   const arUrl = content.public_url || '';
+  const hasPortrait = Boolean(content.photo_url);
 
   return (
     <Box sx={{ maxWidth: 1200, mx: 'auto' }}>
@@ -281,23 +290,32 @@ export default function ARContentDetail() {
           <Paper 
             sx={{ 
               height: 400, 
-              cursor: 'pointer',
+              cursor: hasPortrait ? 'pointer' : 'default',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               overflow: 'hidden',
-              '&:hover': { opacity: 0.9 }
+              ...(hasPortrait ? { '&:hover': { opacity: 0.9 } } : null),
             }}
-            onClick={() => setPortraitLightbox(true)}
+            onClick={() => {
+              if (!hasPortrait) return;
+              setPortraitLightbox(true);
+            }}
           >
-            <img 
-              src={content.photo_url || ''} 
-              alt="Portrait" 
-              style={{ width: '100%', height: '100%', objectFit: 'contain' }}
-            />
+            {hasPortrait ? (
+              <img 
+                src={content.photo_url || ''} 
+                alt="Portrait" 
+                style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+              />
+            ) : (
+              <Typography variant="body2" color="text.secondary">
+                Портрет не загружен
+              </Typography>
+            )}
           </Paper>
           <Typography variant="caption" sx={{ mt: 1, display: 'block', textAlign: 'center' }}>
-            Кликните для просмотра в полный размер
+            {hasPortrait ? 'Кликните для просмотра в полный размер' : '—'}
           </Typography>
         </Grid>
         
@@ -328,7 +346,7 @@ export default function ARContentDetail() {
             InputProps={{
               readOnly: true,
               endAdornment: (
-                <IconButton onClick={() => copyToClipboard(arUrl)}>
+                <IconButton onClick={() => copyToClipboard(arUrl)} disabled={!arUrl}>
                   <CopyIcon />
                 </IconButton>
               ),
@@ -338,6 +356,7 @@ export default function ARContentDetail() {
             variant="outlined" 
             startIcon={<OpenIcon />}
             onClick={() => window.open(arUrl, '_blank')}
+            disabled={!arUrl}
           >
             Открыть
           </Button>
@@ -348,6 +367,7 @@ export default function ARContentDetail() {
             <QRCode 
               value={arUrl} 
               size={200}
+              includeMargin
               ref={(el: any) => {
                 if (el) {
                   const canvas = el.querySelector('canvas');

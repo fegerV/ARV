@@ -10,6 +10,14 @@ from email.mime.multipart import MIMEMultipart
 from app.core.config import settings
 from app.core.database import get_db
 from app.models.notification import Notification
+from app.api.routes.auth import get_current_active_user
+from app.schemas.notifications import (
+    NotificationItem,
+    NotificationListResponse,
+    NotificationMarkReadResponse,
+    NotificationDeleteResponse
+)
+from app.models.user import User
 
 router = APIRouter()
 
@@ -37,32 +45,45 @@ async def _send_telegram_notification_async(chat_id: str, message: str) -> None:
         )
 
 
-@router.get("/notifications")
-async def list_notifications(limit: int = 50, db: AsyncSession = Depends(get_db)):
-    stmt = select(Notification).order_by(Notification.created_at.desc())
+@router.get("/notifications", response_model=NotificationListResponse)
+async def list_notifications(
+    limit: int = Query(50, ge=1, le=200),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    stmt = select(Notification).order_by(Notification.created_at.desc()).limit(limit)
     res = await db.execute(stmt)
-    items = res.scalars().all()[:limit]
-    return [
-        {
-            "id": n.id,
-            "company_id": n.company_id,
-            "project_id": n.project_id,
-            "ar_content_id": n.ar_content_id,
-            "type": n.notification_type,
-            "email_sent": n.email_sent,
-            "telegram_sent": n.telegram_sent,
-            "subject": n.subject,
-            "message": n.message,
-            "created_at": n.created_at.isoformat() if n.created_at else None,
-        }
+    items = res.scalars().all()
+    notification_items = [
+        NotificationItem(
+            id=n.id,
+            title=n.subject or "",
+            message=n.message or "",
+            type=n.notification_type,
+            is_read=bool((n.notification_metadata or {}).get("is_read")),
+            read_at=(n.notification_metadata or {}).get("read_at"),
+            created_at=n.created_at,
+            metadata=n.notification_metadata
+        )
         for n in items
     ]
+    return NotificationListResponse(
+        items=notification_items,
+        total=len(notification_items),
+        page=1,
+        page_size=limit,
+        total_pages=1
+    )
 
 
-@router.post("/notifications/mark-read")
-async def mark_notifications_read(ids: list[int], db: AsyncSession = Depends(get_db)):
+@router.post("/notifications/mark-read", response_model=NotificationMarkReadResponse)
+async def mark_notifications_read(
+    ids: list[int],
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
     if not ids:
-        return {"updated": 0}
+        return NotificationMarkReadResponse(success=False, message="No notification IDs provided")
 
     stmt = select(Notification).where(Notification.id.in_(ids))
     res = await db.execute(stmt)
@@ -78,7 +99,28 @@ async def mark_notifications_read(ids: list[int], db: AsyncSession = Depends(get
             updated += 1
 
     await db.commit()
-    return {"updated": updated}
+    return NotificationMarkReadResponse(
+        success=True,
+        message=f"Marked {updated} notifications as read"
+    )
+
+
+@router.delete("/notifications/{notification_id}", response_model=NotificationDeleteResponse)
+async def delete_notification(
+    notification_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    n = await db.get(Notification, notification_id)
+    if not n:
+        raise HTTPException(status_code=404, detail="Notification not found")
+
+    await db.delete(n)
+    await db.commit()
+    return NotificationDeleteResponse(
+        success=True,
+        message=f"Notification {notification_id} deleted"
+    )
 
 
 @router.post("/notifications/test")

@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Optional, List
 from datetime import datetime, timedelta
 
-from fastapi import APIRouter, UploadFile, File, Form, Depends, HTTPException, Query
+from fastapi import APIRouter, UploadFile, File, Form, Depends, HTTPException, Query, Response
 from fastapi.responses import FileResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, and_, or_
@@ -42,6 +42,15 @@ from app.core.storage import get_storage_provider_instance
 logger = structlog.get_logger()
 
 router = APIRouter()
+
+
+def _set_deprecated_canonical(response: Response, canonical_path: str) -> None:
+    """Mark endpoint as deprecated and provide canonical Link header.
+
+    canonical_path must be an API path (e.g. /api/companies/1/projects/2/ar-content/3).
+    """
+    response.headers["Deprecation"] = "true"
+    response.headers["Link"] = f"<{canonical_path}>; rel=\"canonical\""
 
 
 def validate_email(email: str) -> bool:
@@ -82,9 +91,16 @@ async def list_ar_content(
     search: Optional[str] = Query(None, description="Search by customer name or email"),
     sort_by: Optional[str] = Query("created_at", description="Sort field"),
     sort_order: Optional[str] = Query("desc", description="Sort order: asc or desc"),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    response: Response = None,
 ):
-    """Get list of AR content with pagination and filtering."""
+    """LEGACY: Get list of AR content with pagination and filtering.
+
+    Canonical API is hierarchical: /api/companies/{company_id}/projects/{project_id}/ar-content
+    This endpoint remains for admin aggregation screens.
+    """
+    if response is not None:
+        _set_deprecated_canonical(response, "/api/companies/{company_id}/projects/{project_id}/ar-content")
     
     # Build base query with joins
     base_query = (
@@ -285,13 +301,19 @@ async def create_ar_content(
     project_id: str = Form(...),
     customer_name: Optional[str] = Form(None),
     customer_phone: Optional[str] = Form(None),
-    customer_email: Optional[str] = Form(None),
+    customer_email: str = Form(None),
     duration_years: int = Form(1),
     photo_file: UploadFile = File(...),
     video_file: Optional[UploadFile] = File(None),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    response: Response = None,
 ):
-    """Create new AR content with photo and optional video."""
+    """LEGACY: Create new AR content with photo and optional video.
+
+    Canonical API: POST /api/companies/{company_id}/projects/{project_id}/ar-content/new
+    """
+    if response is not None:
+        _set_deprecated_canonical(response, f"/api/companies/{company_id}/projects/{project_id}/ar-content/new")
     
     # Validate duration years
     if duration_years not in [1, 3, 5]:
@@ -383,8 +405,11 @@ async def create_ar_content(
 
 
 @router.get("/ar-content/{content_id}", response_model=ARContentDetailResponse, tags=["AR Content"])
-async def get_ar_content_details(content_id: str, db: AsyncSession = Depends(get_db)):
-    """Get detailed information about AR content."""
+async def get_ar_content_details(content_id: str, db: AsyncSession = Depends(get_db), response: Response = None):
+    """LEGACY: Get detailed information about AR content.
+
+    Canonical API: GET /api/companies/{company_id}/projects/{project_id}/ar-content/{content_id}
+    """
     
     # Get AR content with relationships
     stmt = (
@@ -402,6 +427,9 @@ async def get_ar_content_details(content_id: str, db: AsyncSession = Depends(get
         raise HTTPException(status_code=404, detail="AR content not found")
     
     ar_content, company, project = row
+
+    if response is not None:
+        _set_deprecated_canonical(response, f"/api/companies/{company.id}/projects/{project.id}/ar-content/{ar_content.id}")
 
     since_30d = datetime.utcnow() - timedelta(days=30)
     views_stmt = select(func.count()).select_from(ARViewSession).where(
@@ -479,13 +507,23 @@ async def get_ar_content_details(content_id: str, db: AsyncSession = Depends(get
 async def update_ar_content(
     content_id: str,
     update_data: ARContentUpdateRequest,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    response: Response = None,
 ):
-    """Update AR content basic information."""
+    """LEGACY: Update AR content details.
+
+    Canonical API: PUT /api/companies/{company_id}/projects/{project_id}/ar-content/{content_id}
+    """
     
     ar_content = await db.get(ARContent, content_id)
     if not ar_content:
         raise HTTPException(status_code=404, detail="AR content not found")
+
+    # Compute canonical path
+    project = await db.get(Project, ar_content.project_id)
+    if project:
+        if response is not None:
+            _set_deprecated_canonical(response, f"/api/companies/{project.company_id}/projects/{project.id}/ar-content/{ar_content.id}")
     
     # Validate email if provided
     if update_data.customer_email and not validate_email(update_data.customer_email):
@@ -560,6 +598,9 @@ async def upload_ar_content_video(
     # Get project and company for storage path
     project = await db.get(Project, ar_content.project_id)
     company = await db.get(Company, project.company_id)
+
+    if response is not None:
+        _set_deprecated_canonical(response, f"/api/companies/{company.id}/projects/{project.id}/ar-content/{ar_content.id}")
     
     # Build storage path
     storage_path = build_ar_content_storage_path(company.id, str(project.id), ar_content.unique_id)
@@ -668,8 +709,11 @@ async def delete_ar_content_video(content_id: str, video_id: str, db: AsyncSessi
 
 
 @router.delete("/ar-content/{content_id}", tags=["AR Content"])
-async def delete_ar_content(content_id: str, db: AsyncSession = Depends(get_db)):
-    """Delete AR content and all associated data."""
+async def delete_ar_content(content_id: str, db: AsyncSession = Depends(get_db), response: Response = None):
+    """LEGACY: Delete AR content and all associated data.
+
+    Canonical API: DELETE /api/companies/{company_id}/projects/{project_id}/ar-content/{content_id}
+    """
     
     ar_content = await db.get(ARContent, content_id)
     if not ar_content:

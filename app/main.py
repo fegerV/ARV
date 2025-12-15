@@ -5,7 +5,7 @@ from datetime import datetime
 from contextlib import asynccontextmanager
 from typing import AsyncGenerator
 
-from fastapi import FastAPI, Request, status
+from fastapi import FastAPI, Request, status, Depends
 from fastapi.responses import JSONResponse
 from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
@@ -16,6 +16,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.core.config import settings
 from app.core.database import init_db, close_db, seed_defaults
+from app.api.routes.auth import get_current_active_user
 
 
 # Configure structured logging
@@ -256,20 +257,22 @@ from app.api.routes import viewer as viewer_router
 from app.api import ar_content as ar_content_api_router
 
 # Include routers with appropriate prefixes
-app.include_router(companies_router.router, prefix="/api/companies", tags=["Companies"])
+admin_dependencies = [Depends(get_current_active_user)]
+
+app.include_router(companies_router.router, prefix="/api/companies", tags=["Companies"], dependencies=admin_dependencies)
 # app.include_router(projects.router, prefix="/api/projects", tags=["Projects"])
 # app.include_router(ar_content.router, prefix="/api/ar-content", tags=["AR Content"])
 # app.include_router(analytics.router, prefix="/api/analytics", tags=["Analytics"]) 
-app.include_router(simplified_storage_router.router, prefix="/api", tags=["Storage"]) 
-app.include_router(projects_router.router, prefix="/api", tags=["Projects"]) 
-app.include_router(ar_content_router.router, prefix="/api", tags=["AR Content"]) 
-app.include_router(ar_content_api_router.router, prefix="/api", tags=["AR Content API"]) 
+app.include_router(simplified_storage_router.router, prefix="/api", tags=["Storage"], dependencies=admin_dependencies) 
+app.include_router(projects_router.router, prefix="/api", tags=["Projects"], dependencies=admin_dependencies) 
+app.include_router(ar_content_router.router, prefix="/api", tags=["AR Content"], dependencies=admin_dependencies) 
+app.include_router(ar_content_api_router.router, prefix="/api", tags=["AR Content API"], dependencies=admin_dependencies) 
 # Removed duplicate companies router inclusion
-app.include_router(videos_router.router, prefix="/api", tags=["Videos"]) 
-app.include_router(rotation_router.router, prefix="/api", tags=["Rotation"]) 
-app.include_router(analytics_router.router, prefix="/api", tags=["Analytics"]) 
-app.include_router(notifications_router.router, prefix="/api", tags=["Notifications"]) 
-app.include_router(settings_router.router, prefix="/api", tags=["Settings"])
+app.include_router(videos_router.router, prefix="/api", tags=["Videos"], dependencies=admin_dependencies) 
+app.include_router(rotation_router.router, prefix="/api", tags=["Rotation"], dependencies=admin_dependencies) 
+app.include_router(analytics_router.router, prefix="/api", tags=["Analytics"], dependencies=admin_dependencies) 
+app.include_router(notifications_router.router, prefix="/api", tags=["Notifications"], dependencies=admin_dependencies) 
+app.include_router(settings_router.router, prefix="/api", tags=["Settings"], dependencies=admin_dependencies)
 app.include_router(oauth_router.router)
 app.include_router(public_router.router, prefix="/api", tags=["Public"])
 app.include_router(health_router.router)

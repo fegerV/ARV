@@ -4,7 +4,8 @@ AR Content API routes with Company → Project → AR Content hierarchy.
 from uuid import uuid4, UUID
 from pathlib import Path
 from typing import Optional
-from fastapi import APIRouter, UploadFile, File, Form, Depends, HTTPException, Query
+from fastapi import APIRouter, UploadFile, File, Form, Depends, HTTPException, Query, BackgroundTasks
+import shutil
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 import structlog
@@ -34,6 +35,31 @@ from app.utils.ar_content import (
 logger = structlog.get_logger()
 
 router = APIRouter()
+
+
+def _safe_delete_folder(path: Path) -> None:
+    """Best-effort recursive delete of content folder.
+
+    Safety: only allow deleting within STORAGE_BASE_PATH.
+    """
+    base = Path(settings.STORAGE_BASE_PATH).resolve()
+    target = path.resolve()
+
+    try:
+        target.relative_to(base)
+    except Exception:
+        logger.error("ar_content_delete_storage_blocked", storage_path=str(target), base_path=str(base))
+        return
+
+    if not target.exists():
+        logger.info("ar_content_delete_storage_missing", storage_path=str(target))
+        return
+
+    try:
+        shutil.rmtree(target)
+        logger.info("ar_content_delete_storage_ok", storage_path=str(target))
+    except Exception as e:
+        logger.error("ar_content_delete_storage_failed", storage_path=str(target), error=str(e))
 
 
 async def validate_company_project(company_id: int, project_id: int, db: AsyncSession) -> tuple[Company, Project]:
@@ -263,6 +289,7 @@ async def delete_ar_content(
     company_id: int,
     project_id: int,
     content_id: int,
+    background_tasks: BackgroundTasks,
     db: AsyncSession = Depends(get_db)
 ):
     """Delete AR content and its storage folder."""
@@ -282,9 +309,10 @@ async def delete_ar_content(
     # Delete from database
     await db.delete(ar_content)
     await db.commit()
-    
-    # TODO: Recursively delete storage folder
-    # For now, just log it
+
+    # Best-effort delete storage folder after DB commit
+    background_tasks.add_task(_safe_delete_folder, storage_path)
+
     logger.info(
         "ar_content_deleted",
         content_id=content_id,

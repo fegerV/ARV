@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, type ChangeEvent } from 'react';
 import { Box, Typography, Button, Paper, Table, TableHead, TableBody, TableRow, TableCell, Chip, Select, MenuItem, FormControl, InputLabel, Alert, Dialog, DialogTitle, DialogContent, DialogActions, DialogContentText, CircularProgress } from '@mui/material';
 import { Add as AddIcon, Delete as DeleteIcon, Refresh as RefreshIcon } from '@mui/icons-material';
 import { useNavigate, useParams } from 'react-router-dom';
@@ -7,24 +7,18 @@ import { useToast } from '../../store/useToast';
 
 // Company interface
 interface Company {
-  id: number;
+  id: string;
   name: string;
   is_default?: boolean;
 }
 
 // Project interface
 interface Project {
-  id: number;
+  id: string;
   name: string;
-  slug: string;
   status: string;
-  contentCount?: number;
-  createdAt?: string;
-  period?: {
-    starts_at?: string;
-    expires_at?: string;
-    days_left?: number;
-  };
+  ar_content_count: number;
+  created_at: string;
 }
 
 export default function ProjectsList() {
@@ -34,7 +28,7 @@ export default function ProjectsList() {
   
   const [companies, setCompanies] = useState<Company[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
-  const [selectedCompanyId, setSelectedCompanyId] = useState<number | null>(null);
+  const [selectedCompanyId, setSelectedCompanyId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [deleting, setDeleting] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -49,7 +43,6 @@ export default function ProjectsList() {
     const fetchData = async () => {
       setLoading(true);
       try {
-        console.log('Fetching companies with include_default=true');
         // Try cached companies first
         const cachedCompanies = sessionStorage.getItem('cached_companies');
         if (cachedCompanies) {
@@ -61,9 +54,9 @@ export default function ProjectsList() {
                 setCompanies(parsed.data);
                 
                 // Set initial selected company from cache
-                let defaultCompanyId: number | null = null;
+                let defaultCompanyId: string | null = null;
                 if (companyId) {
-                  defaultCompanyId = parseInt(companyId);
+                  defaultCompanyId = companyId;
                 } else {
                   const vertexARCompany = parsed.data.find((company: Company) => 
                     company.is_default === true || company.name === 'Vertex AR'
@@ -84,10 +77,9 @@ export default function ProjectsList() {
                   // Fetch projects for this company
                   console.log(`Fetching projects for company ${defaultCompanyId}`);
                   try {
-                    const projectsResponse = await projectsAPI.list(defaultCompanyId);
+                    const projectsResponse = await projectsAPI.listByCompany(defaultCompanyId, { page: 1, page_size: 100 });
                     if (isMounted) {
-                      console.log('Projects response received:', projectsResponse.data?.projects?.length, 'projects');
-                      setProjects(projectsResponse.data.projects || []);
+                      setProjects(projectsResponse.data?.items || []);
                     }
                   } catch (projectsError) {
                     console.error('Failed to fetch projects:', projectsError);
@@ -110,36 +102,35 @@ export default function ProjectsList() {
         }
         
         // Fetch fresh companies data
-        const companiesResponse = await companiesAPI.list(true);
+        const companiesResponse = await companiesAPI.list({ page: 1, page_size: 100 });
         if (!isMounted) return;
         
         // Cache the data
         sessionStorage.setItem('cached_companies', JSON.stringify({
-          data: companiesResponse.data,
+          data: companiesResponse.data?.items || [],
           timestamp: Date.now()
         }));
         
-        console.log('Companies response received:', companiesResponse.data?.length, 'companies');
-        setCompanies(companiesResponse.data);
+        setCompanies(companiesResponse.data?.items || []);
         
         // Set initial selected company
-        let defaultCompanyId: number | null = null;
+        let defaultCompanyId: string | null = null;
         
         if (companyId) {
           // Use the company ID from URL params
-          defaultCompanyId = parseInt(companyId);
+          defaultCompanyId = companyId;
         } else {
           // Find the Vertex AR company (default company)
-          const vertexARCompany = companiesResponse.data.find((company: Company) => 
+          const vertexARCompany = (companiesResponse.data?.items || []).find((company: Company) => 
             company.is_default === true || company.name === 'Vertex AR'
           );
           console.log('Searching for Vertex AR company, found:', vertexARCompany);
           
           if (vertexARCompany) {
             defaultCompanyId = vertexARCompany.id;
-          } else if (companiesResponse.data.length > 0) {
+          } else if ((companiesResponse.data?.items || []).length > 0) {
             // Fallback to first company if Vertex AR not found
-            defaultCompanyId = companiesResponse.data[0].id;
+            defaultCompanyId = (companiesResponse.data?.items || [])[0].id;
           }
         }
         console.log('Selected company ID:', defaultCompanyId);
@@ -151,11 +142,10 @@ export default function ProjectsList() {
           // Fetch projects for this company
           console.log(`Fetching projects for company ${defaultCompanyId}`);
           try {
-            const projectsResponse = await projectsAPI.list(defaultCompanyId);
+            const projectsResponse = await projectsAPI.listByCompany(defaultCompanyId, { page: 1, page_size: 100 });
             if (!isMounted) return;
-            
-            console.log('Projects response received:', projectsResponse.data?.projects?.length, 'projects');
-            setProjects(projectsResponse.data.projects || []);
+
+            setProjects(projectsResponse.data?.items || []);
           } catch (projectsError) {
             console.error('Failed to fetch projects:', projectsError);
             if (isMounted) {
@@ -198,8 +188,8 @@ export default function ProjectsList() {
       if (selectedCompanyId) {
         setLoading(true);
         try {
-          const projectsResponse = await projectsAPI.list(selectedCompanyId);
-          setProjects(projectsResponse.data.projects || []);
+          const projectsResponse = await projectsAPI.listByCompany(selectedCompanyId, { page: 1, page_size: 100 });
+          setProjects(projectsResponse.data?.items || []);
         } catch (error) {
           console.error('Failed to fetch projects:', error);
           addToast('Failed to load projects', 'error');
@@ -239,8 +229,8 @@ export default function ProjectsList() {
       
       // Refresh the projects list
       if (selectedCompanyId) {
-        const projectsResponse = await projectsAPI.list(selectedCompanyId);
-        setProjects(projectsResponse.data.projects || []);
+        const projectsResponse = await projectsAPI.listByCompany(selectedCompanyId, { page: 1, page_size: 100 });
+        setProjects(projectsResponse.data?.items || []);
       }
     } catch (error) {
       console.error('Failed to delete project:', error);
@@ -250,12 +240,12 @@ export default function ProjectsList() {
     }
   };
 
-  const handleCompanyChange = (event: any) => {
-    const value = event.target.value;
-    const companyId = value ? Number(value) : null;
-    setSelectedCompanyId(companyId);
-    if (companyId) {
-      navigate(`/companies/${companyId}/projects`);
+  const handleCompanyChange = (event: ChangeEvent<{ value: unknown }>) => {
+    const value = event.target.value as string;
+    const nextCompanyId = value ? String(value) : null;
+    setSelectedCompanyId(nextCompanyId);
+    if (nextCompanyId) {
+      navigate(`/companies/${nextCompanyId}/projects`);
     } else {
       navigate('/projects');
     }
@@ -268,8 +258,8 @@ export default function ProjectsList() {
       setRefreshing(true);
       // Clear cache
       sessionStorage.removeItem('cached_companies');
-      const projectsResponse = await projectsAPI.list(selectedCompanyId);
-      setProjects(projectsResponse.data.projects || []);
+      const projectsResponse = await projectsAPI.listByCompany(selectedCompanyId, { page: 1, page_size: 100 });
+      setProjects(projectsResponse.data?.items || []);
     } catch (error) {
       console.error('Failed to refresh projects:', error);
       addToast('Failed to refresh projects', 'error');
@@ -285,28 +275,29 @@ export default function ProjectsList() {
       sessionStorage.removeItem('cached_companies');
       
       // Fetch fresh companies data
-      const companiesResponse = await companiesAPI.list(true);
+      const companiesResponse = await companiesAPI.list({ page: 1, page_size: 100 });
       
       // Cache the data
       sessionStorage.setItem('cached_companies', JSON.stringify({
-        data: companiesResponse.data,
+        data: companiesResponse.data?.items || [],
         timestamp: Date.now()
       }));
-      
-      setCompanies(companiesResponse.data);
+
+      setCompanies(companiesResponse.data?.items || []);
       
       // If no company is selected or current selection is invalid, select default
-      if (!selectedCompanyId || !companiesResponse.data.some((c: Company) => c.id === selectedCompanyId)) {
-        const vertexARCompany = companiesResponse.data.find((company: Company) => 
-          company.is_default === true || company.name === 'Vertex AR'
+      const refreshedCompanies = companiesResponse.data?.items || [];
+      if (!selectedCompanyId || !refreshedCompanies.some((c: Company) => c.id === selectedCompanyId)) {
+        const vertexARCompany = refreshedCompanies.find((company: Company) =>
+          company.name === 'Vertex AR'
         );
         
         if (vertexARCompany) {
           setSelectedCompanyId(vertexARCompany.id);
           // Fetch projects for this company
           try {
-            const projectsResponse = await projectsAPI.list(vertexARCompany.id);
-            setProjects(projectsResponse.data.projects || []);
+            const projectsResponse = await projectsAPI.listByCompany(vertexARCompany.id, { page: 1, page_size: 100 });
+            setProjects(projectsResponse.data?.items || []);
           } catch (projectsError) {
             console.error('Failed to fetch projects:', projectsError);
             addToast('Failed to load projects', 'error');
@@ -365,7 +356,7 @@ export default function ProjectsList() {
             onChange={handleCompanyChange}
             label="Select Company"
           >
-            {companies.map((company) => (
+            {companies.map((company: Company) => (
               <MenuItem key={company.id} value={company.id}>
                 <Box sx={{ display: 'flex', alignItems: 'center' }}>
                   <Typography sx={{ fontWeight: company.is_default ? 'bold' : 'normal' }}>
@@ -410,20 +401,16 @@ export default function ProjectsList() {
                   <TableCell>Name</TableCell>
                   <TableCell>Status</TableCell>
                   <TableCell>AR Content</TableCell>
-                  <TableCell>Expires In</TableCell>
                   <TableCell>Created</TableCell>
                   <TableCell>Actions</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
-                {projects.map((project) => (
+                {projects.map((project: Project) => (
                   <TableRow key={project.id} hover>
                     <TableCell>
                       <Typography variant="subtitle2">
                         {project.name}
-                      </Typography>
-                      <Typography variant="caption" color="textSecondary">
-                        {project.slug}
                       </Typography>
                     </TableCell>
                     <TableCell>
@@ -433,22 +420,9 @@ export default function ProjectsList() {
                         color={project.status === 'active' ? 'success' : 'default'}
                       />
                     </TableCell>
-                    <TableCell>{project.contentCount || 0}</TableCell>
+                    <TableCell>{project.ar_content_count ?? 0}</TableCell>
                     <TableCell>
-                      {project.period?.days_left !== undefined ? (
-                        <Chip 
-                          label={`${project.period.days_left} days`}
-                          size="small"
-                          color={project.period.days_left < 30 ? 'warning' : 'default'}
-                        />
-                      ) : (
-                        'N/A'
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      {project.period?.starts_at 
-                        ? new Date(project.period.starts_at).toLocaleDateString() 
-                        : 'N/A'}
+                      {project.created_at ? new Date(project.created_at).toLocaleString() : '—'}
                     </TableCell>
                     <TableCell>
                       <Button

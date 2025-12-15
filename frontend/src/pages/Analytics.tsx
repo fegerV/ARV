@@ -20,6 +20,7 @@ import {
   CircularProgress,
   Alert,
 } from '@mui/material';
+import type { SelectChangeEvent } from '@mui/material';
 import {
   BarChart,
   Bar,
@@ -37,6 +38,7 @@ import {
 } from 'recharts';
 import { Refresh as RefreshIcon } from '@mui/icons-material';
 import { analyticsAPI } from '../services/api';
+import { useToast } from '../store/useToast';
 
 const COLORS = ['#1976d2', '#2e7d32', '#ed6c02', '#d32f2f', '#7b1fa2'];
 
@@ -44,19 +46,62 @@ interface AnalyticsFilters {
   period: '1d' | '7d' | '30d' | 'custom';
 }
 
+interface AnalyticsOverview {
+  total_views: number;
+  unique_sessions: number;
+  active_content: number;
+  storage_used_gb: number | null;
+}
+
 export default function Analytics() {
+  const { addToast } = useToast();
   const [filters, setFilters] = useState<AnalyticsFilters>({
     period: '7d',
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [overview, setOverview] = useState<AnalyticsOverview | null>(null);
 
-  // Mock data
+  const loadOverview = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await analyticsAPI.overview();
+      setOverview(res.data as AnalyticsOverview);
+    } catch (err: any) {
+      const msg = err?.response?.data?.detail || err?.response?.data?.message || 'Failed to fetch analytics';
+      setError(msg);
+      addToast(msg, 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadOverview();
+  }, []);
+
   const overviewCards = [
-    { title: 'Total Views', value: '125,892', change: '+12.5%' },
-    { title: 'Unique Sessions', value: '98,234', change: '+8.3%' },
-    { title: 'Avg. Duration', value: '2m 34s', change: '+4.2%' },
-    { title: 'Conversion Rate', value: '12.5%', change: '-2.1%' },
+    {
+      title: 'Total Views (30d)',
+      value: overview ? overview.total_views.toLocaleString() : '—',
+      change: '—',
+    },
+    {
+      title: 'Unique Sessions (30d)',
+      value: overview ? overview.unique_sessions.toLocaleString() : '—',
+      change: '—',
+    },
+    {
+      title: 'Active Content',
+      value: overview ? overview.active_content.toLocaleString() : '—',
+      change: '—',
+    },
+    {
+      title: 'Storage Used',
+      value: overview?.storage_used_gb != null ? `${overview.storage_used_gb} GB` : '—',
+      change: '—',
+    },
   ];
 
   const viewsTrendData = [
@@ -101,18 +146,11 @@ export default function Analytics() {
   ];
 
   const handleRefresh = async () => {
-    setLoading(true);
-    try {
-      await analyticsAPI.overview();
-      setTimeout(() => setLoading(false), 1000);
-    } catch (err) {
-      setError('Failed to fetch analytics');
-      setLoading(false);
-    }
+    await loadOverview();
   };
 
-  const handleFilterChange = (key: string, value: string) => {
-    setFilters((prev) => ({ ...prev, [key]: value }));
+  const handleFilterChange = (key: keyof AnalyticsFilters, value: AnalyticsFilters[keyof AnalyticsFilters]) => {
+    setFilters((prev: AnalyticsFilters) => ({ ...prev, [key]: value }));
   };
 
   return (
@@ -150,7 +188,7 @@ export default function Analytics() {
           <Select
             value={filters.period}
             label="Period"
-            onChange={(e) => handleFilterChange('period', e.target.value)}
+            onChange={(e: SelectChangeEvent) => handleFilterChange('period', e.target.value as AnalyticsFilters['period'])}
           >
             <MenuItem value="1d">Last 24 hours</MenuItem>
             <MenuItem value="7d">Last 7 days</MenuItem>
@@ -175,7 +213,7 @@ export default function Analytics() {
                 <Chip
                   label={card.change}
                   size="small"
-                  color={card.change.startsWith('+') ? 'success' : 'error'}
+                  color={card.change.startsWith('+') ? 'success' : card.change.startsWith('-') ? 'error' : 'default'}
                   variant="outlined"
                 />
               </CardContent>
@@ -235,7 +273,7 @@ export default function Analytics() {
                   cx="50%"
                   cy="50%"
                   labelLine={false}
-                  label={({ name, value }) => `${name}: ${value}%`}
+                  label={({ name, value }: { name: string; value: number }) => `${name}: ${value}%`}
                   outerRadius={80}
                   fill="#8884d8"
                   dataKey="value"

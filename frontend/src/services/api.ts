@@ -47,35 +47,43 @@ export const arContentAPI = {
       'Content-Type': 'multipart/form-data',
     },
   }),
+  createForProject: (companyId: string, projectId: string, formData: FormData) =>
+    api.post(`/companies/${companyId}/projects/${projectId}/ar-content/new`, formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    }),
 };
 
 export const companiesAPI = {
   list: (params?: { page?: number; page_size?: number; search?: string; status?: string }) => api.get('/companies', { params }),
-  get: (id: number) => api.get(`/companies/${id}`),
+  get: (id: string) => api.get(`/companies/${id}`),
   create: (data: any) => api.post('/companies', data),
-  update: (id: number, data: any) => api.put(`/companies/${id}`, data),
-  delete: (id: number) => api.delete(`/companies/${id}`),
+  update: (id: string, data: any) => api.put(`/companies/${id}`, data),
+  delete: (id: string) => api.delete(`/companies/${id}`),
 };
 
 export const projectsAPI = {
-  listByCompany: (companyId: number, params?: { page?: number; page_size?: number }) =>
+  listByCompany: (companyId: string, params?: { page?: number; page_size?: number }) =>
     api.get(`/companies/${companyId}/projects`, { params }),
   listAll: (params?: { page?: number; page_size?: number; company_id?: number }) =>
     api.get('/projects', { params }),
-  get: (id: number) => api.get(`/projects/${id}`),
+  get: (id: string) => api.get(`/projects/${id}`),
   create: (data: any) => api.post('/projects', data),
-  update: (id: number, data: any) => api.put(`/projects/${id}`, data),
-  delete: (id: number) => api.delete(`/projects/${id}`),
+  update: (id: string, data: any) => api.put(`/projects/${id}`, data),
+  delete: (id: string) => api.delete(`/projects/${id}`),
 };
 
 export const analyticsAPI = {
   summary: () => api.get('/analytics/summary'),
-  company: (companyId: number) => api.get(`/analytics/company/${companyId}`),
+  overview: () => api.get('/analytics/overview'),
+  company: (companyId: string) => api.get(`/analytics/companies/${companyId}`),
 };
 
 export const notificationsAPI = {
   list: (limit: number = 50) => api.get('/notifications', { params: { limit } }),
   markRead: (ids: number[]) => api.post('/notifications/mark-read', ids),
+  delete: (id: number) => api.delete(`/notifications/${id}`),
 };
 
 export const settingsAPI = {
@@ -142,10 +150,10 @@ export const storageAPI = {
   // Yandex Disk specific
   yandex: {
     listFolders: (connectionId: number, path: string = '/') => 
-      api.get<YandexDiskFoldersResponse>(`/api/oauth/yandex/${connectionId}/folders?path=${encodeURIComponent(path)}`),
+      api.get<YandexDiskFoldersResponse>(`/oauth/yandex/${connectionId}/folders?path=${encodeURIComponent(path)}`),
     createFolder: (connectionId: number, folderPath: string) =>
       api.post<{ status: string; message: string; path: string }>(
-        `/api/oauth/yandex/${connectionId}/create-folder?folder_path=${encodeURIComponent(folderPath)}`
+        `/oauth/yandex/${connectionId}/create-folder?folder_path=${encodeURIComponent(folderPath)}`
       ),
   },
 };

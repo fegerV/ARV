@@ -1,4 +1,5 @@
-import { Box, Typography, Grid, Card, CardContent, Paper } from '@mui/material';
+import { useEffect, useState } from 'react';
+import { Box, Typography, Grid, Card, CardContent, Paper, CircularProgress, Alert } from '@mui/material';
 import {
   Visibility as ViewsIcon,
   People as SessionsIcon,
@@ -10,23 +11,94 @@ import {
   CheckCircle as UptimeIcon,
 } from '@mui/icons-material';
 
-const statsCards = [
-  { title: 'Total AR Views', value: '45,892', change: '+12.5%', icon: <ViewsIcon fontSize="large" />, color: '#1976d2' },
-  { title: 'Unique Sessions', value: '38,234', change: '+8.2%', icon: <SessionsIcon fontSize="large" />, color: '#2e7d32' },
-  { title: 'Active Content', value: '280', change: '+15', icon: <ContentIcon fontSize="large" />, color: '#9c27b0' },
-  { title: 'Storage Usage', value: '125GB', change: '10%', icon: <StorageIcon fontSize="large" />, color: '#ed6c02' },
-  { title: 'Active Companies', value: '15', change: '+2', icon: <CompaniesIcon fontSize="large" />, color: '#0288d1' },
-  { title: 'Active Projects', value: '100', change: '+12', icon: <ProjectsIcon fontSize="large" />, color: '#7b1fa2' },
-  { title: 'Revenue', value: '$4,200', change: '+15%', icon: <RevenueIcon fontSize="large" />, color: '#2e7d32' },
-  { title: 'Uptime', value: '99.92%', change: '✅', icon: <UptimeIcon fontSize="large" />, color: '#4caf50' },
-];
+import { analyticsAPI } from '../services/api';
+import { useToast } from '../store/useToast';
+
+interface AnalyticsSummary {
+  total_views: number;
+  unique_sessions: number;
+  active_content: number;
+  storage_used_gb: number | null;
+}
 
 export default function Dashboard() {
+  const { addToast } = useToast();
+
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [summary, setSummary] = useState<AnalyticsSummary | null>(null);
+
+  useEffect(() => {
+    const load = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const res = await analyticsAPI.summary();
+        setSummary(res.data as AnalyticsSummary);
+      } catch (err: any) {
+        const msg = err?.response?.data?.detail || err?.response?.data?.message || 'Failed to load dashboard data';
+        setError(msg);
+        addToast(msg, 'error');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    load();
+  }, [addToast]);
+
+  const statsCards = [
+    {
+      title: 'Total AR Views',
+      value: summary ? summary.total_views.toLocaleString() : '—',
+      change: '',
+      icon: <ViewsIcon fontSize="large" />,
+      color: '#1976d2',
+    },
+    {
+      title: 'Unique Sessions',
+      value: summary ? summary.unique_sessions.toLocaleString() : '—',
+      change: '',
+      icon: <SessionsIcon fontSize="large" />,
+      color: '#2e7d32',
+    },
+    {
+      title: 'Active Content',
+      value: summary ? summary.active_content.toLocaleString() : '—',
+      change: '',
+      icon: <ContentIcon fontSize="large" />,
+      color: '#9c27b0',
+    },
+    {
+      title: 'Storage Usage',
+      value: summary?.storage_used_gb != null ? `${summary.storage_used_gb} GB` : '—',
+      change: '',
+      icon: <StorageIcon fontSize="large" />,
+      color: '#ed6c02',
+    },
+    { title: 'Active Companies', value: '—', change: '', icon: <CompaniesIcon fontSize="large" />, color: '#0288d1' },
+    { title: 'Active Projects', value: '—', change: '', icon: <ProjectsIcon fontSize="large" />, color: '#7b1fa2' },
+    { title: 'Revenue', value: '—', change: '', icon: <RevenueIcon fontSize="large" />, color: '#2e7d32' },
+    { title: 'Uptime', value: '—', change: '', icon: <UptimeIcon fontSize="large" />, color: '#4caf50' },
+  ];
+
   return (
     <Box>
       <Typography variant="h4" gutterBottom sx={{ mb: 4 }}>
         Dashboard
       </Typography>
+
+      {error && (
+        <Alert severity="error" sx={{ mb: 3 }}>
+          {error}
+        </Alert>
+      )}
+
+      {loading && (
+        <Box sx={{ display: 'flex', justifyContent: 'center', mb: 3 }}>
+          <CircularProgress />
+        </Box>
+      )}
 
       <Grid container spacing={3}>
         {statsCards.map((stat, index) => (
@@ -41,9 +113,11 @@ export default function Dashboard() {
                     <Typography variant="h5" sx={{ fontWeight: 700, my: 1 }}>
                       {stat.value}
                     </Typography>
-                    <Typography variant="body2" color="success.main">
-                      {stat.change}
-                    </Typography>
+                    {stat.change ? (
+                      <Typography variant="body2" color="success.main">
+                        {stat.change}
+                      </Typography>
+                    ) : null}
                   </Box>
                   <Box sx={{ color: stat.color }}>
                     {stat.icon}

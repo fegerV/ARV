@@ -66,10 +66,9 @@ export default function ProjectForm() {
         return;
       }
 
-      await projectsAPI.create(parseInt(companyId), {
+      await projectsAPI.create({
+        company_id: companyId,
         name: formData.name,
-        description: formData.description,
-        slug: formData.slug,
       });
 
       addToast('Project created successfully!', 'success');
