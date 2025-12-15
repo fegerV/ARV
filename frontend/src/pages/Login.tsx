@@ -66,10 +66,13 @@ export default function Login() {
   const { addToast: showToast } = useToast();
   const theme = useTheme();
 
-  // Redirect if already authenticated
+  // Redirect if already authenticated AND on login page
   useEffect(() => {
     if (isAuthenticated) {
-      navigate('/', { replace: true });
+      // Only redirect if we're actually on the login page
+      if (window.location.pathname === '/login') {
+        navigate('/', { replace: true });
+      }
     }
   }, [isAuthenticated, navigate]);
 

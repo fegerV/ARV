@@ -20,27 +20,53 @@ export default function CompaniesList() {
   const navigate = useNavigate();
   const { addToast } = useToast();
 
+  console.log('CompaniesList component mounted');
+
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [items, setItems] = useState<CompanyListItem[]>([]);
 
+  console.log('CompaniesList rendering...');
+
   useEffect(() => {
+    console.log('CompaniesList useEffect triggered');
     const load = async () => {
       setLoading(true);
       setError(null);
       try {
+        console.log('Загрузка списка компаний...');
         const res = await companiesAPI.list({ page: 1, page_size: 50 });
+        console.log('Данные о компаниях получены:', res);
         setItems(res.data?.items || []);
+        console.log('Список компаний установлен');
       } catch (err: any) {
+        console.error('Ошибка при загрузке компаний:', err);
+        console.error('Статус ошибки:', err?.response?.status);
+        console.error('Данные ошибки:', err?.response?.data);
         const msg = err?.response?.data?.detail || err?.response?.data?.message || 'Failed to load companies';
         setError(msg);
         addToast(msg, 'error');
       } finally {
         setLoading(false);
+        console.log('Загрузка компаний завершена');
       }
     };
     load();
+    
+    // Cleanup function
+    return () => {
+      console.log('CompaniesList component unmounting');
+    };
   }, [addToast]);
+
+  console.log('CompaniesList rendered with items:', items.length);
+
+  // Log navigation attempts
+  const originalNavigate = navigate;
+  const navigateWrapper = (to: any, options?: any) => {
+    console.log('CompaniesList navigation attempt:', { to, options });
+    return originalNavigate(to, options);
+  };
 
   return (
     <Box>
@@ -49,7 +75,10 @@ export default function CompaniesList() {
         <Button
           variant="contained"
           startIcon={<AddIcon />}
-          onClick={() => navigate('/companies/new')}
+          onClick={() => {
+            console.log('Navigate to /companies/new');
+            navigateWrapper('/companies/new');
+          }}
         >
           New Company
         </Button>
@@ -100,10 +129,24 @@ export default function CompaniesList() {
                   {company.created_at ? format(new Date(company.created_at), 'dd.MM.yyyy HH:mm') : '—'}
                 </TableCell>
                 <TableCell>
-                  <IconButton onClick={() => navigate(`/companies/${company.id}`)} size="small" title="Edit">
+                  <IconButton 
+                    onClick={() => {
+                      console.log('Navigate to company edit:', `/companies/${company.id}`);
+                      navigateWrapper(`/companies/${company.id}`);
+                    }} 
+                    size="small" 
+                    title="Edit"
+                  >
                     <EditIcon fontSize="small" />
                   </IconButton>
-                  <IconButton onClick={() => navigate(`/companies/${company.id}/projects`)} size="small" title="Open Projects">
+                  <IconButton 
+                    onClick={() => {
+                      console.log('Navigate to company projects:', `/companies/${company.id}/projects`);
+                      navigateWrapper(`/companies/${company.id}/projects`);
+                    }} 
+                    size="small" 
+                    title="Open Projects"
+                  >
                     <FolderIcon fontSize="small" />
                   </IconButton>
                 </TableCell>

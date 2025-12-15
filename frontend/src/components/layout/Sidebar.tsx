@@ -47,6 +47,8 @@ export default function Sidebar() {
   const navigate = useNavigate();
   const [mobileOpen, setMobileOpen] = useState(false);
   const { user, logout } = useAuthStore();
+  
+  console.log('Sidebar rendered, current location:', location.pathname);
 
   const handleDrawerToggle = () => {
     setMobileOpen(!mobileOpen);

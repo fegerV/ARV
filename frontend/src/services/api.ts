@@ -27,7 +27,9 @@ api.interceptors.request.use(
 api.interceptors.response.use(
   (response) => response,
   (error) => {
+    console.log('API error interceptor triggered:', error);
     if (error.response?.status === 401) {
+      console.log('401 error, redirecting to /login');
       // Redirect to login
       window.location.href = '/login';
     }

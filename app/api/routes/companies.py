@@ -14,6 +14,8 @@ from app.schemas.company_api import (
     CompanyLinks, PaginatedCompaniesResponse
 )
 from app.api.routes.auth import get_current_active_user
+# Add import for slug utility
+from app.utils.slug_utils import generate_slug
 
 router = APIRouter(tags=["companies"])
 
@@ -157,9 +159,13 @@ async def create_company(
     """Create a new company"""
     logger = structlog.get_logger()
     
+    # Generate slug from company name
+    slug = generate_slug(company_data.name)
+    
     # Create company
     company = Company(
         name=company_data.name,
+        slug=slug,
         contact_email=company_data.contact_email,
         status=company_data.status
     )

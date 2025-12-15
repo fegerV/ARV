@@ -8,7 +8,7 @@ import structlog
 from fastapi import FastAPI, Request, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, FileResponse
 from prometheus_client import Summary
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.requests import Request
@@ -113,7 +113,7 @@ app.add_middleware(
 os.makedirs(settings.MEDIA_ROOT, exist_ok=True)
 os.makedirs("static", exist_ok=True)
 app.mount("/storage", StaticFiles(directory=settings.MEDIA_ROOT), name="storage")
-app.mount("/static", StaticFiles(directory="static"), name="static")
+# Static files mounting moved to the end to not interfere with API routes
 
 
 # Request logging middleware
@@ -275,13 +275,8 @@ async def health_check():
 # Root endpoint
 @app.get("/")
 async def root():
-    """Root endpoint with API information."""
-    return {
-        "message": "Vertex AR B2B Platform API",
-        "version": "0.1.0",
-        "docs": "/docs",
-        "health": "/api/health/status"
-    }
+    """Serve the frontend application."""
+    return templates.TemplateResponse("index.html", {"request": {}})
 
 
 # AR Viewer endpoint
@@ -290,6 +285,16 @@ async def ar_viewer(unique_id: str):
     """Public AR viewer endpoint."""
     return templates.TemplateResponse("ar_viewer.html", {"request": {}, "unique_id": unique_id})
 
+
+# Favicon endpoint
+@app.get("/favicon.ico")
+async def favicon():
+    """Serve favicon."""
+    return FileResponse("templates/favicon.png")
+
+
+# Serve static files (must be after all API routes)
+app.mount("/", StaticFiles(directory="static", html=True), name="static")
 
 if __name__ == "__main__":
     import uvicorn

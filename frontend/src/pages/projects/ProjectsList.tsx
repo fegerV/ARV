@@ -1,5 +1,6 @@
-import { useState, useEffect, type ChangeEvent } from 'react';
+import { useState, useEffect } from 'react';
 import { Box, Typography, Button, Paper, Table, TableHead, TableBody, TableRow, TableCell, Chip, Select, MenuItem, FormControl, InputLabel, Alert, Dialog, DialogTitle, DialogContent, DialogActions, DialogContentText, CircularProgress } from '@mui/material';
+import type { SelectChangeEvent } from '@mui/material';
 import { Add as AddIcon, Delete as DeleteIcon, Refresh as RefreshIcon } from '@mui/icons-material';
 import { useNavigate, useParams } from 'react-router-dom';
 import { companiesAPI, projectsAPI } from '../../services/api';
@@ -26,6 +27,8 @@ export default function ProjectsList() {
   const { companyId } = useParams<{ companyId: string }>();
   const { addToast } = useToast();
   
+  console.log('ProjectsList component mounted, companyId:', companyId);
+
   const [companies, setCompanies] = useState<Company[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [selectedCompanyId, setSelectedCompanyId] = useState<string | null>(null);
@@ -36,6 +39,13 @@ export default function ProjectsList() {
 
   const [refreshing, setRefreshing] = useState(false);
   
+  console.log('ProjectsList rendering with state:', { 
+    companyId, 
+    selectedCompanyId, 
+    loading, 
+    projectsCount: projects.length 
+  });
+
   // Fetch companies and projects
   useEffect(() => {
     let isMounted = true;
@@ -88,9 +98,10 @@ export default function ProjectsList() {
                     }
                   }
                   
-                  if (!companyId && isMounted) {
+                  // Убираем автоматический редирект, который вызывал проблему
+                  /* if (!companyId && isMounted) {
                     navigate(`/companies/${defaultCompanyId}/projects`, { replace: true });
-                  }
+                  } */
                 }
                 setLoading(false);
                 return;
@@ -153,10 +164,11 @@ export default function ProjectsList() {
             }
           }
           
-          // Update URL if needed
+          // Убираем автоматический редирект, который вызывал проблему
+          /* // Update URL if needed
           if (!companyId && isMounted) {
             navigate(`/companies/${defaultCompanyId}/projects`, { replace: true });
-          }
+          } */
         }
       } catch (error) {
         console.error('Failed to fetch companies:', error);
@@ -240,14 +252,18 @@ export default function ProjectsList() {
     }
   };
 
-  const handleCompanyChange = (event: ChangeEvent<{ value: unknown }>) => {
+  const handleCompanyChange = (event: SelectChangeEvent) => {
+    console.log('handleCompanyChange called with event:', event);
     const value = event.target.value as string;
     const nextCompanyId = value ? String(value) : null;
     setSelectedCompanyId(nextCompanyId);
     if (nextCompanyId) {
+      console.log('Navigating to company projects:', `/companies/${nextCompanyId}/projects`);
       navigate(`/companies/${nextCompanyId}/projects`);
     } else {
-      navigate('/projects');
+      console.log('Would navigate to /projects, but skipping');
+      // Убираем редирект на /projects, который может вызывать проблемы
+      // navigate('/projects');
     }
   };
 
@@ -302,7 +318,8 @@ export default function ProjectsList() {
             console.error('Failed to fetch projects:', projectsError);
             addToast('Failed to load projects', 'error');
           }
-          navigate(`/companies/${vertexARCompany.id}/projects`, { replace: true });
+          // Убираем автоматический редирект, который вызывал проблему
+          // navigate(`/companies/${vertexARCompany.id}/projects`, { replace: true });
         }
       }
     } catch (error) {

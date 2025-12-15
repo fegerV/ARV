@@ -8,10 +8,14 @@ interface ProtectedRouteProps {
 
 export default function ProtectedRoute({ children }: ProtectedRouteProps) {
   const { isAuthenticated } = useAuthStore();
+  
+  console.log('ProtectedRoute check, isAuthenticated:', isAuthenticated);
 
   if (!isAuthenticated) {
+    console.log('ProtectedRoute: redirecting to /login');
     return <Navigate to="/login" replace />;
   }
 
+  console.log('ProtectedRoute: rendering children');
   return <>{children}</>;
 }

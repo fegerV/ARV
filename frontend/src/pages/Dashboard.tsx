@@ -23,6 +23,8 @@ interface AnalyticsSummary {
 
 export default function Dashboard() {
   const { addToast } = useToast();
+  
+  console.log('Dashboard component rendered');
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
