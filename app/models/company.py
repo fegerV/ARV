@@ -16,6 +16,7 @@ class Company(Base):
     
     # Basic information
     name = Column(String(255), nullable=False)
+    slug = Column(String(255), nullable=False)  # Добавляем поле slug
     contact_email = Column(String(255))
     status = Column(String(50), default=CompanyStatus.ACTIVE, nullable=False)
     

@@ -108,6 +108,7 @@ async def seed_defaults() -> None:
         if not default_company:
             default_company = Company(
                 name="Vertex AR",
+                slug="vertex-ar",  # Добавляем slug
                 contact_email=settings.ADMIN_EMAIL,
                 status=CompanyStatus.ACTIVE
             )

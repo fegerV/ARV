@@ -31,7 +31,6 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    command: gunicorn -k uvicorn.workers.UvicornWorker -w 2 --bind 0.0.0.0:8000 app.main:app
     volumes:
       - .:/app
       - ./storage:/app/storage

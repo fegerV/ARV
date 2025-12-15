@@ -223,7 +223,7 @@ async def general_exception_handler(request: Request, exc: Exception):
 # Include API routers
 from app.api.routes import auth, companies, projects, ar_content, storage, analytics, notifications
 
-app.include_router(auth.router, prefix="/api/auth", tags=["Authentication"])
+app.include_router(auth.router, prefix="/api", tags=["Authentication"])
 app.include_router(companies.router, prefix="/api/companies", tags=["Companies"])
 app.include_router(projects.router, prefix="/api/projects", tags=["Projects"])
 app.include_router(ar_content.router, prefix="/api/ar-content", tags=["AR Content"])

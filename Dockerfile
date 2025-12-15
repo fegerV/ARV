@@ -49,6 +49,10 @@ RUN mkdir -p /app/storage/content \
     /app/storage/temp \
     && chown -R appuser:appuser /app/storage
 
+# Делаем entrypoint.sh исполняемым и копируем его
+COPY entrypoint.sh /usr/local/bin/
+RUN chmod +x /usr/local/bin/entrypoint.sh
+
 # Переключаемся на непривилегированного пользователя
 USER appuser
 
@@ -58,6 +62,9 @@ EXPOSE 8000
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
     CMD curl -f http://localhost:8000/api/health/status || exit 1
+
+# Используем наш entrypoint script
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
 
 # Default command
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
