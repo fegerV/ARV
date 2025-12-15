@@ -1,17 +1,25 @@
-from typing import AsyncGenerator
-from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
+"""Database configuration and session management."""
+
+import sys
+from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 from sqlalchemy.orm import declarative_base
-
+from sqlalchemy.pool import NullPool
+from typing import AsyncGenerator
 from app.core.config import settings
+import logging
 
-# Create async engine
+logger = logging.getLogger(__name__)
+
+# Create async engine with connection pooling
 engine = create_async_engine(
     settings.DATABASE_URL,
-    echo=settings.DB_ECHO,
-    pool_size=settings.DB_POOL_SIZE,
-    max_overflow=settings.DB_MAX_OVERFLOW,
-    pool_pre_ping=True,
-    pool_recycle=3600,
+    poolclass=NullPool,  # Disable connection pooling for development
+    echo=settings.DEBUG,
+    connect_args={
+        "server_settings": {
+            "application_name": "vertex_ar_api"
+        }
+    }
 )
 
 # Create async session factory
@@ -46,9 +54,8 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
 
 
 async def init_db() -> None:
-    """Initialize database (create tables if not exist)."""
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
+    """Initialize database - no longer creates tables automatically"""
+    pass
 
 
 async def seed_defaults() -> None:
@@ -56,7 +63,7 @@ async def seed_defaults() -> None:
     from sqlalchemy import select
     from app.models.storage import StorageConnection
     from app.models.company import Company
-    from app.models.user import User, UserRole
+    from app.models.user import User
     from app.core.security import get_password_hash
     from app.enums import CompanyStatus
     from pathlib import Path
@@ -70,54 +77,44 @@ async def seed_defaults() -> None:
                 email=settings.ADMIN_EMAIL,
                 hashed_password=get_password_hash(settings.ADMIN_DEFAULT_PASSWORD),
                 full_name="Vertex AR Admin",
-                role=UserRole.ADMIN,
+                role="admin",  # Простая строка вместо ENUM
                 is_active=True,
             )
             session.add(admin_user)
             await session.flush()
 
         # Default local storage connection
-        res = await session.execute(select(StorageConnection).where(StorageConnection.is_default == True))
-        default_conn = res.scalar_one_or_none()
-        if not default_conn:
-            default_conn = StorageConnection(
-                name="Vertex AR Local Storage",
+        res_storage = await session.execute(select(StorageConnection))
+        default_storage = res_storage.scalar_one_or_none()
+        if not default_storage:
+            storage_path = Path("/app/storage/content")
+            storage_path.mkdir(parents=True, exist_ok=True)
+            
+            default_storage = StorageConnection(
+                name="Local Storage",
                 provider="local_disk",
-                base_path=settings.LOCAL_STORAGE_PATH,
+                base_path=str(storage_path),
                 is_active=True,
                 is_default=True,
             )
-            session.add(default_conn)
+            session.add(default_storage)
             await session.flush()
+            
+            logger.info("local_storage_structure_created", base_path=str(storage_path))
 
         # Default company
-        res2 = await session.execute(select(Company).where(Company.name == "Vertex AR"))
-        default_company = res2.scalar_one_or_none()
+        res_company = await session.execute(select(Company))
+        default_company = res_company.scalar_one_or_none()
         if not default_company:
             default_company = Company(
                 name="Vertex AR",
                 contact_email=settings.ADMIN_EMAIL,
-                status=CompanyStatus.ACTIVE,
+                status=CompanyStatus.ACTIVE
             )
             session.add(default_company)
-
-        # Create base folder structure for local storage
-        try:
-            base_dir = Path(settings.LOCAL_STORAGE_PATH)
-            for sub in ["ar-content", "videos", "markers", "qr-codes", "thumbnails"]:
-                (base_dir / sub).mkdir(parents=True, exist_ok=True)
+            await session.flush()
             
-            # Create company structure
-            companies_dir = base_dir / "companies"
-            companies_dir.mkdir(parents=True, exist_ok=True)
-            
-            logger = __import__('structlog').get_logger()
-            logger.info("local_storage_structure_created", base_path=str(base_dir))
-        except Exception as e:
-            logger = __import__('structlog').get_logger()
-            logger.warning("failed_to_create_storage_structure", error=str(e))
+            logger.info("default_company_created", company_id=default_company.id)
 
         await session.commit()
-async def close_db() -> None:
-    """Close database connections."""
-    await engine.dispose()
+        logger.info("defaults_seeded")

@@ -1,7 +1,7 @@
 # Models module
 
 from ..enums import CompanyStatus, ProjectStatus, ArContentStatus, VideoStatus
-from .user import User, UserRole
+from .user import User
 from .company import Company
 from .project import Project
 from .folder import Folder
@@ -18,7 +18,7 @@ from .audit_log import AuditLog
 
 __all__ = [
     "CompanyStatus", "ProjectStatus", "ArContentStatus", "VideoStatus",
-    "User", "UserRole",
+    "User",
     "Company",
     "Project", 
     "Folder",

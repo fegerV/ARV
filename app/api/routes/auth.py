@@ -178,7 +178,7 @@ async def register_user(
             "unauthorized_registration_attempt", 
             user_id=current_user.id, 
             email=current_user.email,
-            requested_role=user_data.role.value
+            requested_role=user_data.role
         )
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -218,7 +218,7 @@ async def register_user(
         "user_registered",
         user_id=new_user.id,
         email=new_user.email,
-        role=new_user.role.value,
+        role=new_user.role,
         created_by=current_user.email
     )
     

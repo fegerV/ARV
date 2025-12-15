@@ -348,84 +348,85 @@ export default function ARContentList() {
             <CircularProgress />
           </Box>
         ) : (
-        <TableContainer>
-          <Table>
-            <TableHead>
-              <TableRow>
-                <TableCell>Company</TableCell>
-                <TableCell>Order Number</TableCell>
-                <TableCell>Created At</TableCell>
-                <TableCell>Status</TableCell>
-                <TableCell>Thumbnail</TableCell>
-                <TableCell>Active Video</TableCell>
-                <TableCell>Customer</TableCell>
-                <TableCell>Views</TableCell>
-                <TableCell>Link</TableCell>
-                <TableCell>QR Code</TableCell>
-                <TableCell>Actions</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {paginatedContent.map((item: ARContentItem) => (
-                <TableRow key={item.id} hover>
-                  <TableCell>{item.company_name}</TableCell>
-                  <TableCell>
-                    <Typography variant="subtitle2">{item.order_number}</Typography>
-                  </TableCell>
-                  <TableCell>{new Date(item.created_at).toLocaleDateString()}</TableCell>
-                  <TableCell>{getStatusChip(item.status)}</TableCell>
-                  <TableCell>
-                    <Avatar
-                      variant="rounded"
-                      src={item.thumbnail_url}
-                      sx={{ width: 40, height: 40 }}
-                    />
-                  </TableCell>
-                  <TableCell>{item.active_video_title || '—'}</TableCell>
-                  <TableCell>
-                    <Typography variant="body2">{item.customer_name || '—'}</Typography>
-                    <Typography variant="caption" color="textSecondary">{item.customer_phone || ''}</Typography>
-                    <Typography variant="caption" color="textSecondary" sx={{ display: 'block' }}>{item.customer_email || ''}</Typography>
-                  </TableCell>
-                  <TableCell>{item.views_30_days ?? item.views_count}</TableCell>
-                  <TableCell>
-                    <IconButton size="small" onClick={() => handleCopyLink(item.public_url || '')} disabled={!item.public_url}>
-                      <CopyIcon fontSize="small" />
-                    </IconButton>
-                    <IconButton size="small" onClick={() => handleOpenLink(item.public_url || '')} disabled={!item.public_url}>
-                      <OpenIcon fontSize="small" />
-                    </IconButton>
-                  </TableCell>
-                  <TableCell>
-                    <IconButton size="small" onClick={() => handleShowQR(item)} disabled={!item.public_url}>
-                      <QrCodeIcon fontSize="small" />
-                    </IconButton>
-                  </TableCell>
-                  <TableCell>
-                    <Tooltip title="Edit">
-                      <IconButton size="small" onClick={() => handleEdit(item.id)}>
-                        <EditIcon fontSize="small" />
-                      </IconButton>
-                    </Tooltip>
-                    <Tooltip title="Delete">
-                      <IconButton size="small" onClick={() => handleDelete(item.id)}>
-                        <DeleteIcon fontSize="small" />
-                      </IconButton>
-                    </Tooltip>
-                  </TableCell>
-                </TableRow>
-              ))}
-              
-              {paginatedContent.length === 0 && (
+          <TableContainer>
+            <Table>
+              <TableHead>
                 <TableRow>
-                  <TableCell colSpan={13} align="center">
-                    <Typography>No AR content found</Typography>
-                  </TableCell>
+                  <TableCell>Company</TableCell>
+                  <TableCell>Order Number</TableCell>
+                  <TableCell>Created At</TableCell>
+                  <TableCell>Status</TableCell>
+                  <TableCell>Thumbnail</TableCell>
+                  <TableCell>Active Video</TableCell>
+                  <TableCell>Customer</TableCell>
+                  <TableCell>Views</TableCell>
+                  <TableCell>Link</TableCell>
+                  <TableCell>QR Code</TableCell>
+                  <TableCell>Actions</TableCell>
                 </TableRow>
-              )}
-            </TableBody>
-          </Table>
-        </TableContainer>
+              </TableHead>
+              <TableBody>
+                {paginatedContent.map((item: ARContentItem) => (
+                  <TableRow key={item.id} hover>
+                    <TableCell>{item.company_name}</TableCell>
+                    <TableCell>
+                      <Typography variant="subtitle2">{item.order_number}</Typography>
+                    </TableCell>
+                    <TableCell>{new Date(item.created_at).toLocaleDateString()}</TableCell>
+                    <TableCell>{getStatusChip(item.status)}</TableCell>
+                    <TableCell>
+                      <Avatar
+                        variant="rounded"
+                        src={item.thumbnail_url}
+                        sx={{ width: 40, height: 40 }}
+                      />
+                    </TableCell>
+                    <TableCell>{item.active_video_title || '—'}</TableCell>
+                    <TableCell>
+                      <Typography variant="body2">{item.customer_name || '—'}</Typography>
+                      <Typography variant="caption" color="text.secondary">{item.customer_phone || ''}</Typography>
+                      <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>{item.customer_email || ''}</Typography>
+                    </TableCell>
+                    <TableCell>{item.views_30_days ?? item.views_count}</TableCell>
+                    <TableCell>
+                      <IconButton size="small" onClick={() => handleCopyLink(item.public_url || '')} disabled={!item.public_url}>
+                        <CopyIcon fontSize="small" />
+                      </IconButton>
+                      <IconButton size="small" onClick={() => handleOpenLink(item.public_url || '')} disabled={!item.public_url}>
+                        <OpenIcon fontSize="small" />
+                      </IconButton>
+                    </TableCell>
+                    <TableCell>
+                      <IconButton size="small" onClick={() => handleShowQR(item)} disabled={!item.public_url}>
+                        <QrCodeIcon fontSize="small" />
+                      </IconButton>
+                    </TableCell>
+                    <TableCell>
+                      <Tooltip title="Edit">
+                        <IconButton size="small" onClick={() => handleEdit(item.id)}>
+                          <EditIcon fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
+                      <Tooltip title="Delete">
+                        <IconButton size="small" onClick={() => handleDelete(item.id)}>
+                          <DeleteIcon fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
+                    </TableCell>
+                  </TableRow>
+                ))}
+                
+                {paginatedContent.length === 0 && (
+                  <TableRow>
+                    <TableCell colSpan={13} align="center">
+                      <Typography>No AR content found</Typography>
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        )}
         
         {/* Pagination */}
         <TablePagination
@@ -437,7 +438,6 @@ export default function ARContentList() {
           onPageChange={handleChangePage}
           onRowsPerPageChange={handleChangeRowsPerPage}
         />
-        )}
       </Paper>
 
       {/* QR Code Dialog */}
@@ -447,7 +447,7 @@ export default function ARContentList() {
           {selectedContent && (
             <>
               <QRCode value={selectedContent.public_url || ''} size={200} />
-              <Typography variant="body2" color="textSecondary">{selectedContent.public_url}</Typography>
+              <Typography variant="body2" color="text.secondary">{selectedContent.public_url}</Typography>
             </>
           )}
         </DialogContent>

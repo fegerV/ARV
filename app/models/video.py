@@ -1,14 +1,19 @@
 from sqlalchemy import Column, Integer, String, ForeignKey, Boolean, DateTime
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
-from app.models.base import BaseModel
+from app.core.database import Base
 from app.enums import VideoStatus
+import uuid
+from datetime import datetime
 
 
-class Video(BaseModel):
+class Video(Base):
     __tablename__ = "videos"
 
-    ar_content_id = Column(UUID(as_uuid=True), ForeignKey("ar_contents.id"), nullable=False)
+    # Use Integer as primary key to match migration
+    id = Column(Integer, primary_key=True, index=True)
+    # Исправляем ссылку на правильное имя таблицы
+    ar_content_id = Column(Integer, ForeignKey("ar_content.id"), nullable=False)
     
     # File information
     filename = Column(String(255), nullable=False)
@@ -35,6 +40,11 @@ class Video(BaseModel):
     rotation_order = Column(Integer, default=0, nullable=False)
     subscription_end = Column(DateTime, nullable=True)
     
+    # Timestamps
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    
     # Relationships
+    # Исправляем ссылку на правильное имя таблицы
     ar_content = relationship("ARContent", back_populates="videos", foreign_keys=[ar_content_id])
     schedules = relationship("VideoSchedule", back_populates="video", cascade="all, delete-orphan")

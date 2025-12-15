@@ -1,13 +1,19 @@
 from sqlalchemy import Column, Integer, String, Time, DateTime, ARRAY, ForeignKey
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
-from app.models.base import BaseModel
+from app.core.database import Base
+import uuid
+from datetime import datetime
 
 
-class VideoRotationSchedule(BaseModel):
+class VideoRotationSchedule(Base):
     __tablename__ = "video_rotation_schedules"
-
-    ar_content_id = Column(UUID(as_uuid=True), ForeignKey("ar_contents.id"), nullable=False)
+    
+    # Use Integer as primary key to match migration
+    id = Column(Integer, primary_key=True, index=True)
+    
+    # Исправляем ссылку на правильное имя таблицы
+    ar_content_id = Column(Integer, ForeignKey("ar_content.id"), nullable=False)
 
     rotation_type = Column(String(50), nullable=False)
 
@@ -22,6 +28,10 @@ class VideoRotationSchedule(BaseModel):
     is_active = Column(Integer, default=1)  # use Boolean if preferred
     last_rotation_at = Column(DateTime)
     next_rotation_at = Column(DateTime)
+    
+    # Timestamps
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
 
     # Relationships
     ar_content = relationship("ARContent")

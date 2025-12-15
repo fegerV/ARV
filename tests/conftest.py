@@ -2,70 +2,71 @@
 Test configuration and fixtures for Vertex AR platform tests.
 """
 
-import os
-import sys
-import pytest
 import asyncio
-from typing import AsyncGenerator
-import tempfile
-from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
-from sqlalchemy.pool import StaticPool
-from httpx import AsyncClient
+import pytest
+from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
+from sqlalchemy.sql import text
+from app.core.database import Base
+from app.core.config import settings
+from app.core.security import get_password_hash
 
 
-_pytest_media_root = tempfile.mkdtemp(prefix="arv_test_media_")
-os.environ["MEDIA_ROOT"] = _pytest_media_root
-os.environ["LOCAL_STORAGE_PATH"] = _pytest_media_root
-os.environ["STORAGE_BASE_PATH"] = _pytest_media_root
-os.makedirs(_pytest_media_root, exist_ok=True)
-
-# Add project root to path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
-
-from app.core.database import Base, get_db
-from app.models import user, company, storage, ar_content  # Import all models
-from app.models.company import Company
-from app.models.project import Project
-from app.models.ar_content import ARContent
-from app.models.video import Video
-from app.enums import CompanyStatus, ProjectStatus, ArContentStatus, VideoStatus
+# Test database URL - use same as dev but with test suffix
+TEST_DATABASE_URL = settings.DATABASE_URL.replace("vertex_ar", "vertex_ar_test")
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture(scope="session")
+def event_loop():
+    """Create event loop for async tests."""
+    loop = asyncio.get_event_loop_policy().new_event_loop()
+    yield loop
+    loop.close()
+
+
+@pytest.fixture(scope="session")
 async def test_engine():
-    """Create a test database engine."""
-    test_database_url = "sqlite+aiosqlite:///:memory:"
-    
-    test_engine = create_async_engine(
-        test_database_url,
-        echo=False,
-        poolclass=StaticPool,
-        connect_args={"check_same_thread": False},
-    )
-    
+    """Create test database engine."""
+    engine = create_async_engine(TEST_DATABASE_URL, echo=False)
+    yield engine
+    await engine.dispose()
+
+
+@pytest.fixture(scope="session")
+async def test_session_factory(test_engine):
+    """Create test session factory."""
     async with test_engine.begin() as conn:
+        await conn.run_sync(Base.metadata.drop_all)
         await conn.run_sync(Base.metadata.create_all)
-    
-    yield test_engine
-    await test_engine.dispose()
+    session_factory = async_sessionmaker(test_engine, expire_on_commit=False)
+    yield session_factory
 
 
 @pytest.fixture(scope="function")
-async def test_session(test_engine):
-    """Create a test database session."""
-    TestSessionLocal = async_sessionmaker(
-        test_engine,
-        class_=AsyncSession,
-        expire_on_commit=False,
-        autocommit=False,
-        autoflush=False,
-    )
-    
-    # Seed data
-    await seed_test_data(TestSessionLocal)
-    
-    async with TestSessionLocal() as session:
+async def test_session(test_session_factory):
+    """Create isolated test session with rollback."""
+    async with test_session_factory() as session:
+        # Begin a nested transaction
+        nested = await session.begin_nested()
+        
+        # Override commit to flush and rollback instead
+        original_commit = session.commit
+        original_rollback = session.rollback
+        
+        async def mock_commit():
+            await session.flush()
+            await nested.rollback()
+            
+        async def mock_rollback():
+            await nested.rollback()
+            
+        session.commit = mock_commit
+        session.rollback = mock_rollback
+        
         yield session
+        
+        # Restore original methods
+        session.commit = original_commit
+        session.rollback = original_rollback
 
 
 @pytest.fixture(scope="function")
@@ -76,8 +77,9 @@ async def db(test_session):
 
 async def seed_test_data(session_factory):
     """Seed test database with default data."""
+    from sqlalchemy import select
     from app.core.security import get_password_hash
-    from app.models.user import User, UserRole
+    from app.models.user import User
     from app.models.storage import StorageConnection
     from app.models.company import Company
     
@@ -86,7 +88,7 @@ async def seed_test_data(session_factory):
             email="admin@vertexar.com",
             hashed_password=get_password_hash("admin123"),
             full_name="Vertex AR Admin",
-            role=UserRole.ADMIN,
+            role="admin",  # Простая строка вместо ENUM
             is_active=True,
         )
         session.add(default_admin)
@@ -98,7 +100,6 @@ async def seed_test_data(session_factory):
             base_path="/tmp/test_storage",
             is_active=True,
             is_default=True,
-            credentials={},
         )
         session.add(default_storage)
         await session.flush()
@@ -111,6 +112,14 @@ async def seed_test_data(session_factory):
         session.add(default_company)
         
         await session.commit()
+
+
+@pytest.fixture(scope="function")
+async def seeded_test_session(test_session_factory):
+    """Create test session with default data."""
+    await seed_test_data(test_session_factory)
+    async with test_session_factory() as session:
+        yield session
 
 
 @pytest.fixture(scope="function")

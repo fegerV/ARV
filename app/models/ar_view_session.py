@@ -1,15 +1,21 @@
 from sqlalchemy import Column, Integer, String, Boolean, DateTime, ForeignKey
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import relationship
-from app.models.base import BaseModel
+from app.core.database import Base
+import uuid
+from datetime import datetime
 
 
-class ARViewSession(BaseModel):
+class ARViewSession(Base):
     __tablename__ = "ar_view_sessions"
-
-    ar_content_id = Column(UUID(as_uuid=True), ForeignKey("ar_contents.id"), nullable=False)
-    project_id = Column(UUID(as_uuid=True), ForeignKey("projects.id"), nullable=False)
-    company_id = Column(UUID(as_uuid=True), ForeignKey("companies.id"), nullable=False)
+    
+    # Use Integer as primary key to match migration
+    id = Column(Integer, primary_key=True, index=True)
+    
+    # Исправляем ссылку на правильное имя таблицы
+    ar_content_id = Column(Integer, ForeignKey("ar_content.id"), nullable=False)
+    project_id = Column(Integer, ForeignKey("projects.id"), nullable=False)
+    company_id = Column(Integer, ForeignKey("companies.id"), nullable=False)
 
     session_id = Column(UUID(as_uuid=True))
 
@@ -25,6 +31,10 @@ class ARViewSession(BaseModel):
     duration_seconds = Column(Integer)
     tracking_quality = Column(String(50))
     video_played = Column(Boolean, default=False)
+    
+    # Timestamps
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
 
     # Relationships
     ar_content = relationship("ARContent")

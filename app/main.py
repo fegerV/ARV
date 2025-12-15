@@ -1,21 +1,23 @@
-import sys
-import os
-import structlog
-from datetime import datetime
 from contextlib import asynccontextmanager
+from datetime import datetime
+import os
+import sys
 from typing import AsyncGenerator
 
-from fastapi import FastAPI, Request, status, Depends
-from fastapi.responses import JSONResponse
-from fastapi.templating import Jinja2Templates
-from fastapi.staticfiles import StaticFiles
-from fastapi.middleware.cors import CORSMiddleware
+import structlog
+from fastapi import FastAPI, Request, status
 from fastapi.exceptions import RequestValidationError
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from prometheus_client import Summary
 from starlette.exceptions import HTTPException as StarletteHTTPException
+from starlette.requests import Request
+from starlette.responses import JSONResponse
+from starlette.templating import Jinja2Templates
+from starlette.staticfiles import StaticFiles
 
 from app.core.config import settings
-from app.core.database import init_db, close_db, seed_defaults
+from app.core.database import init_db, seed_defaults
 from app.api.routes.auth import get_current_active_user
 
 
@@ -77,7 +79,6 @@ async def lifespan(app: FastAPI) -> AsyncGenerator:
     
     # Shutdown
     logger.info("application_shutdown")
-    await close_db()
     logger.info("database_closed")
 
 
@@ -212,95 +213,90 @@ async def general_exception_handler(request: Request, exc: Exception):
         content={
             "error": {
                 "code": 500,
-                "message": "Internal server error" if not settings.DEBUG else str(exc),
+                "message": "Internal server error",
                 "timestamp": datetime.utcnow().isoformat(),
             }
         },
     )
 
 
-# Health check endpoints
-# Health endpoints moved to app.api.routes.health
+# Include API routers
+from app.api.routes import auth, companies, projects, ar_content, storage, analytics, notifications
 
+app.include_router(auth.router, prefix="/api/auth", tags=["Authentication"])
+app.include_router(companies.router, prefix="/api/companies", tags=["Companies"])
+app.include_router(projects.router, prefix="/api/projects", tags=["Projects"])
+app.include_router(ar_content.router, prefix="/api/ar-content", tags=["AR Content"])
+app.include_router(storage.router, prefix="/api/storage", tags=["Storage"])
+app.include_router(analytics.router, prefix="/api/analytics", tags=["Analytics"])
+app.include_router(notifications.router, prefix="/api/notifications", tags=["Notifications"])
 
-# Readiness endpoint removed; use /api/health/status for checks
-
-
-@app.get("/", tags=["Root"])
-async def root():
-    """Root endpoint."""
+# Health check endpoint
+@app.get("/api/health/status")
+async def health_check():
+    """Health check endpoint."""
+    logger = structlog.get_logger()
+    
+    # Check database connection
+    from app.core.database import engine
+    from sqlalchemy import text
+    try:
+        async with engine.connect() as conn:
+            await conn.execute(text("SELECT 1"))
+        db_status = "healthy"
+    except Exception as e:
+        db_status = f"unhealthy: {str(e)}"
+    
+    # System metrics
+    import psutil
+    system_metrics = {
+        "cpu_percent": psutil.cpu_percent(),
+        "memory_percent": psutil.virtual_memory().percent,
+        "disk_percent": psutil.disk_usage("/").percent if os.name != "nt" else psutil.disk_usage("C:").percent,
+    }
+    
+    overall_status = "healthy" if db_status == "healthy" else "unhealthy"
+    
+    logger.info(
+        "health_check",
+        database=db_status,
+        system=system_metrics,
+        overall=overall_status,
+    )
+    
     return {
-        "message": "Vertex AR B2B Platform API",
-        "version": app.version,
-        "docs": "/docs",
-        "health": "/api/health/status",
+        "status": overall_status,
+        "database": db_status,
+        "system": system_metrics,
+        "timestamp": datetime.utcnow().isoformat(),
     }
 
 
-# Include API routers (will be added in next phases)
-from app.api.routes import companies as companies_router
-from app.api.routes import projects as projects_router
-from app.api.routes import ar_content as ar_content_router
-from app.api.routes import storage as storage_router
-from app.api import storage as simplified_storage_router
-from app.api.routes import videos as videos_router
-from app.api.routes import rotation as rotation_router
-from app.api.routes import analytics as analytics_router
-from app.api.routes import notifications as notifications_router
-from app.api.routes import settings as settings_router
-from app.api.routes import oauth as oauth_router
-from app.api.routes import public as public_router
-from app.api.routes import health as health_router
-from app.api.routes import alerts_ws as alerts_ws_router
-from app.api.routes import auth as auth_router
-from app.api.routes import viewer as viewer_router
-from app.api import ar_content as ar_content_api_router
-
-# Include routers with appropriate prefixes
-admin_dependencies = [Depends(get_current_active_user)]
-
-app.include_router(companies_router.router, prefix="/api/companies", tags=["Companies"], dependencies=admin_dependencies)
-# app.include_router(projects.router, prefix="/api/projects", tags=["Projects"])
-# app.include_router(ar_content.router, prefix="/api/ar-content", tags=["AR Content"])
-# app.include_router(analytics.router, prefix="/api/analytics", tags=["Analytics"]) 
-app.include_router(simplified_storage_router.router, prefix="/api", tags=["Storage"], dependencies=admin_dependencies) 
-app.include_router(projects_router.router, prefix="/api", tags=["Projects"], dependencies=admin_dependencies) 
-app.include_router(ar_content_router.router, prefix="/api", tags=["AR Content"], dependencies=admin_dependencies) 
-app.include_router(ar_content_api_router.router, prefix="/api", tags=["AR Content API"], dependencies=admin_dependencies) 
-# Removed duplicate companies router inclusion
-app.include_router(videos_router.router, prefix="/api", tags=["Videos"], dependencies=admin_dependencies) 
-app.include_router(rotation_router.router, prefix="/api", tags=["Rotation"], dependencies=admin_dependencies) 
-app.include_router(analytics_router.router, prefix="/api", tags=["Analytics"], dependencies=admin_dependencies) 
-app.include_router(notifications_router.router, prefix="/api", tags=["Notifications"], dependencies=admin_dependencies) 
-app.include_router(settings_router.router, prefix="/api", tags=["Settings"], dependencies=admin_dependencies)
-app.include_router(oauth_router.router)
-app.include_router(public_router.router, prefix="/api", tags=["Public"])
-app.include_router(health_router.router)
-app.include_router(alerts_ws_router.router)
-app.include_router(auth_router.router, prefix="/api", tags=["Authentication"])
-app.include_router(viewer_router.router, prefix="/api", tags=["Viewer"])
+# Root endpoint
+@app.get("/")
+async def root():
+    """Root endpoint with API information."""
+    return {
+        "message": "Vertex AR B2B Platform API",
+        "version": "0.1.0",
+        "docs": "/docs",
+        "health": "/api/health/status"
+    }
 
 
-# Public AR Viewer endpoints
-@app.get("/ar/{unique_id}", tags=["AR"])
-async def ar_viewer(unique_id: str, request: Request):
-    """AR viewer template endpoint (legacy path)."""
-    return templates.TemplateResponse("ar_viewer.html", {"request": request, "unique_id": unique_id})
+# AR Viewer endpoint
+@app.get("/ar/{unique_id}")
+async def ar_viewer(unique_id: str):
+    """Public AR viewer endpoint."""
+    return templates.TemplateResponse("ar_viewer.html", {"request": {}, "unique_id": unique_id})
 
 
-@app.get("/ar-content/{unique_id}", tags=["AR"])
-async def ar_viewer_new(unique_id: str, request: Request):
-    """AR viewer template endpoint (new clean path)."""
-    return templates.TemplateResponse("ar_viewer.html", {"request": request, "unique_id": unique_id})
-
-
-@app.get("/view/{unique_id}", tags=["AR"])
-async def ar_viewer_public(unique_id: str, request: Request):
-    """AR viewer template endpoint (public canonical path)."""
-    return templates.TemplateResponse("ar_viewer.html", {"request": request, "unique_id": unique_id})
-
-
-@app.get("/ar/view/{unique_id}", tags=["AR"])
-async def ar_viewer_public_alias(unique_id: str, request: Request):
-    """AR viewer template endpoint (alias for backward compatibility)."""
-    return templates.TemplateResponse("ar_viewer.html", {"request": request, "unique_id": unique_id})
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(
+        "app.main:app",
+        host="0.0.0.0",
+        port=8000,
+        reload=settings.DEBUG,
+        log_level=settings.LOG_LEVEL.lower(),
+    )

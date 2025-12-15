@@ -25,8 +25,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 # Устанавливаем Node.js для сборки фронтенда
 RUN curl -fsSL https://deb.nodesource.com/setup_18.x | bash - && \
-    apt-get install -y nodejs && \
-    npm install -g mind-ar-js-compiler
+    apt-get install -y nodejs
+    # && npm install -g mind-ar-js-compiler  # Закомментировано, так как пакет не существует
 
 # Устанавливаем рабочую директорию
 WORKDIR /app
@@ -34,6 +34,9 @@ WORKDIR /app
 # Копируем зависимости и устанавливаем их
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
+
+# Устанавливаем gunicorn для использования в docker-compose
+RUN pip install gunicorn
 
 # Копируем исходный код приложения
 COPY . .
