@@ -1,0 +1,38 @@
+name: Automated Backups
+on:
+  schedule:
+    - cron: '0 1 * * *'  # Daily at 01:00 UTC
+  workflow_dispatch:
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: SSH to server and run backups
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SERVER_IP }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SSH_KEY }}
+          script: |
+            docker compose -f /path/to/docker-compose.yml run --rm postgres-backup
+            docker compose -f /path/to/docker-compose.yml run --rm redis-backup
+            docker compose -f /path/to/docker-compose.yml run --rm minio-backup
+
+      - name: Sync PostgreSQL backups to S3
+        uses: jakejarvis/s3-sync-action@master
+        with:
+          args: --delete
+        env:
+          AWS_S3_BUCKET: ${{ secrets.BACKUP_S3_BUCKET }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.BACKUP_S3_ACCESS_KEY }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.BACKUP_S3_SECRET_KEY }}
+          AWS_REGION: ${{ secrets.BACKUP_S3_REGION }}
+          SOURCE_DIR: '/backups/postgresql'
+
+      - name: Test Restore (staging)
+        run: |
+          echo "Simulate restore test (configure staging access as needed)"
