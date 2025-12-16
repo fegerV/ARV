@@ -14,7 +14,7 @@ from app.models.storage import StorageConnection
 from app.utils.oauth_state import oauth_state_store
 from app.utils.token_encryption import token_encryption
 
-router = APIRouter(prefix="/api/oauth/yandex", tags=["oauth"])
+router = APIRouter(prefix="/oauth/yandex", tags=["oauth"])
 settings = get_settings()
 logger = logging.getLogger(__name__)
 

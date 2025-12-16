@@ -113,7 +113,8 @@ app.add_middleware(
 os.makedirs(settings.MEDIA_ROOT, exist_ok=True)
 os.makedirs("static", exist_ok=True)
 app.mount("/storage", StaticFiles(directory=settings.MEDIA_ROOT), name="storage")
-# Static files mounting moved to the end to not interfere with API routes
+# Serve static files (must be after all API routes)
+app.mount("/", StaticFiles(directory="static", html=True), name="static")
 
 
 # Request logging middleware
@@ -221,7 +222,10 @@ async def general_exception_handler(request: Request, exc: Exception):
 
 
 # Include API routers
-from app.api.routes import auth, companies, projects, ar_content, storage, analytics, notifications
+from app.api.routes import (
+    auth, companies, projects, ar_content, storage, analytics, notifications,
+    rotation, oauth, public, settings, viewer, videos, health, alerts_ws
+)
 
 app.include_router(auth.router, prefix="/api", tags=["Authentication"])
 app.include_router(companies.router, prefix="/api/companies", tags=["Companies"])
@@ -230,46 +234,16 @@ app.include_router(ar_content.router, prefix="/api/ar-content", tags=["AR Conten
 app.include_router(storage.router, prefix="/api/storage", tags=["Storage"])
 app.include_router(analytics.router, prefix="/api/analytics", tags=["Analytics"])
 app.include_router(notifications.router, prefix="/api/notifications", tags=["Notifications"])
+app.include_router(rotation.router, prefix="/api/rotation", tags=["Rotation"])
+app.include_router(oauth.router, prefix="/api", tags=["OAuth"])
+app.include_router(public.router, prefix="/api/public", tags=["Public"])
+app.include_router(settings.router, prefix="/api/settings", tags=["Settings"])
+app.include_router(viewer.router, prefix="/api/viewer", tags=["Viewer"])
+app.include_router(videos.router, prefix="/api/videos", tags=["Videos"])
+app.include_router(health.router, prefix="/api", tags=["Health"])
+app.include_router(alerts_ws.router, prefix="/api", tags=["WebSocket"])
 
-# Health check endpoint
-@app.get("/api/health/status")
-async def health_check():
-    """Health check endpoint."""
-    logger = structlog.get_logger()
-    
-    # Check database connection
-    from app.core.database import engine
-    from sqlalchemy import text
-    try:
-        async with engine.connect() as conn:
-            await conn.execute(text("SELECT 1"))
-        db_status = "healthy"
-    except Exception as e:
-        db_status = f"unhealthy: {str(e)}"
-    
-    # System metrics
-    import psutil
-    system_metrics = {
-        "cpu_percent": psutil.cpu_percent(),
-        "memory_percent": psutil.virtual_memory().percent,
-        "disk_percent": psutil.disk_usage("/").percent if os.name != "nt" else psutil.disk_usage("C:").percent,
-    }
-    
-    overall_status = "healthy" if db_status == "healthy" else "unhealthy"
-    
-    logger.info(
-        "health_check",
-        database=db_status,
-        system=system_metrics,
-        overall=overall_status,
-    )
-    
-    return {
-        "status": overall_status,
-        "database": db_status,
-        "system": system_metrics,
-        "timestamp": datetime.utcnow().isoformat(),
-    }
+# This endpoint is now handled by the health router
 
 
 # Root endpoint
@@ -292,9 +266,6 @@ async def favicon():
     """Serve favicon."""
     return FileResponse("templates/favicon.png")
 
-
-# Serve static files (must be after all API routes)
-app.mount("/", StaticFiles(directory="static", html=True), name="static")
 
 if __name__ == "__main__":
     import uvicorn

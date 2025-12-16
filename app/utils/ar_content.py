@@ -8,6 +8,7 @@ import qrcode
 from PIL import Image
 import io
 import aiofiles
+import re
 
 from app.core.config import settings
 from app.core.storage import get_storage_provider_instance
@@ -118,3 +119,43 @@ async def save_uploaded_file(upload_file, destination_path: Path) -> None:
     async with aiofiles.open(destination_path, "wb") as f:
         while chunk := await upload_file.read(1024 * 1024):  # 1MB chunks
             await f.write(chunk)
+
+
+def validate_email_format(email: str) -> bool:
+    """Validate email format using regex.
+    
+    Args:
+        email: Email address to validate
+        
+    Returns:
+        True if email is valid, False otherwise
+    """
+    email_pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+    return re.match(email_pattern, email) is not None
+
+
+def validate_file_extension(filename: str, allowed_extensions: list) -> bool:
+    """Validate file extension against allowed extensions.
+    
+    Args:
+        filename: Name of the file to validate
+        allowed_extensions: List of allowed extensions (without dots)
+        
+    Returns:
+        True if extension is allowed, False otherwise
+    """
+    ext = Path(filename).suffix.lower()[1:]  # Remove the dot
+    return ext in allowed_extensions
+
+
+def validate_file_size(file_size: int, max_size: int) -> bool:
+    """Validate file size against maximum allowed size.
+    
+    Args:
+        file_size: Size of the file in bytes
+        max_size: Maximum allowed size in bytes
+        
+    Returns:
+        True if file size is within limits, False otherwise
+    """
+    return file_size <= max_size

@@ -23,8 +23,8 @@ cp .env.example .env
 # 3. Запустить все сервисы
 docker compose up -d
 
-# 4. Применить миграции (создает администратора и компанию по умолчанию)
-docker compose exec app alembic upgrade head
+# 4. Миграции применяются автоматически при запуске (через entrypoint.sh)
+# Ранее требовалась команда: docker compose exec app alembic upgrade head
 
 # 5. Открыть приложение
 # API: http://localhost:8000
@@ -71,6 +71,9 @@ vertex-ar/
 ├── scripts/               # Служебные скрипты
 ├── docker-compose.yml     # Производственная конфигурация
 ├── docker-compose.override.yml  # Development настройки
+├── Dockerfile             # Production Dockerfile
+├── Dockerfile.dev         # Development Dockerfile (с авто-миграциями)
+├── entrypoint.sh          # Docker entrypoint script (авто-миграции)
 ```
 
 ## 🛠 Технологии
@@ -96,7 +99,7 @@ python -m venv venv
 source venv/bin/activate  # Windows: venv\Scripts\activate
 pip install -r requirements.txt
 
-# Запустить в dev режиме
+# Запустить в dev режиме (миграции применяются автоматически)
 uvicorn app.main:app --reload --port 8000
 ```
 
@@ -145,6 +148,7 @@ LOG_LEVEL=INFO
 - [x] Local storage
 - [x] Health check endpoints
 - [x] Structured logging
+- [x] Automatic migrations on startup
 
 ## 🌐 Docker Networking Diagnostics
 

@@ -27,6 +27,9 @@ qrcode[pil]==7.4.2
 opencv-python-headless==4.9.0.80
 aiofiles==23.2.1
 
+# AR маркеры
+mind-ar-js-compiler==1.2.5
+
 # HTTP клиент
 httpx==0.26.0
 

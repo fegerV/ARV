@@ -1,18 +1,18 @@
 from typing import Optional, Dict, Any, List
 from uuid import UUID
-from pydantic import BaseModel, Field, EmailStr, validator
+from pydantic import BaseModel, Field, EmailStr, field_validator
 from app.enums import ArContentStatus
 
 
 class ArContentCreate(BaseModel):
-    project_id: UUID
+    project_id: int
     customer_name: Optional[str] = None
     customer_phone: Optional[str] = None
     customer_email: Optional[EmailStr] = None
     duration_years: int = Field(default=1)
-    metadata: Optional[Dict[str, Any]] = Field(default_factory=dict)
     
-    @validator('duration_years')
+    @field_validator('duration_years')
+    @classmethod
     def validate_duration_years(cls, v):
         if v not in [1, 3, 5]:
             raise ValueError('duration_years must be one of: 1, 3, 5')
@@ -28,9 +28,9 @@ class ArContentUpdate(BaseModel):
     customer_email: Optional[EmailStr] = None
     status: Optional[ArContentStatus] = None
     duration_years: Optional[int] = None
-    metadata: Optional[Dict[str, Any]] = None
     
-    @validator('duration_years')
+    @field_validator('duration_years')
+    @classmethod
     def validate_duration_years(cls, v):
         if v is not None and v not in [1, 3, 5]:
             raise ValueError('duration_years must be one of: 1, 3, 5')
@@ -41,12 +41,13 @@ class ArContentUpdate(BaseModel):
 
 
 class VideoResponse(BaseModel):
-    id: UUID
-    ar_content_id: UUID
+    id: int
+    ar_content_id: int
     filename: str
     duration: Optional[int] = None
     size: Optional[int] = None
     video_status: str
+    is_active: bool
     created_at: str
     
     class Config:
@@ -54,19 +55,21 @@ class VideoResponse(BaseModel):
 
 
 class ArContentResponse(BaseModel):
-    id: UUID
+    id: int
     order_number: str
-    project_id: UUID
-    company_id: Optional[str] = None  # computed
+    project_id: int
+    company_id: int
     customer_name: Optional[str] = None
     customer_phone: Optional[str] = None
     customer_email: Optional[str] = None
     duration_years: int
     views_count: int
     status: str
-    active_video_id: Optional[UUID] = None
-    public_link: str  # computed
-    qr_code_path: str  # computed
+    active_video_id: Optional[int] = None
+    public_link: str
+    qr_code_url: str
+    photo_url: str
+    video_url: str
     created_at: str
     updated_at: str
     
@@ -90,7 +93,7 @@ class ARContent(ArContentResponse):
 
 class ARContentVideoUpdate(BaseModel):
     """Schema for updating the active video of AR content"""
-    active_video_id: UUID
+    active_video_id: int
     
     class Config:
         from_attributes = True
@@ -99,9 +102,6 @@ class ARContentVideoUpdate(BaseModel):
 class ARContentList(BaseModel):
     """Schema for AR content list response"""
     items: List[ArContentResponse]
-    total: int
-    page: int
-    size: int
     
     class Config:
         from_attributes = True
@@ -109,10 +109,12 @@ class ARContentList(BaseModel):
 
 class ARContentCreateResponse(BaseModel):
     """Schema for AR content creation response"""
-    id: UUID
+    id: int
     order_number: str
     public_link: str
     qr_code_url: str
+    photo_url: str
+    video_url: str
     
     class Config:
         from_attributes = True
@@ -120,12 +122,16 @@ class ARContentCreateResponse(BaseModel):
 
 class ARContentWithLinks(BaseModel):
     """Schema for AR content with additional links"""
-    id: UUID
+    id: int
     order_number: str
     public_link: str
     qr_code_url: str
+    photo_url: str
+    video_url: str
     views_count: int
     status: str
+    videos: List[VideoResponse] = []
+    active_video: Optional[VideoResponse] = None
     
     class Config:
         from_attributes = True

@@ -3,16 +3,28 @@ Test configuration and fixtures for Vertex AR platform tests.
 """
 
 import asyncio
+import os
+import tempfile
+from typing import AsyncGenerator
+
 import pytest
-from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
+from httpx import AsyncClient
+from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 from sqlalchemy.sql import text
-from app.core.database import Base
+
+from app.core.database import Base, get_db
 from app.core.config import settings
-from app.core.security import get_password_hash
+from app.models.user import User
+from app.models.storage import StorageConnection
+from app.models.company import Company
+from app.models.project import Project
+from app.models.ar_content import ARContent
+from app.models.video import Video
+from app.enums import CompanyStatus, ProjectStatus, ArContentStatus, VideoStatus
 
 
 # Test database URL - use same as dev but with test suffix
-TEST_DATABASE_URL = settings.DATABASE_URL.replace("vertex_ar", "vertex_ar_test")
+TEST_DATABASE_URL = os.getenv("TEST_DATABASE_URL", settings.DATABASE_URL.replace("vertex_ar", "vertex_ar_test"))
 
 
 @pytest.fixture(scope="session")
@@ -77,16 +89,10 @@ async def db(test_session):
 
 async def seed_test_data(session_factory):
     """Seed test database with default data."""
-    from sqlalchemy import select
-    from app.core.security import get_password_hash
-    from app.models.user import User
-    from app.models.storage import StorageConnection
-    from app.models.company import Company
-    
     async with session_factory() as session:
         default_admin = User(
             email="admin@vertexar.com",
-            hashed_password=get_password_hash("admin123"),
+            hashed_password=settings.ADMIN_DEFAULT_PASSWORD,
             full_name="Vertex AR Admin",
             role="admin",  # Простая строка вместо ENUM
             is_active=True,
@@ -149,7 +155,7 @@ async def admin_token(async_client):
     """Get admin auth token."""
     login_data = {
         "username": "admin@vertexar.com",
-        "password": "admin123"
+        "password": settings.ADMIN_DEFAULT_PASSWORD
     }
     
     response = await async_client.post("/api/auth/login", data=login_data)
@@ -170,13 +176,12 @@ async def auth_client(async_client, admin_token):
 @pytest.fixture(scope="function")
 def company_factory():
     """Factory to create test companies."""
-    async def _create_company(session: AsyncSession, name: str = None, contact_email: str = None, status: str = None) -> Company:
+    async def _create_company(session: AsyncSession, name: str = None, contact_email: str = None) -> Company:
         import uuid
         unique_id = str(uuid.uuid4())[:8]
         company = Company(
             name=name or f"Test Company {unique_id}",
             contact_email=contact_email or f"test{unique_id}@example.com",
-            status=status or CompanyStatus.ACTIVE
         )
         session.add(company)
         await session.flush()
@@ -187,14 +192,13 @@ def company_factory():
 @pytest.fixture(scope="function") 
 def project_factory():
     """Factory to create test projects."""
-    async def _create_project(session: AsyncSession, name: str = None, company_id: str = None, status: str = None) -> Project:
+    async def _create_project(session: AsyncSession, name: str = None, company_id: int = None) -> Project:
         import uuid
         unique_id = str(uuid.uuid4())[:8]
         if company_id is None:
             company = Company(
                 name=f"Test Company {unique_id}",
                 contact_email=f"test{unique_id}@example.com",
-                status=CompanyStatus.ACTIVE,
             )
             session.add(company)
             await session.flush()
@@ -203,7 +207,6 @@ def project_factory():
         project = Project(
             name=name or f"Test Project {unique_id}",
             company_id=company_id,
-            status=status or ProjectStatus.ACTIVE
         )
         session.add(project)
         await session.flush()
@@ -217,9 +220,8 @@ def ar_content_factory():
     async def _create_ar_content(
         session: AsyncSession,
         order_number: str = None, 
-        project_id: str = None,
+        project_id: int = None,
         customer_name: str = None,
-        status: str = None
     ) -> ARContent:
         import uuid
         unique_id = str(uuid.uuid4())[:8]
@@ -228,7 +230,6 @@ def ar_content_factory():
             company = Company(
                 name=f"Test Company {unique_id}",
                 contact_email=f"test{unique_id}@example.com",
-                status=CompanyStatus.ACTIVE,
             )
             session.add(company)
             await session.flush()
@@ -236,7 +237,6 @@ def ar_content_factory():
             project = Project(
                 name=f"Test Project {unique_id}",
                 company_id=company.id,
-                status=ProjectStatus.ACTIVE,
             )
             session.add(project)
             await session.flush()
@@ -247,7 +247,6 @@ def ar_content_factory():
             project_id=project_id,
             order_number=order_number or f"ORDER-{unique_id}",
             customer_name=customer_name or f"Test Customer {unique_id}",
-            status=status or ArContentStatus.PENDING
         )
         session.add(ar_content)
         await session.flush()
@@ -286,9 +285,8 @@ def video_factory():
     """Factory to create test videos."""
     async def _create_video(
         session: AsyncSession,
-        ar_content_id: str = None,
+        ar_content_id: int = None,
         filename: str = None,
-        video_status: str = None
     ) -> Video:
         import uuid
         unique_id = str(uuid.uuid4())[:8]
@@ -297,7 +295,6 @@ def video_factory():
             company = Company(
                 name=f"Test Company {unique_id}",
                 contact_email=f"test{unique_id}@example.com",
-                status=CompanyStatus.ACTIVE,
             )
             session.add(company)
             await session.flush()
@@ -305,7 +302,6 @@ def video_factory():
             project = Project(
                 name=f"Test Project {unique_id}",
                 company_id=company.id,
-                status=ProjectStatus.ACTIVE,
             )
             session.add(project)
             await session.flush()
@@ -314,7 +310,6 @@ def video_factory():
                 project_id=project.id,
                 order_number=f"ORDER-{unique_id}",
                 customer_name=f"Test Customer {unique_id}",
-                status=ArContentStatus.PENDING,
             )
             session.add(ar_content)
             await session.flush()
@@ -323,7 +318,6 @@ def video_factory():
         video = Video(
             ar_content_id=ar_content_id,
             filename=filename or f"test_video_{unique_id}.mp4",
-            video_status=video_status or VideoStatus.UPLOADED
         )
         session.add(video)
         await session.flush()

@@ -1,0 +1,21 @@
+version: '3.8'
+
+# Development overrides for docker-compose.yml
+# Automatically loaded when running `docker-compose up` without -f flag
+
+services:
+  app:
+    # Use development Dockerfile
+    build:
+      dockerfile: Dockerfile.dev
+    # Enable debug mode
+    environment:
+      - DEBUG=true
+      - LOG_LEVEL=DEBUG
+    # Mount local code for hot reloading
+    volumes:
+      - .:/app:cached
+      - ./storage:/app/storage
+    # Expose additional ports for debugging if needed
+    ports:
+      - "8000:8000"
