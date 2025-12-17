@@ -49,9 +49,10 @@ RUN mkdir -p /app/storage/content \
     /app/storage/temp \
     && chown -R appuser:appuser /app/storage
 
-# Делаем entrypoint.sh исполняемым и копируем его
+# Делаем entrypoint.sh и entrypoint.dev.sh исполняемыми и копируем их
 COPY entrypoint.sh /usr/local/bin/
-RUN chmod +x /usr/local/bin/entrypoint.sh
+COPY entrypoint.dev.sh /usr/local/bin/
+RUN chmod +x /usr/local/bin/entrypoint.sh /usr/local/bin/entrypoint.dev.sh
 
 # Переключаемся на непривилегированного пользователя
 USER appuser

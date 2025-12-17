@@ -52,21 +52,21 @@ export default function Dashboard() {
   const statsCards = [
     {
       title: 'Total AR Views',
-      value: summary ? summary.total_views.toLocaleString() : '—',
+      value: summary && summary.total_views !== undefined ? summary.total_views.toLocaleString() : '—',
       change: '',
       icon: <ViewsIcon fontSize="large" />,
       color: '#1976d2',
     },
     {
       title: 'Unique Sessions',
-      value: summary ? summary.unique_sessions.toLocaleString() : '—',
+      value: summary && summary.unique_sessions !== undefined ? summary.unique_sessions.toLocaleString() : '—',
       change: '',
       icon: <SessionsIcon fontSize="large" />,
       color: '#2e7d32',
     },
     {
       title: 'Active Content',
-      value: summary ? summary.active_content.toLocaleString() : '—',
+      value: summary && summary.active_content !== undefined ? summary.active_content.toLocaleString() : '—',
       change: '',
       icon: <ContentIcon fontSize="large" />,
       color: '#9c27b0',

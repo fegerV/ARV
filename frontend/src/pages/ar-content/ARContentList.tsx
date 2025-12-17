@@ -194,6 +194,8 @@ export default function ARContentList() {
   };
 
   const handleEdit = (id: string) => {
+    // Try to navigate with company and project context if available
+    // For now, using the flat route
     navigate(`/ar-content/${id}`);
   };
 

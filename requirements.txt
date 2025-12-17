@@ -29,6 +29,16 @@ aiofiles==23.2.1
 
 # AR маркеры
 mind-ar-js-compiler==1.2.5
+mind_ar==1.0.0
+
+# QR коды
+qrcode[pil]==7.4.2
+
+# Обработка изображений
+pillow==11.0.0
+
+# Обработка видео
+opencv-python==4.9.0.80
 
 # HTTP клиент
 httpx==0.26.0
@@ -55,3 +65,4 @@ black==23.12.1
 isort==5.13.2
 flake8==7.0.0
 mypy==1.8.0
+slowapi==0.1.9

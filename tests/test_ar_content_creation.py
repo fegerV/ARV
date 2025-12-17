@@ -38,11 +38,11 @@ async def test_create_ar_content_success(async_client: AsyncClient, db: AsyncSes
     response = await async_client.post("/api/ar-content", data=data, files=files)
     
     # Check response
-    assert response.status_code == 200
+    assert response.status_code == 201  # Should be 201 for creation
     result = response.json()
     
     assert "id" in result
-    assert result["order_number"].startswith("ORD-")
+    assert result["order_number"].startswith("AR-")  # Updated format
     assert result["public_link"].startswith("/view/")
     assert result["qr_code_url"] is not None
     assert result["photo_url"] is not None
@@ -154,7 +154,7 @@ async def test_ar_content_files_saved(async_client: AsyncClient, db: AsyncSessio
     }
     
     response = await async_client.post("/api/ar-content", data=data, files=files)
-    assert response.status_code == 200
+    assert response.status_code == 201
     
     result = response.json()
     
@@ -198,7 +198,7 @@ async def test_qr_code_generated(async_client: AsyncClient, db: AsyncSession, sa
     }
     
     response = await async_client.post("/api/ar-content", data=data, files=files)
-    assert response.status_code == 200
+    assert response.status_code == 201
     
     result = response.json()
     
@@ -230,7 +230,7 @@ async def test_marker_generated(async_client: AsyncClient, db: AsyncSession, sam
     response = await async_client.post("/api/ar-content", data=data, files=files)
     
     # The endpoint should work even if marker generation fails
-    assert response.status_code == 200
+    assert response.status_code == 201
     
     result = response.json()
     assert "id" in result
@@ -256,7 +256,7 @@ async def test_get_ar_content_with_videos(async_client: AsyncClient, db: AsyncSe
     }
     
     response = await async_client.post("/api/ar-content", data=data, files=files)
-    assert response.status_code == 200
+    assert response.status_code == 201
     
     result = response.json()
     content_id = result["id"]

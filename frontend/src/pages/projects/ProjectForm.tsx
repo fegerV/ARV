@@ -66,7 +66,7 @@ export default function ProjectForm() {
         return;
       }
 
-      await projectsAPI.create({
+      await projectsAPI.create(companyId, {
         company_id: companyId,
         name: formData.name,
       });

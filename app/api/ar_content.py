@@ -301,10 +301,10 @@ async def create_ar_content(
     project_id: str = Form(...),
     customer_name: Optional[str] = Form(None),
     customer_phone: Optional[str] = Form(None),
-    customer_email: str = Form(None),
-    duration_years: int = Form(1),
+    customer_email: Optional[str] = Form(None),
+    duration_years: int = Form(...),
     photo_file: UploadFile = File(...),
-    video_file: Optional[UploadFile] = File(None),
+    video_file: UploadFile = File(...),
     db: AsyncSession = Depends(get_db),
     response: Response = None,
 ):
@@ -325,10 +325,10 @@ async def create_ar_content(
     
     # Validate file types
     if not validate_file_type(photo_file.filename, ['.jpg', '.jpeg', '.png']):
-        raise HTTPException(status_code=400, detail="Photo must be JPG or PNG")
+        raise HTTPException(status_code=422, detail="Photo must be JPEG or PNG")
     
-    if video_file and not validate_file_type(video_file.filename, ['.mp4']):
-        raise HTTPException(status_code=400, detail="Video must be MP4")
+    if not validate_file_type(video_file.filename, ['.mp4', '.webm', '.mov']):
+        raise HTTPException(status_code=422, detail="Video must be MP4, WebM, or MOV")
     
     # Validate company and project exist
     company = await db.get(Company, company_id)
@@ -356,17 +356,32 @@ async def create_ar_content(
     await save_uploaded_file(photo_file, photo_path)
     photo_url = build_public_url(photo_path)
     
-    # Save video if provided
-    video_path = None
-    video_url = None
-    if video_file:
-        video_filename = f"video{Path(video_file.filename).suffix}"
-        video_path = storage_path / video_filename
-        await save_uploaded_file(video_file, video_path)
-        video_url = build_public_url(video_path)
+    # Save video
+    video_filename = f"video{Path(video_file.filename).suffix}"
+    video_path = storage_path / video_filename
+    await save_uploaded_file(video_file, video_path)
+    video_url = build_public_url(video_path)
     
     # Generate QR code
     qr_code_url = await generate_qr_code(unique_id, storage_path)
+    
+    # Generate MindAR marker
+    marker_path = storage_path / "targets.mind"
+    try:
+        from mind_ar import image_codegen
+        photo_full_path = str(photo_path.absolute())
+        targets_output_dir = str(marker_path.parent.absolute())
+        
+        # Generate the marker using mind_ar
+        image_codegen(
+            img_path=photo_full_path,
+            targets_output_dir=targets_output_dir,
+            max_features=settings.MINDAR_MAX_FEATURES,
+            compiler_path=settings.MINDAR_COMPILER_PATH
+        )
+    except Exception as e:
+        logger.error(f"Failed to generate MindAR marker: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to generate MindAR marker: {str(e)}")
     
     # Create AR content record
     ar_content = ARContent(
@@ -379,7 +394,7 @@ async def create_ar_content(
         duration_years=duration_years,
         photo_path=str(photo_path),
         photo_url=photo_url,
-        video_path=str(video_path) if video_path else None,
+        video_path=str(video_path),
         video_url=video_url,
         qr_code_path=str(storage_path / "qr_code.png"),
         qr_code_url=qr_code_url,
@@ -390,7 +405,6 @@ async def create_ar_content(
     await db.commit()
     await db.refresh(ar_content)
     
-    # TODO: Generate NFT marker
     marker_url = f"/api/ar-content/{ar_content.id}/marker"
     
     return ARContentCreateResponse(
@@ -441,9 +455,24 @@ async def get_ar_content_details(content_id: str, db: AsyncSession = Depends(get
     
     # Get videos
     videos = []
+    active_video = None
     active_video_title = None
     for video in ar_content.videos:
         if str(video.id) == str(ar_content.active_video_id):
+            active_video = {
+                "id": str(video.id),
+                "filename": video.filename,
+                "uploaded_at": video.created_at.isoformat(),
+                "is_active": str(video.id) == str(ar_content.active_video_id),
+                "thumbnail_url": f"/storage/thumbnails/{video.id}.jpg",
+                "duration": video.duration,
+                "size": video.size,
+                "_links": {
+                    "set_active": f"/api/ar-content/{content_id}/videos/{video.id}/set-active",
+                    "download": f"/api/ar-content/{content_id}/videos/{video.id}/download",
+                    "delete": f"/api/ar-content/{content_id}/videos/{video.id}"
+                }
+            }
             active_video_title = video.filename
         video_item = {
             "id": str(video.id),
@@ -493,6 +522,7 @@ async def get_ar_content_details(content_id: str, db: AsyncSession = Depends(get
         marker_url=f"/api/ar-content/{content_id}/marker",
         marker_preview_url=f"/api/ar-content/{content_id}/marker/preview",
         videos=videos,
+        active_video=active_video,
         stats=stats,
         _links={
             "view": f"/api/ar-content/{content_id}",

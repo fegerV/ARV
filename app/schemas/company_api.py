@@ -40,6 +40,7 @@ class CompanyLinks(BaseModel):
     """HATEOAS links for company actions"""
     edit: str = Field(..., description="URL to edit the company")
     delete: str = Field(..., description="URL to delete the company")
+    view_projects: str = Field(..., description="URL to view company's projects")
     view_content: str = Field(..., description="URL to view company's AR content")
 
 

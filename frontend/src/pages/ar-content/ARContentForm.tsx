@@ -300,7 +300,7 @@ export default function ARContentForm() {
       let finalProjectId = formData.projectId;
       if (formData.creatingNewProject && formData.newProjectName.trim() && formData.companyId) {
         try {
-          const projectResponse = await projectsAPI.create({
+          const projectResponse = await projectsAPI.create(formData.companyId, {
             company_id: formData.companyId,
             name: formData.newProjectName,
           });
@@ -347,7 +347,7 @@ export default function ARContentForm() {
       }
 
       // Call API to create AR content
-      const response = await arContentAPI.createForProject(formData.companyId, finalProjectId, uploadData);
+      const response = await arContentAPI.create(formData.companyId, finalProjectId, uploadData);
       const responseData = response.data as CreationResponse;
       
       setCreationResponse(responseData);
@@ -371,8 +371,8 @@ export default function ARContentForm() {
           <Button
             startIcon={<BackIcon />}
             onClick={() => {
-              if (projectId) {
-                navigate(`/projects/${projectId}/content`);
+              if (companyId && projectId) {
+                navigate(`/companies/${companyId}/projects/${projectId}/ar-content`);
               } else if (companyId) {
                 navigate(`/companies/${companyId}/projects`);
               } else {
@@ -461,8 +461,8 @@ export default function ARContentForm() {
               variant="contained"
               size="large"
               onClick={() => {
-                if (projectId) {
-                  navigate(`/projects/${projectId}/content`);
+                if (companyId && projectId) {
+                  navigate(`/companies/${companyId}/projects/${projectId}/ar-content`);
                 } else if (companyId) {
                   navigate(`/companies/${companyId}/projects`);
                 } else {
@@ -553,8 +553,8 @@ export default function ARContentForm() {
         <Button
           startIcon={<BackIcon />}
           onClick={() => {
-            if (projectId) {
-              navigate(`/projects/${projectId}/content`);
+            if (companyId && projectId) {
+              navigate(`/companies/${companyId}/projects/${projectId}/ar-content`);
             } else {
               navigate('/ar-content');
             }
@@ -992,8 +992,8 @@ export default function ARContentForm() {
               <Button
                 variant="outlined"
                 onClick={() => {
-                  if (projectId) {
-                    navigate(`/projects/${projectId}/content`);
+                 if (companyId && projectId) {
+                    navigate(`/companies/${companyId}/projects/${projectId}/ar-content`);
                   } else {
                     navigate('/ar-content');
                   }

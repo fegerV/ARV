@@ -19,3 +19,24 @@ services:
     # Expose additional ports for debugging if needed
     ports:
       - "8000:8000"
+    # Make sure migrations run before the app starts
+    depends_on:
+      db-migrate:
+        condition: service_completed_successfully
+
+  # Service to run database migrations before the app starts
+  db-migrate:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: sh -c "alembic upgrade head"
+    volumes:
+      - ./alembic:/app/alembic
+      - ./alembic.ini:/app/alembic.ini
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://vertex_ar:password@postgres:5432/vertex_ar
+    depends_on:
+      postgres:
+        condition: service_healthy
+    profiles:
+      - migrate

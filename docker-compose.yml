@@ -52,5 +52,22 @@ services:
     networks:
       - vertex_net
 
+  # Миграции базы данных (отдельный сервис для запуска миграций)
+  db-migrate:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: sh -c "alembic upgrade head"
+    volumes:
+      - ./alembic:/app/alembic
+      - ./alembic.ini:/app/alembic.ini
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://vertex_ar:password@postgres:5432/vertex_ar
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - vertex_net
+
 volumes:
   postgres_data:

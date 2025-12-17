@@ -39,22 +39,27 @@ api.interceptors.response.use(
 
 export default api;
 
+// Authentication API methods
+export const authAPI = {
+  login: (credentials: { username: string; password: string }) => api.post('/auth/login', credentials),
+  logout: () => api.post('/auth/logout'),
+  me: () => api.get('/auth/me'),
+  register: (userData: any) => api.post('/auth/register', userData),
+};
+
 // API methods
 export const arContentAPI = {
   listAll: (params?: { page?: number; page_size?: number; company_id?: number; project_id?: string; status?: string; search?: string }) =>
     api.get('/ar-content', { params }),
   getDetail: (id: string) => api.get(`/ar-content/${id}`),
-  create: (formData: FormData) => api.post('/ar-content', formData, {
+  getDetailByHierarchy: (companyId: string, projectId: string, id: string) => api.get(`/companies/${companyId}/projects/${projectId}/ar-content/${id}`),
+  create: (companyId: string, projectId: string, formData: FormData) => api.post(`/companies/${companyId}/projects/${projectId}/ar-content`, formData, {
     headers: {
       'Content-Type': 'multipart/form-data',
     },
   }),
-  createForProject: (companyId: string, projectId: string, formData: FormData) =>
-    api.post(`/companies/${companyId}/projects/${projectId}/ar-content/new`, formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
-    }),
+  listByProject: (companyId: string, projectId: string, params?: { page?: number; page_size?: number }) =>
+    api.get(`/companies/${companyId}/projects/${projectId}/ar-content`, { params }),
 };
 
 export const companiesAPI = {
@@ -68,12 +73,10 @@ export const companiesAPI = {
 export const projectsAPI = {
   listByCompany: (companyId: string, params?: { page?: number; page_size?: number }) =>
     api.get(`/companies/${companyId}/projects`, { params }),
-  listAll: (params?: { page?: number; page_size?: number; company_id?: number }) =>
-    api.get('/projects', { params }),
-  get: (id: string) => api.get(`/projects/${id}`),
-  create: (data: any) => api.post('/projects', data),
-  update: (id: string, data: any) => api.put(`/projects/${id}`, data),
-  delete: (id: string) => api.delete(`/projects/${id}`),
+  get: (companyId: string, id: string) => api.get(`/companies/${companyId}/projects/${id}`),
+  create: (companyId: string, data: any) => api.post(`/companies/${companyId}/projects`, data),
+  update: (companyId: string, id: string, data: any) => api.put(`/companies/${companyId}/projects/${id}`, data),
+  delete: (companyId: string, id: string) => api.delete(`/companies/${companyId}/projects/${id}`),
 };
 
 export const analyticsAPI = {
@@ -89,7 +92,7 @@ export const notificationsAPI = {
 };
 
 export const settingsAPI = {
-  get: () => api.get('/settings'),
+ get: () => api.get('/settings'),
 };
 
 // Storage Connections API
@@ -151,11 +154,11 @@ export const storageAPI = {
 
   // Yandex Disk specific
   yandex: {
-    listFolders: (connectionId: number, path: string = '/') => 
-      api.get<YandexDiskFoldersResponse>(`/oauth/yandex/${connectionId}/folders?path=${encodeURIComponent(path)}`),
+    listFolders: (connectionId: number, path: string = '/') =>
+      api.get<YandexDiskFoldersResponse>(`/oauth/${connectionId}/folders?path=${encodeURIComponent(path)}`),
     createFolder: (connectionId: number, folderPath: string) =>
       api.post<{ status: string; message: string; path: string }>(
-        `/oauth/yandex/${connectionId}/create-folder?folder_path=${encodeURIComponent(folderPath)}`
+        `/oauth/${connectionId}/create-folder?folder_path=${encodeURIComponent(folderPath)}`
       ),
   },
 };

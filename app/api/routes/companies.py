@@ -23,13 +23,14 @@ router = APIRouter(tags=["companies"])
 def _generate_company_links(company_id: int) -> CompanyLinks:
     """Generate HATEOAS links for a company"""
     return CompanyLinks(
-        edit=f"/api/companies/{company_id}",
-        delete=f"/api/companies/{company_id}",
-        view_content=f"/api/companies/{company_id}/ar-content"
+        edit=f"/companies/{company_id}",
+        delete=f"/companies/{company_id}",
+        view_projects=f"/companies/{company_id}/projects",
+        view_content=f"/companies/{company_id}/ar-content"
     )
 
 
-@router.get("/", response_model=PaginatedCompaniesResponse)
+@router.get("/companies", response_model=PaginatedCompaniesResponse)
 async def list_companies(
     page: int = Query(default=1, ge=1, description="Page number"),
     page_size: int = Query(default=20, ge=1, le=100, description="Number of items per page"),
@@ -39,6 +40,7 @@ async def list_companies(
     current_user: User = Depends(get_current_active_user)
 ):
     """List companies with pagination and filtering"""
+    import structlog
     logger = structlog.get_logger()
     
     # Build base query
@@ -108,7 +110,7 @@ async def list_companies(
     )
 
 
-@router.get("/{company_id}", response_model=CompanyDetail)
+@router.get("/companies/{company_id}", response_model=CompanyDetail)
 async def get_company(
     company_id: int,
     db: AsyncSession = Depends(get_db),
@@ -150,7 +152,7 @@ async def get_company(
     )
 
 
-@router.post("/", response_model=CompanyDetail)
+@router.post("/companies", response_model=CompanyDetail)
 async def create_company(
     company_data: CompanyCreate,
     db: AsyncSession = Depends(get_db),
@@ -189,7 +191,7 @@ async def create_company(
     )
 
 
-@router.put("/{company_id}", response_model=CompanyDetail)
+@router.put("/companies/{company_id}", response_model=CompanyDetail)
 async def update_company(
     company_id: int,
     company_data: CompanyUpdate,
@@ -241,7 +243,7 @@ async def update_company(
     )
 
 
-@router.delete("/{company_id}")
+@router.delete("/companies/{company_id}")
 async def delete_company(
     company_id: int,
     db: AsyncSession = Depends(get_db),

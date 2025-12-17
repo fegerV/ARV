@@ -1,24 +1,28 @@
 from contextlib import asynccontextmanager
+from fastapi import FastAPI, HTTPException, Request, status
+from fastapi.staticfiles import StaticFiles
+from fastapi.templating import Jinja2Templates
+from fastapi.responses import HTMLResponse, FileResponse, JSONResponse
+from fastapi.exceptions import RequestValidationError
+from fastapi.middleware.cors import CORSMiddleware
+from starlette.exceptions import HTTPException as StarletteHTTPException
+from starlette.requests import Request
+from starlette.responses import JSONResponse
+from starlette.templating import Jinja2Templates
+from starlette.staticfiles import StaticFiles
+from prometheus_client import Summary
+import structlog
 from datetime import datetime
 import os
 import sys
 from typing import AsyncGenerator
 
 import structlog
-from fastapi import FastAPI, Request, status
-from fastapi.exceptions import RequestValidationError
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse, FileResponse
-from prometheus_client import Summary
-from starlette.exceptions import HTTPException as StarletteHTTPException
-from starlette.requests import Request
-from starlette.responses import JSONResponse
-from starlette.templating import Jinja2Templates
-from starlette.staticfiles import StaticFiles
 
 from app.core.config import settings
 from app.core.database import init_db, seed_defaults
 from app.api.routes.auth import get_current_active_user
+from app.middleware.rate_limiter import setup_rate_limiting, limiter
 
 
 # Configure structured logging
@@ -90,10 +94,19 @@ app = FastAPI(
     title="Vertex AR B2B Platform",
     description="B2B SaaS platform for creating AR content based on image recognition (NFT markers)",
     version="0.1.0",
-    docs_url="/docs",
-    redoc_url="/redoc",
-    openapi_url="/openapi.json",
+    docs_url="/docs",  # Standard FastAPI docs URL
+    redoc_url="/redoc",  # Standard FastAPI redoc URL
+    openapi_url="/openapi.json",  # Standard FastAPI openapi URL
     lifespan=lifespan,
+    contact={
+        "name": "Vertex AR Support",
+        "url": "https://vertexar.com/support",
+        "email": "support@vertexar.com",
+    },
+    license_info={
+        "name": "Apache 2.0",
+        "url": "https://www.apache.org/licenses/LICENSE-2.0.html",
+    },
 )
 
 # Jinja2 templates
@@ -109,162 +122,72 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Serve static files
-os.makedirs(settings.MEDIA_ROOT, exist_ok=True)
-os.makedirs("static", exist_ok=True)
-app.mount("/storage", StaticFiles(directory=settings.MEDIA_ROOT), name="storage")
-# Serve static files (must be after all API routes)
-app.mount("/", StaticFiles(directory="static", html=True), name="static")
-
-
-# Request logging middleware
-REQUEST_DURATION = Summary('api_request_duration_seconds', 'API request duration seconds', ['method','path'])
-@app.middleware("http")
-async def logging_middleware(request: Request, call_next):
-    """Log all HTTP requests with structured logging."""
-    logger = structlog.get_logger()
-    
-    start_time = datetime.utcnow()
-    
-    # Log request
-    logger.info(
-        "http_request_started",
-        method=request.method,
-        path=request.url.path,
-        client_host=request.client.host if request.client else None,
-    )
-    
-    # Process request
-    response = await call_next(request)
-    
-    # Calculate duration
-    duration = (datetime.utcnow() - start_time).total_seconds()
-    REQUEST_DURATION.labels(request.method, request.url.path).observe(duration)
-    
-    # Log response
-    logger.info(
-        "http_request_completed",
-        method=request.method,
-        path=request.url.path,
-        status_code=response.status_code,
-        duration_seconds=duration,
-    )
-    
-    return response
-
-
-# Exception handlers
-@app.exception_handler(StarletteHTTPException)
-async def http_exception_handler(request: Request, exc: StarletteHTTPException):
-    """Handle HTTP exceptions."""
-    logger = structlog.get_logger()
-    logger.warning(
-        "http_exception",
-        status_code=exc.status_code,
-        detail=exc.detail,
-        path=request.url.path,
-    )
-    return JSONResponse(
-        status_code=exc.status_code,
-        content={
-            "error": {
-                "code": exc.status_code,
-                "message": exc.detail,
-                "timestamp": datetime.utcnow().isoformat(),
-            }
-        },
-    )
-
-
-@app.exception_handler(RequestValidationError)
-async def validation_exception_handler(request: Request, exc: RequestValidationError):
-    """Handle request validation errors."""
-    logger = structlog.get_logger()
-    logger.warning(
-        "validation_error",
-        errors=exc.errors(),
-        path=request.url.path,
-    )
-    return JSONResponse(
-        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-        content={
-            "error": {
-                "code": 422,
-                "message": "Validation error",
-                "details": exc.errors(),
-                "timestamp": datetime.utcnow().isoformat(),
-            }
-        },
-    )
-
-
-@app.exception_handler(Exception)
-async def general_exception_handler(request: Request, exc: Exception):
-    """Handle all other exceptions."""
-    logger = structlog.get_logger()
-    logger.error(
-        "unhandled_exception",
-        error=str(exc),
-        error_type=type(exc).__name__,
-        path=request.url.path,
-        exc_info=True,
-    )
-    return JSONResponse(
-        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-        content={
-            "error": {
-                "code": 500,
-                "message": "Internal server error",
-                "timestamp": datetime.utcnow().isoformat(),
-            }
-        },
-    )
-
+# Custom static files handler to support React Router client-side routing
+class SPAStaticFiles(StaticFiles):
+    async def get_response(self, path: str, scope):
+        # Add logging to debug the path
+        logger = structlog.get_logger()
+        logger.info("SPAStaticFiles.get_response", path=path, scope_path=scope.get("path"))
+        
+        try:
+            response = await super().get_response(path, scope)
+            # Only return index.html for 404s that are not API routes
+            if response.status_code == 404 and not path.startswith("api/") and not path.startswith("/api/"):
+                logger.info("Returning index.html for 404", path=path)
+                # Return index.html for any 404 - this enables client-side routing
+                response = await super().get_response("index.html", scope)
+            return response
+        except Exception as e:
+            logger.error("SPAStaticFiles exception", error=str(e), path=path)
+            # Return index.html for any error - this enables client-side routing
+            return await super().get_response("index.html", scope)
 
 # Include API routers
 from app.api.routes import (
     auth, companies, projects, ar_content, storage, analytics, notifications,
-    rotation, oauth, public, settings, viewer, videos, health, alerts_ws
+    rotation, oauth, public, settings as routes_settings, viewer, videos, health, alerts_ws
 )
 
-app.include_router(auth.router, prefix="/api", tags=["Authentication"])
-app.include_router(companies.router, prefix="/api/companies", tags=["Companies"])
-app.include_router(projects.router, prefix="/api/projects", tags=["Projects"])
+app.include_router(auth.router, prefix="/api/auth", tags=["Authentication"])
+app.include_router(companies.router, prefix="/api", tags=["Companies"])
+app.include_router(projects.router, prefix="/api", tags=["Projects"])
 app.include_router(ar_content.router, prefix="/api/ar-content", tags=["AR Content"])
 app.include_router(storage.router, prefix="/api/storage", tags=["Storage"])
 app.include_router(analytics.router, prefix="/api/analytics", tags=["Analytics"])
 app.include_router(notifications.router, prefix="/api/notifications", tags=["Notifications"])
 app.include_router(rotation.router, prefix="/api/rotation", tags=["Rotation"])
-app.include_router(oauth.router, prefix="/api", tags=["OAuth"])
+app.include_router(oauth.router, prefix="/api/oauth", tags=["OAuth"])
 app.include_router(public.router, prefix="/api/public", tags=["Public"])
-app.include_router(settings.router, prefix="/api/settings", tags=["Settings"])
+app.include_router(routes_settings.router, prefix="/api/settings", tags=["Settings"])
 app.include_router(viewer.router, prefix="/api/viewer", tags=["Viewer"])
 app.include_router(videos.router, prefix="/api/videos", tags=["Videos"])
-app.include_router(health.router, prefix="/api", tags=["Health"])
-app.include_router(alerts_ws.router, prefix="/api", tags=["WebSocket"])
+app.include_router(health.router, prefix="/api/health", tags=["Health"])
+app.include_router(alerts_ws.router, prefix="/api/ws", tags=["WebSocket"])
 
-# This endpoint is now handled by the health router
+# Setup rate limiting
+setup_rate_limiting(app)
 
-
-# Root endpoint
-@app.get("/")
-async def root():
-    """Serve the frontend application."""
-    return templates.TemplateResponse("index.html", {"request": {}})
-
-
-# AR Viewer endpoint
-@app.get("/ar/{unique_id}")
-async def ar_viewer(unique_id: str):
-    """Public AR viewer endpoint."""
-    return templates.TemplateResponse("ar_viewer.html", {"request": {}, "unique_id": unique_id})
-
+# Serve static files
+os.makedirs(settings.MEDIA_ROOT, exist_ok=True)
+os.makedirs("static", exist_ok=True)
+app.mount("/storage", StaticFiles(directory=settings.MEDIA_ROOT), name="storage")
+app.mount("/assets", StaticFiles(directory="static/assets"), name="assets")
 
 # Favicon endpoint
 @app.get("/favicon.ico")
 async def favicon():
     """Serve favicon."""
     return FileResponse("templates/favicon.png")
+
+
+# Catch-all route for React Router client-side routing
+@app.get("/{full_path:path}")
+async def serve_frontend(full_path: str):
+    """Serve the frontend application for any unmatched routes (enables client-side routing)."""
+    # Don't serve frontend for API routes
+    if full_path.startswith("api/"):
+        raise HTTPException(status_code=404, detail="Not found")
+    return FileResponse("static/index.html")
 
 
 if __name__ == "__main__":

@@ -136,10 +136,26 @@ function App() {
             <ProtectedLayout>
               <ARContentList />
             </ProtectedLayout>
-          </ProtectedRoute>
+         </ProtectedRoute>
         } />
         
         <Route path="/projects/:projectId/content/new" element={
+          <ProtectedRoute>
+            <ProtectedLayout>
+              <ARContentForm />
+            </ProtectedLayout>
+          </ProtectedRoute>
+        } />
+        
+        <Route path="/companies/:companyId/projects/:projectId/ar-content" element={
+          <ProtectedRoute>
+            <ProtectedLayout>
+              <ARContentList />
+            </ProtectedLayout>
+         </ProtectedRoute>
+        } />
+        
+        <Route path="/companies/:companyId/projects/:projectId/ar-content/new" element={
           <ProtectedRoute>
             <ProtectedLayout>
               <ARContentForm />
@@ -153,6 +169,14 @@ function App() {
               <ARContentDetail />
             </ProtectedLayout>
           </ProtectedRoute>
+        } />
+        
+        <Route path="/companies/:companyId/projects/:projectId/ar-content/:arContentId" element={
+          <ProtectedRoute>
+            <ProtectedLayout>
+              <ARContentDetail />
+            </ProtectedLayout>
+         </ProtectedRoute>
         } />
         
         <Route path="/analytics" element={

@@ -21,7 +21,7 @@ except Exception:
     CONTENT_TYPE_LATEST = "text/plain; version=0.0.4"
     multiprocess = None
 
-router = APIRouter(prefix="/health", tags=["Health"])
+router = APIRouter(tags=["Health"])
 logger = structlog.get_logger()
 
 

@@ -234,7 +234,7 @@ export default function ProjectsList() {
     
     try {
       setDeleting(true);
-      await projectsAPI.delete(projectToDelete.id);
+      await projectsAPI.delete(selectedCompanyId!, projectToDelete.id);
       addToast('Project deleted successfully', 'success');
       setDeleteDialogOpen(false);
       setProjectToDelete(null);

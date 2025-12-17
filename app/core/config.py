@@ -72,6 +72,12 @@ class Settings(BaseSettings):
     LOCAL_STORAGE_PATH: str = "/app/storage/content"
     LOCAL_STORAGE_PUBLIC_URL: str = "http://localhost:8000/storage"
     
+    # File storage configuration
+    ALLOWED_FILE_EXTENSIONS_PHOTO: list[str] = ["jpeg", "jpg", "png"]
+    ALLOWED_FILE_EXTENSIONS_VIDEO: list[str] = ["mp4", "webm", "mov"]
+    MAX_FILE_SIZE_PHOTO: int = 10 * 1024 * 1024  # 10MB
+    MAX_FILE_SIZE_VIDEO: int = 100 * 1024 * 1024  # 100MB
+    
     # Email
     SMTP_HOST: str = "smtp.gmail.com"
     SMTP_PORT: int = 587

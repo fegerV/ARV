@@ -1,4 +1,5 @@
 from fastapi import APIRouter, HTTPException, Depends, status, Request
+from app.middleware.rate_limiter import rate_limit
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
@@ -9,8 +10,8 @@ from app.models.user import User
 from app.schemas.auth import Token, UserResponse, RegisterRequest, RegisterResponse
 import structlog
 
-router = APIRouter(prefix="/auth", tags=["auth"])
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login")
+router = APIRouter(tags=["auth"])
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="login")
 logger = structlog.get_logger()
 
 # Rate limiting constants
@@ -53,6 +54,7 @@ async def get_current_active_user(current_user: User = Depends(get_current_user)
     return current_user
 
 @router.post("/login", response_model=Token)
+@rate_limit(max_requests=10, window_size="minute", per_user=False)  # 10 login attempts per minute per IP
 async def login(
     request: Request,
     form_data: OAuth2PasswordRequestForm = Depends(),
