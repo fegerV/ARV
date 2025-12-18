@@ -1,0 +1,2 @@
+-- Test AR content fixture (placeholder)
+-- Add rows for portraits, videos as needed per migrations

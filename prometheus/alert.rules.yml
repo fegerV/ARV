@@ -1,0 +1,22 @@
+groups:
+- name: vertex_ar_alerts
+  rules:
+  - alert: HighAPIResponseTime
+    expr: api_request_duration_seconds{quantile="0.95"} > 5
+    for: 2m
+    labels:
+      severity: critical
+    annotations:
+      summary: "High API latency (p95 > 5s)"
+
+  - alert: CeleryQueueBacklog
+    expr: celery_queue_length > 100
+    for: 5m
+    labels:
+      severity: warning
+
+  - alert: PostgresHighConnections
+    expr: pg_stat_activity_count > 80
+    for: 10m
+    labels:
+      severity: warning
