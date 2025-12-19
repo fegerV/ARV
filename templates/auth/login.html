@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full bg-gray-50">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sign In - Vertex AR Admin</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#1976d2',
+                        secondary: '#dc004e',
+                        success: '#2e7d32',
+                        warning: '#ed6c02',
+                        error: '#d32f2f'
+                    }
+                }
+            }
+        }
+    </script>
+    
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <style>
+        /* Background pattern */
+        .bg-pattern {
+            background-color: #f9fafb;
+            background-image: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%239C92AC' fill-opacity='0.05'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+        }
+    </style>
+</head>
+<body class="h-full bg-pattern">
+    <div class="flex min-h-full">
+        <!-- Left side - Branding -->
+        <div class="flex-1 flex flex-col justify-center py-12 px-4 sm:px-6 lg:flex-none lg:px-20 xl:px-24">
+            <div class="mx-auto w-full max-w-sm lg:w-96">
+                <div>
+                    <!-- Logo -->
+                    <div class="flex items-center justify-center mb-8">
+                        <div class="w-16 h-16 bg-primary rounded-xl flex items-center justify-center shadow-lg">
+                            <i class="fas fa-cube text-white text-2xl"></i>
+                        </div>
+                    </div>
+                    
+                    <h2 class="mt-6 text-3xl font-bold text-gray-900 text-center">Vertex AR</h2>
+                    <p class="mt-2 text-sm text-gray-600 text-center">
+                        Sign in to your admin account
+                    </p>
+                </div>
+                
+                <!-- Features -->
+                <div class="mt-8">
+                    <div class="space-y-6">
+                        <div class="flex items-center">
+                            <div class="flex-shrink-0">
+                                <i class="fas fa-shield-alt text-primary text-xl"></i>
+                            </div>
+                            <div class="ml-4">
+                                <h3 class="text-sm font-medium text-gray-900">Secure Platform</h3>
+                                <p class="text-sm text-gray-500">Enterprise-grade security for your AR content</p>
+                            </div>
+                        </div>
+                        
+                        <div class="flex items-center">
+                            <div class="flex-shrink-0">
+                                <i class="fas fa-chart-line text-primary text-xl"></i>
+                            </div>
+                            <div class="ml-4">
+                                <h3 class="text-sm font-medium text-gray-900">Advanced Analytics</h3>
+                                <p class="text-sm text-gray-500">Track performance and user engagement</p>
+                            </div>
+                        </div>
+                        
+                        <div class="flex items-center">
+                            <div class="flex-shrink-0">
+                                <i class="fas fa-users text-primary text-xl"></i>
+                            </div>
+                            <div class="ml-4">
+                                <h3 class="text-sm font-medium text-gray-900">Multi-Tenant</h3>
+                                <p class="text-sm text-gray-500">Manage multiple companies and projects</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Right side - Login Form -->
+        <div class="flex-1 flex flex-col justify-center py-12 px-4 sm:px-6 lg:flex-none lg:px-20 xl:px-24">
+            <div class="mx-auto w-full max-w-sm lg:w-96">
+                <div x-data="loginForm()">
+                    
+                    <!-- Error Alert -->
+                    <div x-show="error" 
+                         x-transition
+                         class="mb-6 bg-red-50 border border-red-200 rounded-lg p-4">
+                        <div class="flex">
+                            <i class="fas fa-exclamation-circle text-red-500 mr-3"></i>
+                            <div>
+                                <h3 class="text-sm font-medium text-red-800">Sign In Failed</h3>
+                                <p class="mt-1 text-sm text-red-700" x-text="error"></p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Success Alert -->
+                    <div x-show="success" 
+                         x-transition
+                         class="mb-6 bg-green-50 border border-green-200 rounded-lg p-4">
+                        <div class="flex">
+                            <i class="fas fa-check-circle text-green-500 mr-3"></i>
+                            <div>
+                                <h3 class="text-sm font-medium text-green-800">Success</h3>
+                                <p class="mt-1 text-sm text-green-700" x-text="success"></p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-white py-8 px-6 shadow-xl rounded-lg">
+                        <form @submit.prevent="handleLogin" class="space-y-6">
+                            <div>
+                                <label for="email" class="block text-sm font-medium text-gray-700">
+                                    Email address
+                                </label>
+                                <div class="mt-1">
+                                    <input id="email" 
+                                           name="email" 
+                                           type="email" 
+                                           autocomplete="email" 
+                                           required
+                                           x-model="form.email"
+                                           class="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-primary focus:border-primary sm:text-sm"
+                                           placeholder="Enter your email">
+                                </div>
+                            </div>
+
+                            <div>
+                                <label for="password" class="block text-sm font-medium text-gray-700">
+                                    Password
+                                </label>
+                                <div class="mt-1 relative">
+                                    <input id="password" 
+                                           name="password" 
+                                           :type="showPassword ? 'text' : 'password'" 
+                                           autocomplete="current-password" 
+                                           required
+                                           x-model="form.password"
+                                           class="appearance-none block w-full px-3 py-2 pr-10 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-primary focus:border-primary sm:text-sm"
+                                           placeholder="Enter your password">
+                                    <button type="button" 
+                                            @click="showPassword = !showPassword"
+                                            class="absolute inset-y-0 right-0 pr-3 flex items-center">
+                                        <i class="fas text-gray-400"
+                                           :class="showPassword ? 'fa-eye-slash' : 'fa-eye'"></i>
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div class="flex items-center justify-between">
+                                <div class="flex items-center">
+                                    <input id="remember-me" 
+                                           name="remember-me" 
+                                           type="checkbox" 
+                                           x-model="form.remember"
+                                           class="h-4 w-4 text-primary focus:ring-primary border-gray-300 rounded">
+                                    <label for="remember-me" class="ml-2 block text-sm text-gray-900">
+                                        Remember me
+                                    </label>
+                                </div>
+
+                                <div class="text-sm">
+                                    <a href="/auth/forgot-password" class="font-medium text-primary hover:text-primary/80">
+                                        Forgot your password?
+                                    </a>
+                                </div>
+                            </div>
+
+                            <div>
+                                <button type="submit" 
+                                        :disabled="loading"
+                                        class="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
+                                    <span x-show="!loading">Sign in</span>
+                                    <span x-show="loading" class="flex items-center">
+                                        <i class="fas fa-spinner fa-spin mr-2"></i>
+                                        Signing in...
+                                    </span>
+                                </button>
+                            </div>
+                        </form>
+
+                        <!-- Demo Account Info -->
+                        <div class="mt-6 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+                            <p class="text-sm text-blue-800 dark:text-blue-200">
+                                <i class="fas fa-info-circle mr-2"></i>
+                                <strong>Demo Account:</strong> admin@vertex.local / admin123
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+    function loginForm() {
+        return {
+            loading: false,
+            error: null,
+            success: null,
+            showPassword: false,
+            form: {
+                email: '',
+                password: '',
+                remember: false
+            },
+            
+            async handleLogin() {
+                this.loading = true;
+                this.error = null;
+                this.success = null;
+                
+                try {
+                    const response = await fetch('/api/auth/login', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/x-www-form-urlencoded',
+                        },
+                        body: new URLSearchParams({
+                            username: this.form.email,
+                            password: this.form.password,
+                            grant_type: 'password'
+                        })
+                    });
+                    
+                    if (!response.ok) {
+                        const errorData = await response.json();
+                        throw new Error(errorData.detail || 'Login failed');
+                    }
+                    
+                    const data = await response.json();
+                    
+                    // Store token in cookie
+                    document.cookie = `access_token=${data.access_token}; path=/; max-age=${data.expires_in || 3600}; ${this.form.remember ? 'SameSite=Lax' : ''}`;
+                    
+                    this.success = 'Login successful! Redirecting...';
+                    
+                    // Redirect to dashboard after a short delay
+                    setTimeout(() => {
+                        window.location.href = '/admin';
+                    }, 1000);
+                    
+                } catch (error) {
+                    console.error('Login error:', error);
+                    this.error = error.message || 'An unexpected error occurred';
+                } finally {
+                    this.loading = false;
+                }
+            }
+        };
+    }
+    </script>
+</body>
+</html>

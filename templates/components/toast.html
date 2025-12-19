@@ -1,0 +1,156 @@
+<!-- Toast Notification Container -->
+<div x-data="toastManager()" 
+     x-init="init()"
+     @show-toast.window="addToast($event.detail.message, $event.detail.type)"
+     class="fixed top-4 right-4 z-50 space-y-2">
+    
+    <template x-for="toast in toasts" :key="toast.id">
+        <div x-show="toast.visible"
+             x-transition:enter="transform ease-out duration-300 transition"
+             x-transition:enter-start="translate-x-full opacity-0"
+             x-transition:enter-end="translate-x-0 opacity-100"
+             x-transition:leave="transition ease-in duration-200"
+             x-transition:leave-start="translate-x-0 opacity-100"
+             x-transition:leave-end="translate-x-full opacity-0"
+             class="max-w-sm w-full bg-white dark:bg-gray-800 shadow-lg rounded-lg border border-gray-200 dark:border-gray-700 pointer-events-auto">
+            
+            <div class="p-4">
+                <div class="flex items-start">
+                    <!-- Icon -->
+                    <div class="flex-shrink-0">
+                        <i class="fas text-lg"
+                           :class="{
+                               'fa-check-circle text-green-500': toast.type === 'success',
+                               'fa-exclamation-triangle text-yellow-500': toast.type === 'warning',
+                               'fa-times-circle text-red-500': toast.type === 'error',
+                               'fa-info-circle text-blue-500': toast.type === 'info'
+                           }"></i>
+                    </div>
+                    
+                    <!-- Message -->
+                    <div class="ml-3 w-0 flex-1">
+                        <p class="text-sm font-medium text-gray-900 dark:text-white" x-text="toast.message"></p>
+                    </div>
+                    
+                    <!-- Close Button -->
+                    <div class="ml-4 flex-shrink-0 flex">
+                        <button @click="removeToast(toast.id)"
+                                class="inline-flex text-gray-400 dark:text-gray-300 hover:text-gray-600 dark:hover:text-gray-100 focus:outline-none">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Progress bar (optional) -->
+            <div x-show="toast.autoClose && toast.progress > 0"
+                 class="h-1 bg-gray-200 dark:bg-gray-700 rounded-b-lg overflow-hidden">
+                <div class="h-full bg-primary transition-all duration-100"
+                     :style="`width: ${toast.progress}%`"></div>
+            </div>
+        </div>
+    </template>
+</div>
+
+<script>
+function toastManager() {
+    return {
+        toasts: [],
+        nextId: 1,
+        
+        init() {
+            // Initialize with any existing toasts if needed
+        },
+        
+        addToast(message, type = 'info', options = {}) {
+            const toast = {
+                id: this.nextId++,
+                message: message,
+                type: type,
+                visible: true,
+                autoClose: options.autoClose !== false, // Default to true
+                duration: options.duration || 5000, // Default 5 seconds
+                progress: 100
+            };
+            
+            this.toasts.push(toast);
+            
+            // Auto remove if enabled
+            if (toast.autoClose) {
+                this.startProgress(toast);
+                setTimeout(() => {
+                    this.removeToast(toast.id);
+                }, toast.duration);
+            }
+            
+            return toast.id;
+        },
+        
+        removeToast(id) {
+            const index = this.toasts.findIndex(toast => toast.id === id);
+            if (index > -1) {
+                this.toasts[index].visible = false;
+                // Remove from array after animation
+                setTimeout(() => {
+                    this.toasts.splice(index, 1);
+                }, 300);
+            }
+        },
+        
+        startProgress(toast) {
+            const interval = 50; // Update every 50ms
+            const steps = toast.duration / interval;
+            const decrement = 100 / steps;
+            
+            const progressInterval = setInterval(() => {
+                if (toast.progress > 0) {
+                    toast.progress -= decrement;
+                } else {
+                    clearInterval(progressInterval);
+                }
+            }, interval);
+        },
+        
+        // Convenience methods
+        success(message, options = {}) {
+            return this.addToast(message, 'success', options);
+        },
+        
+        error(message, options = {}) {
+            return this.addToast(message, 'error', options);
+        },
+        
+        warning(message, options = {}) {
+            return this.addToast(message, 'warning', options);
+        },
+        
+        info(message, options = {}) {
+            return this.addToast(message, 'info', options);
+        }
+    };
+}
+
+// Global convenience functions
+window.showToast = function(message, type = 'info', options = {}) {
+    const event = new CustomEvent('show-toast', {
+        detail: { message, type, ...options }
+    });
+    document.dispatchEvent(event);
+};
+
+window.showSuccess = function(message, options = {}) {
+    showToast(message, 'success', options);
+};
+
+window.showError = function(message, options = {}) {
+    showToast(message, 'error', options);
+};
+
+window.showWarning = function(message, options = {}) {
+    showToast(message, 'warning', options);
+};
+
+window.showInfo = function(message, options = {}) {
+    showToast(message, 'info', options);
+};
+</script>

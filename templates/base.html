@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Vertex AR Admin{% endblock %}</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#1976d2',
+                        secondary: '#dc004e',
+                        success: '#2e7d32',
+                        warning: '#ed6c02',
+                        error: '#d32f2f'
+                    }
+                }
+            }
+        }
+    </script>
+    
+    <!-- htmx -->
+    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+    <script src="https://unpkg.com/htmx.org/dist/ext/sse.js"></script>
+    <script src="https://unpkg.com/htmx.org/dist/ext/ws.js"></script>
+    
+    <!-- Alpine.js -->
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    
+    <!-- Chart.js for analytics -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <!-- Heroicons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <style>
+        /* Custom animations and transitions */
+        .htmx-indicator {
+            opacity: 0;
+            transition: opacity 0.3s ease-in-out;
+        }
+        .htmx-request .htmx-indicator {
+            opacity: 1;
+        }
+        
+        /* Sidebar transitions */
+        .sidebar-transition {
+            transition: transform 0.3s ease-in-out, opacity 0.3s ease-in-out;
+        }
+        
+        /* Dark mode transitions */
+        * {
+            transition-property: background-color, border-color, color;
+            transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+            transition-duration: 150ms;
+        }
+    </style>
+    {% block extra_head %}{% endblock %}
+</head>
+<body class="h-full bg-gray-50 dark:bg-gray-900" x-data="{
+    sidebarOpen: true,
+    theme: localStorage.getItem('theme') || 'light',
+    init() {
+        // Apply saved theme
+        if (this.theme === 'dark') {
+            document.documentElement.classList.add('dark');
+        }
+        
+        // Listen for theme changes
+        this.$watch('theme', value => {
+            localStorage.setItem('theme', value);
+            if (value === 'dark') {
+                document.documentElement.classList.add('dark');
+            } else {
+                document.documentElement.classList.remove('dark');
+            }
+        });
+    }
+}">
+    
+    <!-- Main Container -->
+    <div class="flex h-screen overflow-hidden">
+        
+        <!-- Sidebar -->
+        {% include "components/sidebar.html" %}
+        
+        <!-- Main Content -->
+        <div class="flex flex-col flex-1 overflow-hidden">
+            
+            <!-- Top Header -->
+            {% include "components/header.html" %}
+            
+            <!-- Page Content -->
+            <main class="flex-1 overflow-y-auto bg-gray-50 dark:bg-gray-900 p-6">
+                {% block content %}{% endblock %}
+            </main>
+            
+        </div>
+    </div>
+    
+    <!-- Toast Container -->
+    {% include "components/toast.html" %}
+    
+    <!-- Modal Container -->
+    {% include "components/modals.html" %}
+    
+    <!-- Global JavaScript -->
+    <script>
+        // Toast notification system
+        window.showToast = function(message, type = 'info') {
+            const event = new CustomEvent('show-toast', {
+                detail: { message, type }
+            });
+            document.dispatchEvent(event);
+        };
+        
+        // Theme toggle
+        window.toggleTheme = function() {
+            const currentTheme = localStorage.getItem('theme') || 'light';
+            const newTheme = currentTheme === 'light' ? 'dark' : 'light';
+            
+            document.documentElement.classList.toggle('dark', newTheme === 'dark');
+            localStorage.setItem('theme', newTheme);
+            
+            // Update Alpine store if available
+            if (window.Alpine && window.Alpine.store) {
+                window.Alpine.store('theme', newTheme);
+            }
+        };
+        
+        // Initialize theme on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            const savedTheme = localStorage.getItem('theme') || 'light';
+            document.documentElement.classList.toggle('dark', savedTheme === 'dark');
+        });
+        
+        // htmx event listeners
+        document.addEventListener('htmx:afterRequest', function(evt) {
+            // Show success/error messages based on response
+            if (evt.detail.successful) {
+                const responseText = evt.detail.xhr.responseText;
+                if (responseText.includes('success') || responseText.includes('created') || responseText.includes('updated')) {
+                    showToast('Operation completed successfully', 'success');
+                }
+            } else {
+                showToast('Request failed: ' + evt.detail.xhr.statusText, 'error');
+            }
+        });
+        
+        // Global error handler
+        window.addEventListener('error', function(evt) {
+            console.error('Global error:', evt.error);
+            showToast('An unexpected error occurred', 'error');
+        });
+    </script>
+    
+    {% block extra_scripts %}{% endblock %}
+</body>
+</html>

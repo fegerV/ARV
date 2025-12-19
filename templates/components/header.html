@@ -1,0 +1,121 @@
+<!-- Top Header -->
+<header class="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
+    <div class="flex items-center justify-between px-6 py-4">
+        
+        <!-- Left side - Page title and breadcrumb -->
+        <div class="flex items-center space-x-4">
+            <!-- Mobile menu button -->
+            <button @click="sidebarOpen = !sidebarOpen" 
+                    class="lg:hidden p-2 rounded-md text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">
+                <i class="fas fa-bars"></i>
+            </button>
+            
+            <!-- Page Title -->
+            <div>
+                <h1 class="text-xl font-semibold text-gray-900 dark:text-white">
+                    {% block page_title %}Dashboard{% endblock %}
+                </h1>
+                {% block breadcrumb %}{% endblock %}
+            </div>
+        </div>
+        
+        <!-- Right side - Actions and user menu -->
+        <div class="flex items-center space-x-4">
+            
+            <!-- Theme Toggle -->
+            <button @click="theme = theme === 'light' ? 'dark' : 'light'" 
+                    class="p-2 rounded-md text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                    title="Toggle theme">
+                <i class="fas" :class="theme === 'light' ? 'fa-moon' : 'fa-sun'"></i>
+            </button>
+            
+            <!-- Notifications -->
+            <div x-data="{ notificationsOpen: false }" class="relative">
+                <button @click="notificationsOpen = !notificationsOpen" 
+                        class="relative p-2 rounded-md text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                        title="Notifications">
+                    <i class="fas fa-bell"></i>
+                    <span class="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
+                </button>
+                
+                <!-- Notifications Dropdown -->
+                <div x-show="notificationsOpen" 
+                     @click.away="notificationsOpen = false"
+                     x-transition
+                     class="absolute right-0 mt-2 w-80 bg-white dark:bg-gray-800 rounded-md shadow-lg border border-gray-200 dark:border-gray-700 z-50">
+                    <div class="p-4 border-b border-gray-200 dark:border-gray-700">
+                        <h3 class="text-sm font-medium text-gray-900 dark:text-white">Notifications</h3>
+                    </div>
+                    <div class="max-h-96 overflow-y-auto">
+                        <div class="p-4 text-sm text-gray-600 dark:text-gray-300">
+                            <p class="mb-2">
+                                <i class="fas fa-info-circle text-blue-500 mr-2"></i>
+                                New AR content uploaded successfully
+                            </p>
+                            <p class="mb-2">
+                                <i class="fas fa-exclamation-triangle text-yellow-500 mr-2"></i>
+                                Storage usage at 85% capacity
+                            </p>
+                            <p>
+                                <i class="fas fa-check-circle text-green-500 mr-2"></i>
+                                Project "Demo Campaign" completed
+                            </p>
+                        </div>
+                    </div>
+                    <div class="p-4 border-t border-gray-200 dark:border-gray-700">
+                        <a href="/admin/notifications" class="text-sm text-primary hover:underline">
+                            View all notifications
+                        </a>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- User Menu -->
+            <div x-data="{ userMenuOpen: false }" class="relative">
+                <button @click="userMenuOpen = !userMenuOpen" 
+                        class="flex items-center space-x-2 p-2 rounded-md text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
+                    <div class="w-8 h-8 bg-gray-300 dark:bg-gray-600 rounded-full flex items-center justify-center">
+                        <i class="fas fa-user text-gray-600 dark:text-gray-300 text-sm"></i>
+                    </div>
+                    <i class="fas fa-chevron-down text-xs"></i>
+                </button>
+                
+                <!-- User Dropdown -->
+                <div x-show="userMenuOpen" 
+                     @click.away="userMenuOpen = false"
+                     x-transition
+                     class="absolute right-0 mt-2 w-56 bg-white dark:bg-gray-800 rounded-md shadow-lg border border-gray-200 dark:border-gray-700 z-50">
+                    <div class="p-3 border-b border-gray-200 dark:border-gray-700">
+                        <p class="text-sm font-medium text-gray-900 dark:text-white">
+                            {% if current_user %}{{ current_user.full_name or current_user.email }}{% else %}Guest{% endif %}
+                        </p>
+                        <p class="text-xs text-gray-500 dark:text-gray-400">
+                            {% if current_user %}{{ current_user.email }}{% else %}Not logged in{% endif %}
+                        </p>
+                    </div>
+                    <div class="py-1">
+                        <a href="/admin/settings" 
+                           class="flex items-center px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700">
+                            <i class="fas fa-cog w-4 h-4 mr-3"></i>
+                            Settings
+                        </a>
+                        <a href="/admin/profile" 
+                           class="flex items-center px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700">
+                            <i class="fas fa-user w-4 h-4 mr-3"></i>
+                            Profile
+                        </a>
+                        <div class="border-t border-gray-200 dark:border-gray-700"></div>
+                        <form action="/auth/logout" method="post">
+                            <button type="submit" 
+                                    class="flex items-center w-full px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700">
+                                <i class="fas fa-sign-out-alt w-4 h-4 mr-3"></i>
+                                Logout
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            
+        </div>
+    </div>
+</header>

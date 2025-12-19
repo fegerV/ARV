@@ -1,0 +1,175 @@
+<!-- Sidebar -->
+<aside class="flex flex-col w-64 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 sidebar-transition" 
+     :class="sidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'" 
+     x-show="sidebarOpen"
+     x-transition>
+    
+    <!-- Logo/Brand -->
+    <div class="flex items-center justify-center h-16 px-4 border-b border-gray-200 dark:border-gray-700">
+        <div class="flex items-center space-x-3">
+            <div class="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
+                <i class="fas fa-cube text-white text-lg"></i>
+            </div>
+            <span class="text-xl font-bold text-gray-900 dark:text-white">Vertex AR</span>
+        </div>
+    </div>
+    
+    <!-- Navigation -->
+    <nav class="flex-1 px-4 py-6 space-y-2 overflow-y-auto">
+        
+        <!-- Dashboard -->
+        <a href="/admin" 
+           class="flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors
+                  {% if request.url.path == '/admin' %}bg-primary text-white{% else %}text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700%}">
+            <i class="fas fa-chart-line w-5 h-5 mr-3"></i>
+            Dashboard
+        </a>
+        
+        <!-- Companies -->
+        <div x-data="{ companiesOpen: {{ 'companies' in request.url.path }} }">
+            <button @click="companiesOpen = !companiesOpen" 
+                    class="flex items-center w-full px-3 py-2 text-sm font-medium rounded-md transition-colors
+                           {% if 'companies' in request.url.path %}bg-primary text-white{% else %}text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700%}">
+                <i class="fas fa-building w-5 h-5 mr-3"></i>
+                Companies
+                <i class="fas fa-chevron-down ml-auto transform transition-transform" 
+                   :class="companiesOpen ? 'rotate-180' : ''"></i>
+            </button>
+            
+            <div x-show="companiesOpen" x-transition class="mt-1 ml-6 space-y-1">
+                <a href="/admin/companies" 
+                   class="flex items-center px-3 py-1 text-sm rounded-md transition-colors
+                          {% if request.url.path == '/admin/companies' %}bg-primary text-white{% else %}text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700%}">
+                    <i class="fas fa-list w-4 h-4 mr-2"></i>
+                    All Companies
+                </a>
+                <a href="/admin/companies/new" 
+                   class="flex items-center px-3 py-1 text-sm rounded-md transition-colors
+                          {% if request.url.path == '/admin/companies/new' %}bg-primary text-white{% else %}text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700%}">
+                    <i class="fas fa-plus w-4 h-4 mr-2"></i>
+                    New Company
+                </a>
+            </div>
+        </div>
+        
+        <!-- Projects -->
+        <div x-data="{ projectsOpen: {{ 'projects' in request.url.path }} }">
+            <button @click="projectsOpen = !projectsOpen" 
+                    class="flex items-center w-full px-3 py-2 text-sm font-medium rounded-md transition-colors
+                           {% if 'projects' in request.url.path %}bg-primary text-white{% else %}text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700%}">
+                <i class="fas fa-folder w-5 h-5 mr-3"></i>
+                Projects
+                <i class="fas fa-chevron-down ml-auto transform transition-transform" 
+                   :class="projectsOpen ? 'rotate-180' : ''"></i>
+            </button>
+            
+            <div x-show="projectsOpen" x-transition class="mt-1 ml-6 space-y-1">
+                <a href="/admin/projects" 
+                   class="flex items-center px-3 py-1 text-sm rounded-md transition-colors
+                          {% if request.url.path == '/admin/projects' %}bg-primary text-white{% else %}text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700%}">
+                    <i class="fas fa-list w-4 h-4 mr-2"></i>
+                    All Projects
+                </a>
+                <a href="/admin/projects/new" 
+                   class="flex items-center px-3 py-1 text-sm rounded-md transition-colors
+                          {% if request.url.path == '/admin/projects/new' %}bg-primary text-white{% else %}text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700%}">
+                    <i class="fas fa-plus w-4 h-4 mr-2"></i>
+                    New Project
+                </a>
+            </div>
+        </div>
+        
+        <!-- AR Content -->
+        <div x-data="{ arContentOpen: {{ 'ar-content' in request.url.path }} }">
+            <button @click="arContentOpen = !arContentOpen" 
+                    class="flex items-center w-full px-3 py-2 text-sm font-medium rounded-md transition-colors
+                           {% if 'ar-content' in request.url.path %}bg-primary text-white{% else %}text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700%}">
+                <i class="fas fa-cube w-5 h-5 mr-3"></i>
+                AR Content
+                <i class="fas fa-chevron-down ml-auto transform transition-transform" 
+                   :class="arContentOpen ? 'rotate-180' : ''"></i>
+            </button>
+            
+            <div x-show="arContentOpen" x-transition class="mt-1 ml-6 space-y-1">
+                <a href="/admin/ar-content" 
+                   class="flex items-center px-3 py-1 text-sm rounded-md transition-colors
+                          {% if request.url.path == '/admin/ar-content' %}bg-primary text-white{% else %}text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700%}">
+                    <i class="fas fa-list w-4 h-4 mr-2"></i>
+                    All Content
+                </a>
+                <a href="/admin/ar-content/new" 
+                   class="flex items-center px-3 py-1 text-sm rounded-md transition-colors
+                          {% if request.url.path == '/admin/ar-content/new' %}bg-primary text-white{% else %}text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700%}">
+                    <i class="fas fa-plus w-4 h-4 mr-2"></i>
+                    New Content
+                </a>
+            </div>
+        </div>
+        
+        <!-- Analytics -->
+        <a href="/admin/analytics" 
+           class="flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors
+                  {% if request.url.path == '/admin/analytics' %}bg-primary text-white{% else %}text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700%}">
+            <i class="fas fa-chart-bar w-5 h-5 mr-3"></i>
+            Analytics
+        </a>
+        
+        <!-- Storage -->
+        <a href="/admin/storage" 
+           class="flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors
+                  {% if request.url.path == '/admin/storage' %}bg-primary text-white{% else %}text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700%}">
+            <i class="fas fa-database w-5 h-5 mr-3"></i>
+            Storage
+        </a>
+        
+        <!-- Notifications -->
+        <a href="/admin/notifications" 
+           class="flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors
+                  {% if request.url.path == '/admin/notifications' %}bg-primary text-white{% else %}text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700%}">
+            <i class="fas fa-bell w-5 h-5 mr-3"></i>
+            Notifications
+        </a>
+        
+        <!-- Settings -->
+        <a href="/admin/settings" 
+           class="flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors
+                  {% if request.url.path == '/admin/settings' %}bg-primary text-white{% else %}text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700%}">
+            <i class="fas fa-cog w-5 h-5 mr-3"></i>
+            Settings
+        </a>
+        
+    </nav>
+    
+    <!-- User Info -->
+    <div class="p-4 border-t border-gray-200 dark:border-gray-700">
+        <div class="flex items-center">
+            <div class="flex-shrink-0">
+                <div class="w-8 h-8 bg-gray-300 dark:bg-gray-600 rounded-full flex items-center justify-center">
+                    <i class="fas fa-user text-gray-600 dark:text-gray-300 text-sm"></i>
+                </div>
+            </div>
+            <div class="ml-3 flex-1">
+                <p class="text-sm font-medium text-gray-900 dark:text-white">
+                    {% if current_user %}{{ current_user.full_name or current_user.email }}{% else %}Guest{% endif %}
+                </p>
+                <p class="text-xs text-gray-500 dark:text-gray-400">
+                    {% if current_user %}{{ current_user.role }}{% else %}Not logged in{% endif %}
+                </p>
+            </div>
+        </div>
+    </div>
+    
+</aside>
+
+<!-- Mobile sidebar overlay -->
+<div x-show="sidebarOpen" 
+     x-transition.opacity 
+     class="fixed inset-0 bg-gray-600 bg-opacity-75 z-40 lg:hidden"
+     @click="sidebarOpen = false">
+</div>
+
+<!-- Mobile sidebar toggle button -->
+<button @click="sidebarOpen = !sidebarOpen" 
+        class="lg:hidden fixed top-4 left-4 z-50 p-2 rounded-md bg-white dark:bg-gray-800 shadow-md">
+    <i class="fas fa-bars text-gray-600 dark:text-gray-300"></i>
+</button>

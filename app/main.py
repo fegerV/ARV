@@ -179,6 +179,10 @@ app.include_router(videos.router, prefix="/api/videos", tags=["Videos"])
 app.include_router(health.router, prefix="/api/health", tags=["Health"])
 app.include_router(alerts_ws.router, prefix="/api/ws", tags=["WebSocket"])
 
+# Include admin routes for HTML templates
+from app.routes import admin
+app.include_router(admin.router, tags=["Admin HTML"])
+
 
 # Global exception handlers
 @app.exception_handler(RequestValidationError)
