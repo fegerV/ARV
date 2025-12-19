@@ -53,6 +53,7 @@ export const arContentAPI = {
     api.get('/ar-content', { params }),
   getDetail: (id: string) => api.get(`/ar-content/${id}`),
   getDetailByHierarchy: (companyId: string, projectId: string, id: string) => api.get(`/companies/${companyId}/projects/${projectId}/ar-content/${id}`),
+  getDetailWithIds: (id: string) => api.get(`/ar-content/${id}`),
   create: (companyId: string, projectId: string, formData: FormData) => api.post(`/companies/${companyId}/projects/${projectId}/ar-content`, formData, {
     headers: {
       'Content-Type': 'multipart/form-data',
@@ -60,6 +61,15 @@ export const arContentAPI = {
   }),
   listByProject: (companyId: string, projectId: string, params?: { page?: number; page_size?: number }) =>
     api.get(`/companies/${companyId}/projects/${projectId}/ar-content`, { params }),
+  updateVideo: (companyId: string, projectId: string, contentId: string, formData: FormData) =>
+    api.patch(`/companies/${companyId}/projects/${projectId}/ar-content/${contentId}/video`, formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    }),
+  delete: (id: string) => api.delete(`/ar-content/${id}`),
+  deleteByHierarchy: (companyId: string, projectId: string, contentId: string) =>
+    api.delete(`/companies/${companyId}/projects/${projectId}/ar-content/${contentId}`),
 };
 
 export const companiesAPI = {

@@ -202,10 +202,14 @@ export default function ARContentList() {
   const handleDelete = async (id: string) => {
     if (window.confirm('Are you sure you want to delete this AR content? This action cannot be undone.')) {
       try {
-        addToast('Delete is not wired yet (no DELETE endpoint for flat AR content in UI)', 'warning');
+        await arContentAPI.delete(id);
+        addToast('AR content deleted successfully', 'success');
+        // Refresh the content list after deletion
+        await fetchContentList();
       } catch (error) {
         console.error('Error deleting AR content:', error);
-        addToast('Failed to delete AR content', 'error');
+        const msg = (error as any)?.response?.data?.detail || (error as any)?.response?.data?.message || 'Failed to delete AR content';
+        addToast(msg, 'error');
       }
     }
   };
@@ -305,7 +309,7 @@ export default function ARContentList() {
               renderValue={(selected: any) => (selected as string[]).join(', ')}
             >
               {uniqueCompanies.map((company) => (
-                <MenuItem key={company} value={company}>
+                <MenuItem key={`company-${company}`} value={company}>
                   <Checkbox checked={selectedCompanies.indexOf(company) > -1} />
                   <ListItemText primary={company} />
                 </MenuItem>
@@ -324,7 +328,7 @@ export default function ARContentList() {
               renderValue={(selected: any) => (selected as string[]).join(', ')}
             >
               {uniqueStatuses.map((status) => (
-                <MenuItem key={status} value={status}>
+                <MenuItem key={`status-${status}`} value={status}>
                   <Checkbox checked={selectedStatuses.indexOf(status) > -1} />
                   <ListItemText primary={status} />
                 </MenuItem>

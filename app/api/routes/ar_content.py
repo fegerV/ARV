@@ -40,6 +40,11 @@ from app.utils.ar_content import (
 )
 from app.services.marker_service import marker_service
 
+# Add import for the viewer route
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import HTMLResponse
+import json
+
 logger = structlog.get_logger()
 
 router = APIRouter(tags=["AR Content"])
@@ -587,22 +592,40 @@ async def get_ar_content(
     # Validate company and project relationship
     await validate_company_project(company_id, project_id, db)
     
-    # Get AR content
-    ar_content = await get_ar_content_or_404(content_id, db)
+    # Get AR content with related videos, company, and project
+    stmt = select(ARContent).options(
+        selectinload(ARContent.videos),
+        selectinload(ARContent.active_video),
+        selectinload(ARContent.company),
+        selectinload(ARContent.project)
+    ).where(ARContent.id == content_id)
+    result = await db.execute(stmt)
+    ar_content = result.scalar()
     
     # Verify it belongs to the specified company and project
     if ar_content.company_id != company_id or ar_content.project_id != project_id:
         raise HTTPException(status_code=404, detail="AR content not found in specified project")
     
-    # Load related videos
-    stmt = select(Video).where(Video.ar_content_id == content_id)
-    result = await db.execute(stmt)
-    videos = result.scalars().all()
-    
     # Add unique link and videos to response
     content_data = ARContentWithLinks.model_validate(ar_content)
     # Set unique_link after validation since it's not in the database model
     content_data.unique_link = build_unique_link(ar_content.unique_id)
+    # Set public_url as alias for unique_link
+    content_data.public_url = content_data.unique_link
+    # Set company and project IDs
+    content_data.company_id = ar_content.company_id
+    content_data.project_id = ar_content.project_id
+    # Set storage path
+    from app.utils.ar_content import build_ar_content_storage_path
+    import uuid
+    unique_id = uuid.UUID(str(ar_content.unique_id))
+    storage_path = build_ar_content_storage_path(ar_content.company_id, ar_content.project_id, unique_id)
+    content_data.storage_path = str(storage_path)
+    # Set company and project names
+    if ar_content.company:
+        content_data.company_name = ar_content.company.name
+    if ar_content.project:
+        content_data.project_name = ar_content.project.name
     
     return content_data
 
@@ -699,7 +722,11 @@ async def delete_ar_content(
     # Build storage path
     storage_path = build_ar_content_storage_path(company_id, project_id, ar_content.unique_id)
     
-    # Delete from database
+    # Clear the active_video_id reference to avoid circular dependency
+    ar_content.active_video_id = None
+    await db.commit()
+    
+    # Delete from database (this will cascade delete related videos due to cascade="all, delete-orphan")
     await db.delete(ar_content)
     await db.commit()
 
@@ -723,8 +750,13 @@ async def get_ar_content_by_id(
     db: AsyncSession = Depends(get_db)
 ):
     """Get AR content by ID without requiring company/project context (for compatibility)"""
-    # Get AR content with related videos
-    stmt = select(ARContent).options(selectinload(ARContent.videos), selectinload(ARContent.active_video)).where(ARContent.id == content_id)
+    # Get AR content with related videos, company, and project
+    stmt = select(ARContent).options(
+        selectinload(ARContent.videos),
+        selectinload(ARContent.active_video),
+        selectinload(ARContent.company),
+        selectinload(ARContent.project)
+    ).where(ARContent.id == content_id)
     result = await db.execute(stmt)
     ar_content = result.scalar()
     
@@ -735,6 +767,22 @@ async def get_ar_content_by_id(
     content_data = ARContentWithLinks.model_validate(ar_content)
     # Set unique_link after validation since it's not in the database model
     content_data.unique_link = build_unique_link(ar_content.unique_id)
+    # Set public_url as alias for unique_link
+    content_data.public_url = content_data.unique_link
+    # Set company and project IDs
+    content_data.company_id = ar_content.company_id
+    content_data.project_id = ar_content.project_id
+    # Set storage path
+    from app.utils.ar_content import build_ar_content_storage_path
+    import uuid
+    unique_id = uuid.UUID(str(ar_content.unique_id))
+    storage_path = build_ar_content_storage_path(ar_content.company_id, ar_content.project_id, unique_id)
+    content_data.storage_path = str(storage_path)
+    # Set company and project names
+    if ar_content.company:
+        content_data.company_name = ar_content.company.name
+    if ar_content.project:
+        content_data.project_name = ar_content.project.name
     
     return content_data
 
@@ -753,7 +801,11 @@ async def delete_ar_content_by_id(
     # Build storage path
     storage_path = build_ar_content_storage_path(ar_content.company_id, ar_content.project_id, ar_content.unique_id)
     
-    # Delete from database
+    # Clear the active_video_id reference to avoid circular dependency
+    ar_content.active_video_id = None
+    await db.commit()
+    
+    # Delete from database (this will cascade delete related videos due to cascade="all, delete-orphan")
     await db.delete(ar_content)
     await db.commit()
     
@@ -791,3 +843,165 @@ async def get_ar_content_by_id_legacy(
     content_data.unique_link = build_unique_link(ar_content.unique_id)
     
     return content_data
+
+
+# AR viewer endpoint
+@router.get("/view/{unique_id}", response_class=HTMLResponse, tags=["AR Content"])
+async def get_ar_viewer(unique_id: str, db: AsyncSession = Depends(get_db)):
+    """Get AR viewer page for a specific AR content"""
+    try:
+        # Validate UUID format
+        parsed_uuid = UUID(unique_id)
+        
+        # Find AR content by unique_id
+        stmt = select(ARContent).where(ARContent.unique_id == parsed_uuid)
+        result = await db.execute(stmt)
+        ar_content = result.scalar()
+        
+        if not ar_content:
+            raise HTTPException(status_code=404, detail="AR content not found")
+        
+        # Check if content has expired based on duration_years
+        from datetime import datetime, timedelta
+        creation_date = ar_content.created_at.replace(tzinfo=None) if ar_content.created_at.tzinfo else ar_content.created_at
+        expiry_date = creation_date + timedelta(days=ar_content.duration_years * 365)
+        current_date = datetime.utcnow()
+        
+        if current_date > expiry_date:
+            raise HTTPException(status_code=403, detail="AR content subscription has expired")
+        
+        # Check if marker is available
+        if not ar_content.marker_url:
+            if ar_content.marker_status == "pending":
+                raise HTTPException(status_code=400, detail="AR marker is being generated, please try again later")
+            else:
+                raise HTTPException(status_code=400, detail="AR marker not available")
+        
+        # Return the AR viewer page HTML
+        html_content = f"""
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta name="viewport" content="width=device-width, initial-scale=1" />
+            <title>AR Viewer - {ar_content.order_number}</title>
+            <script src="https://cdn.jsdelivr.net/gh/hiukim/mind-ar-js@1.2.5/dist/mindar-image.prod.js"></script>
+            <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
+            <script src="https://cdn.jsdelivr.net/gh/hiukim/mind-ar-js@1.2.5/dist/mindar-image-aframe.prod.js"></script>
+            <style>
+                body, html {{
+                    margin: 0;
+                    padding: 0;
+                    overflow: hidden;
+                    width: 100%;
+                    height: 100%;
+                    background-color: #000;
+                }}
+                #ar-container {{
+                    width: 100%;
+                    height: 100%;
+                }}
+            </style>
+        </head>
+        <body>
+            <div id="ar-container">
+                <a-scene
+                    mindar-image="imageTargetSrc: {ar_content.marker_url}; uiLoading: #uiLoading; uiError: #uiError;"
+                    color-space="sRGB"
+                    renderer="colorManagement: true, physicallyCorrectLights"
+                    vr-mode-ui="enabled: false"
+                    device-orientation-permission-ui="enabled: false"
+                >
+                    <a-assets>
+                        <img id="targetImage" src="{ar_content.photo_url}" />
+                        <a-asset-item id="videoModel" src="{ar_content.video_url}"></a-asset-item>
+                    </a-assets>
+
+                    <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
+                    <a-entity mindar-image-target="targetIndex: 0">
+                        <a-image
+                            src="#targetImage"
+                            position="0 0 0"
+                            scale="0.5 0.5 1"
+                        ></a-image>
+                        <a-video
+                            src="#videoModel"
+                            width="0.5"
+                            height="0.5"
+                            position="0 0.1 0.01"
+                            rotation="0 0 0"
+                        ></a-video>
+                    </a-entity>
+                    
+                    <div id="uiLoading" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: white; font-size: 18px; text-align: center;">
+                        <div>Initializing AR experience...</div>
+                    </div>
+                    <div id="uiError" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: white; font-size: 18px; text-align: center; display: none;">
+                        <div>Error loading AR. Please try again.</div>
+                    </div>
+                </a-scene>
+            </div>
+        </body>
+        </html>
+        """
+        return HTMLResponse(content=html_content)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid unique_id format")
+    except HTTPException:
+        # Re-raise HTTP exceptions (like 404) to be handled properly by FastAPI
+        raise
+    except Exception as e:
+        # Log unexpected errors
+        logger.error("ar_viewer_error", unique_id=unique_id, error=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+
+# Endpoint to get marker file by unique_id
+@router.get("/ar-content/marker/{unique_id}", tags=["AR Content"])
+async def get_ar_marker(unique_id: str, db: AsyncSession = Depends(get_db)):
+    """Get AR marker file by unique_id"""
+    try:
+        parsed_uuid = UUID(unique_id)
+        
+        # Find AR content by unique_id
+        stmt = select(ARContent).where(ARContent.unique_id == parsed_uuid)
+        result = await db.execute(stmt)
+        ar_content = result.scalar()
+        
+        if not ar_content:
+            raise HTTPException(status_code=404, detail="AR content not found")
+        
+        if not ar_content.marker_url:
+            raise HTTPException(status_code=404, detail="AR marker not available")
+            
+        # Return a redirect to the marker URL or serve the file directly
+        from fastapi.responses import RedirectResponse
+        return RedirectResponse(url=ar_content.marker_url)
+        
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid unique_id format")
+
+
+# Endpoint to get image by unique_id
+@router.get("/ar-content/image/{unique_id}", tags=["AR Content"])
+async def get_ar_image(unique_id: str, db: AsyncSession = Depends(get_db)):
+    """Get AR target image by unique_id"""
+    try:
+        parsed_uuid = UUID(unique_id)
+        
+        # Find AR content by unique_id
+        stmt = select(ARContent).where(ARContent.unique_id == parsed_uuid)
+        result = await db.execute(stmt)
+        ar_content = result.scalar()
+        
+        if not ar_content:
+            raise HTTPException(status_code=404, detail="AR content not found")
+        
+        if not ar_content.photo_url:
+            raise HTTPException(status_code=404, detail="AR target image not available")
+            
+        # Return a redirect to the image URL or serve the file directly
+        from fastapi.responses import RedirectResponse
+        return RedirectResponse(url=ar_content.photo_url)
+        
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid unique_id format")

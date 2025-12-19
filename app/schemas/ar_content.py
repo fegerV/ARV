@@ -131,6 +131,10 @@ class ARContentWithLinks(BaseModel):
     id: int
     order_number: str
     unique_link: Optional[str] = None
+    public_url: Optional[str] = None # Public URL for AR viewer
+    company_id: int  # Company ID
+    project_id: int # Project ID
+    storage_path: Optional[str] = None  # Local storage path
     qr_code_url: str
     photo_url: str
     thumbnail_url: Optional[str] = None # Thumbnail URL for photo preview
@@ -139,6 +143,8 @@ class ARContentWithLinks(BaseModel):
     status: str
     created_at: datetime
     updated_at: datetime
+    company_name: Optional[str] = None  # Company name
+    project_name: Optional[str] = None  # Project name
     marker_url: Optional[str] = None  # URL to the AR marker file
     marker_status: Optional[str] = None  # Status of marker generation
     marker_metadata: Optional[Dict[str, Any]] = None  # Additional marker metadata

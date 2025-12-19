@@ -134,11 +134,13 @@ class NoCacheStaticFiles(StaticFiles):
         
         try:
             response = await super().get_response(path, scope)
-            # Only return index.html for 404s that are not API routes
+            # Only return index.html for 404s that are not API routes or special paths
             if response.status_code == 404 and not path.startswith("api/") and not path.startswith("/api/"):
-                logger.info("Returning index.html for 404", path=path)
-                # Return index.html for any 404 - this enables client-side routing
-                response = await super().get_response("index.html", scope)
+                # Check if this looks like a client-side route (no file extension, or specific frontend routes)
+                if '.' not in path or path.startswith('ar-content') or path.startswith('view') or path.startswith('companies') or path.startswith('projects'):
+                    logger.info("Returning index.html for client-side route", path=path)
+                    # Return index.html for client-side routing
+                    response = await super().get_response("index.html", scope)
             # Add no-cache headers
             if response.status_code == 200:
                 response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
@@ -147,8 +149,13 @@ class NoCacheStaticFiles(StaticFiles):
             return response
         except Exception as e:
             logger.error("NoCacheStaticFiles exception", error=str(e), path=path)
-            # Return index.html for any error - this enables client-side routing
-            return await super().get_response("index.html", scope)
+            # Check if this looks like a client-side route before returning index.html
+            if '.' not in path or path.startswith('ar-content') or path.startswith('view') or path.startswith('companies') or path.startswith('projects'):
+                # Return index.html for any error on client-side routes - this enables client-side routing
+                return await super().get_response("index.html", scope)
+            else:
+                # Re-raise the exception for actual static file errors
+                raise
 
 # Include API routers
 from app.api.routes import (
@@ -196,7 +203,7 @@ setup_rate_limiting(app)
 os.makedirs(settings.MEDIA_ROOT, exist_ok=True)
 os.makedirs("static", exist_ok=True)
 app.mount("/storage", StaticFiles(directory=settings.MEDIA_ROOT), name="storage")
-app.mount("/assets", NoCacheStaticFiles(directory="static/assets"), name="assets")
+app.mount("/", NoCacheStaticFiles(directory="static", html=True), name="static")
 
 # Favicon endpoint
 @app.get("/favicon.ico")
@@ -216,33 +223,6 @@ async def favicon():
         return Response(content=default_favicon, media_type="image/x-icon")
 
 
-# Catch-all route for React Router client-side routing
-@app.get("/{full_path:path}")
-async def serve_frontend(full_path: str):
-    """Serve the frontend application for any unmatched routes (enables client-side routing)."""
-    from fastapi.responses import FileResponse
-    import os
-    
-    # Don't serve frontend for API routes
-    if full_path.startswith("api/"):
-        raise HTTPException(status_code=404, detail="Not found")
-    
-    # Check if file exists
-    if not os.path.exists("static/index.html"):
-        logger = structlog.get_logger()
-        logger.error("Frontend index.html not found", path="static/index.html")
-        raise HTTPException(status_code=500, detail="Frontend files not found")
-    
-    # Return the file with no cache headers
-    response = FileResponse(
-        "static/index.html",
-        headers={
-            "Cache-Control": "no-cache, no-store, must-revalidate",
-            "Pragma": "no-cache",
-            "Expires": "0"
-        }
-    )
-    return response
 
 
 if __name__ == "__main__":

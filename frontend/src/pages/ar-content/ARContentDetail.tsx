@@ -39,12 +39,18 @@ import { format } from 'date-fns';
 import { arContentAPI } from '../../services/api';
 import { useToast } from '../../store/useToast';
 import { downloadQRAsPNG, downloadQRAsSVG, downloadQRAsPDF } from '../../utils/qrCodeExport';
+import { Upload as UploadIcon, FileUpload as FileUploadIcon } from '@mui/icons-material';
 
 interface ARContentDetailProps {
   id: string;
   order_number: string;
-  company_name: string;
-  project_name: string;
+  unique_link?: string;
+  public_url?: string;
+  company_id: number;
+  project_id: number;
+  storage_path?: string;
+  company_name?: string;
+  project_name?: string;
   created_at: string;
   status: string;
   customer_name?: string;
@@ -57,8 +63,23 @@ interface ARContentDetailProps {
   active_video_url?: string | null;
   views_count: number;
   views_30_days?: number;
-  public_url?: string;
   qr_code_url?: string;
+  marker_url?: string | null;
+  marker_status?: string | null;
+  marker_metadata?: Record<string, any> | null;
+  videos: VideoResponse[];
+  active_video?: VideoResponse | null;
+}
+
+interface VideoResponse {
+  id: number;
+  ar_content_id: number;
+  filename: string;
+  duration: number | null;
+  size: number | null;
+  status: string;
+  is_active: boolean;
+  created_at: string;
 }
 
 interface VideoInfo {
@@ -85,6 +106,7 @@ interface Stats {
   deviceBreakdown: { device: string; percentage: number }[];
 }
 
+
 export default function ARContentDetail() {
   const { arContentId } = useParams<{ arContentId: string }>();
   const navigate = useNavigate();
@@ -103,6 +125,9 @@ export default function ARContentDetail() {
   const [deleteDialog, setDeleteDialog] = useState(false);
   const [zoom, setZoom] = useState(100);
   const [downloadingQR, setDownloadingQR] = useState(false);
+  const [uploadingVideo, setUploadingVideo] = useState(false);
+  const [videoFile, setVideoFile] = useState<File | null>(null);
+  const [uploadDialog, setUploadDialog] = useState(false);
 
   const fetchContentDetail = useCallback(async () => {
     setLoading(true);
@@ -110,7 +135,23 @@ export default function ARContentDetail() {
       const response = await arContentAPI.getDetail(String(arContentId));
       const data = response.data;
       setContent(data);
-      setVideos((data.videos || []) as VideoInfo[]);
+      
+      // Convert VideoResponse objects to VideoInfo objects for display
+      const convertedVideos: VideoInfo[] = (data.videos || []).map((video: VideoResponse) => ({
+        id: video.id,
+        fileName: video.filename,
+        fileSize: video.size || 0,
+        duration: video.duration || 0,
+        width: 0, // Will be populated from video metadata if available
+        height: 0, // Will be populated from video metadata if available
+        fps: 0, // Will be populated from video metadata if available
+        codec: '', // Will be populated from video metadata if available
+        previewUrl: data.video_url,
+        videoUrl: data.video_url,
+        isActive: video.is_active,
+      }));
+      
+      setVideos(convertedVideos);
     } catch (error: any) {
       addToast(
         error.response?.data?.message || 'Failed to load AR content',
@@ -137,7 +178,15 @@ export default function ARContentDetail() {
   const handleDelete = async () => {
     setDeleting(true);
     try {
-      addToast('Delete is not wired yet', 'warning');
+      // Use the company_id and project_id from the content object for hierarchical deletion
+      if (content && content.company_id && content.project_id) {
+        await arContentAPI.deleteByHierarchy(String(content.company_id), String(content.project_id), String(content.id));
+      } else {
+        // Fallback to flat deletion if company or project IDs are not available
+        await arContentAPI.delete(String(content?.id));
+      }
+      addToast('AR content deleted successfully', 'success');
+      navigate('/ar-content'); // Navigate back to the list after deletion
     } catch (error: any) {
       addToast(
         error.response?.data?.message || 'Failed to delete AR content',
@@ -195,7 +244,7 @@ export default function ARContentDetail() {
       }
 
       const filename = `qr-${content.order_number}.${format}`;
-      const arUrl = content.public_url || '';
+      const arUrl = fullArUrl || '';
       if (!arUrl) {
         addToast('Ссылка недоступна — QR-код нельзя скачать', 'error');
         return;
@@ -222,6 +271,52 @@ export default function ARContentDetail() {
     }
   };
 
+  const handleVideoUpload = async () => {
+    if (!content || !videoFile) return;
+    
+    setUploadingVideo(true);
+    try {
+      const formData = new FormData();
+      formData.append('video', videoFile);
+      
+      // Use company_id and project_id from the content object
+      const companyId = content.company_id;
+      const projectId = content.project_id;
+      
+      if (!companyId || !projectId) {
+        addToast('Company or project information missing', 'error');
+        return;
+      }
+      
+      await arContentAPI.updateVideo(String(companyId), String(projectId), String(content.id), formData);
+      addToast('Video uploaded successfully!', 'success');
+      setUploadDialog(false);
+      setVideoFile(null);
+      // Refresh the content details
+      await fetchContentDetail();
+    } catch (error: any) {
+      addToast(
+        error.response?.data?.message || 'Failed to upload video',
+        'error'
+      );
+      console.error('Failed to upload video:', error);
+    } finally {
+      setUploadingVideo(false);
+    }
+ };
+
+  const handleVideoFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      const file = e.target.files[0];
+      // Validate file type
+      if (!file.type.startsWith('video/')) {
+        addToast('Please select a video file', 'error');
+        return;
+      }
+      setVideoFile(file);
+    }
+  };
+
   if (loading) {
     return (
       <Box sx={{ maxWidth: 1200, mx: 'auto' }}>
@@ -241,8 +336,13 @@ export default function ARContentDetail() {
 
   if (!content) return <Typography>AR content not found</Typography>;
 
-  const arUrl = content.public_url || '';
+  const arUrl = content.public_url || content.unique_link || '';
+  // Ensure arUrl is a complete URL, not just a path
+  const fullArUrl = arUrl.startsWith('/') ? `${window.location.origin}${arUrl}` : arUrl;
   const hasPortrait = Boolean(content.photo_url);
+  
+  // AR viewer URL - using unique_link from the response
+  const arViewerUrl = content.unique_link ? `/view/${content.unique_link}` : '';
 
   return (
     <Box sx={{ maxWidth: 1200, mx: 'auto' }}>
@@ -277,8 +377,8 @@ export default function ARContentDetail() {
       {/* Company & Project Info */}
       <Paper sx={{ p: 2, mb: 3 }}>
         <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
-          <Chip label={`🏢 ${content.company_name}`} />
-          <Chip label={`📁 ${content.project_name}`} />
+          <Chip label={`🏢 ${content.company_name || '—'}`} />
+          <Chip label={`📁 ${content.project_name || '—'}`} />
           <Chip label={`📅 ${format(new Date(content.created_at), 'dd.MM.yyyy HH:mm')}`} />
           <Chip label={`⏳ ${content.duration_years}y`} />
         </Box>
@@ -330,8 +430,23 @@ export default function ARContentDetail() {
 
             <Divider sx={{ my: 2 }} />
 
+            <Typography variant="h6" gutterBottom>💾 Расположение файлов</Typography>
+            <Typography variant="body2">
+              {content.storage_path ? content.storage_path : 'Путь не определен'}
+            </Typography>
+
+            <Divider sx={{ my: 2 }} />
+
             <Typography variant="h6" gutterBottom>🎬 Видео</Typography>
-            <Typography variant="body2">Активное: {content.active_video_title || '—'}</Typography>
+            <Typography variant="body2">Активное: {content.active_video?.filename || '—'}</Typography>
+            <Button
+              variant="outlined"
+              startIcon={<UploadIcon />}
+              onClick={() => setUploadDialog(true)}
+              sx={{ mt: 2 }}
+            >
+              Загрузить новое видео
+            </Button>
           </Paper>
         </Grid>
       </Grid>
@@ -342,42 +457,56 @@ export default function ARContentDetail() {
         <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', mb: 2 }}>
           <TextField
             fullWidth
-            value={arUrl}
+            value={fullArUrl}
             InputProps={{
               readOnly: true,
               endAdornment: (
-                <IconButton onClick={() => copyToClipboard(arUrl)} disabled={!arUrl}>
+                <IconButton onClick={() => copyToClipboard(fullArUrl)} disabled={!fullArUrl}>
                   <CopyIcon />
                 </IconButton>
               ),
             }}
           />
-          <Button 
-            variant="outlined" 
-            startIcon={<OpenIcon />}
-            onClick={() => window.open(arUrl, '_blank')}
-            disabled={!arUrl}
+          <Button
+          variant="outlined"
+          startIcon={<OpenIcon />}
+          onClick={() => window.open(fullArUrl, '_blank')}
+          disabled={!arUrl}
+        >
+          Открыть
+        </Button>
+        {arViewerUrl && (
+          <Button
+            variant="contained"
+            startIcon={<PlayIcon />}
+            onClick={() => window.open(arViewerUrl, '_blank')}
           >
-            Открыть
+            AR Просмотр
           </Button>
-        </Box>
-        
-        <Box sx={{ display: 'flex', gap: 3, alignItems: 'flex-start' }}>
-          <Box>
-            <QRCode 
-              value={arUrl} 
-              size={200}
-              includeMargin
-              ref={(el: any) => {
-                if (el) {
-                  const canvas = el.querySelector('canvas');
-                  if (canvas && qrCanvasRef.current !== canvas) {
-                    // @ts-ignore
-                    qrCanvasRef.current = canvas;
-                  }
+        )}
+      </Box>
+      
+      <Box sx={{ display: 'flex', gap: 3, alignItems: 'flex-start' }}>
+        <Box>
+          <div
+            ref={(el: any) => {
+              if (el) {
+                const canvas = el.querySelector('canvas');
+                if (canvas && qrCanvasRef.current !== canvas) {
+                  // @ts-ignore
+                  qrCanvasRef.current = canvas;
                 }
-              }}
-            />
+              }
+            }}
+            onClick={() => setQrDialog(true)}
+            style={{ cursor: 'pointer' }}
+          >
+            <QRCode
+                value={arUrl}
+                size={300}
+                includeMargin
+              />
+          </div>
           </Box>
           <Box>
             <Typography variant="body2" gutterBottom>Скачать QR-код:</Typography>
@@ -411,6 +540,42 @@ export default function ARContentDetail() {
               </Button>
             </Box>
           </Box>
+        </Box>
+      </Paper>
+
+      {/* AR Marker Info */}
+      <Paper sx={{ p: 3, mb: 4 }}>
+        <Typography variant="h6" gutterBottom>🎯 AR Маркер</Typography>
+        <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', mb: 2 }}>
+          <Typography variant="body2">
+            Статус: {
+              content.marker_status === 'pending' ? 'В процессе генерации' :
+              content.marker_status === 'ready' ? 'Готов' :
+              content.marker_status === 'failed' ? 'Ошибка генерации' :
+              'Неизвестен'
+            }
+          </Typography>
+          {content.marker_url && (
+            <Button
+              variant="outlined"
+              startIcon={<DownloadIcon />}
+              href={content.marker_url}
+              target="_blank"
+              download
+            >
+              Скачать маркер
+            </Button>
+          )}
+          {!content.marker_url && content.marker_status === 'failed' && (
+            <Button
+              variant="outlined"
+              color="warning"
+              startIcon={<EditIcon />}
+              onClick={handleGenerateMarker}
+            >
+              Повторить генерацию
+            </Button>
+          )}
         </Box>
       </Paper>
 
@@ -580,11 +745,11 @@ export default function ARContentDetail() {
                 }
               }
             }}>
-              <QRCode value={arUrl} size={300} />
+              <QRCode value={fullArUrl} size={300} />
             </div>
           </Box>
           <Typography variant="body2" sx={{ mb: 2 }}>
-            {arUrl}
+            {fullArUrl}
           </Typography>
           <Box sx={{ display: 'flex', gap: 1, justifyContent: 'center', flexWrap: 'wrap' }}>
             <Button 
@@ -635,6 +800,58 @@ export default function ARContentDetail() {
             startIcon={deleting ? <CircularProgress size={16} /> : <DeleteIcon />}
           >
             {deleting ? 'Удаление...' : 'Удалить'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+      
+      {/* Video Upload Dialog */}
+      <Dialog open={uploadDialog} onClose={() => setUploadDialog(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <Typography>📁 Загрузить новое видео</Typography>
+            <IconButton onClick={() => setUploadDialog(false)}>
+              <CloseIcon />
+            </IconButton>
+          </Box>
+        </DialogTitle>
+        <DialogContent>
+          <Box sx={{ mt: 2 }}>
+            <input
+              accept="video/*"
+              type="file"
+              onChange={handleVideoFileChange}
+              style={{ display: 'none' }}
+              id="video-upload"
+            />
+            <label htmlFor="video-upload">
+              <Button
+                variant="outlined"
+                component="span"
+                startIcon={<FileUploadIcon />}
+                fullWidth
+              >
+                Выберите видео файл
+              </Button>
+            </label>
+            {videoFile && (
+              <Box sx={{ mt: 2, p: 2, border: '1px dashed #ccc', borderRadius: 1 }}>
+                <Typography variant="body2">Выбран файл: {videoFile.name}</Typography>
+                <Typography variant="body2">Размер: {formatBytes(videoFile.size)}</Typography>
+              </Box>
+            )}
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setUploadDialog(false)} disabled={uploadingVideo}>
+            Отмена
+          </Button>
+          <Button
+            onClick={handleVideoUpload}
+            variant="contained"
+            disabled={!videoFile || uploadingVideo}
+            startIcon={uploadingVideo ? <CircularProgress size={16} /> : <UploadIcon />}
+          >
+            {uploadingVideo ? 'Загрузка...' : 'Загрузить'}
           </Button>
         </DialogActions>
       </Dialog>

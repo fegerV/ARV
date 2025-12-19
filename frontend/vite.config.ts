@@ -6,12 +6,17 @@ export default defineConfig({
   plugins: [react()],
   server: {
     port: 3000,
+    historyApiFallback: true, // Обработка SPA маршрутов
     proxy: {
       '/api': {
         target: 'http://localhost:8000',
         changeOrigin: true,
       },
       '/ar': {
+        target: 'http://localhost:8000',
+        changeOrigin: true,
+      },
+      '/view': {
         target: 'http://localhost:8000',
         changeOrigin: true,
       },

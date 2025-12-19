@@ -19,7 +19,6 @@ import Analytics from './pages/Analytics';
 import Storage from './pages/Storage';
 import Notifications from './pages/Notifications';
 import Settings from './pages/Settings';
-import YandexDiskCallback from './pages/oauth/YandexDiskCallback';
 
 // Layout component for protected routes
 const ProtectedLayout = ({ children }: { children: React.ReactNode }) => {
@@ -63,8 +62,6 @@ function App() {
         {/* Public Routes */}
         <Route path="/login" element={<Login />} />
         
-        {/* OAuth Callback Routes (public - accessed from popup) */}
-        <Route path="/oauth/yandex/callback" element={<YandexDiskCallback />} />
         
         {/* Protected Routes - Specific routes first */}
         <Route path="/companies" element={
