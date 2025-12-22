@@ -15,11 +15,6 @@ engine = create_async_engine(
     settings.DATABASE_URL,
     poolclass=NullPool,  # Disable connection pooling for development
     echo=settings.DEBUG,
-    connect_args={
-        "server_settings": {
-            "application_name": "vertex_ar_api"
-        }
-    }
 )
 
 # Create async session factory

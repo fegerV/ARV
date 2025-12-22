@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Time, DateTime, ARRAY, ForeignKey
+from sqlalchemy import Column, Integer, String, Time, DateTime, ForeignKey, JSON
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 from app.core.database import Base
@@ -22,7 +22,7 @@ class VideoRotationSchedule(Base):
     day_of_month = Column(Integer)
     cron_expression = Column(String(100))
 
-    video_sequence = Column(ARRAY(Integer))
+    video_sequence = Column(JSON)  # Store as JSON for SQLite compatibility
     current_index = Column(Integer, default=0)
 
     is_active = Column(Integer, default=1)  # use Boolean if preferred
