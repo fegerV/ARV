@@ -20,6 +20,9 @@
     <!-- Alpine.js Focus from CDN -->
     <script defer src="https://cdn.jsdelivr.net/npm/@alpinejs/focus@3.x/dist/cdn.min.js"></script>
     
+    <!-- Material Icons font -->
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    
     <style>
         [x-cloak] { display: none !important; }
         
@@ -171,6 +174,42 @@
                     } else {
                         document.documentElement.classList.remove('dark');
                     }
+                }
+            }
+        }
+        
+        // Sidebar functionality
+        function sidebar() {
+            return {
+                expanded: true,
+                
+                init() {
+                    // Initialize sidebar state
+                    this.expanded = localStorage.getItem('sidebarExpanded') !== 'false';
+                },
+                
+                toggle() {
+                    this.expanded = !this.expanded;
+                    localStorage.setItem('sidebarExpanded', this.expanded);
+                    
+                    const sidebar = document.getElementById('sidebar');
+                    const mainContent = document.querySelector('.ml-64');
+                    
+                    if (this.expanded) {
+                        sidebar.classList.remove('sidebar-collapsed');
+                        sidebar.classList.add('sidebar-expanded');
+                        mainContent.classList.remove('ml-16');
+                        mainContent.classList.add('ml-64');
+                    } else {
+                        sidebar.classList.remove('sidebar-expanded');
+                        sidebar.classList.add('sidebar-collapsed');
+                        mainContent.classList.remove('ml-64');
+                        mainContent.classList.add('ml-16');
+                    }
+                },
+                
+                isActive(path) {
+                    return window.location.pathname.startsWith(path);
                 }
             }
         }

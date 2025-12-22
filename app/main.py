@@ -787,7 +787,67 @@ async def favicon():
         default_favicon = b'\x00\x00\x01\x00\x01\x00\x10\x10\x00\x00\x01\x00\x04\x00\x86\x00\x00\x00(\x00\x00\x00\x10\x00\x00\x00 \x00\x00\x00\x01\x00\x04\x00'
         return Response(content=default_favicon, media_type="image/x-icon")
 
-
+# Catchall route for SPA-style HTML serving
+@app.get("/{path:path}")
+async def catchall(request: Request, path: str, current_user: User = Depends(get_current_user_optional)):
+    """Catchall route to serve HTML templates for all routes."""
+    # Skip API routes and static files
+    if path.startswith("api/") or path.startswith("storage/") or path.startswith("static/"):
+        from fastapi.responses import JSONResponse
+        return JSONResponse(
+            status_code=404,
+            content={"detail": "Not Found"}
+        )
+    
+    # Redirect to login if not authenticated and not on login page
+    if not current_user and not path.startswith("admin/login"):
+        return RedirectResponse("/admin/login")
+    
+    # Serve the appropriate template based on the path
+    if path == "" or path == "admin" or path == "admin/":
+        # Dashboard
+        return await admin_dashboard(request, current_user)
+    elif path.startswith("companies"):
+        if "/" not in path[len("companies"):]:
+            return await companies_list(request, current_user)
+        elif path.endswith("/create"):
+            return await company_create(request, current_user)
+        else:
+            # Company detail or other company routes
+            company_id = path.split("/")[-1] if path.split("/")[-1].isdigit() else None
+            if company_id:
+                return await company_detail(company_id, request, current_user)
+    elif path.startswith("projects"):
+        if "/" not in path[len("projects"):]:
+            return await projects_list(request, current_user)
+        elif path.endswith("/create"):
+            return await project_create(request, current_user)
+        else:
+            # Project detail or other project routes
+            project_id = path.split("/")[-1] if path.split("/")[-1].isdigit() else None
+            if project_id:
+                return await project_detail(project_id, request, current_user)
+    elif path.startswith("ar-content"):
+        if "/" not in path[len("ar-content"):]:
+            return await ar_content_list(request, current_user)
+        elif path.endswith("/create"):
+            return await ar_content_create(request, current_user)
+        else:
+            # AR content detail or other routes
+            ar_content_id = path.split("/")[-1] if path.split("/")[-1].isdigit() else None
+            if ar_content_id:
+                return await ar_content_detail(ar_content_id, request, current_user)
+    elif path == "storage":
+        return await storage_page(request, current_user)
+    elif path == "analytics":
+        return await analytics_page(request, current_user)
+    elif path == "notifications":
+        return await notifications_page(request, current_user)
+    elif path == "settings":
+        return await settings_page(request, current_user)
+    
+    # Default fallback to dashboard
+    return await admin_dashboard(request, current_user)
 
 
 if __name__ == "__main__":
