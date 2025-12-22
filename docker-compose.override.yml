@@ -1,7 +1,5 @@
-version: '3.8'
-
 # Development overrides for docker-compose.yml
-# Automatically loaded when running `docker-compose up` without -f flag
+# Automatically loaded when running `docker compose up` without -f flag
 
 services:
   app:
@@ -19,10 +17,6 @@ services:
     # Expose additional ports for debugging if needed
     ports:
       - "8000:8000"
-    # Make sure migrations run before the app starts
-    depends_on:
-      db-migrate:
-        condition: service_completed_successfully
 
   # Service to run database migrations before the app starts
   db-migrate:
