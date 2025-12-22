@@ -368,17 +368,22 @@ async def create_ar_content(
     # Generate MindAR marker
     marker_path = storage_path / "targets.mind"
     try:
-        from mind_ar import image_codegen
-        photo_full_path = str(photo_path.absolute())
-        targets_output_dir = str(marker_path.parent.absolute())
+        from app.services.mindar_generator import mindar_generator
         
-        # Generate the marker using mind_ar
-        image_codegen(
-            img_path=photo_full_path,
-            targets_output_dir=targets_output_dir,
-            max_features=settings.MINDAR_MAX_FEATURES,
-            compiler_path=settings.MINDAR_COMPILER_PATH
+        # Generate the marker using our MindAR generator
+        result = await mindar_generator.generate_and_upload_marker(
+            ar_content_id=str(ar_content.id),
+            image_path=photo_path,
+            max_features=settings.MINDAR_MAX_FEATURES
         )
+        
+        if not result["success"]:
+            raise Exception(f"Marker generation failed: {result['error']}")
+            
+        logger.info("MindAR marker generated successfully", 
+                   ar_content_id=ar_content.id,
+                   marker_url=result.get("marker_url"))
+                   
     except Exception as e:
         logger.error(f"Failed to generate MindAR marker: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to generate MindAR marker: {str(e)}")

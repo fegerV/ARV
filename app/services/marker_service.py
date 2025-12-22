@@ -33,71 +33,35 @@ class MindARMarkerService:
         log = logger.bind(ar_content_id=ar_content_id, image_path=image_path)
         log.info("mind_ar_generation_started")
 
-        # Create directory for marker
-        marker_dir = Path(output_dir) / str(ar_content_id)
-        marker_dir.mkdir(parents=True, exist_ok=True)
-
-        # Path to output file
-        output_file = marker_dir / "targets.mind"
-
         try:
-            # Run Mind AR compiler
-            cmd = [
-                "npx",
-                "mind-ar-js-compiler",
-                "--input",
-                image_path,
-                "--output",
-                str(output_file),
-                "--max-features",
-                str(settings.MINDAR_MAX_FEATURES),
-            ]
-
-            process = await asyncio.create_subprocess_exec(
-                *cmd,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE,
+            # Use the new MindAR generator
+            from app.services.mindar_generator import mindar_generator
+            
+            result = await mindar_generator.generate_and_upload_marker(
+                ar_content_id=str(ar_content_id),
+                image_path=Path(image_path),
+                max_features=settings.MINDAR_MAX_FEATURES
             )
-
-            stdout, stderr = await process.communicate()
-
-            if process.returncode != 0:
-                error_msg = stderr.decode()
-                log.error("mind_ar_compilation_failed", error=error_msg)
+            
+            if not result["success"]:
+                log.error("mindar_generation_failed", error=result.get("error", "Unknown error"))
                 return {
                     "status": "failed",
-                    "error": f"Mind AR compilation failed: {error_msg}",
+                    "error": result.get("error", "Unknown error"),
                 }
-
-            # Check that file was created
-            if not output_file.exists():
-                error_msg = f"Marker file not created: {output_file}"
-                log.error("mind_ar_compilation_output_missing", error_msg)
-                return {
-                    "status": "failed",
-                    "error": error_msg,
-                }
-
-            # Upload to storage
-            storage_provider = get_storage_provider_instance()
-            marker_storage_path = f"markers/{ar_content_id}/targets.mind"
-            marker_url = await storage_provider.save_file(
-                source_path=str(output_file),
-                destination_path=marker_storage_path
-            )
 
             # Get marker metadata
-            metadata = await self._extract_marker_metadata(output_file)
+            metadata = await self._extract_marker_metadata(Path(result["marker_path"]))
 
             log.info(
                 "mind_ar_generation_success",
-                marker_url=marker_url,
-                file_size=output_file.stat().st_size,
+                marker_url=result.get("marker_url"),
+                file_size=result.get("file_size", 0),
             )
 
             return {
-                "marker_path": str(output_file),
-                "marker_url": marker_url,
+                "marker_path": result.get("marker_path"),
+                "marker_url": result.get("marker_url"),
                 "metadata": metadata,
                 "status": "ready",
             }

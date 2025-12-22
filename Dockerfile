@@ -23,10 +23,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     && rm -rf /var/lib/apt/lists/*
 
-# Устанавливаем Node.js для сборки фронтенда
+# Устанавливаем Node.js для сборки фронтенда и MindAR компилятора
 RUN curl -fsSL https://deb.nodesource.com/setup_18.x | bash - && \
     apt-get install -y nodejs
-    # && npm install -g mind-ar-js-compiler  # Закомментировано, так как пакет не существует
 
 # Устанавливаем рабочую директорию
 WORKDIR /app
@@ -40,6 +39,9 @@ RUN pip install gunicorn
 
 # Копируем исходный код приложения
 COPY . .
+
+# Устанавливаем Node.js зависимости для MindAR
+RUN npm install
 
 # Создаем директории для хранения файлов
 RUN mkdir -p /app/storage/content \
