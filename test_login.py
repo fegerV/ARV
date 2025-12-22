@@ -1,106 +1,55 @@
 #!/usr/bin/env python3
 
-import requests
+import asyncio
+import httpx
 import json
+from urllib.parse import urljoin
 
-def test_login():
+async def test_admin_login():
     """Test admin login functionality"""
+    base_url = "http://localhost:8000"
     
-    # Test the login page loads
-    print("🔍 Testing login page accessibility...")
-    try:
-        response = requests.get("http://localhost:8000/admin/login")
-        if response.status_code == 200:
-            print("✅ Login page accessible")
-        else:
-            print(f"❌ Login page returned status: {response.status_code}")
-            return False
-    except Exception as e:
-        print(f"❌ Cannot access login page: {e}")
-        return False
-    
-    # Test form-based login
-    print("\n🔐 Testing form-based login...")
-    login_data = {
-        "username": "admin@vertexar.com",
-        "password": "ChangeMe123!"
-    }
-    
-    try:
-        # Use session to preserve cookies
-        session = requests.Session()
-        response = session.post(
-            "http://localhost:8000/api/auth/login-form",
-            data=login_data,
-            allow_redirects=False
-        )
-        
-        if response.status_code in [302, 303]:
-            # Login successful - redirect to admin
-            print("✅ Login successful - redirect received")
+    async with httpx.AsyncClient() as client:
+        try:
+            # Test health endpoint first
+            health_response = await client.get(f"{base_url}/api/health/status")
+            print(f"✅ Health check: {health_response.status_code}")
             
-            # Follow redirect to admin dashboard
-            admin_response = session.get("http://localhost:8000/admin")
-            if admin_response.status_code == 200:
-                print("✅ Admin dashboard accessible after login")
-                return True
+            # Test login endpoint
+            login_data = {
+                "username": "admin@vertex.local",
+                "password": "admin123"
+            }
+            
+            login_response = await client.post(
+                f"{base_url}/api/auth/login",
+                data=login_data
+            )
+            
+            print(f"Login response status: {login_response.status_code}")
+            
+            if login_response.status_code == 200:
+                result = login_response.json()
+                if "access_token" in result:
+                    print(f"✅ Login successful! Token received: {result['access_token'][:50]}...")
+                    
+                    # Test protected endpoint with token
+                    headers = {"Authorization": f"Bearer {result['access_token']}"}
+                    me_response = await client.get(f"{base_url}/api/auth/me", headers=headers)
+                    
+                    if me_response.status_code == 200:
+                        user_info = me_response.json()
+                        print(f"✅ Protected endpoint accessible! User: {user_info.get('email', 'Unknown')}")
+                    else:
+                        print(f"❌ Protected endpoint failed: {me_response.status_code}")
+                else:
+                    print(f"❌ Login response missing token: {result}")
             else:
-                print(f"❌ Admin dashboard returned status: {admin_response.status_code}")
-                return False
-        else:
-            print(f"❌ Login failed with status: {response.status_code}")
-            print(f"Response: {response.text}")
-            return False
-            
-    except Exception as e:
-        print(f"❌ Login request failed: {e}")
-        return False
-
-def test_api_login():
-    """Test API login endpoint"""
-    print("\n🔧 Testing API login endpoint...")
-    
-    login_data = {
-        "username": "admin@vertexar.com", 
-        "password": "ChangeMe123!"
-    }
-    
-    try:
-        response = requests.post(
-            "http://localhost:8000/api/auth/login",
-            data=login_data
-        )
-        
-        if response.status_code == 200:
-            result = response.json()
-            if "access_token" in result:
-                print("✅ API login successful - token received")
-                return True
-            else:
-                print("❌ API login response missing token")
-                return False
-        else:
-            print(f"❌ API login failed with status: {response.status_code}")
-            print(f"Response: {response.text}")
-            return False
-            
-    except Exception as e:
-        print(f"❌ API login request failed: {e}")
-        return False
+                print(f"❌ Login failed: {login_response.status_code}")
+                print(f"Response: {login_response.text}")
+                
+        except Exception as e:
+            print(f"❌ Error testing login: {e}")
 
 if __name__ == "__main__":
-    print("🚀 Testing Vertex AR Admin Login")
-    print("=" * 50)
-    
-    form_success = test_login()
-    api_success = test_api_login()
-    
-    print("\n" + "=" * 50)
-    if form_success and api_success:
-        print("🎉 ALL TESTS PASSED! Admin login is working correctly.")
-        print("\n📝 Login Credentials:")
-        print("   Email: admin@vertexar.com")
-        print("   Password: ChangeMe123!")
-        print("   URL: http://localhost:8000/admin/login")
-    else:
-        print("❌ Some tests failed. Please check the issues above.")
+    asyncio.run(test_admin_login())
