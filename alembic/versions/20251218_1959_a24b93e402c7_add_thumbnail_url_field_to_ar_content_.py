@@ -1,7 +1,7 @@
 """add thumbnail_url field to ar_content table
 
 Revision ID: a24b93e402c7
-Revises: f224b2c1d30f
+Revises: 45a7b8c9d1ef
 Create Date: 2025-12-18 19:59:46.634694
 
 """
@@ -13,7 +13,7 @@ import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
 revision: str = 'a24b93e402c7'
-down_revision: Union[str, None] = 'f224b2c1d30f'
+down_revision: Union[str, None] = '45a7b8c9d1ef'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
