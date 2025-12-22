@@ -58,9 +58,13 @@ class ARContent(Base):
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
     
-    # Constraints
+    # Constraints and Indexes
     __table_args__ = (
         Index('ix_ar_content_project_order', 'project_id', 'order_number', unique=True),
+        Index('ix_ar_content_company_project', 'company_id', 'project_id'),
+        Index('ix_ar_content_created_at', 'created_at'),
+        Index('ix_ar_content_status', 'status'),
+        Index('ix_ar_content_unique_id', 'unique_id'),
         CheckConstraint('duration_years IN (1, 3, 5)', name='check_duration_years'),
         CheckConstraint('views_count >= 0', name='check_views_count_non_negative'),
     )
