@@ -29,7 +29,6 @@ class Settings(BaseSettings):
     API_V1_PREFIX: str = "/api"
     
     # Mind AR
-    MINDAR_COMPILER_PATH: str = "npx mind-ar-js-compiler"
     MINDAR_MAX_FEATURES: int = 1000
     
     # Allowed origins (optional, alongside CORS_ORIGINS)
