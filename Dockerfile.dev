@@ -23,10 +23,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     && rm -rf /var/lib/apt/lists/*
 
-# Устанавливаем Node.js для сборки фронтенда
-RUN curl -fsSL https://deb.nodesource.com/setup_18.x | bash - && \
-    apt-get install -y nodejs
-    # && npm install -g mind-ar-js-compiler  # Закомментировано, так как пакет не существует
+# Node.js больше не требуется - используем HTML + Jinja2 + htmx + Alpine.js
+# Все зависимости подгружаются через CDN, нет необходимости в сборке
 
 # Устанавливаем рабочую директорию
 WORKDIR /app

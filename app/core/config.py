@@ -33,8 +33,8 @@ class Settings(BaseSettings):
     
     # Allowed origins (optional, alongside CORS_ORIGINS)
     ALLOWED_ORIGINS: list[str] = [
-        "http://localhost:3000",
         "http://localhost:8000",
+        "https://localhost:8000",
     ]
     
     # Database
