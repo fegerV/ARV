@@ -1,0 +1,37 @@
+                                         Table "public.ar_content"
+      Column      |          Type          | Collation | Nullable |                Default                 
+------------------+------------------------+-----------+----------+----------------------------------------
+ id               | integer                |           | not null | nextval('ar_content_id_seq'::regclass)
+ project_id       | integer                |           | not null | 
+ company_id       | integer                |           | not null | 
+ active_video_id  | integer                |           |          | 
+ unique_id        | uuid                   |           | not null | 
+ order_number     | character varying(50)  |           | not null | 
+ customer_name    | character varying(255) |           |          | 
+ customer_phone   | character varying(50)  |           |          | 
+ customer_email   | character varying(255) |           |          | 
+ duration_years   | integer                |           | not null | 
+ views_count      | integer                |           | not null | 
+ status           | character varying(50)  |           | not null | 
+ content_metadata | json                   |           |          | 
+ photo_path       | character varying(500) |           |          | 
+ photo_url        | character varying(500) |           |          | 
+ video_path       | character varying(500) |           |          | 
+ video_url        | character varying(500) |           |          | 
+ qr_code_path     | character varying(500) |           |          | 
+ qr_code_url      | character varying(500) |           |          | 
+Indexes:
+    "ar_content_pkey" PRIMARY KEY, btree (id)
+    "ar_content_unique_id_key" UNIQUE CONSTRAINT, btree (unique_id)
+    "ix_ar_content_company_id" btree (company_id)
+    "ix_ar_content_id" btree (id)
+    "ix_ar_content_project_id" btree (project_id)
+    "ix_ar_content_project_order" UNIQUE, btree (project_id, order_number)
+Check constraints:
+    "check_duration_years" CHECK (duration_years = ANY (ARRAY[1, 3, 5]))
+    "check_views_count_non_negative" CHECK (views_count >= 0)
+Referenced by:
+    TABLE "ar_view_sessions" CONSTRAINT "ar_view_sessions_ar_content_id_fkey" FOREIGN KEY (ar_content_id) REFERENCES ar_content(id)
+    TABLE "video_rotation_schedules" CONSTRAINT "video_rotation_schedules_ar_content_id_fkey" FOREIGN KEY (ar_content_id) REFERENCES ar_content(id)
+    TABLE "videos" CONSTRAINT "videos_ar_content_id_fkey" FOREIGN KEY (ar_content_id) REFERENCES ar_content(id)
+
