@@ -15,11 +15,7 @@ engine = create_async_engine(
     settings.DATABASE_URL,
     poolclass=NullPool,  # Disable connection pooling for development
     echo=settings.DEBUG,
-    connect_args={
-        "server_settings": {
-            "application_name": "vertex_ar_api"
-        }
-    }
+    connect_args={}
 )
 
 # Create async session factory
@@ -116,7 +112,7 @@ async def seed_defaults() -> None:
         res_storage = await session.execute(select(StorageConnection))
         default_storage = res_storage.scalar_one_or_none()
         if not default_storage:
-            storage_path = Path("/app/storage/content")
+            storage_path = Path("/tmp/storage/content")
             storage_path.mkdir(parents=True, exist_ok=True)
             
             default_storage = StorageConnection(

@@ -71,10 +71,10 @@ class Settings(BaseSettings):
     STATIC_DIR: str = "/app/static"
     
     # Storage
-    STORAGE_BASE_PATH: str = "/app/storage/content"
+    STORAGE_BASE_PATH: str = "/tmp/storage/content"
     
     # Local Storage
-    LOCAL_STORAGE_PATH: str = "/app/storage/content"
+    LOCAL_STORAGE_PATH: str = "/tmp/storage/content"
     LOCAL_STORAGE_PUBLIC_URL: str = "http://localhost:8000/storage"
     
     # File storage configuration
