@@ -385,7 +385,6 @@ async def login_form(
         key="access_token",
         value=access_token,
         max_age=3600,
-        expires=3600,
         path="/",
         secure=settings.is_production,  # Use secure cookies in production
         httponly=True,

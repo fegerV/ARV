@@ -1,43 +1,62 @@
-from sqlalchemy import create_engine, text
-from app.core.config import settings
+#!/usr/bin/env python3
 
-def check_admin_user():
-    # Создаем синхронный движок
-    database_url = settings.DATABASE_URL.replace('postgresql+asyncpg://', 'postgresql://')
-    print(f"Connecting to database: {database_url}")
-    
-    engine = create_engine(database_url)
-    
-    # Проверяем наличие пользователей
-    with engine.connect() as conn:
-        # Проверяем пользователя из настроек
-        result = conn.execute(text('SELECT id, email, full_name, role FROM users WHERE email = :email'), 
-                             {'email': settings.ADMIN_EMAIL})
-        user_from_settings = result.fetchone()
+import asyncio
+import sys
+from app.core.database import AsyncSessionLocal
+from sqlalchemy import select, text
+
+async def check_admin_user():
+    try:
+        session = AsyncSessionLocal()
         
-        print(f"User from settings ({settings.ADMIN_EMAIL}):")
-        if user_from_settings:
-            print(f"  Found: ID={user_from_settings[0]}, Email={user_from_settings[1]}, Name={user_from_settings[2]}, Role={user_from_settings[3]}")
+        # Check if admin user exists
+        result = await session.execute(select(text("email, full_name, role, is_active")).select_from(text("users")))
+        users = result.fetchall()
+        
+        print("=== Current Users ===")
+        if users:
+            for user in users:
+                print(f"Email: {user[0]}, Name: {user[1]}, Role: {user[2]}, Active: {user[3]}")
         else:
-            print("  Not found")
+            print("No users found in database")
         
-        # Проверяем пользователя из миграции
-        result = conn.execute(text('SELECT id, email, full_name, role FROM users WHERE email = :email'), 
-                             {'email': 'admin@vertex.local'})
-        user_from_migration = result.fetchone()
+        # Check if admin user with expected email exists
+        from app.core.config import settings
+        result = await session.execute(
+            select(text("email")).select_from(text("users")).where(text("email = :email")), 
+            {"email": settings.ADMIN_EMAIL}
+        )
+        admin_user = result.scalar_one_or_none()
         
-        print(f"User from migration (admin@vertex.local):")
-        if user_from_migration:
-            print(f"  Found: ID={user_from_migration[0]}, Email={user_from_migration[1]}, Name={user_from_migration[2]}, Role={user_from_migration[3]}")
+        if admin_user:
+            print(f"\n✅ Admin user found: {admin_user}")
         else:
-            print("  Not found")
+            print(f"\n❌ Admin user not found for email: {settings.ADMIN_EMAIL}")
+            print("Creating admin user...")
+            
+            # Create admin user
+            from app.core.security import get_password_hash
+            from app.models.user import User
+            
+            admin_user = User(
+                email=settings.ADMIN_EMAIL,
+                hashed_password=get_password_hash(settings.ADMIN_DEFAULT_PASSWORD),
+                full_name="System Administrator",
+                role="admin",
+                is_active=True,
+            )
+            session.add(admin_user)
+            await session.commit()
+            print(f"✅ Admin user created: {settings.ADMIN_EMAIL} / {settings.ADMIN_DEFAULT_PASSWORD}")
         
-        # Показываем всех пользователей
-        result = conn.execute(text('SELECT id, email, full_name, role FROM users'))
-        all_users = result.fetchall()
-        print(f"All users in database ({len(all_users)}):")
-        for user in all_users:
-            print(f"  ID: {user[0]}, Email: {user[1]}, Name: {user[2]}, Role: {user[3]}")
+        await session.close()
+        return True
+    except Exception as e:
+        print(f"❌ Error checking admin user: {e}")
+        import traceback
+        traceback.print_exc()
+        return False
 
 if __name__ == "__main__":
-    check_admin_user()
+    success = asyncio.run(check_admin_user())
+    sys.exit(0 if success else 1)
