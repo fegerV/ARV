@@ -1,0 +1,214 @@
+{% extends "base.html" %}
+
+{% block title %}{{ ar_content.order_number }} - Vertex AR Admin{% endblock %}
+
+{% block page_title %}{{ ar_content.order_number }}{% endblock %}
+
+{% block content %}
+<div class="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
+    <div class="px-4 py-5 sm:px-6 border-b border-gray-200 dark:border-gray-700">
+        <div class="flex justify-between items-center">
+            <h3 class="text-lg leading-6 font-medium text-gray-900 dark:text-white">{{ ar_content.order_number }}</h3>
+            <div class="flex space-x-2">
+                <a href="/ar-content/{{ ar_content.id }}/edit" 
+                   class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded flex items-center">
+                    <span class="material-icons mr-2">edit</span> Edit
+                </a>
+                <a href="/ar-content" 
+                   class="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded flex items-center">
+                    <span class="material-icons mr-2">arrow_back</span> Back
+                </a>
+            </div>
+        <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
+            AR content details and management
+        </p>
+    </div>
+    
+    <div class="px-4 py-5 sm:p-6">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+                <h4 class="text-md font-medium text-gray-900 dark:text-white mb-4">AR Content Information</h4>
+                <dl class="grid grid-cols-1 gap-x-4 gap-y-8 sm:grid-cols-2">
+                    <div class="sm:col-span-1">
+                        <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">ID</dt>
+                        <dd class="mt-1 text-sm text-gray-900 dark:text-white">{{ ar_content.id }}</dd>
+                    </div>
+                    <div class="sm:col-span-1">
+                        <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">Order Number</dt>
+                        <dd class="mt-1 text-sm text-gray-900 dark:text-white">{{ ar_content.order_number }}</dd>
+                    </div>
+                    <div class="sm:col-span-1">
+                        <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">Project</dt>
+                        <dd class="mt-1 text-sm text-gray-900 dark:text-white">{{ ar_content.project_name or '—' }}</dd>
+                    </div>
+                    <div class="sm:col-span-1">
+                        <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">Company</dt>
+                        <dd class="mt-1 text-sm text-gray-900 dark:text-white">{{ ar_content.company_name or '—' }}</dd>
+                    </div>
+                    <div class="sm:col-span-1">
+                        <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">Status</dt>
+                        <dd class="mt-1 text-sm">
+                            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full
+                                {% if ar_content.status == 'ready' or ar_content.status == 'generated' %}bg-green-100 text-green-800 dark:bg-green-800 dark:text-green-100
+                                {% elif ar_content.status == 'processing' or ar_content.status == 'pending' %}bg-yellow-100 text-yellow-800 dark:bg-yellow-800 dark:text-yellow-100
+                                {% elif ar_content.status == 'failed' %}bg-red-100 text-red-800 dark:bg-red-80 dark:text-red-100
+                                {% else %}bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-20{% endif %}">
+                                {{ ar_content.status }}
+                            </span>
+                        </dd>
+                    </div>
+                    <div class="sm:col-span-1">
+                        <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">Created</dt>
+                        <dd class="mt-1 text-sm text-gray-900 dark:text-white">{{ ar_content.created_at|datetime_format if ar_content.created_at else '—' }}</dd>
+                    </div>
+                </dl>
+            </div>
+            
+            <div>
+                <h4 class="text-md font-medium text-gray-900 dark:text-white mb-4">Customer Information</h4>
+                <dl class="grid grid-cols-1 gap-x-4 gap-y-8 sm:grid-cols-2">
+                    <div class="sm:col-span-2">
+                        <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">Name</dt>
+                        <dd class="mt-1 text-sm text-gray-900 dark:text-white">{{ ar_content.customer_name or '—' }}</dd>
+                    </div>
+                    <div class="sm:col-span-1">
+                        <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">Phone</dt>
+                        <dd class="mt-1 text-sm text-gray-900 dark:text-white">{{ ar_content.customer_phone or '—' }}</dd>
+                    </div>
+                    <div class="sm:col-span-1">
+                        <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">Email</dt>
+                        <dd class="mt-1 text-sm text-gray-900 dark:text-white">{{ ar_content.customer_email or '—' }}</dd>
+                    </div>
+                </dl>
+            </div>
+        
+        <!-- Statistics Section -->
+        <div class="mt-8">
+            <h4 class="text-md font-medium text-gray-900 dark:text-white mb-4">Statistics</h4>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div class="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg">
+                    <div class="text-sm font-medium text-gray-500 dark:text-gray-300">Total Views</div>
+                    <div class="text-2xl font-bold text-gray-900 dark:text-white">{{ ar_content.views_count or 0 }}</div>
+                </div>
+                <div class="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg">
+                    <div class="text-sm font-medium text-gray-500 dark:text-gray-300">Views (30 days)</div>
+                    <div class="text-2xl font-bold text-gray-900 dark:text-white">{{ ar_content.views_30_days or 0 }}</div>
+                </div>
+                <div class="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg">
+                    <div class="text-sm font-medium text-gray-500 dark:text-gray-300">Active Video</div>
+                    <div class="text-sm text-gray-900 dark:text-white">{{ ar_content.active_video_title or '—' }}</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Actions Section -->
+<div class="mt-8 bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
+    <div class="px-4 py-5 sm:px-6 border-b border-gray-200 dark:border-gray-700">
+        <h3 class="text-lg leading-6 font-medium text-gray-900 dark:text-white">Actions</h3>
+    </div>
+    
+    <div class="px-4 py-5 sm:p-6">
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div class="flex flex-col items-center">
+                <a href="{{ ar_content.public_url }}" 
+                   target="_blank"
+                   class="w-full flex flex-col items-center justify-center p-4 border-gray-200 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700">
+                    <span class="material-icons text-3xl text-blue-500 mb-2">open_in_new</span>
+                    <span class="text-sm font-medium text-gray-900 dark:text-white">View AR Content</span>
+                </a>
+            </div>
+            
+            <div class="flex flex-col items-center">
+                <button @click="showQRModal()"
+                        class="w-full flex flex-col items-center justify-center p-4 border border-gray-200 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700">
+                    <span class="material-icons text-3xl text-green-500 mb-2">qr_code</span>
+                    <span class="text-sm font-medium text-gray-900 dark:text-white">Show QR Code</span>
+                </button>
+            </div>
+            
+            <div class="flex flex-col items-center">
+                <button @click="copyLink()"
+                        class="w-full flex flex-col items-center justify-center p-4 border border-gray-200 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700">
+                    <span class="material-icons text-3xl text-purple-500 mb-2">content_copy</span>
+                    <span class="text-sm font-medium text-gray-900 dark:text-white">Copy Link</span>
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- QR Code Modal -->
+<div x-show="showingQRModal" 
+     @click="showingQRModal = false"
+     class="fixed z-50 inset-0 overflow-y-auto" 
+     aria-labelledby="modal-title" 
+     role="dialog" 
+     aria-modal="true"
+     x-cloak>
+    <div class="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+        <div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" aria-hidden="true"></div>
+        
+        <span class="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
+        
+        <div class="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+            <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                <div class="sm:flex sm:items-start">
+                    <div class="mx-auto flex-shrink-0 flex items-center justify-center h-12 w-12 rounded-full bg-blue-100 sm:mx-0 sm:h-10 sm:w-10">
+                        <span class="material-icons text-blue-600">qr_code</span>
+                    </div>
+                    <div class="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left">
+                        <h3 class="text-lg leading-6 font-medium text-gray-900" id="modal-title">
+                            QR Code
+                        </h3>
+                        <div class="mt-2">
+                            <div class="text-center">
+                                <img :src="'https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=' + encodeURIComponent(ar_content.public_url)" 
+                                     :alt="'QR Code for ' + ar_content.order_number"
+                                     class="mx-auto">
+                                <p class="mt-2 text-sm text-gray-500">{{ ar_content.public_url }}</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            <div class="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                <button @click="showingQRModal = false" 
+                        type="button" 
+                        class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm">
+                    Close
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function arContentDetail() {
+    return {
+        showingQRModal: false,
+        
+        showQRModal() {
+            this.showingQRModal = true;
+        },
+        
+        copyLink() {
+            navigator.clipboard.writeText("{{ ar_content.public_url }}").then(() => {
+                // Show a toast notification
+                const toast = document.createElement('div');
+                toast.className = 'fixed bottom-4 right-4 bg-green-500 text-white px-4 py-2 rounded shadow';
+                toast.textContent = 'Link copied to clipboard';
+                document.body.appendChild(toast);
+                
+                setTimeout(() => {
+                    document.body.removeChild(toast);
+                }, 3000);
+            }).catch(err => {
+                console.error('Failed to copy link: ', err);
+                alert('Failed to copy link to clipboard');
+            });
+        }
+    }
+}
+</script>
+{% endblock %}

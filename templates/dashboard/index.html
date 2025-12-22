@@ -1,0 +1,118 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - Vertex AR Admin{% endblock %}
+{% block page_title %}Dashboard{% endblock %}
+
+{% block content %}
+<div x-data="dashboardData()">
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
+        <div class="bg-white dark:bg-gray-800 p-6 rounded-lg shadow">
+            <div class="flex items-center">
+                <div class="p-3 rounded-full bg-blue-100 text-blue-600 dark:bg-blue-90/30 dark:text-blue-400 mr-4">
+                    <span class="material-icons">visibility</span>
+                </div>
+                <div>
+                    <p class="text-gray-500 dark:text-gray-400">Total AR Views</p>
+                    <p class="text-2xl font-bold text-gray-900 dark:text-white">{{ total_views|default('—') }}</p>
+                </div>
+            </div>
+        
+        <div class="bg-white dark:bg-gray-800 p-6 rounded-lg shadow">
+            <div class="flex items-center">
+                <div class="p-3 rounded-full bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400 mr-4">
+                    <span class="material-icons">people</span>
+                </div>
+                <div>
+                    <p class="text-gray-500 dark:text-gray-400">Unique Sessions</p>
+                    <p class="text-2xl font-bold text-gray-90 dark:text-white">{{ unique_sessions|default('—') }}</p>
+                </div>
+            </div>
+        
+        <div class="bg-white dark:bg-gray-800 p-6 rounded-lg shadow">
+            <div class="flex items-center">
+                <div class="p-3 rounded-full bg-purple-100 text-purple-600 dark:bg-purple-900/30 dark:text-purple-400 mr-4">
+                    <span class="material-icons">view_in_ar</span>
+                </div>
+                <div>
+                    <p class="text-gray-500 dark:text-gray-400">Active Content</p>
+                    <p class="text-2xl font-bold text-gray-90 dark:text-white">{{ active_content|default('—') }}</p>
+                </div>
+            </div>
+        
+        <div class="bg-white dark:bg-gray-800 p-6 rounded-lg shadow">
+            <div class="flex items-center">
+                <div class="p-3 rounded-full bg-orange-100 text-orange-600 dark:bg-orange-90/30 dark:text-orange-400 mr-4">
+                    <span class="material-icons">storage</span>
+                </div>
+                <div>
+                    <p class="text-gray-500 dark:text-gray-400">Storage Usage</p>
+                    <p class="text-2xl font-bold text-gray-90 dark:text-white">{{ storage_used_gb|default('—') }} GB</p>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+        <div class="bg-white dark:bg-gray-800 p-6 rounded-lg shadow">
+            <h3 class="text-lg font-semibold mb-4 dark:text-white">Companies & Projects</h3>
+            <div class="space-y-4">
+                <div class="flex items-center justify-between">
+                    <span class="text-gray-700 dark:text-gray-300">Active Companies</span>
+                    <span class="text-lg font-semibold text-gray-900 dark:text-white">{{ active_companies|default('—') }}</span>
+                </div>
+                <div class="flex items-center justify-between">
+                    <span class="text-gray-700 dark:text-gray-300">Active Projects</span>
+                    <span class="text-lg font-semibold text-gray-900 dark:text-white">{{ active_projects|default('—') }}</span>
+                </div>
+                <div class="flex items-center justify-between">
+                    <span class="text-gray-700 dark:text-gray-300">Revenue</span>
+                    <span class="text-lg font-semibold text-gray-90 dark:text-white">{{ revenue|default('—') }}</span>
+                </div>
+                <div class="flex items-center justify-between">
+                    <span class="text-gray-700 dark:text-gray-300">Uptime</span>
+                    <span class="text-lg font-semibold text-gray-900 dark:text-white">{{ uptime|default('—') }}</span>
+                </div>
+            </div>
+        
+        <div class="bg-white dark:bg-gray-800 p-6 rounded-lg shadow">
+            <h3 class="text-lg font-semibold mb-4 dark:text-white">Recent Activity</h3>
+            <div class="space-y-4">
+                <div class="flex items-start">
+                    <div class="p-2 rounded-full bg-blue-100 dark:bg-blue-900 text-blue-500 dark:text-blue-300 mr-3">
+                        <span class="material-icons text-sm">check_circle</span>
+                    </div>
+                    <div>
+                        <p class="text-gray-700 dark:text-gray-300">New AR content created</p>
+                        <p class="text-sm text-gray-500 dark:text-gray-400">2 hours ago</p>
+                    </div>
+                <div class="flex items-start">
+                    <div class="p-2 rounded-full bg-green-100 dark:bg-green-900 text-green-500 dark:text-green-300 mr-3">
+                        <span class="material-icons text-sm">schedule</span>
+                    </div>
+                    <div>
+                        <p class="text-gray-700 dark:text-gray-300">Storage threshold reached</p>
+                        <p class="text-sm text-gray-500 dark:text-gray-400">Yesterday</p>
+                    </div>
+                </div>
+                <div class="flex items-start">
+                    <div class="p-2 rounded-full bg-yellow-100 dark:bg-yellow-900 text-yellow-500 dark:text-yellow-30 mr-3">
+                        <span class="material-icons text-sm">person_add</span>
+                    </div>
+                    <div>
+                        <p class="text-gray-700 dark:text-gray-300">User registration</p>
+                        <p class="text-sm text-gray-500 dark:text-gray-400">2 days ago</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function dashboardData() {
+    return {
+        // Dashboard-specific Alpine.js data and methods
+    };
+}
+</script>
+{% endblock %}

@@ -1,0 +1,123 @@
+{% extends "base.html" %}
+
+{% block title %}Notifications - Vertex AR Admin{% endblock %}
+{% block page_title %}Notifications{% endblock %}
+
+{% block content %}
+<div x-data="notificationsPage()">
+    <div class="flex justify-between items-center mb-6">
+        <h2 class="text-2xl font-bold text-gray-800 dark:text-white">Notifications</h2>
+        <div class="flex space-x-3">
+            <button @click="markAllAsRead" 
+                    class="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2">
+                Mark All as Read
+            </button>
+            <button @click="refreshNotifications" 
+                    class="bg-gray-600 text-white px-4 py-2 rounded-md hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2">
+                Refresh
+            </button>
+        </div>
+    
+    <div class="bg-white dark:bg-gray-900 shadow rounded-lg overflow-hidden">
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                <thead class="bg-gray-50 dark:bg-gray-800">
+                    <tr>
+                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Title</th>
+                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Message</th>
+                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Company</th>
+                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Project</th>
+                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Date</th>
+                        <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Actions</th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-700">
+                    {% for notification in notifications %}
+                    <tr class="hover:bg-gray-50 dark:hover:bg-gray-800" 
+                        :class="{'bg-blue-50 dark:bg-blue-900/20': !{{ notification.is_read|lower }}}">
+                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">{{ notification.title }}</td>
+                        <td class="px-6 py-4 text-sm text-gray-500 dark:text-gray-40">{{ notification.message }}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-40">{{ notification.company_name }}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-40">{{ notification.project_name }}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-40">{{ notification.created_at | datetime_format }}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                            <button @click="markAsRead('{{ notification.id }}')" 
+                                    :disabled="{{ notification.is_read|lower }}"
+                                    class="text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:hover:text-indigo-300 mr-3"
+                                    :class="{'opacity-50 cursor-not-allowed': {{ notification.is_read|lower }}}">
+                                {% if notification.is_read %}Read{% else %}Mark Read{% endif %}
+                            </button>
+                            <button @click="deleteNotification('{{ notification.id }}')" 
+                                    class="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-30">Delete</button>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        
+        <!-- Pagination -->
+        {% include "components/pagination.html" %}
+    </div>
+</div>
+
+<script>
+function notificationsPage() {
+    return {
+        markAsRead(id) {
+            // Mark notification as read using htmx
+            htmx.ajax('POST', `/api/notifications/${id}/read`, {
+                headers: {
+                    'X-CSRF-Token': 'token' // Add CSRF token if required
+                }
+            }).then(() => {
+                // Update UI to reflect the change
+                showToast('Notification marked as read', 'success');
+            }).catch(() => {
+                showToast('Failed to mark notification as read', 'error');
+            });
+        },
+        
+        markAllAsRead() {
+            // Mark all notifications as read
+            htmx.ajax('POST', '/api/notifications/mark-all-read', {
+                headers: {
+                    'X-CSRF-Token': 'token' // Add CSRF token if required
+                }
+            }).then(() => {
+                showToast('All notifications marked as read', 'success');
+                // Reload the page to update the UI
+                location.reload();
+            }).catch(() => {
+                showToast('Failed to mark all notifications as read', 'error');
+            });
+        },
+        
+        deleteNotification(id) {
+            if (confirm('Are you sure you want to delete this notification?')) {
+                // Delete notification using htmx
+                htmx.ajax('DELETE', `/api/notifications/${id}`, {
+                    headers: {
+                        'X-CSRF-Token': 'token' // Add CSRF token if required
+                    }
+                }).then(() => {
+                    // Remove the notification from the UI
+                    const notificationElement = document.getElementById(`notification-${id}`);
+                    if (notificationElement) {
+                        notificationElement.remove();
+                    }
+                    showToast('Notification deleted', 'success');
+                }).catch(() => {
+                    showToast('Failed to delete notification', 'error');
+                });
+            }
+        },
+        
+        refreshNotifications() {
+            // Reload the page to refresh notifications
+            location.reload();
+        }
+    };
+}
+</script>
+{% endblock %}

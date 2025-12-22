@@ -1,0 +1,68 @@
+<div x-data="sidebar()" id="sidebar" class="fixed top-0 left-0 h-screen bg-gray-800 dark:bg-gray-800 text-white w-64 z-10 transition-all duration-300">
+    <div class="p-4 border-b border-gray-700 dark:border-gray-700">
+        <h1 class="text-xl font-bold">Vertex AR</h1>
+    </div>
+    
+    <div class="p-2">
+        <ul class="space-y-1">
+            <li>
+                <a href="/admin" class="nav-item flex items-center p-2 rounded hover:bg-gray-700 dark:hover:bg-gray-700 group" :class="{'bg-gray-70': isActive('/admin')}">
+                    <span class="material-icons mr-3">dashboard</span>
+                    <span class="sidebar-text">Dashboard</span>
+                </a>
+            </li>
+            <li>
+                <a href="/companies" class="nav-item flex items-center p-2 rounded hover:bg-gray-700 dark:hover:bg-gray-700 group" :class="{'bg-gray-70': isActive('/companies')}">
+                    <span class="material-icons mr-3">business</span>
+                    <span class="sidebar-text">Companies</span>
+                </a>
+            </li>
+            <li>
+                <a href="/projects" class="nav-item flex items-center p-2 rounded hover:bg-gray-700 dark:hover:bg-gray-700 group" :class="{'bg-gray-700': isActive('/projects')}">
+                    <span class="material-icons mr-3">folder</span>
+                    <span class="sidebar-text">Projects</span>
+                </a>
+            </li>
+            <li>
+                <a href="/ar-content" class="nav-item flex items-center p-2 rounded hover:bg-gray-700 dark:hover:bg-gray-700 group" :class="{'bg-gray-700': isActive('/ar-content')}">
+                    <span class="material-icons mr-3">view_in_ar</span>
+                    <span class="sidebar-text">AR Content</span>
+                </a>
+            </li>
+            <li>
+                <a href="/storage" class="nav-item flex items-center p-2 rounded hover:bg-gray-700 dark:hover:bg-gray-700 group" :class="{'bg-gray-700': isActive('/storage')}">
+                    <span class="material-icons mr-3">storage</span>
+                    <span class="sidebar-text">Storage</span>
+                </a>
+            </li>
+            <li>
+                <a href="/analytics" class="nav-item flex items-center p-2 rounded hover:bg-gray-700 dark:hover:bg-gray-700 group" :class="{'bg-gray-700': isActive('/analytics')}">
+                    <span class="material-icons mr-3">analytics</span>
+                    <span class="sidebar-text">Analytics</span>
+                </a>
+            </li>
+            <li>
+                <a href="/notifications" class="nav-item flex items-center p-2 rounded hover:bg-gray-70 dark:hover:bg-gray-700 group" :class="{'bg-gray-700': isActive('/notifications')}">
+                    <span class="material-icons mr-3">notifications</span>
+                    <span class="sidebar-text">Notifications</span>
+                </a>
+            </li>
+            <li>
+                <a href="/settings" class="nav-item flex items-center p-2 rounded hover:bg-gray-700 dark:hover:bg-gray-700 group" :class="{'bg-gray-70': isActive('/settings')}">
+                    <span class="material-icons mr-3">settings</span>
+                    <span class="sidebar-text">Settings</span>
+                </a>
+            </li>
+        </ul>
+    </div>
+    
+    <script>
+        function sidebar() {
+            return {
+                isActive(route) {
+                    return window.location.pathname === route;
+                }
+            }
+        }
+    </script>
+</div>

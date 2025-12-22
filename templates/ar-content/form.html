@@ -1,0 +1,137 @@
+{% extends "base.html" %}
+
+{% block title %}{% if ar_content %}Edit AR Content - Vertex AR Admin{% else %}Create AR Content - Vertex AR Admin{% endif %}{% endblock %}
+{% block page_title %}{% if ar_content %}Edit AR Content{% else %}Create AR Content{% endif %}{% endblock %}
+
+{% block content %}
+<div x-data="arContentForm()">
+    <div class="max-w-3xl mx-auto">
+        <form :action="formAction" method="post" enctype="multipart/form-data" class="bg-white dark:bg-gray-800 shadow rounded-lg p-6">
+            <div class="grid grid-cols-1 gap-6">
+                <div>
+                    <label for="order_number" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Order Number</label>
+                    <input type="text" name="order_number" id="order_number" 
+                           class="mt-1 block w-full rounded-md border border-gray-30 dark:border-gray-600 bg-white dark:bg-gray-700 py-2 px-3 shadow-sm focus:outline-none focus:ring-indigo-50 focus:border-indigo-500 sm:text-sm dark:text-white"
+                           :value="ar_content ? ar_content.order_number : ''"
+                           x-model="formData.order_number"
+                           required>
+                </div>
+                
+                <div>
+                    <label for="project_id" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Project</label>
+                    <select name="project_id" id="project_id" 
+                            class="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 py-2 px-3 shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm dark:text-white"
+                            x-model="formData.project_id"
+                            required>
+                        <option value="">Select a project</option>
+                        {% for project in projects %}
+                        <option value="{{ project.id }}">{{ project.name }} ({{ project.company_name }})</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                
+                <div>
+                    <label for="marker_image" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Marker Image</label>
+                    <div class="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 dark:border-gray-600 border-dashed rounded-md">
+                        <div class="space-y-1 text-center">
+                            <div class="flex text-sm text-gray-600 dark:text-gray-400">
+                                <label for="marker_image" class="relative cursor-pointer bg-white dark:bg-gray-700 rounded-md font-medium text-indigo-600 hover:text-indigo-500 dark:text-indigo-400 dark:hover:text-indigo-300 focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-indigo-500">
+                                    <span>Upload a file</span>
+                                    <input id="marker_image" name="marker_image" type="file" class="sr-only" accept="image/*">
+                                </label>
+                                <p class="pl-1">or drag and drop</p>
+                            </div>
+                            <p class="text-xs text-gray-500 dark:text-gray-400">
+                                PNG, JPG, GIF up to 10MB
+                            </p>
+                        </div>
+                    </div>
+                
+                <div>
+                    <label for="active_video" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Active Video</label>
+                    <select name="active_video" id="active_video" 
+                            class="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 py-2 px-3 shadow-sm focus:outline-none focus:ring-indigo-50 focus:border-indigo-500 sm:text-sm dark:text-white"
+                            x-model="formData.active_video">
+                        <option value="">Select a video</option>
+                        {% for video in videos %}
+                        <option value="{{ video.id }}">{{ video.title }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                
+                <div>
+                    <label for="customer_name" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Customer Name</label>
+                    <input type="text" name="customer_name" id="customer_name" 
+                           class="mt-1 block w-full rounded-md border border-gray-30 dark:border-gray-600 bg-white dark:bg-gray-700 py-2 px-3 shadow-sm focus:outline-none focus:ring-indigo-50 focus:border-indigo-500 sm:text-sm dark:text-white"
+                           :value="ar_content ? ar_content.customer_name : ''"
+                           x-model="formData.customer_name">
+                </div>
+                
+                <div>
+                    <label for="customer_email" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Customer Email</label>
+                    <input type="email" name="customer_email" id="customer_email" 
+                           class="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 py-2 px-3 shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm dark:text-white"
+                           :value="ar_content ? ar_content.customer_email : ''"
+                           x-model="formData.customer_email">
+                </div>
+                
+                <div>
+                    <label for="customer_phone" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Customer Phone</label>
+                    <input type="tel" name="customer_phone" id="customer_phone" 
+                           class="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 py-2 px-3 shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm dark:text-white"
+                           :value="ar_content ? ar_content.customer_phone : ''"
+                           x-model="formData.customer_phone">
+                </div>
+                
+                <div>
+                    <label for="status" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Status</label>
+                    <select name="status" id="status" 
+                            class="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 py-2 px-3 shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm dark:text-white"
+                            x-model="formData.status">
+                        <option value="pending">Pending</option>
+                        <option value="processing">Processing</option>
+                        <option value="ready">Ready</option>
+                        <option value="failed">Failed</option>
+                    </select>
+                </div>
+                
+                <div class="flex justify-end space-x-3">
+                    <a href="/ar-content" class="inline-flex items-center px-4 py-2 border border-gray-30 dark:border-gray-600 text-sm font-medium rounded-md text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600">
+                        Cancel
+                    </a>
+                    <button type="submit" 
+                            class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-60 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                            :disabled="!isValid"
+                            :class="{'opacity-50 cursor-not-allowed': !isValid}">
+                        {% if ar_content %}Update{% else %}Create{% endif %} AR Content
+                    </button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+function arContentForm() {
+    return {
+        formData: {
+            order_number: '{{ ar_content.order_number if ar_content else "" }}',
+            project_id: '{{ ar_content.project_id if ar_content else "" }}',
+            active_video: '{{ ar_content.active_video if ar_content else "" }}',
+            customer_name: '{{ ar_content.customer_name if ar_content else "" }}',
+            customer_email: '{{ ar_content.customer_email if ar_content else "" }}',
+            customer_phone: '{{ ar_content.customer_phone if ar_content else "" }}',
+            status: '{{ ar_content.status if ar_content else "pending" }}'
+        },
+        
+        get formAction() {
+            return this.formData.id ? `/api/ar-content/${this.formData.id}` : '/api/ar-content';
+        },
+        
+        get isValid() {
+            return this.formData.order_number && this.formData.project_id;
+        }
+    };
+}
+</script>
+{% endblock %}

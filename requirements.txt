@@ -28,8 +28,7 @@ opencv-python-headless==4.9.0.80
 aiofiles==23.2.1
 
 # AR маркеры
-mind-ar-js-compiler==1.2.5
-mind_ar==1.0.0
+# mind_ar==1.0.0  # Commented out as it's not available
 
 # QR коды
 qrcode[pil]==7.4.2

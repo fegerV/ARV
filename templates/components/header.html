@@ -1,0 +1,30 @@
+<div class="fixed top-0 right-0 left-0 h-16 bg-white dark:bg-gray-800 shadow-md flex items-center px-4 z-10" style="margin-left: 240px;">
+    <div class="flex items-center space-x-4">
+        <button id="sidebar-toggle" class="material-icons text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white">menu</button>
+        <h2 class="text-lg font-semibold dark:text-white">{% block page_title %}{% endblock %}</h2>
+    </div>
+    <div class="ml-auto flex items-center space-x-4">
+        <button @click="$store.darkMode.toggle()" class="text-gray-600 hover:text-gray-70 dark:text-gray-30 dark:hover:text-white">
+            <span class="material-icons" id="theme-icon" x-text="$store.darkMode.darkMode ? 'light_mode' : 'dark_mode'"></span>
+        </button>
+        {% if current_user %}
+        <span class="text-gray-600 dark:text-gray-300">{{ current_user.full_name or current_user.email }}</span>
+        <a href="/api/auth/logout" class="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded text-sm">Выйти</a>
+        {% else %}
+        <span class="text-gray-600 dark:text-gray-300">Guest</span>
+        {% endif %}
+    </div>
+    
+    <script>
+        // Add sidebar toggle functionality
+        document.addEventListener('DOMContentLoaded', function() {
+            const sidebarToggle = document.getElementById('sidebar-toggle');
+            if (sidebarToggle) {
+                sidebarToggle.addEventListener('click', function() {
+                    const sidebar = document.getElementById('sidebar');
+                    sidebar.classList.toggle('hidden');
+                });
+            }
+        });
+    </script>
+</div>

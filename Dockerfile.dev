@@ -41,6 +41,9 @@ RUN pip install gunicorn uvicorn[standard]
 # Копируем исходный код приложения
 COPY . .
 
+# Ensure templates directory is copied to the container
+COPY ./templates /app/templates
+
 # Создаем директории для хранения файлов
 RUN mkdir -p /app/storage/content \
     /app/storage/thumbnails \

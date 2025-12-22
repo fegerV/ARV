@@ -1,0 +1,117 @@
+{% extends "base.html" %}
+
+{% block title %}Settings - Vertex AR Admin{% endblock %}
+
+{% block page_title %}Settings{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto">
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
+        <!-- Settings Navigation -->
+        <div class="md:col-span-1">
+            <div class="bg-white rounded-lg shadow p-4">
+                <nav class="space-y-2">
+                    <a href="#general" class="block px-3 py-2 text-sm font-medium rounded-md bg-blue-100 text-blue-800">General</a>
+                    <a href="#security" class="block px-3 py-2 text-sm font-medium rounded-md text-gray-700 hover:bg-gray-100">Security</a>
+                    <a href="#storage" class="block px-3 py-2 text-sm font-medium rounded-md text-gray-700 hover:bg-gray-100">Storage</a>
+                    <a href="#notifications" class="block px-3 py-2 text-sm font-medium rounded-md text-gray-700 hover:bg-gray-100">Notifications</a>
+                    <a href="#api" class="block px-3 py-2 text-sm font-medium rounded-md text-gray-700 hover:bg-gray-100">API</a>
+                    <a href="#integrations" class="block px-3 py-2 text-sm font-medium rounded-md text-gray-700 hover:bg-gray-100">Integrations</a>
+                </nav>
+            </div>
+        </div>
+        
+        <!-- Settings Content -->
+        <div class="md:col-span-3">
+            <div class="bg-white rounded-lg shadow p-6">
+                <!-- General Settings -->
+                <div id="general" class="mb-8">
+                    <h3 class="text-lg font-medium text-gray-900 mb-4">General Settings</h3>
+                    <form class="space-y-6">
+                        <div class="grid grid-cols-1 gap-6 sm:grid-cols-2">
+                            <div>
+                                <label for="site-title" class="block text-sm font-medium text-gray-700">Site Title</label>
+                                <input type="text" name="site-title" id="site-title" value="{{ settings.site_title|default('Vertex AR B2B Platform') }}" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                            </div>
+                            
+                            <div>
+                                <label for="admin-email" class="block text-sm font-medium text-gray-700">Admin Email</label>
+                                <input type="email" name="admin-email" id="admin-email" value="{{ settings.admin_email|default('admin@vertexar.com') }}" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                            </div>
+                        </div>
+                        
+                        <div>
+                            <label for="site-description" class="block text-sm font-medium text-gray-700">Site Description</label>
+                            <textarea id="site-description" name="site-description" rows="3" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">{{ settings.site_description|default('B2B SaaS platform for creating AR content based on image recognition (NFT markers)') }}</textarea>
+                        </div>
+                        
+                        <div class="flex items-center">
+                            <input id="maintenance-mode" name="maintenance-mode" type="checkbox" class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
+                            <label for="maintenance-mode" class="ml-2 block text-sm text-gray-900">Maintenance Mode</label>
+                        </div>
+                        
+                        <div class="flex justify-end">
+                            <button type="button" class="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded mr-2">Cancel</button>
+                            <button type="submit" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded">Save Changes</button>
+                        </div>
+                    </form>
+                </div>
+                
+                <!-- Security Settings -->
+                <div id="security" class="mb-8">
+                    <h3 class="text-lg font-medium text-gray-900 mb-4">Security Settings</h3>
+                    <form class="space-y-6">
+                        <div class="grid grid-cols-1 gap-6 sm:grid-cols-2">
+                            <div>
+                                <label for="password-min-length" class="block text-sm font-medium text-gray-700">Minimum Password Length</label>
+                                <input type="number" name="password-min-length" id="password-min-length" value="{{ settings.password_min_length|default(8) }}" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-50 sm:text-sm">
+                            </div>
+                            
+                            <div>
+                                <label for="session-timeout" class="block text-sm font-medium text-gray-700">Session Timeout (minutes)</label>
+                                <input type="number" name="session-timeout" id="session-timeout" value="{{ settings.session_timeout|default(60) }}" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                            </div>
+                        </div>
+                        
+                        <div class="flex items-center">
+                            <input id="require-2fa" name="require-2fa" type="checkbox" class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
+                            <label for="require-2fa" class="ml-2 block text-sm text-gray-900">Require 2FA for all users</label>
+                        </div>
+                        
+                        <div class="flex justify-end">
+                            <button type="button" class="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded mr-2">Cancel</button>
+                            <button type="submit" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded">Save Changes</button>
+                        </div>
+                    </form>
+                </div>
+                
+                <!-- Storage Settings -->
+                <div id="storage" class="mb-8">
+                    <h3 class="text-lg font-medium text-gray-900 mb-4">Storage Settings</h3>
+                    <form class="space-y-6">
+                        <div>
+                            <label for="default-storage" class="block text-sm font-medium text-gray-700">Default Storage Provider</label>
+                            <select id="default-storage" name="default-storage" class="mt-1 block w-full bg-white border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                                <option value="local" {% if settings.default_storage == 'local' %}selected{% endif %}>Local Storage</option>
+                                <option value="aws" {% if settings.default_storage == 'aws' %}selected{% endif %}>AWS S3</option>
+                                <option value="gcp" {% if settings.default_storage == 'gcp' %}selected{% endif %}>Google Cloud Storage</option>
+                                <option value="azure" {% if settings.default_storage == 'azure' %}selected{% endif %}>Azure Blob Storage</option>
+                            </select>
+                        </div>
+                        
+                        <div>
+                            <label for="max-file-size" class="block text-sm font-medium text-gray-700">Maximum File Size (MB)</label>
+                            <input type="number" name="max-file-size" id="max-file-size" value="{{ settings.max_file_size|default(100) }}" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                        </div>
+                        
+                        <div class="flex justify-end">
+                            <button type="button" class="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded mr-2">Cancel</button>
+                            <button type="submit" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded">Save Changes</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -19,6 +19,10 @@ class Settings(BaseSettings):
     ENVIRONMENT: str = "production"
     LOG_LEVEL: str = "INFO"
     
+    @property
+    def is_production(self) -> bool:
+        return self.ENVIRONMENT.lower() == "production"
+    
     # Project info
     PROJECT_NAME: str = "Vertex AR with Mind AR"
     VERSION: str = "2.0.0"
@@ -64,6 +68,8 @@ class Settings(BaseSettings):
 
     # Media
     MEDIA_ROOT: str = "/app/storage/content"
+    TEMPLATES_DIR: str = "/app/templates"
+    STATIC_DIR: str = "/app/static"
     
     # Storage
     STORAGE_BASE_PATH: str = "/app/storage/content"

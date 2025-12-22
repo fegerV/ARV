@@ -34,6 +34,7 @@ services:
     volumes:
       - .:/app
       - ./storage:/app/storage
+      - ./templates:/app/templates  # Add templates volume
     ports:
       - "8000:8000"
     environment:
@@ -41,6 +42,7 @@ services:
       - PUBLIC_URL=http://localhost:8000
       - MEDIA_ROOT=/app/storage/content
       - LOG_LEVEL=INFO
+      - TEMPLATES_DIR=/app/templates  # Add templates directory
     depends_on:
       postgres:
         condition: service_healthy

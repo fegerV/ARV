@@ -1,0 +1,149 @@
+{% extends "base.html" %}
+
+{% block title %}Projects - Vertex AR Admin{% endblock %}
+{% block page_title %}Projects{% endblock %}
+
+{% block content %}
+<div x-data="projectsList()">
+    <div class="flex justify-between items-center mb-6">
+        <h2 class="text-2xl font-bold text-gray-800 dark:text-white">Projects</h2>
+        <button class="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
+                @click="showCreateForm()">
+            Add Project
+        </button>
+    </div>
+    
+    <!-- Filters -->
+    <div class="bg-white dark:bg-gray-900 shadow rounded-lg p-4 mb-6">
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div>
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Status</label>
+                <select class="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 py-2 px-3 shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm dark:text-white"
+                        x-model="filters.status">
+                    <option value="">All Statuses</option>
+                    <option value="active">Active</option>
+                    <option value="inactive">Inactive</option>
+                    <option value="archived">Archived</option>
+                </select>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Company</label>
+                <select class="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 py-2 px-3 shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm dark:text-white"
+                        x-model="filters.company">
+                    <option value="">All Companies</option>
+                    {% for company in companies %}
+                    <option value="{{ company.id }}">{{ company.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Search</label>
+                <input type="text" placeholder="Search projects..." 
+                       class="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 py-2 px-3 shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm dark:text-white"
+                       x-model="filters.search"
+                       @input.debounce.300ms="searchProjects">
+            </div>
+            <div class="flex items-end">
+                <button class="w-full bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
+                        @click="applyFilters">
+                    Apply Filters
+                </button>
+            </div>
+        </div>
+    
+    <!-- Projects table -->
+    <div class="bg-white dark:bg-gray-900 shadow rounded-lg overflow-hidden">
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                <thead class="bg-gray-50 dark:bg-gray-800">
+                    <tr>
+                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Name</th>
+                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Company</th>
+                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Status</th>
+                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">AR Content</th>
+                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Created</th>
+                        <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Actions</th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-700">
+                    {% for project in projects %}
+                    <tr class="hover:bg-gray-50 dark:hover:bg-gray-800" id="project-{{ project.id }}">
+                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">{{ project.name }}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{{ project.company_name }}</td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
+                                {% if project.status == 'active' %}bg-green-100 text-green-800 dark:bg-green-800 dark:text-green-100
+                                {% elif project.status == 'inactive' %}bg-yellow-100 text-yellow-800 dark:bg-yellow-800 dark:text-yellow-100
+                                {% else %}bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-100{% endif %}">
+                                {{ project.status }}
+                            </span>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-40">{{ project.ar_content_count }}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-40">{{ project.created_at | datetime_format }}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                            <a :href="`/projects/${project.id}/edit`" class="text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:hover:text-indigo-300 mr-3">Edit</a>
+                            <a :href="`/projects/${project.id}/ar-content`" class="text-green-600 hover:text-green-900 dark:text-green-400 dark:hover:text-green-300 mr-3">AR Content</a>
+                            <button @click="deleteProject('{{ project.id }}')" 
+                                    class="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-30">Delete</button>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        
+        <!-- Pagination -->
+        {% include "components/pagination.html" %}
+    </div>
+</div>
+
+<script>
+function projectsList() {
+    return {
+        filters: {
+            status: '',
+            company: '',
+            search: ''
+        },
+        
+        showCreateForm() {
+            window.location.href = '/projects/create';
+        },
+        
+        searchProjects() {
+            // Debounced search implementation
+            this.applyFilters();
+        },
+        
+        applyFilters() {
+            // Apply filters by updating URL parameters
+            const params = new URLSearchParams();
+            
+            if (this.filters.status) params.append('status', this.filters.status);
+            if (this.filters.company) params.append('company', this.filters.company);
+            if (this.filters.search) params.append('search', this.filters.search);
+            
+            // Add pagination parameters if they exist
+            const urlParams = new URLSearchParams(window.location.search);
+            if (urlParams.get('page')) params.append('page', urlParams.get('page'));
+            if (urlParams.get('page_size')) params.append('page_size', urlParams.get('page_size'));
+            
+            window.location.search = params.toString();
+        },
+        
+        deleteProject(id) {
+            if (confirm('Are you sure you want to delete this project?')) {
+                // Using htmx to handle the delete request
+                htmx.ajax('DELETE', `/api/projects/${id}`, {
+                    target: `#project-${id}`,
+                    swap: 'outerHTML',
+                    headers: {
+                        'X-CSRF-Token': 'token' // Add CSRF token if required
+                    }
+                });
+            }
+        }
+    };
+}
+</script>
+{% endblock %}

@@ -160,63 +160,84 @@ export default function Login() {
   }
 
   return (
-    <Container 
-      maxWidth="sm" 
-      sx={{ 
-        py: 8, 
+    <Container
+      maxWidth="sm"
+      sx={{
+        py: 8,
         minHeight: '100vh',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        background: theme.palette.mode === 'dark' 
-          ? 'linear-gradient(135deg, #1e1e1e 0%, #121212 100%)'
-          : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+        background: theme.palette.mode === 'dark'
+          ? `radial-gradient(circle at top right, ${theme.palette.primary.dark}, ${theme.palette.background.default})`
+          : `radial-gradient(circle at top right, ${theme.palette.primary.light}, ${theme.palette.grey[100]})`,
       }}
     >
-      <Paper 
-        elevation={24} 
-        sx={{ 
-          p: 6, 
+      <Paper
+        elevation={16}
+        sx={{
+          p: 6,
           width: '100%',
-          borderRadius: 4,
+          maxWidth: '450px',
+          borderRadius: 3,
           position: 'relative',
-          overflow: 'hidden',
-          [theme.breakpoints.down('sm')]: { 
-            p: 4, 
-            px: 3 
+          overflow: 'visible',
+          [theme.breakpoints.down('sm')]: {
+            p: 4,
+            mx: 2
           },
-          '&::before': {
-            content: '""',
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            right: 0,
-            height: '4px',
-            background: 'linear-gradient(90deg, #667eea 0%, #764ba2 100%)',
+          boxShadow: theme.palette.mode === 'dark'
+            ? '0 25px 50px -12px rgba(0, 0, 0, 0.5)'
+            : '0 25px 50px -12px rgba(0, 0, 0, 0.15)',
+          transition: 'all 0.3s ease-in-out',
+          '&:hover': {
+            transform: 'translateY(-2px)',
+            boxShadow: theme.palette.mode === 'dark'
+              ? '0 35px 60px -15px rgba(0, 0, 0, 0.6)'
+              : '0 35px 60px -15px rgba(0, 0, 0, 0.2)',
           }
         }}
       >
         {/* Logo & Title */}
-        <Box sx={{ textAlign: 'center', mb: 4 }}>
-          <LoginIcon sx={{ fontSize: 64, color: 'primary.main', mb: 2 }} />
-          <Typography variant="h3" component="h1" gutterBottom fontWeight={700}>
+        <Box sx={{ textAlign: 'center', mb: 4, position: 'relative', zIndex: 1 }}>
+          <Box sx={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            width: 96,
+            height: 96,
+            borderRadius: '50%',
+            background: `linear-gradient(135deg, ${theme.palette.primary.main}, ${theme.palette.primary.light})`,
+            mb: 3,
+            boxShadow: theme.shadows[8],
+          }}>
+            <LoginIcon sx={{ fontSize: 48, color: 'white' }} />
+          </Box>
+          <Typography variant="h4" component="h1" gutterBottom fontWeight={700} color="text.primary">
             Vertex AR
           </Typography>
-          <Typography variant="h5" color="text.secondary">
+          <Typography variant="h6" color="text.secondary" fontWeight={500}>
             Админ-панель
           </Typography>
         </Box>
 
         {/* Error Alert */}
         {error && (
-          <Alert 
-            severity={lockedUntil ? 'warning' : 'error'} 
-            sx={{ mb: 3 }}
+          <Alert
+            severity={lockedUntil ? 'warning' : 'error'}
+            sx={{
+              mb: 3,
+              borderRadius: 2,
+              border: '1px solid',
+              borderColor: lockedUntil
+                ? theme.palette.warning.light + '80'
+                : theme.palette.error.light + '80',
+            }}
             icon={lockedUntil ? <SecurityIcon /> : undefined}
           >
             {error}
             {lockedUntil && (
-              <Typography variant="body2" sx={{ mt: 1 }}>
+              <Typography variant="body2" sx={{ mt: 1, fontWeight: 600 }}>
                 ⏳ Разблокировка через: <strong>{getRemainingTime()}</strong>
               </Typography>
             )}
@@ -225,7 +246,15 @@ export default function Login() {
 
         {/* Attempts Left Warning */}
         {attemptsLeft !== null && attemptsLeft <= 2 && (
-          <Alert severity="warning" sx={{ mb: 3 }}>
+          <Alert
+            severity="warning"
+            sx={{
+              mb: 3,
+              borderRadius: 2,
+              border: '1px solid',
+              borderColor: theme.palette.warning.light + '80',
+            }}
+          >
             ⚠️ Осталось попыток: <strong>{attemptsLeft}</strong> из 5
           </Alert>
         )}
@@ -242,12 +271,41 @@ export default function Login() {
             autoComplete="email"
             autoFocus
             placeholder="admin@vertexar.com"
-            sx={{ mb: 3 }}
+            sx={{
+              mb: 3,
+              '& .MuiOutlinedInput-root': {
+                borderRadius: 2,
+                backgroundColor: theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.02)',
+                transition: 'all 0.3s ease',
+                '&:hover': {
+                  backgroundColor: theme.palette.mode === 'dark' ? 'rgba(255,255,0.08)' : 'rgba(0,0,0,0.05)',
+                  boxShadow: `0 0 0 1px ${theme.palette.primary.main}`,
+                },
+                '&.Mui-focused': {
+                  backgroundColor: 'transparent',
+                  boxShadow: `0 0 2px ${theme.palette.primary.main}`,
+                },
+                '& fieldset': {
+                  borderColor: theme.palette.mode === 'dark' ? 'rgba(255,0.23)' : 'rgba(0,0,0,0.23)',
+                },
+                '&:hover fieldset': {
+                  borderColor: theme.palette.primary.main,
+                },
+                '&.Mui-focused fieldset': {
+                  borderColor: theme.palette.primary.main,
+                },
+              }
+            }}
             disabled={loading || !!lockedUntil}
             InputProps={{
               startAdornment: (
                 <InputAdornment position="start">
-                  <EmailIcon color="action" />
+                  <EmailIcon
+                    sx={{
+                      color: theme.palette.text.secondary,
+                      ml: 0.5,
+                    }}
+                  />
                 </InputAdornment>
               ),
             }}
@@ -290,11 +348,31 @@ export default function Login() {
             variant="contained"
             size="large"
             disabled={loading || !email || !password || !!lockedUntil}
-            sx={{ 
-              py: 1.5, 
+            sx={{
+              py: 1.5,
               borderRadius: 2,
               fontSize: '1.1rem',
               fontWeight: 600,
+              textTransform: 'uppercase',
+              letterSpacing: '0.5px',
+              boxShadow: theme.palette.mode === 'dark'
+                ? `0 4px 20px ${theme.palette.primary.dark}`
+                : `0 4px 20px ${theme.palette.primary.light}`,
+              transition: 'all 0.3s ease',
+              '&:hover': {
+                transform: 'translateY(-2px)',
+                boxShadow: theme.palette.mode === 'dark'
+                  ? `0 6px 25px ${theme.palette.primary.dark}`
+                  : `0 6px 25px ${theme.palette.primary.light}`,
+              },
+              '&:active': {
+                transform: 'translateY(0)',
+              },
+              '&.Mui-disabled': {
+                opacity: 0.6,
+                transform: 'none',
+                boxShadow: 'none',
+              }
             }}
           >
             {loading ? <CircularProgress size={24} color="inherit" /> : 'ВОЙТИ'}
@@ -371,3 +449,4 @@ export default function Login() {
     </Container>
   );
 }
+

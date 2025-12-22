@@ -53,9 +53,38 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
             await session.close()
 
 
+def init_db_sync() -> None:
+    """Initialize database by running Alembic migrations"""
+    from alembic.config import Config
+    from alembic import command
+    import os
+    from pathlib import Path
+    
+    try:
+        # Create alembic config
+        alembic_cfg = Config("alembic.ini")
+        
+        # Set the script location to the alembic directory
+        alembic_cfg.set_main_option("script_location", "alembic")
+        
+        # Set the database URL
+        from app.core.config import settings
+        alembic_cfg.set_main_option("sqlalchemy.url", settings.DATABASE_URL)
+        
+        # Run migrations to upgrade to the latest version
+        command.upgrade(alembic_cfg, "head")
+        logger.info("Database migrations applied successfully")
+    except Exception as e:
+        logger.error(f"Error applying database migrations: {e}")
+        # Don't raise the exception to allow the application to start
+        # The database might be initialized later or manually
+        import traceback
+        traceback.print_exc()
+
+
 async def init_db() -> None:
-    """Initialize database - no longer creates tables automatically"""
-    pass
+    """Initialize database - but skip migrations since they're handled separately"""
+    logger.info("Database initialized (migrations handled separately)")
 
 
 async def seed_defaults() -> None:
