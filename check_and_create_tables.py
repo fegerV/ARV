@@ -23,7 +23,7 @@ import traceback
 def check_and_create_tables():
     try:
         # Создаем синхронный движок
-        database_url = settings.DATABASE_URL.replace('postgresql+asyncpg://', 'postgresql://')
+        database_url = settings.DATABASE_URL.replace('postgresql+asyncpg://', 'postgresql://').replace('sqlite+aiosqlite://', 'sqlite://')
         print(f"Connecting to database: {database_url}")
         
         engine = create_engine(database_url)
@@ -32,15 +32,11 @@ def check_and_create_tables():
         with engine.connect() as conn:
             print("Database connection successful")
             
-            # Проверяем существование таблицы users
+            # Проверяем существование таблицы users (для SQLite используем другую проверку)
             result = conn.execute(text("""
-                SELECT EXISTS (
-                    SELECT FROM information_schema.tables
-                    WHERE table_schema = 'public'
-                    AND table_name = 'users'
-                )
+                SELECT name FROM sqlite_master WHERE type='table' AND name='users';
             """))
-            table_exists = result.scalar()
+            table_exists = result.fetchone() is not None
             print(f'Users table exists: {table_exists}')
             
             if not table_exists:
@@ -51,9 +47,7 @@ def check_and_create_tables():
                 
                 # Проверяем, что таблицы теперь существуют
                 result = conn.execute(text("""
-                    SELECT table_name FROM information_schema.tables
-                    WHERE table_schema = 'public'
-                    ORDER BY table_name
+                    SELECT name FROM sqlite_master WHERE type='table' ORDER BY name;
                 """))
                 tables = [row[0] for row in result.fetchall()]
                 print(f'All existing tables: {tables}')

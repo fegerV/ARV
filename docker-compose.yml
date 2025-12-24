@@ -25,6 +25,13 @@ services:
     networks:
       - vertex_net
 
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    networks:
+      - vertex_net
+
   app:
     build:
       context: .
@@ -39,11 +46,14 @@ services:
       - DATABASE_URL=postgresql+asyncpg://vertex_ar:password@postgres:5432/vertex_ar
       - PUBLIC_URL=http://localhost:8000
       - MEDIA_ROOT=/app/storage/content
+      - REDIS_URL=redis://redis:6379/0
       - LOG_LEVEL=INFO
       - TEMPLATES_DIR=/app/templates  # Add templates directory
     depends_on:
       postgres:
         condition: service_healthy
+      redis:
+        condition: service_started
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/api/health/status"]
       interval: 30s
@@ -54,3 +64,4 @@ services:
 
 volumes:
   postgres_data:
+  redis_data:
