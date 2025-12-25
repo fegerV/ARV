@@ -88,7 +88,6 @@ async def create_test_data(async_session):
             
             # Создаем AR-контент
             ar_content = ARContent(
-                name="Тестовый AR-контент",
                 project_id=project.id,
                 company_id=company.id,
                 unique_id=str(uuid.uuid4()),
@@ -170,7 +169,7 @@ async def create_test_data(async_session):
             print(f"   - Администратор: admin@vertexar.com / admin123")
             print(f"   - Компания: Vertex AR (ID: {company.id})")
             print(f"   - Проект: Портреты (ID: {project.id})")
-            print(f"   - AR-контент: {ar_content.name} (ID: {ar_content.id})")
+            print(f"   - AR-контент: ORDER-001 - Иван Петров (ID: {ar_content.id})")
             print(f"   - Уникальная ссылка: http://localhost:8000/view/{ar_content.unique_id}")
             print(f"   - Активное видео: {video1.filename}")
             print(f"   - Всего видео: 2")
