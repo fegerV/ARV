@@ -46,7 +46,7 @@ B2B SaaS платформа для создания AR-контента на о�
 
 ### 1. Клонируйте репозиторий
 ```bash
-git clone <repository-url>
+git clone https://github.com/fegerV/ARV
 cd ARV
 ```
 
