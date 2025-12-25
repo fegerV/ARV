@@ -9,45 +9,45 @@
     <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
         <!-- Settings Navigation -->
         <div class="md:col-span-1">
-            <div class="bg-white rounded-lg shadow p-4">
+            <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
                 <nav class="space-y-2">
-                    <a href="#general" class="block px-3 py-2 text-sm font-medium rounded-md bg-blue-100 text-blue-800">General</a>
-                    <a href="#security" class="block px-3 py-2 text-sm font-medium rounded-md text-gray-700 hover:bg-gray-100">Security</a>
-                    <a href="#storage" class="block px-3 py-2 text-sm font-medium rounded-md text-gray-700 hover:bg-gray-100">Storage</a>
-                    <a href="#notifications" class="block px-3 py-2 text-sm font-medium rounded-md text-gray-700 hover:bg-gray-100">Notifications</a>
-                    <a href="#api" class="block px-3 py-2 text-sm font-medium rounded-md text-gray-700 hover:bg-gray-100">API</a>
-                    <a href="#integrations" class="block px-3 py-2 text-sm font-medium rounded-md text-gray-700 hover:bg-gray-100">Integrations</a>
+                    <a href="#general" class="block px-3 py-2 text-sm font-medium rounded-md bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-100">General</a>
+                    <a href="#security" class="block px-3 py-2 text-sm font-medium rounded-md text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">Security</a>
+                    <a href="#storage" class="block px-3 py-2 text-sm font-medium rounded-md text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">Storage</a>
+                    <a href="#notifications" class="block px-3 py-2 text-sm font-medium rounded-md text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">Notifications</a>
+                    <a href="#api" class="block px-3 py-2 text-sm font-medium rounded-md text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">API</a>
+                    <a href="#integrations" class="block px-3 py-2 text-sm font-medium rounded-md text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">Integrations</a>
                 </nav>
             </div>
         </div>
         
         <!-- Settings Content -->
         <div class="md:col-span-3">
-            <div class="bg-white rounded-lg shadow p-6">
+            <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
                 <!-- General Settings -->
                 <div id="general" class="mb-8">
-                    <h3 class="text-lg font-medium text-gray-900 mb-4">General Settings</h3>
+                    <h3 class="text-lg font-medium text-gray-900 dark:text-white mb-4">General Settings</h3>
                     <form class="space-y-6">
                         <div class="grid grid-cols-1 gap-6 sm:grid-cols-2">
                             <div>
-                                <label for="site-title" class="block text-sm font-medium text-gray-700">Site Title</label>
-                                <input type="text" name="site-title" id="site-title" value="{{ settings.site_title|default('Vertex AR B2B Platform') }}" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                                <label for="site-title" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Site Title</label>
+                                <input type="text" name="site-title" id="site-title" value="{{ settings.site_title|default('Vertex AR B2B Platform') }}" class="mt-1 block w-full border border-gray-300 dark:border-gray-600 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm dark:bg-gray-700 dark:text-white">
                             </div>
                             
                             <div>
-                                <label for="admin-email" class="block text-sm font-medium text-gray-700">Admin Email</label>
-                                <input type="email" name="admin-email" id="admin-email" value="{{ settings.admin_email|default('admin@vertexar.com') }}" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                                <label for="admin-email" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Admin Email</label>
+                                <input type="email" name="admin-email" id="admin-email" value="{{ settings.admin_email|default('admin@vertexar.com') }}" class="mt-1 block w-full border border-gray-300 dark:border-gray-600 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm dark:bg-gray-700 dark:text-white">
                             </div>
                         </div>
                         
                         <div>
-                            <label for="site-description" class="block text-sm font-medium text-gray-700">Site Description</label>
-                            <textarea id="site-description" name="site-description" rows="3" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">{{ settings.site_description|default('B2B SaaS platform for creating AR content based on image recognition (NFT markers)') }}</textarea>
+                            <label for="site-description" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Site Description</label>
+                            <textarea id="site-description" name="site-description" rows="3" class="mt-1 block w-full border border-gray-300 dark:border-gray-600 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm dark:bg-gray-700 dark:text-white">{{ settings.site_description|default('B2B SaaS platform for creating AR content based on image recognition (NFT markers)') }}</textarea>
                         </div>
                         
                         <div class="flex items-center">
                             <input id="maintenance-mode" name="maintenance-mode" type="checkbox" class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
-                            <label for="maintenance-mode" class="ml-2 block text-sm text-gray-900">Maintenance Mode</label>
+                            <label for="maintenance-mode" class="ml-2 block text-sm text-gray-900 dark:text-white">Maintenance Mode</label>
                         </div>
                         
                         <div class="flex justify-end">

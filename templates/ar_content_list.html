@@ -7,7 +7,7 @@
     <!-- Sidebar -->
     <div class="fixed inset-y-0 left-0 z-30 w-64 bg-white dark:bg-gray-900 shadow-lg transform transition-transform duration-300 ease-in-out lg:translate-x-0 lg:static lg:inset-0 -translate-x-full lg:translate-x-0" 
          :class="{ 'translate-x-0': sidebarOpen, '-translate-x-full': !sidebarOpen }">
-        <div class="flex items-center justify-center h-16 px-4 bg-indigo-60 text-white">
+        <div class="flex items-center justify-center h-16 px-4 bg-indigo-600 text-white">
             <span class="text-xl font-bold">Vertex AR Admin</span>
         </div>
         <nav class="mt-5 px-2 space-y-1">
@@ -53,7 +53,7 @@
                 </svg>
                 Notifications
             </a>
-            <a href="/settings" class="text-gray-700 dark:text-gray-300 hover:bg-gray-10 dark:hover:bg-gray-700 group flex items-center px-2 py-2 text-base font-medium rounded-md">
+            <a href="/settings" class="text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 group flex items-center px-2 py-2 text-base font-medium rounded-md">
                 <svg class="text-gray-500 dark:text-gray-400 mr-4 h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
@@ -69,7 +69,7 @@
         <header class="bg-white dark:bg-gray-900 shadow-sm z-10">
             <div class="flex items-center justify-between px-6 py-4">
                 <div class="flex items-center">
-                    <button @click="sidebarOpen = true" class="lg:hidden mr-4 text-gray-50 dark:text-gray-400">
+                    <button @click="sidebarOpen = true" class="lg:hidden mr-4 text-gray-500 dark:text-gray-400">
                         <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
                         </svg>
@@ -113,9 +113,10 @@
             <div class="max-w-7xl mx-auto">
                 <div class="flex justify-between items-center mb-6">
                     <h2 class="text-2xl font-bold text-gray-800 dark:text-white">AR Content</h2>
-                    <button class="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2">
+                    <a href="/ar-content/new" class="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 inline-flex items-center">
+                        <span class="material-icons mr-2">add</span>
                         Add AR Content
-                    </button>
+                    </a>
                 </div>
                 
                 <!-- Filters -->
@@ -180,7 +181,7 @@
                                         </div>
                                         {% endif %}
                                     </td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-40">{{ item.created_at | datetime_format }}</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{{ item.created_at | datetime_format }}</td>
                                     <td class="px-6 py-4 whitespace-nowrap">
                                         <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
                                             {% if item.status == 'ready' %}bg-green-100 text-green-800 dark:bg-green-800 dark:text-green-100
@@ -190,11 +191,17 @@
                                             {{ item.status }}
                                         </span>
                                     </td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-40">{{ item.views_count }}</td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-40">{{ item.views_30_days }}</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{{ item.views_count }}</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{{ item.views_30_days }}</td>
                                     <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                        <a href="#" class="text-indigo-60 hover:text-indigo-900 dark:text-indigo-400 dark:hover:text-indigo-300 mr-3">View</a>
-                                        <a href="#" class="text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:hover:text-indigo-300 mr-3">Edit</a>
+                                        <a href="/ar-content/{{ item.id }}" class="text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:hover:text-indigo-300 mr-3 inline-flex items-center">
+                                            <span class="material-icons text-sm">visibility</span>
+                                            View
+                                        </a>
+                                        <a href="/ar-content/{{ item.id }}/edit" class="text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:hover:text-indigo-300 mr-3 inline-flex items-center">
+                                            <span class="material-icons text-sm">edit</span>
+                                            Edit
+                                        </a>
                                         <button
                                             hx-post="/htmx/ar-content/{{ item.id }}/copy-link"
                                             hx-target="#toast-box"

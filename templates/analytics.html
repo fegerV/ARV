@@ -6,138 +6,142 @@
 
 {% block content %}
 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
-    <div class="bg-white p-6 rounded-lg shadow">
+    <div class="bg-white dark:bg-gray-800 p-6 rounded-lg shadow">
         <div class="flex items-center">
-            <div class="p-3 rounded-full bg-blue-100 text-blue-600 mr-4">
+            <div class="p-3 rounded-full bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400 mr-4">
                 <span class="material-icons">visibility</span>
             </div>
             <div>
-                <p class="text-gray-500">Total Views</p>
-                <p class="text-2xl font-bold">{{ analytics_data.total_views|default(0) }}</p>
+                <p class="text-gray-500 dark:text-gray-400">Total Views</p>
+                <p class="text-2xl font-bold text-gray-900 dark:text-white">{{ analytics_data.total_views|default(0) }}</p>
             </div>
         </div>
+    </div>
     
-    <div class="bg-white p-6 rounded-lg shadow">
+    <div class="bg-white dark:bg-gray-800 p-6 rounded-lg shadow">
         <div class="flex items-center">
-            <div class="p-3 rounded-full bg-green-100 text-green-600 mr-4">
+            <div class="p-3 rounded-full bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400 mr-4">
                 <span class="material-icons">people</span>
             </div>
             <div>
-                <p class="text-gray-500">Unique Sessions</p>
-                <p class="text-2xl font-bold">{{ analytics_data.unique_sessions|default(0) }}</p>
+                <p class="text-gray-500 dark:text-gray-400">Unique Sessions</p>
+                <p class="text-2xl font-bold text-gray-900 dark:text-white">{{ analytics_data.unique_sessions|default(0) }}</p>
             </div>
         </div>
+    </div>
     
-    <div class="bg-white p-6 rounded-lg shadow">
+    <div class="bg-white dark:bg-gray-800 p-6 rounded-lg shadow">
         <div class="flex items-center">
-            <div class="p-3 rounded-full bg-purple-100 text-purple-600 mr-4">
+            <div class="p-3 rounded-full bg-purple-100 text-purple-600 dark:bg-purple-900/30 dark:text-purple-400 mr-4">
                 <span class="material-icons">view_in_ar</span>
             </div>
             <div>
-                <p class="text-gray-500">Active Content</p>
-                <p class="text-2xl font-bold">{{ analytics_data.active_content|default(0) }}</p>
+                <p class="text-gray-500 dark:text-gray-400">Active Content</p>
+                <p class="text-2xl font-bold text-gray-900 dark:text-white">{{ analytics_data.active_content|default(0) }}</p>
             </div>
         </div>
+    </div>
     
-    <div class="bg-white p-6 rounded-lg shadow">
+    <div class="bg-white dark:bg-gray-800 p-6 rounded-lg shadow">
         <div class="flex items-center">
-            <div class="p-3 rounded-full bg-orange-100 text-orange-600 mr-4">
+            <div class="p-3 rounded-full bg-orange-100 text-orange-600 dark:bg-orange-900/30 dark:text-orange-400 mr-4">
                 <span class="material-icons">trending_up</span>
             </div>
             <div>
-                <p class="text-gray-500">Avg. Session Duration</p>
-                <p class="text-2xl font-bold">{{ analytics_data.avg_session_duration|default('0s') }}</p>
+                <p class="text-gray-500 dark:text-gray-400">Avg. Session Duration</p>
+                <p class="text-2xl font-bold text-gray-900 dark:text-white">{{ analytics_data.avg_session_duration|default('0s') }}</p>
             </div>
         </div>
     </div>
 </div>
 
 <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-    <div class="bg-white p-6 rounded-lg shadow">
-        <h3 class="text-lg font-semibold mb-4">Views Over Time</h3>
-        <div class="h-64 flex items-center justify-center bg-gray-50 rounded">
-            <p class="text-gray-500">Chart would be displayed here</p>
+    <div class="bg-white dark:bg-gray-800 p-6 rounded-lg shadow">
+        <h3 class="text-lg font-semibold mb-4 text-gray-900 dark:text-white">Views Over Time</h3>
+        <div class="h-64 flex items-center justify-center bg-gray-50 dark:bg-gray-700 rounded">
+            <p class="text-gray-500 dark:text-gray-400">Chart would be displayed here</p>
         </div>
     </div>
     
-    <div class="bg-white p-6 rounded-lg shadow">
-        <h3 class="text-lg font-semibold mb-4">Top Performing Content</h3>
+    <div class="bg-white dark:bg-gray-800 p-6 rounded-lg shadow">
+        <h3 class="text-lg font-semibold mb-4 text-gray-900 dark:text-white">Top Performing Content</h3>
         <div class="space-y-3">
             {% for content in analytics_data.top_content|default([]) %}
             <div class="flex justify-between items-center">
                 <div>
-                    <p class="font-medium">{{ content.title or content.id }}</p>
-                    <p class="text-sm text-gray-500">{{ content.company_name }}</p>
+                    <p class="font-medium text-gray-900 dark:text-white">{{ content.title or content.id }}</p>
+                    <p class="text-sm text-gray-500 dark:text-gray-400">{{ content.company_name }}</p>
                 </div>
                 <div class="text-right">
-                    <p class="font-semibold">{{ content.views_count or 0 }}</p>
-                    <p class="text-sm text-gray-500">views</p>
+                    <p class="font-semibold text-gray-900 dark:text-white">{{ content.views_count or 0 }}</p>
+                    <p class="text-sm text-gray-500 dark:text-gray-400">views</p>
                 </div>
+            </div>
             {% endfor %}
         </div>
     </div>
 </div>
 
-<div class="bg-white p-6 rounded-lg shadow">
-    <h3 class="text-lg font-semibold mb-4">Detailed Analytics</h3>
+<div class="bg-white dark:bg-gray-800 p-6 rounded-lg shadow">
+    <h3 class="text-lg font-semibold mb-4 text-gray-900 dark:text-white">Detailed Analytics</h3>
     <div class="overflow-x-auto">
-        <table class="min-w-full divide-y divide-gray-200">
-            <thead class="bg-gray-50">
+        <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+            <thead class="bg-gray-50 dark:bg-gray-800">
                 <tr>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Metric</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Value</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Change</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Metric</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Value</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Change</th>
                 </tr>
             </thead>
-            <tbody class="bg-white divide-y divide-gray-200">
+            <tbody class="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-700">
                 <tr>
                     <td class="px-6 py-4 whitespace-nowrap">
-                        <div class="text-sm font-medium text-gray-900">Total Views (30 days)</div>
+                        <div class="text-sm font-medium text-gray-900 dark:text-white">Total Views (30 days)</div>
                     </td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
                         {{ analytics_data.views_30_days|default(0) }}
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap">
-                        <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
+                        <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800 dark:bg-green-800 dark:text-green-100">
                             +12.5%
                         </span>
                     </td>
                 </tr>
                 <tr>
                     <td class="px-6 py-4 whitespace-nowrap">
-                        <div class="text-sm font-medium text-gray-900">Unique Visitors (30 days)</div>
+                        <div class="text-sm font-medium text-gray-900 dark:text-white">Unique Visitors (30 days)</div>
                     </td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
                         {{ analytics_data.unique_visitors_30_days|default(0) }}
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap">
-                        <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
+                        <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800 dark:bg-green-800 dark:text-green-100">
                             +8.2%
                         </span>
                     </td>
                 </tr>
                 <tr>
                     <td class="px-6 py-4 whitespace-nowrap">
-                        <div class="text-sm font-medium text-gray-900">Avg. Engagement Time</div>
+                        <div class="text-sm font-medium text-gray-900 dark:text-white">Avg. Engagement Time</div>
                     </td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
                         {{ analytics_data.avg_engagement_time|default('0s') }}
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap">
-                        <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
+                        <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800 dark:bg-green-800 dark:text-green-100">
                             +5.3%
                         </span>
                     </td>
                 </tr>
                 <tr>
                     <td class="px-6 py-4 whitespace-nowrap">
-                        <div class="text-sm font-medium text-gray-900">Bounce Rate</div>
+                        <div class="text-sm font-medium text-gray-900 dark:text-white">Bounce Rate</div>
                     </td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
                         {{ analytics_data.bounce_rate|default('0%') }}
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap">
-                        <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800">
+                        <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800 dark:bg-red-800 dark:text-red-100">
                             -3.1%
                         </span>
                     </td>
