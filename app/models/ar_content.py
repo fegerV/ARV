@@ -23,8 +23,11 @@ class ARContent(Base):
     company_id = Column(Integer, ForeignKey("companies.id"), nullable=False)
     active_video_id = Column(Integer, ForeignKey("videos.id"), nullable=True)
     
-    # Unique identifier for public links
-    unique_id = Column(UUID(as_uuid=True), default=uuid.uuid4, nullable=False, unique=True)
+    # Unique identifier for public links - String for SQLite compatibility
+    unique_id = Column(String(36), default=lambda: str(uuid.uuid4()), nullable=False, unique=True)
+    
+    # Basic information
+    name = Column(String(255), nullable=True)  # Optional name for AR content
     
     # Order and customer information
     order_number = Column(String(50), nullable=False)
