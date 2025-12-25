@@ -43,7 +43,11 @@
         
         <!-- Login form -->
         <div class="px-6 pb-8">
-            <form class="space-y-6" action="/api/auth/login-form" method="post" id="loginForm">
+            <form class="space-y-6"
+                  hx-post="/api/auth/login-form"
+                  hx-target="body"
+                  hx-swap="innerHTML"
+                  id="loginForm">
                 <div>
                     <label for="email" class="block text-sm font-medium text-gray-700 dark:text-gray-30 mb-2">Email</label>
                     <div class="relative rounded-md shadow-sm">
@@ -63,7 +67,7 @@
                     <div class="relative rounded-md shadow-sm">
                         <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                             <svg class="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 0-2-2H6a2 2 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path>
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 01-8 0v4h8z"></path>
                             </svg>
                         </div>
                         <input id="password" name="password" type="password" autocomplete="current-password" required 
@@ -112,7 +116,7 @@
         <div class="mx-6 mb-6 py-4 flex items-center justify-center border-t border-gray-200 dark:border-gray-700">
             <div class="flex items-center px-3 py-1 bg-gray-10 dark:bg-gray-700 rounded-full text-sm font-medium text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600">
                 <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 0-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path>
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 01-8 0v4h8z"></path>
                 </svg>
                 Двухфакторная аутентификация (в разработке)
             </div>

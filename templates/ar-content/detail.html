@@ -57,8 +57,9 @@
                     <h3 class="text-lg font-medium text-gray-900 dark:text-white mb-4">Портрет</h3>
                     <div class="aspect-square bg-gray-100 dark:bg-gray-700 rounded-lg overflow-hidden">
                         {% if ar_content.photo_url %}
-                        <img src="{{ ar_content.photo_url }}" 
-                             alt="Portrait" 
+                        <img src="{{ ar_content.photo_url }}"
+                             alt="Portrait"
+                             loading="lazy"
                              @click="showPortraitLightbox = true"
                              class="w-full h-full object-cover cursor-pointer hover:opacity-90 transition-opacity">
                         {% else %}
@@ -180,8 +181,9 @@
             <!-- QR Code Preview -->
             <div class="flex items-center justify-center p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
                 <div class="text-center">
-                    <img :src="'https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=' + encodeURIComponent(fullArUrl)" 
+                    <img :src="'https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=' + encodeURIComponent(fullArUrl)"
                          :alt="'QR Code for ' + ar_content.order_number"
+                         loading="lazy"
                          class="mx-auto mb-2">
                     <p class="text-sm text-gray-600 dark:text-gray-400">{{ fullArUrl }}</p>
                 </div>
@@ -211,7 +213,7 @@
                 </div>
                 <div class="p-4">
                     {% if ar_content.photo_url %}
-                    <img src="{{ ar_content.photo_url }}" alt="Portrait" class="w-full h-auto max-h-[80vh] object-contain">
+                    <img src="{{ ar_content.photo_url }}" alt="Portrait" loading="lazy" class="w-full h-auto max-h-[80vh] object-contain">
                     {% endif %}
                 </div>
             </div>
@@ -242,8 +244,9 @@
                     <div class="text-center mb-4">
                         <div class="bg-white p-4 rounded-lg inline-block">
                             <canvas x-ref="qrCanvas" class="hidden"></canvas>
-                            <img :src="'https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=' + encodeURIComponent(fullArUrl)" 
+                            <img :src="'https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=' + encodeURIComponent(fullArUrl)"
                                  :alt="'QR Code for ' + ar_content.order_number"
+                                 loading="lazy"
                                  class="mx-auto">
                         </div>
                         <p class="mt-2 text-sm text-gray-600 dark:text-gray-400">{{ ar_content.public_url }}</p>
@@ -480,7 +483,7 @@ function arContentDetail(arContent) {
                     </head>
                     <body>
                         <h2>QR Code - ${this.arContent.order_number}</h2>
-                        <img src="https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(this.fullArUrl)}" />
+                        <img src="https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(this.fullArUrl)}" loading="lazy" />
                         <p>${this.fullArUrl}</p>
                     </body>
                 </html>

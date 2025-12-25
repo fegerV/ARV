@@ -69,12 +69,12 @@
                 </thead>
                 <tbody class="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-700">
                     {% for item in ar_content_list %}
-                    <tr class="hover:bg-gray-50 dark:hover:bg-gray-800" id="ar-content-{{ item.id }}">
+                    <tr class="{% if item.status == 'deleted' %}opacity-50 {% endif %}hover:bg-gray-50 dark:hover:bg-gray-800" id="row-{{ item.id }}">
                         <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">{{ item.order_number }}</td>
                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{{ item.company_name }}</td>
                         <td class="px-6 py-4 whitespace-nowrap">
                             {% if item.thumbnail_url %}
-                            <img src="{{ item.thumbnail_url }}" alt="Thumbnail" class="h-10 w-10 object-cover rounded">
+                            <img src="{{ item.thumbnail_url }}" alt="Thumbnail" loading="lazy" class="h-10 w-10 object-cover rounded">
                             {% else %}
                             <div class="h-10 w-10 bg-gray-200 dark:bg-gray-700 rounded flex items-center justify-center">
                                 <span class="text-gray-500 dark:text-gray-400">No Image</span>
@@ -94,34 +94,10 @@
                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{{ item.views_count }}</td>
                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{{ item.views_30_days }}</td>
                         <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                            <a :href="`/ar-content/${item.id}/view`" class="text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:hover:text-indigo-300 mr-3">View</a>
+                            <a :href="`/ar-content/${item.id}/view`" class="text-indigo-60 hover:text-indigo-900 dark:text-indigo-400 dark:hover:text-indigo-300 mr-3">View</a>
                             <a :href="`/ar-content/${item.id}/edit`" class="text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:hover:text-indigo-30 mr-3">Edit</a>
-                            <button
-                                hx-post="/htmx/ar-content/{{ item.id }}/copy-link"
-                                hx-trigger="click"
-                                hx-target="this"          <!-- заменим текст кнопки -->
-                                hx-swap="innerHTML"
-                                x-data
-                                @htmx:after-request="
-                                    navigator.clipboard.writeText(JSON.parse(event.detail.xhr.responseText).link);
-                                    $el.innerText = 'Скопировано!';
-                                    setTimeout(() => $el.innerText = 'Copy link', 1500)
-                                "
-                                class="text-green-600 hover:text-green-900 dark:text-green-40 dark:hover:text-green-30 mr-3">Copy Link</button>
-                            <button
-                                hx-get="/htmx/ar-content/{{ item.id }}/qr-code"
-                                hx-target="#modal-body"
-                                hx-swap="innerHTML"
-                                @click="showQRCode('{{ item.id }}')"
-                                class="text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300 mr-3">QR</button>
-                            <div id="controls-{{ item.id }}">
-                                <button
-                                    hx-delete="/htmx/ar-content/{{ item.id }}"
-                                    hx-target="#controls-{{ item.id }}"
-                                    hx-swap="innerHTML"
-                                    hx-confirm="Удалить контент?"
-                                    class="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-30">Delete</button>
-                            </div>
+                            {% from 'macros/ar_actions.html' import ar_actions %}
+                            {{ ar_actions(item.id) }}
                         </td>
                     </tr>
                     {% endfor %}

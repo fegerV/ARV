@@ -13,6 +13,9 @@ class Settings(BaseSettings):
         case_sensitive=False,
         extra="ignore"
     )
+    
+    # Redis
+    REDIS_URL: str = "redis://localhost:6379/0"
 
     # Application
     DEBUG: bool = False
