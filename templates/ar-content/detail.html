@@ -5,7 +5,7 @@
 {% block page_title %}{{ ar_content.order_number }}{% endblock %}
 
 {% block content %}
-<div x-data="arContentDetail({{ ar_content | tojson }})">
+<div x-data="arContentDetail({{ ar_content_js | tojson }})">
     <!-- Header -->
     <div class="flex justify-between items-center mb-6">
         <div class="flex items-center gap-2">
