@@ -103,8 +103,8 @@
 
 ```bash
 # 1. Клонирование репозитория
-git clone <repository-url>
-cd vertex-ar-b2b-platform
+git clone https://github.com/fegerV/ARV
+cd vertex-ar
 
 # 2. Создание виртуального окружения
 python -m venv venv
