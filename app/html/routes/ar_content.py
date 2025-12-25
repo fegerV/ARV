@@ -63,20 +63,114 @@ async def ar_content_detail(
     """AR Content detail page."""
     try:
         result = await get_ar_content_by_id_legacy(int(ar_content_id), db)
-        ar_content = dict(result)
+        print(f"🔍 Result type: {type(result)}")
+        print(f"🔍 Result has model_dump: {hasattr(result, 'model_dump')}")
         
-        # Convert datetime objects to strings for template
-        if 'created_at' in ar_content and ar_content['created_at']:
-            ar_content['created_at'] = ar_content['created_at'].isoformat()
-        if 'updated_at' in ar_content and ar_content['updated_at']:
-            ar_content['updated_at'] = ar_content['updated_at'].isoformat()
+        # Convert to dict and handle datetime serialization
+        if hasattr(result, 'model_dump'):
+            ar_content = result.model_dump()
+        elif hasattr(result, '__dict__'):
+            ar_content = result.__dict__
+        else:
+            ar_content = dict(result)
+            
+        print(f"🔍 ar_content type: {type(ar_content)}")
+        print(f"🔍 ar_content keys: {list(ar_content.keys()) if isinstance(ar_content, dict) else 'Not a dict'}")
+        
+        # Convert datetime objects to strings for template and JSON serialization
+        def convert_datetimes(obj):
+            if isinstance(obj, dict):
+                return {k: convert_datetimes(v) for k, v in obj.items()}
+            elif isinstance(obj, list):
+                return [convert_datetimes(item) for item in obj]
+            elif hasattr(obj, 'isoformat'):  # datetime objects
+                return obj.isoformat()
+            else:
+                return obj
+        
+        ar_content = convert_datetimes(ar_content)
+        
+        # Create a simplified version for JavaScript serialization
+        ar_content_js = {
+            'id': ar_content.get('id'),
+            'order_number': ar_content.get('order_number'),
+            'customer_name': ar_content.get('customer_name'),
+            'customer_phone': ar_content.get('customer_phone'),
+            'customer_email': ar_content.get('customer_email'),
+            'duration_years': ar_content.get('duration_years'),
+            'status': ar_content.get('status'),
+            'photo_url': ar_content.get('photo_url'),
+            'video_url': ar_content.get('video_url'),
+            'thumbnail_url': ar_content.get('thumbnail_url'),
+            'qr_code_url': ar_content.get('qr_code_url'),
+            'marker_url': ar_content.get('marker_url'),
+            'marker_status': ar_content.get('marker_status'),
+            'public_url': ar_content.get('public_url'),
+            'unique_link': ar_content.get('unique_link'),
+            'company_name': ar_content.get('company_name'),
+            'project_name': ar_content.get('project_name'),
+            'views_count': ar_content.get('views_count'),
+            'views_30_days': ar_content.get('views_30_days'),
+            'active_video_title': ar_content.get('active_video_title'),
+            'created_at': ar_content.get('created_at'),
+            'updated_at': ar_content.get('updated_at')
+        }
+        
+        # Debug: check for any remaining datetime objects
+        def find_datetimes(obj, path=""):
+            if hasattr(obj, 'isoformat'):
+                print(f"⚠️  Found datetime at {path}: {type(obj)}")
+                return True
+            elif isinstance(obj, dict):
+                found = False
+                for k, v in obj.items():
+                    if find_datetimes(v, f"{path}.{k}" if path else k):
+                        found = True
+                return found
+            elif isinstance(obj, list):
+                found = False
+                for i, v in enumerate(obj):
+                    if find_datetimes(v, f"{path}[{i}]" if path else f"[{i}]"):
+                        found = True
+                return found
+            return False
+        
+        print("🔍 Checking for datetime objects in ar_content...")
+        find_datetimes(ar_content)
+        print("✅ DateTime check complete")
     except Exception:
         # fallback to mock data
         ar_content = {**AR_CONTENT_DETAIL_MOCK_DATA, "id": ar_content_id}
+        # Create a simplified version for JavaScript serialization from mock data
+        ar_content_js = {
+            'id': ar_content.get('id'),
+            'order_number': ar_content.get('order_number'),
+            'customer_name': ar_content.get('customer_name'),
+            'customer_phone': ar_content.get('customer_phone'),
+            'customer_email': ar_content.get('customer_email'),
+            'duration_years': ar_content.get('duration_years'),
+            'status': ar_content.get('status'),
+            'photo_url': ar_content.get('photo_url'),
+            'video_url': ar_content.get('video_url'),
+            'thumbnail_url': ar_content.get('thumbnail_url'),
+            'qr_code_url': ar_content.get('qr_code_url'),
+            'marker_url': ar_content.get('marker_url'),
+            'marker_status': ar_content.get('marker_status'),
+            'public_url': ar_content.get('public_url'),
+            'unique_link': ar_content.get('unique_link'),
+            'company_name': ar_content.get('company_name'),
+            'project_name': ar_content.get('project_name'),
+            'views_count': ar_content.get('views_count'),
+            'views_30_days': ar_content.get('views_30_days'),
+            'active_video_title': ar_content.get('active_video_title'),
+            'created_at': ar_content.get('created_at'),
+            'updated_at': ar_content.get('updated_at')
+        }
     
     context = {
         "request": request,
         "ar_content": ar_content,
+        "ar_content_js": ar_content_js,
         "current_user": current_user
     }
     return templates.TemplateResponse("ar-content/detail.html", context)
