@@ -19,7 +19,7 @@
                     <span class="material-icons mr-2">arrow_back</span> Back
                 </a>
             </div>
-        <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
+        <p class="mt-1 text-sm text-gray-500 dark:text-gray-40000">
             Project details and management
         </p>
     </div>
@@ -30,19 +30,19 @@
                 <h4 class="text-md font-medium text-gray-900 dark:text-white mb-4">Project Information</h4>
                 <dl class="grid grid-cols-1 gap-x-4 gap-y-8 sm:grid-cols-2">
                     <div class="sm:col-span-1">
-                        <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">ID</dt>
+                        <dt class="text-sm font-medium text-gray-500 dark:text-gray-40000">ID</dt>
                         <dd class="mt-1 text-sm text-gray-900 dark:text-white">{{ project.id }}</dd>
                     </div>
                     <div class="sm:col-span-1">
-                        <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">Name</dt>
+                        <dt class="text-sm font-medium text-gray-500 dark:text-gray-40000">Name</dt>
                         <dd class="mt-1 text-sm text-gray-900 dark:text-white">{{ project.name }}</dd>
                     </div>
                     <div class="sm:col-span-1">
-                        <dt class="text-sm font-medium text-gray-500 dark:text-gray-40">Company</dt>
+                        <dt class="text-sm font-medium text-gray-500 dark:text-gray-4000">Company</dt>
                         <dd class="mt-1 text-sm text-gray-900 dark:text-white">{{ project.company_name or '—' }}</dd>
                     </div>
                     <div class="sm:col-span-1">
-                        <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">Status</dt>
+                        <dt class="text-sm font-medium text-gray-500 dark:text-gray-40000">Status</dt>
                         <dd class="mt-1 text-sm">
                             <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full
                                 {% if project.status == 'active' %}bg-green-100 text-green-800 dark:bg-green-800 dark:text-green-100{% else %}bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200{% endif %}">
@@ -51,7 +51,7 @@
                         </dd>
                     </div>
                     <div class="sm:col-span-1">
-                        <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">Created</dt>
+                        <dt class="text-sm font-medium text-gray-500 dark:text-gray-40000">Created</dt>
                         <dd class="mt-1 text-sm text-gray-900 dark:text-white">{{ project.created_at|datetime_format if project.created_at else '—' }}</dd>
                     </div>
                 </dl>
@@ -61,7 +61,7 @@
                 <h4 class="text-md font-medium text-gray-900 dark:text-white mb-4">Statistics</h4>
                 <dl class="grid grid-cols-1 gap-x-4 gap-y-8 sm:grid-cols-2">
                     <div class="sm:col-span-1">
-                        <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">AR Content</dt>
+                        <dt class="text-sm font-medium text-gray-500 dark:text-gray-40000">AR Content</dt>
                         <dd class="mt-1 text-sm text-gray-900 dark:text-white">{{ project.ar_content_count or 0 }}</dd>
                     </div>
                 </dl>
@@ -130,7 +130,7 @@
         </div>
         {% else %}
         <div class="text-center py-8">
-            <p class="text-gray-500 dark:text-gray-400">No AR content found for this project</p>
+            <p class="text-gray-500 dark:text-gray-40000">No AR content found for this project</p>
             <a href="/ar-content/new?project_id={{ project.id }}" class="mt-4 inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
                 Create AR Content
             </a>
