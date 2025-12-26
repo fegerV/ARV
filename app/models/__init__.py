@@ -15,6 +15,7 @@ from .ar_view_session import ARViewSession
 from .notification import Notification
 from .email_queue import EmailQueue
 from .audit_log import AuditLog
+from .settings import SystemSettings
 
 __all__ = [
     "CompanyStatus", "ProjectStatus", "ArContentStatus", "VideoStatus",
@@ -31,5 +32,6 @@ __all__ = [
     "ARViewSession", 
     "Notification",
     "EmailQueue",
-    "AuditLog"
+    "AuditLog",
+    "SystemSettings"
 ]
