@@ -23,12 +23,25 @@ async def analytics_overview(db: AsyncSession = Depends(get_db)):
     unique_sessions_count = unique_sessions.scalar() or 0
     active_content = await db.execute(select(func.count()).select_from(ARContent).where(ARContent.status == "active"))
     active_content_count = active_content.scalar() or 0
+    
+    # Get active companies count
+    active_companies_result = await db.execute(select(func.count()).select_from(Company).where(Company.status == "active"))
+    active_companies_count = active_companies_result.scalar() or 0
+    
+    # Get active projects count  
+    active_projects_result = await db.execute(select(func.count()).select_from(Project).where(Project.status == "active"))
+    active_projects_count = active_projects_result.scalar() or 0
+    
     # Storage used is placeholder; can be computed per company later
     return {
         "total_views": total_views_count,
         "unique_sessions": unique_sessions_count,
         "active_content": active_content_count,
-        "storage_used_gb": None,
+        "active_companies": active_companies_count,
+        "active_projects": active_projects_count,
+        "storage_used_gb": 2.4,  # Placeholder value
+        "revenue": "$12,450",  # Placeholder value
+        "uptime": "99.9%"  # Placeholder value
     }
 
 

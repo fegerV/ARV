@@ -100,13 +100,18 @@ def upgrade():
     
     # Insert default settings
     for setting in default_settings:
+        # Generate UUID for SQLite compatibility
+        import uuid
+        setting_id = str(uuid.uuid4())
+        
         op.execute(
             sa.text("""
                 INSERT INTO system_settings (id, key, value, data_type, category, description, is_public, created_at, updated_at)
-                VALUES (gen_random_uuid(), :key, :value, :data_type, :category, :description, :is_public, NOW(), NOW())
+                VALUES (:id, :key, :value, :data_type, :category, :description, :is_public, datetime('now'), datetime('now'))
                 ON CONFLICT (key) DO NOTHING
             """),
             {
+                'id': setting_id,
                 'key': setting[0],
                 'value': setting[1],
                 'data_type': setting[2],
