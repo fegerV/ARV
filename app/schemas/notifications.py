@@ -9,13 +9,16 @@ from pydantic import BaseModel, Field
 class NotificationItem(BaseModel):
     """Single notification item."""
     id: int
-    title: str
-    message: str
+    title: Optional[str] = None
+    message: Optional[str] = None
     type: str
-    is_read: bool
+    is_read: bool = False
     read_at: Optional[datetime] = None
     created_at: datetime
     metadata: Optional[dict] = None
+    company_name: Optional[str] = None
+    project_name: Optional[str] = None
+    ar_content_name: Optional[str] = None
 
 
 class NotificationListResponse(BaseModel):
