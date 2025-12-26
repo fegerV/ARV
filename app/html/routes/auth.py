@@ -23,7 +23,7 @@ async def admin_login_page(request: Request):
         "locked_until": None,
         "attempts_left": None
     }
-    return templates.TemplateResponse("auth/login.html", context)
+    return templates.TemplateResponse("admin/login.html", context)
 
 
 @router.get("/", response_class=RedirectResponse)

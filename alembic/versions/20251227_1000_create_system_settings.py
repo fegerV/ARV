@@ -104,7 +104,7 @@ def upgrade():
             op.execute(
                 sa.text("""
                     INSERT INTO system_settings (id, key, value, data_type, category, description, is_public, created_at, updated_at)
-                    VALUES (hex(randomblob(16)), :key, :value, :data_type, :category, :description, :is_public, datetime('now'), datetime('now'))
+                    VALUES (gen_random_uuid(), :key, :value, :data_type, :category, :description, :is_public, NOW(), NOW())
                 """),
                 {
                     'key': setting[0],

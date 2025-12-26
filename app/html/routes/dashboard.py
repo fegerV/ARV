@@ -29,7 +29,7 @@ async def admin_dashboard(
         dashboard_data = DASHBOARD_MOCK_DATA          # fallback
 
     return templates.TemplateResponse(
-        "dashboard/index.html",
+        "admin/dashboard.html",
         {
             "request": request,
             "current_user": current_user,
