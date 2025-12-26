@@ -1,14 +1,12 @@
 <!DOCTYPE html>
-<html lang="en" x-data="darkMode()" class="h-full">
+<html lang="en" class="h-full">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}Vertex AR Admin{% endblock %}</title>
     
-    <!-- Local Tailwind CSS -->
-    <link rel="stylesheet" href="/static/css/tailwind.css">
-    
-    <!-- Tailwind CSS configuration for dark mode -->
+    <!-- Tailwind CSS from CDN with dark mode configuration -->
+    <script src="https://cdn.tailwindcss.com?plugins=forms,typography,aspect-ratio"></script>
     <script>
         tailwind.config = {
             darkMode: 'class', // Enable class-based dark mode
@@ -146,30 +144,6 @@
     {% include "components/modals.html" %}
     
     <script>
-        // Dark mode functionality
-        function darkMode() {
-            return {
-                darkMode: localStorage.getItem('darkMode') === 'true',
-                
-                init() {
-                    if (this.darkMode) {
-                        document.documentElement.classList.add('dark');
-                    } else {
-                        document.documentElement.classList.remove('dark');
-                    }
-                },
-                
-                toggle() {
-                    this.darkMode = !this.darkMode;
-                    localStorage.setItem('darkMode', this.darkMode);
-                    if (this.darkMode) {
-                        document.documentElement.classList.add('dark');
-                    } else {
-                        document.documentElement.classList.remove('dark');
-                    }
-                }
-            }
-        }
         
         // Toast notification functions
         function showToast(message, type = 'info') {
