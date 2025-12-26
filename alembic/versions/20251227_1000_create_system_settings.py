@@ -11,7 +11,7 @@ from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
 revision = '20251227_1000_create_system_settings'
-down_revision = 'update_notifications_2024'
+down_revision = '20251223_1200_comprehensive_ar_content_fix'
 branch_labels = None
 depends_on = None
 
@@ -103,7 +103,7 @@ def upgrade():
         op.execute(
             sa.text("""
                 INSERT INTO system_settings (id, key, value, data_type, category, description, is_public, created_at, updated_at)
-                VALUES (gen_random_uuid(), :key, :value, :data_type, :category, :description, :is_public, NOW(), NOW())
+                VALUES (hex(randomblob(16)), :key, :value, :data_type, :category, :description, :is_public, datetime('now'), datetime('now'))
                 ON CONFLICT (key) DO NOTHING
             """),
             {

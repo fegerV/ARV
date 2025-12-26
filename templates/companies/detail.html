@@ -8,7 +8,7 @@
 <div class="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
     <div class="px-4 py-5 sm:px-6 border-b border-gray-200 dark:border-gray-700">
         <div class="flex justify-between items-center">
-            <h3 class="text-lg leading-6 font-medium text-gray-900 dark:text-white">{{ company.name }}</h3>
+            <h3 class="text-lg leading-6 font-medium text-gray-9000 dark:text-white">{{ company.name }}</h3>
             <div class="flex space-x-2">
                 <a href="/companies/{{ company.id }}/edit" 
                    class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded flex items-center">
@@ -28,19 +28,19 @@
     <div class="px-4 py-5 sm:p-6">
         <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
-                <h4 class="text-md font-medium text-gray-900 dark:text-white mb-4">Company Information</h4>
+                <h4 class="text-md font-medium text-gray-9000 dark:text-white mb-4">Company Information</h4>
                 <dl class="grid grid-cols-1 gap-x-4 gap-y-8 sm:grid-cols-2">
                     <div class="sm:col-span-1">
                         <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">ID</dt>
-                        <dd class="mt-1 text-sm text-gray-900 dark:text-white">{{ company.id }}</dd>
+                        <dd class="mt-1 text-sm text-gray-9000 dark:text-white">{{ company.id }}</dd>
                     </div>
                     <div class="sm:col-span-1">
                         <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">Name</dt>
-                        <dd class="mt-1 text-sm text-gray-90 dark:text-white">{{ company.name }}</dd>
+                        <dd class="mt-1 text-sm text-gray-900 dark:text-white">{{ company.name }}</dd>
                     </div>
                     <div class="sm:col-span-1">
                         <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">Contact Email</dt>
-                        <dd class="mt-1 text-sm text-gray-90 dark:text-white">{{ company.contact_email or '—' }}</dd>
+                        <dd class="mt-1 text-sm text-gray-900 dark:text-white">{{ company.contact_email or '—' }}</dd>
                     </div>
                     <div class="sm:col-span-1">
                         <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">Status</dt>
@@ -53,25 +53,25 @@
                     </div>
                     <div class="sm:col-span-1">
                         <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">Storage Provider</dt>
-                        <dd class="mt-1 text-sm text-gray-900 dark:text-white">{{ company.storage_provider or 'Local' }}</dd>
+                        <dd class="mt-1 text-sm text-gray-9000 dark:text-white">{{ company.storage_provider or 'Local' }}</dd>
                     </div>
                     <div class="sm:col-span-1">
                         <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">Created</dt>
-                        <dd class="mt-1 text-sm text-gray-900 dark:text-white">{{ company.created_at|datetime_format if company.created_at else '—' }}</dd>
+                        <dd class="mt-1 text-sm text-gray-9000 dark:text-white">{{ company.created_at|datetime_format if company.created_at else '—' }}</dd>
                     </div>
                 </dl>
             </div>
             
             <div>
-                <h4 class="text-md font-medium text-gray-900 dark:text-white mb-4">Statistics</h4>
+                <h4 class="text-md font-medium text-gray-9000 dark:text-white mb-4">Statistics</h4>
                 <dl class="grid grid-cols-1 gap-x-4 gap-y-8 sm:grid-cols-2">
                     <div class="sm:col-span-1">
                         <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">Projects</dt>
-                        <dd class="mt-1 text-sm text-gray-900 dark:text-white">{{ company.projects_count or 0 }}</dd>
+                        <dd class="mt-1 text-sm text-gray-9000 dark:text-white">{{ company.projects_count or 0 }}</dd>
                     </div>
                     <div class="sm:col-span-1">
                         <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">AR Content</dt>
-                        <dd class="mt-1 text-sm text-gray-900 dark:text-white">{{ company.ar_content_count or 0 }}</dd>
+                        <dd class="mt-1 text-sm text-gray-9000 dark:text-white">{{ company.ar_content_count or 0 }}</dd>
                     </div>
                 </dl>
             </div>
@@ -83,7 +83,7 @@
 <div class="mt-8 bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
     <div class="px-4 py-5 sm:px-6 border-b border-gray-200 dark:border-gray-700">
         <div class="flex justify-between items-center">
-            <h3 class="text-lg leading-6 font-medium text-gray-900 dark:text-white">Projects</h3>
+            <h3 class="text-lg leading-6 font-medium text-gray-9000 dark:text-white">Projects</h3>
             <a href="/projects/new?company_id={{ company.id }}" 
                class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded flex items-center">
                 <span class="material-icons mr-2">add</span> New Project
@@ -106,7 +106,7 @@
                     {% for project in projects %}
                     <tr class="hover:bg-gray-50 dark:hover:bg-gray-700">
                         <td class="px-6 py-4 whitespace-nowrap">
-                            <div class="text-sm font-medium text-gray-900 dark:text-white">{{ project.name }}</div>
+                            <div class="text-sm font-medium text-gray-9000 dark:text-white">{{ project.name }}</div>
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap">
                             <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full
