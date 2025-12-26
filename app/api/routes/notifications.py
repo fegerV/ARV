@@ -48,30 +48,84 @@ async def _send_telegram_notification_async(chat_id: str, message: str) -> None:
 @router.get("")
 async def list_notifications(
     limit: int = Query(50, ge=1, le=200),
+    offset: int = Query(0, ge=0),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
 ):
-    stmt = select(Notification).order_by(Notification.created_at.desc()).limit(limit)
+    stmt = (
+        select(Notification)
+        .order_by(Notification.created_at.desc())
+        .limit(limit)
+        .offset(offset)
+    )
     res = await db.execute(stmt)
     items = res.scalars().all()
-    notification_items = [
-        NotificationItem(
-            id=n.id,
-            company_id=n.company_id,
-            project_id=n.project_id,
-            ar_content_id=n.ar_content_id,
-            type=n.notification_type,
-            email_sent=n.email_sent or False,
-            telegram_sent=n.telegram_sent or False,
-            subject=n.subject or "",
-            message=n.message or "",
-            created_at=n.created_at.isoformat() if n.created_at else None,
-            is_read=bool((n.notification_metadata or {}).get("is_read")),
-            read_at=(n.notification_metadata or {}).get("read_at"),
+    
+    # Get total count for pagination
+    count_stmt = select(Notification)
+    count_res = await db.execute(count_stmt)
+    total = len(count_res.scalars().all())
+    
+    notification_items = []
+    for n in items:
+        meta = dict(n.notification_metadata or {})
+        
+        # Extract names from metadata or generate defaults
+        company_name = meta.get("company_name")
+        project_name = meta.get("project_name") 
+        ar_content_name = meta.get("ar_content_name")
+        
+        # Use subject as title, or generate from type
+        title = n.subject or meta.get("title") or n.notification_type.replace("_", " ").title()
+        
+        notification_items.append(
+            NotificationItem(
+                id=n.id,
+                title=title,
+                message=n.message or "",
+                type=n.notification_type,
+                is_read=bool(meta.get("is_read", False)),
+                read_at=meta.get("read_at"),
+                created_at=n.created_at,
+                metadata=meta,
+                company_name=company_name,
+                project_name=project_name,
+                ar_content_name=ar_content_name,
+            )
         )
-        for n in items
-    ]
-    return notification_items
+    
+    return NotificationListResponse(
+        items=notification_items,
+        total=total,
+        page=(offset // limit) + 1,
+        page_size=limit,
+        total_pages=(total + limit - 1) // limit
+    )
+
+
+@router.post("/mark-all-read", response_model=NotificationMarkReadResponse)
+async def mark_all_notifications_read(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    stmt = select(Notification)
+    res = await db.execute(stmt)
+    items = res.scalars().all()
+
+    updated = 0
+    for n in items:
+        meta = dict(n.notification_metadata or {})
+        if not meta.get("is_read"):
+            meta["is_read"] = True
+            meta["read_at"] = datetime.utcnow().isoformat()
+            n.notification_metadata = meta
+            updated += 1
+
+    await db.commit()
+    return NotificationMarkReadResponse(
+        success=True,
+        message=f"Marked {updated} notifications as read"
+    )
 
 
 @router.post("/mark-read", response_model=NotificationMarkReadResponse)

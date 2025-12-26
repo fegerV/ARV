@@ -1,8 +1,11 @@
 from fastapi import APIRouter, Request, Depends
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 from app.html.deps import CurrentActiveUser
-from app.html.mock import NOTIFICATIONS_MOCK_DATA
+from app.core.database import get_db
+from app.models.notification import Notification
 from app.html.filters import datetime_format
 
 router = APIRouter()
@@ -14,10 +17,31 @@ templates.env.filters["datetime_format"] = datetime_format
 @router.get("/notifications", response_class=HTMLResponse)
 async def notifications_page(
     request: Request,
-    current_user=CurrentActiveUser
+    current_user=CurrentActiveUser,
+    db: AsyncSession = Depends(get_db)
 ):
     """Notifications page."""
-    notifications = NOTIFICATIONS_MOCK_DATA
+    # Get notifications from database
+    stmt = select(Notification).order_by(Notification.created_at.desc()).limit(50)
+    result = await db.execute(stmt)
+    notifications_db = result.scalars().all()
+    
+    # Transform database notifications to template format
+    notifications = []
+    for n in notifications_db:
+        meta = dict(n.notification_metadata or {})
+        
+        notification = {
+            "id": n.id,
+            "title": n.subject or meta.get("title") or n.notification_type.replace("_", " ").title(),
+            "message": n.message or "",
+            "created_at": n.created_at,
+            "is_read": bool(meta.get("is_read", False)),
+            "company_name": meta.get("company_name"),
+            "project_name": meta.get("project_name"),
+            "ar_content_name": meta.get("ar_content_name"),
+        }
+        notifications.append(notification)
     
     context = {
         "request": request,
