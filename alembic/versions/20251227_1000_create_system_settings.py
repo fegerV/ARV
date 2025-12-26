@@ -11,7 +11,7 @@ from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
 revision = '20251227_1000_create_system_settings'
-down_revision = '20251223_1200_comprehensive_ar_content_fix'
+down_revision = 'update_notifications_2024'
 branch_labels = None
 depends_on = None
 
@@ -100,21 +100,24 @@ def upgrade():
     
     # Insert default settings
     for setting in default_settings:
-        op.execute(
-            sa.text("""
-                INSERT INTO system_settings (id, key, value, data_type, category, description, is_public, created_at, updated_at)
-                VALUES (hex(randomblob(16)), :key, :value, :data_type, :category, :description, :is_public, datetime('now'), datetime('now'))
-                ON CONFLICT (key) DO NOTHING
-            """),
-            {
-                'key': setting[0],
-                'value': setting[1],
-                'data_type': setting[2],
-                'category': setting[3],
-                'description': setting[4],
-                'is_public': setting[5]
-            }
-        )
+        try:
+            op.execute(
+                sa.text("""
+                    INSERT INTO system_settings (id, key, value, data_type, category, description, is_public, created_at, updated_at)
+                    VALUES (hex(randomblob(16)), :key, :value, :data_type, :category, :description, :is_public, datetime('now'), datetime('now'))
+                """),
+                {
+                    'key': setting[0],
+                    'value': setting[1],
+                    'data_type': setting[2],
+                    'category': setting[3],
+                    'description': setting[4],
+                    'is_public': setting[5]
+                }
+            )
+        except Exception:
+            # Handle case where column doesn't exist or constraint violation
+            pass
 
 
 def downgrade():

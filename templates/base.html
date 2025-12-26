@@ -5,8 +5,16 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}Vertex AR Admin{% endblock %}</title>
     
-    <!-- Tailwind CSS from CDN -->
+    <!-- Tailwind CSS from CDN with dark mode configuration -->
     <script src="https://cdn.tailwindcss.com?plugins=forms,typography,aspect-ratio"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class', // Enable class-based dark mode
+            theme: {
+                extend: {}
+            }
+        }
+    </script>
     
     <!-- htmx from CDN -->
     <script src="https://unpkg.com/htmx.org@1.9.10"></script>
