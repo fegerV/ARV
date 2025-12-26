@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Start test server for admin interface testing.
+Create admin user for testing.
 """
 
 import os
@@ -16,9 +16,9 @@ os.environ.setdefault("DATABASE_URL", "sqlite+aiosqlite:///./test_vertex_ar.db")
 os.environ.setdefault("DEBUG", "true")
 os.environ.setdefault("SECRET_KEY", "test-secret-key-for-admin-testing")
 
-async def setup_test_data():
-    """Setup test database and admin user."""
-    from app.core.database import init_db_sync, AsyncSessionLocal
+async def create_admin():
+    """Create admin user and test data."""
+    from app.core.database import AsyncSessionLocal
     from app.models.user import User
     from app.core.security import get_password_hash
     from app.models.company import Company
@@ -26,10 +26,7 @@ async def setup_test_data():
     from app.models.ar_content import ARContent
     from sqlalchemy import select
     
-    print("🔧 Setting up test database...")
-    
-    # Initialize database
-    init_db_sync()
+    print("🔧 Creating admin user and test data...")
     
     async with AsyncSessionLocal() as db:
         # Create admin user
@@ -49,6 +46,8 @@ async def setup_test_data():
             db.add(admin)
             await db.commit()
             print("✅ Created admin user")
+        else:
+            print("✅ Admin user already exists")
         
         # Create test company
         result = await db.execute(
@@ -67,77 +66,36 @@ async def setup_test_data():
             await db.commit()
             await db.refresh(company)
             print("✅ Created test company")
+        else:
+            print("✅ Test company already exists")
+            await db.refresh(company)
         
-        # Create test project
+        # Create test project "Портреты"
         result = await db.execute(
-            select(Project).where(Project.name == "Тестовый проект")
+            select(Project).where((Project.name == "Портреты") & (Project.company_id == company.id))
         )
         project = result.scalar_one_or_none()
         
         if not project:
             project = Project(
-                name="Тестовый проект",
-                slug="test-project",
+                name="Портреты",
+                slug="portrets",  # URL-friendly slug
                 company_id=company.id,
                 status="active"
             )
             db.add(project)
             await db.commit()
             await db.refresh(project)
-            print("✅ Created test project")
-        
-        # Create test AR content
-        result = await db.execute(
-            select(ARContent).where(ARContent.order_number == "TEST-001")
-        )
-        ar_content = result.scalar_one_or_none()
-        
-        if not ar_content:
-            ar_content = ARContent(
-                order_number="TEST-001",
-                customer_name="Тестовый клиент",
-                customer_phone="+7 (999) 123-45-67",
-                customer_email="test@example.com",
-                company_id=company.id,
-                project_id=project.id,
-                status="ready",
-                unique_id="test-unique-id-12345"
-            )
-            db.add(ar_content)
-            await db.commit()
-            print("✅ Created test AR content")
+            print("✅ Created project 'Портреты'")
+        else:
+            print("✅ Project 'Портреты' already exists")
+            await db.refresh(project)
     
-    print("✅ Test data setup completed!")
-
-def main():
-    """Main function to start the server."""
-    print("🚀 Starting test server for admin interface...")
-    
-    # Setup test data
-    asyncio.run(setup_test_data())
-    
-    print("\n📝 Server Information:")
-    print("🌐 URL: http://localhost:8000")
-    print("🔐 Admin Login: http://localhost:8000/admin/login")
+    print("✅ Setup completed!")
+    print("\n📝 Login Information:")
+    print("🌐 URL: http://localhost:8000/admin/login")
     print("👤 Email: admin@vertexar.com")
     print("🔑 Password: admin123")
-    print("\n🎯 Testing Checklist:")
-    print("1. Login page loads with proper styles")
-    print("2. Theme toggle works (🌙/☀️)")
-    print("3. Dark mode applies correctly")
-    print("4. Dashboard shows metrics")
-    print("5. No white text on white background")
-    print("\n⚠️  Press Ctrl+C to stop the server")
-    
-    # Start the server
-    import uvicorn
-    uvicorn.run(
-        "app.main:app",
-        host="0.0.0.0",
-        port=8000,
-        reload=True,
-        log_level="info"
-    )
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(create_admin())
