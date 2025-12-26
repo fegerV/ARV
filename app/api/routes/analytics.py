@@ -3,7 +3,7 @@ from typing import Optional
 import uuid
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func, distinct
+from sqlalchemy import select, func, distinct, text
 
 from app.core.database import get_db
 from app.models.ar_view_session import ARViewSession
@@ -17,15 +17,26 @@ router = APIRouter()
 @router.get("/overview")
 async def analytics_overview(db: AsyncSession = Depends(get_db)):
     since = datetime.utcnow() - timedelta(days=30)
+    
+    # Use text() for SQLite compatibility with count(distinct)
     total_views = await db.execute(select(func.count()).select_from(ARViewSession).where(ARViewSession.created_at >= since))
     total_views_count = total_views.scalar() or 0
-    unique_sessions = await db.execute(select(func.count(distinct(ARViewSession.session_id))).where(ARViewSession.created_at >= since))
+    
+    # For SQLite compatibility, use a different approach for distinct count
+    try:
+        unique_sessions = await db.execute(
+            select(func.count(text('DISTINCT session_id'))).select_from(ARViewSession).where(ARViewSession.created_at >= since)
+        )
+    except:
+        # Fallback for PostgreSQL
+        unique_sessions = await db.execute(select(func.count(distinct(ARViewSession.session_id))).where(ARViewSession.created_at >= since))
     unique_sessions_count = unique_sessions.scalar() or 0
+    
     active_content = await db.execute(select(func.count()).select_from(ARContent).where(ARContent.status == "active"))
     active_content_count = active_content.scalar() or 0
     
     # Get active companies and projects
-    active_companies = await db.execute(select(func.count()).select_from(Company).where(Company.is_active == True))
+    active_companies = await db.execute(select(func.count()).select_from(Company).where(Company.status == "active"))
     active_companies_count = active_companies.scalar() or 0
     
     active_projects = await db.execute(select(func.count()).select_from(Project).where(Project.status == "active"))
@@ -108,7 +119,7 @@ async def track_ar_session(payload: dict, db: AsyncSession = Depends(get_db)):
         ar_content_id=ac.id,
         project_id=ac.project_id,
         company_id=ac.company_id,
-        session_id=session_uuid,
+        session_id=str(session_uuid),  # Store UUID as string for SQLite compatibility
         user_agent=payload.get("user_agent"),
         device_type=payload.get("device_type"),
         browser=payload.get("browser"),
@@ -144,7 +155,7 @@ async def mobile_session_start(payload: dict, db: AsyncSession = Depends(get_db)
         raise HTTPException(status_code=404, detail="AR content not found")
 
     # idempotency: do not create duplicates for same session_id
-    existing = await db.execute(select(ARViewSession).where(ARViewSession.session_id == session_uuid))
+    existing = await db.execute(select(ARViewSession).where(ARViewSession.session_id == str(session_uuid)))
     if existing.scalar_one_or_none():
         return {"status": "exists", "session_id": str(session_uuid)}
 
@@ -152,7 +163,7 @@ async def mobile_session_start(payload: dict, db: AsyncSession = Depends(get_db)
         ar_content_id=ac.id,
         project_id=ac.project_id,
         company_id=ac.company_id,
-        session_id=session_uuid,
+        session_id=str(session_uuid),  # Store UUID as string for SQLite compatibility
         user_agent=payload.get("user_agent"),
         device_type=payload.get("device_type"),
         browser=payload.get("browser"),
@@ -179,7 +190,7 @@ async def mobile_analytics_update(payload: dict, db: AsyncSession = Depends(get_
     except Exception:
         raise HTTPException(status_code=400, detail="session_id must be UUID")
 
-    res = await db.execute(select(ARViewSession).where(ARViewSession.session_id == session_uuid))
+    res = await db.execute(select(ARViewSession).where(ARViewSession.session_id == str(session_uuid)))
     s = res.scalar_one_or_none()
     if not s:
         raise HTTPException(status_code=404, detail="Session not found")

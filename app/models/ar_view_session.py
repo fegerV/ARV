@@ -17,7 +17,8 @@ class ARViewSession(Base):
     project_id = Column(Integer, ForeignKey("projects.id"), nullable=False)
     company_id = Column(Integer, ForeignKey("companies.id"), nullable=False)
 
-    session_id = Column(UUID(as_uuid=True))
+    # Use String for SQLite compatibility, UUID for PostgreSQL
+    session_id = Column(String(36), nullable=False)  # Store UUID as string for SQLite compatibility
 
     user_agent = Column(String)
     device_type = Column(String(50))

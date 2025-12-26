@@ -298,23 +298,39 @@ def upgrade() -> None:
     op.create_index(op.f('ix_audit_logs_created_at'), 'audit_logs', ['created_at'], unique=False)
     op.create_index(op.f('ix_audit_logs_user_id'), 'audit_logs', ['user_id'], unique=False)
 
-    # Add check constraints
-    op.create_check_constraint(
-        'check_duration_years',
-        'ar_content',
-        'duration_years IN (1, 3, 5)'
-    )
-    op.create_check_constraint(
-        'check_views_count_non_negative',
-        'ar_content',
-        'views_count >= 0'
-    )
+    # Add check constraints (skip for SQLite compatibility)
+    try:
+        op.create_check_constraint(
+            'check_duration_years',
+            'ar_content',
+            'duration_years IN (1, 3, 5)'
+        )
+    except NotImplementedError:
+        # SQLite doesn't support ALTER of constraints
+        pass
+    
+    try:
+        op.create_check_constraint(
+            'check_views_count_non_negative',
+            'ar_content',
+            'views_count >= 0'
+        )
+    except NotImplementedError:
+        # SQLite doesn't support ALTER of constraints
+        pass
 
 
 def downgrade() -> None:
-    # Drop check constraints first
-    op.drop_constraint('check_duration_years', 'ar_content', type_='check')
-    op.drop_constraint('check_views_count_non_negative', 'ar_content', type_='check')
+    # Drop check constraints first (skip for SQLite compatibility)
+    try:
+        op.drop_constraint('check_duration_years', 'ar_content', type_='check')
+    except Exception:
+        pass
+    
+    try:
+        op.drop_constraint('check_views_count_non_negative', 'ar_content', type_='check')
+    except Exception:
+        pass
 
     # Drop tables in reverse order due to foreign key dependencies
     op.drop_table('audit_logs')
