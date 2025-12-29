@@ -4,9 +4,9 @@
         <h2 class="text-lg font-semibold dark:text-white">{% block page_title %}{% endblock %}</h2>
     </div>
     <div class="ml-auto flex items-center space-x-4">
-        <div x-data="darkMode()">
-            <button @click="toggle()" class="text-gray-600 hover:text-gray-700 dark:text-gray-300 dark:hover:text-white">
-                <span class="material-icons" x-text="darkMode ? 'light_mode' : 'dark_mode'"></span>
+        <div x-data>
+            <button @click="$store.darkMode.toggle()" class="text-gray-600 hover:text-gray-700 dark:text-gray-300 dark:hover:text-white">
+                <span class="material-icons" x-text="$store.darkMode.darkMode ? 'light_mode' : 'dark_mode'"></span>
             </button>
         </div>
         {% if current_user %}

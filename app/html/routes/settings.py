@@ -1,8 +1,9 @@
-from fastapi import APIRouter, Depends, HTTPException, Form
-from fastapi.responses import HTMLResponse
+from fastapi import APIRouter, Depends, HTTPException, Form, Request
+from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.html.deps import CurrentActiveUser, get_db
+from app.html.deps import get_html_db
+from app.api.routes.auth import get_current_user_optional
 from app.services.settings_service import SettingsService
 from app.schemas.settings import (
     AllSettings, GeneralSettings, SecuritySettings, StorageSettings,
@@ -19,11 +20,18 @@ templates.env.filters["datetime_format"] = datetime_format
 
 @router.get("/settings", response_class=HTMLResponse)
 async def settings_page(
-    request,
-    current_user=CurrentActiveUser,
-    db: AsyncSession = Depends(get_db)
+    request: Request,
+    current_user=Depends(get_current_user_optional),
+    db: AsyncSession = Depends(get_html_db)
 ):
     """Settings page."""
+    if not current_user:
+        # Redirect to login page if user is not authenticated
+        return RedirectResponse(url="/admin/login", status_code=303)
+    
+    if not current_user.is_active:
+        # Redirect to login page if user is not active
+        return RedirectResponse(url="/admin/login", status_code=303)
     settings_service = SettingsService(db)
     
     try:
@@ -50,9 +58,9 @@ async def settings_page(
 
 @router.post("/settings/general")
 async def update_general_settings(
-    request,
-    current_user=CurrentActiveUser,
-    db: AsyncSession = Depends(get_db),
+    request: Request,
+    current_user=Depends(get_current_user_optional),
+    db: AsyncSession = Depends(get_html_db),
     site_title: str = Form(...),
     admin_email: str = Form(...),
     site_description: str = Form(...),
@@ -62,6 +70,13 @@ async def update_general_settings(
     default_subscription_years: int = Form(1)
 ):
     """Update general settings."""
+    if not current_user:
+        # Redirect to login page if user is not authenticated
+        return RedirectResponse(url="/admin/login", status_code=303)
+    
+    if not current_user.is_active:
+        # Redirect to login page if user is not active
+        return RedirectResponse(url="/admin/login", status_code=303)
     settings_service = SettingsService(db)
     
     try:
@@ -105,17 +120,24 @@ async def update_general_settings(
 
 @router.post("/settings/security")
 async def update_security_settings(
-    request,
-    current_user=CurrentActiveUser,
-    db: AsyncSession = Depends(get_db),
+    request: Request,
+    current_user=Depends(get_current_user_optional),
+    db: AsyncSession = Depends(get_html_db),
     password_min_length: int = Form(...),
     session_timeout: int = Form(...),
     require_2fa: str = Form("off"),
     max_login_attempts: int = Form(5),
-    lockout_duration: int = Form(300),
+    lockout_duration: int = Form(30),
     api_rate_limit: int = Form(100)
 ):
     """Update security settings."""
+    if not current_user:
+        # Redirect to login page if user is not authenticated
+        return RedirectResponse(url="/admin/login", status_code=303)
+    
+    if not current_user.is_active:
+        # Redirect to login page if user is not active
+        return RedirectResponse(url="/admin/login", status_code=303)
     settings_service = SettingsService(db)
     
     try:
@@ -158,9 +180,9 @@ async def update_security_settings(
 
 @router.post("/settings/storage")
 async def update_storage_settings(
-    request,
-    current_user=CurrentActiveUser,
-    db: AsyncSession = Depends(get_db),
+    request: Request,
+    current_user=Depends(get_current_user_optional),
+    db: AsyncSession = Depends(get_html_db),
     default_storage: str = Form(...),
     max_file_size: int = Form(...),
     cdn_enabled: str = Form("off"),
@@ -169,6 +191,13 @@ async def update_storage_settings(
     backup_retention_days: int = Form(30)
 ):
     """Update storage settings."""
+    if not current_user:
+        # Redirect to login page if user is not authenticated
+        return RedirectResponse(url="/admin/login", status_code=303)
+    
+    if not current_user.is_active:
+        # Redirect to login page if user is not active
+        return RedirectResponse(url="/admin/login", status_code=303)
     settings_service = SettingsService(db)
     
     try:
@@ -211,9 +240,9 @@ async def update_storage_settings(
 
 @router.post("/settings/notifications")
 async def update_notification_settings(
-    request,
-    current_user=CurrentActiveUser,
-    db: AsyncSession = Depends(get_db),
+    request: Request,
+    current_user=Depends(get_current_user_optional),
+    db: AsyncSession = Depends(get_html_db),
     email_enabled: str = Form("on"),
     smtp_host: str = Form(""),
     smtp_port: int = Form(587),
@@ -224,6 +253,13 @@ async def update_notification_settings(
     telegram_admin_chat_id: str = Form("")
 ):
     """Update notification settings."""
+    if not current_user:
+        # Redirect to login page if user is not authenticated
+        return RedirectResponse(url="/admin/login", status_code=303)
+    
+    if not current_user.is_active:
+        # Redirect to login page if user is not active
+        return RedirectResponse(url="/admin/login", status_code=303)
     settings_service = SettingsService(db)
     
     try:
@@ -268,9 +304,9 @@ async def update_notification_settings(
 
 @router.post("/settings/api")
 async def update_api_settings(
-    request,
-    current_user=CurrentActiveUser,
-    db: AsyncSession = Depends(get_db),
+    request: Request,
+    current_user=Depends(get_current_user_optional),
+    db: AsyncSession = Depends(get_html_db),
     api_keys_enabled: str = Form("on"),
     webhook_enabled: str = Form("off"),
     webhook_url: str = Form(""),
@@ -278,6 +314,13 @@ async def update_api_settings(
     cors_origins: str = Form("http://localhost:3000,http://localhost:8000")
 ):
     """Update API settings."""
+    if not current_user:
+        # Redirect to login page if user is not authenticated
+        return RedirectResponse(url="/admin/login", status_code=303)
+    
+    if not current_user.is_active:
+        # Redirect to login page if user is not active
+        return RedirectResponse(url="/admin/login", status_code=303)
     settings_service = SettingsService(db)
     
     try:
@@ -322,9 +365,9 @@ async def update_api_settings(
 
 @router.post("/settings/integrations")
 async def update_integration_settings(
-    request,
-    current_user=CurrentActiveUser,
-    db: AsyncSession = Depends(get_db),
+    request: Request,
+    current_user=Depends(get_current_user_optional),
+    db: AsyncSession = Depends(get_html_db),
     google_oauth_enabled: str = Form("off"),
     google_client_id: str = Form(""),
     payment_provider: str = Form("stripe"),
@@ -333,6 +376,13 @@ async def update_integration_settings(
     analytics_provider: str = Form("google")
 ):
     """Update integration settings."""
+    if not current_user:
+        # Redirect to login page if user is not authenticated
+        return RedirectResponse(url="/admin/login", status_code=303)
+    
+    if not current_user.is_active:
+        # Redirect to login page if user is not active
+        return RedirectResponse(url="/admin/login", status_code=303)
     settings_service = SettingsService(db)
     
     try:
@@ -375,9 +425,9 @@ async def update_integration_settings(
 
 @router.post("/settings/ar")
 async def update_ar_settings(
-    request,
-    current_user=CurrentActiveUser,
-    db: AsyncSession = Depends(get_db),
+    request: Request,
+    current_user=Depends(get_current_user_optional),
+    db: AsyncSession = Depends(get_html_db),
     mindar_max_features: int = Form(1000),
     marker_generation_enabled: str = Form("on"),
     thumbnail_quality: int = Form(80),
@@ -386,6 +436,13 @@ async def update_ar_settings(
     qr_code_expiration_days: int = Form(365)
 ):
     """Update AR settings."""
+    if not current_user:
+        # Redirect to login page if user is not authenticated
+        return RedirectResponse(url="/admin/login", status_code=303)
+    
+    if not current_user.is_active:
+        # Redirect to login page if user is not active
+        return RedirectResponse(url="/admin/login", status_code=303)
     settings_service = SettingsService(db)
     
     try:

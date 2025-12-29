@@ -1,4 +1,4 @@
-{% extends "base.html" %}
+{% extends "base_auth.html" %}
 
 {% block title %}Login - Vertex AR Admin{% endblock %}
 
@@ -37,9 +37,9 @@
 
                     <div class="text-sm flex items-center space-x-2">
                         <!-- Theme toggle -->
-                        <button @click="darkMode.toggle()" class="p-2 rounded-md bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600">
-                            <span x-show="!darkMode.darkMode">🌙</span>
-                            <span x-show="darkMode.darkMode">☀️</span>
+                        <button @click="toggleTheme()" class="p-2 rounded-md bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600">
+                            <span x-show="!isDarkMode">🌙</span>
+                            <span x-show="isDarkMode">☀️</span>
                         </button>
                         <a href="#" class="font-medium text-indigo-600 hover:text-indigo-500 dark:text-indigo-400 dark:hover:text-indigo-300">
                             Forgot your password?
@@ -56,4 +56,54 @@
         </div>
     </div>
 </div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    // Theme toggle functionality
+    let isDarkMode = localStorage.getItem('darkMode') === 'true';
+    
+    function toggleTheme() {
+        isDarkMode = !isDarkMode;
+        localStorage.setItem('darkMode', isDarkMode);
+        
+        if (isDarkMode) {
+            document.documentElement.classList.add('dark');
+            document.querySelectorAll('[x-show="!isDarkMode"]').forEach(el => {
+                el.style.display = 'none';
+            });
+            document.querySelectorAll('[x-show="isDarkMode"]').forEach(el => {
+                el.style.display = 'inline';
+            });
+        } else {
+            document.documentElement.classList.remove('dark');
+            document.querySelectorAll('[x-show="!isDarkMode"]').forEach(el => {
+                el.style.display = 'inline';
+            });
+            document.querySelectorAll('[x-show="isDarkMode"]').forEach(el => {
+                el.style.display = 'none';
+            });
+        }
+    }
+
+    // Initialize theme on page load
+    document.addEventListener('DOMContentLoaded', function() {
+        if (isDarkMode) {
+            document.documentElement.classList.add('dark');
+            document.querySelectorAll('[x-show="!isDarkMode"]').forEach(el => {
+                el.style.display = 'none';
+            });
+            document.querySelectorAll('[x-show="isDarkMode"]').forEach(el => {
+                el.style.display = 'inline';
+            });
+        } else {
+            document.querySelectorAll('[x-show="!isDarkMode"]').forEach(el => {
+                el.style.display = 'inline';
+            });
+            document.querySelectorAll('[x-show="isDarkMode"]').forEach(el => {
+                el.style.display = 'none';
+            });
+        }
+    });
+</script>
 {% endblock %}

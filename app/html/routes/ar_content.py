@@ -1,12 +1,13 @@
 from fastapi import APIRouter, Request, Depends
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi.templating import Jinja2Templates
 from app.models.user import User
 from app.api.routes.ar_content import list_all_ar_content, get_ar_content_by_id_legacy
 from app.api.routes.companies import list_companies
 from app.api.routes.projects import list_projects
-from app.html.deps import get_html_db, CurrentActiveUser
+from app.html.deps import get_html_db
+from app.api.routes.auth import get_current_user_optional
 from app.html.mock import MOCK_AR_CONTENT, AR_CONTENT_DETAIL_MOCK_DATA, PROJECT_CREATE_MOCK_DATA
 from app.html.filters import datetime_format
 
@@ -19,10 +20,17 @@ templates.env.filters["datetime_format"] = datetime_format
 @router.get("/ar-content", response_class=HTMLResponse)
 async def ar_content_list(
     request: Request,
-    current_user=CurrentActiveUser,
+    current_user=Depends(get_current_user_optional),
     db: AsyncSession = Depends(get_html_db)
 ):
     """AR Content list page."""
+    if not current_user:
+        # Redirect to login page if user is not authenticated
+        return RedirectResponse(url="/admin/login", status_code=303)
+    
+    if not current_user.is_active:
+        # Redirect to login page if user is not active
+        return RedirectResponse(url="/admin/login", status_code=303)
     try:
         result = await list_all_ar_content(page=1, page_size=10, db=db)
         ar_content_list = [dict(item) for item in result.items]
@@ -53,14 +61,248 @@ async def ar_content_list(
     }
     return templates.TemplateResponse("ar-content/list.html", context)
 
+@router.get("/ar-content/create", response_class=HTMLResponse)
+async def ar_content_create(
+    request: Request,
+    current_user=Depends(get_current_user_optional),
+    db: AsyncSession = Depends(get_html_db)
+):
+    """AR Content create page."""
+    if not current_user:
+        # Redirect to login page if user is not authenticated
+        return RedirectResponse(url="/admin/login", status_code=303)
+    
+    if not current_user.is_active:
+        # Redirect to login page if user is not active
+        return RedirectResponse(url="/admin/login", status_code=303)
+    try:
+        # Query companies and projects directly to avoid user dependency issues
+        from sqlalchemy import select
+        from app.models.company import Company
+        from app.models.project import Project
+        
+        # Get all companies
+        companies_query = select(Company)
+        companies_result = await db.execute(companies_query)
+        companies = []
+        for company in companies_result.scalars().all():
+            companies.append({
+                "id": company.id,
+                "name": company.name,
+                "contact_email": company.contact_email,
+                "status": company.status,
+                "created_at": company.created_at,
+                "updated_at": company.updated_at
+            })
+        
+        # Get all projects
+        projects_query = select(Project)
+        projects_result = await db.execute(projects_query)
+        projects = []
+        for project in projects_result.scalars().all():
+            projects.append({
+                "id": project.id,
+                "name": project.name,
+                "company_id": project.company_id,
+                "status": project.status,
+                "created_at": project.created_at,
+                "updated_at": project.updated_at
+            })
+        
+        data = {
+            "companies": companies,
+            "projects": projects
+        }
+    except Exception:
+        # fallback to mock data
+        data = PROJECT_CREATE_MOCK_DATA
+    
+    # Create safe JavaScript versions of the data
+    companies_js = [
+        {
+            "id": company.get("id"),
+            "name": company.get("name"),
+            "status": company.get("status"),
+            "contact_email": company.get("contact_email"),
+            "created_at": (company.get("created_at").isoformat() if company.get("created_at") and hasattr(company.get("created_at"), "isoformat")
+                          else str(company.get("created_at")) if company.get("created_at") else None),
+            "updated_at": (company.get("updated_at").isoformat() if company.get("updated_at") and hasattr(company.get("updated_at"), "isoformat")
+                          else str(company.get("updated_at")) if company.get("updated_at") else None),
+        }
+        for company in data["companies"]
+    ]
+    
+    projects_js = [
+        {
+            "id": project.get("id"),
+            "name": project.get("name"),
+            "company_id": project.get("company_id"),
+            "status": project.get("status"),
+            "description": project.get("description"),
+            "created_at": (project.get("created_at").isoformat() if project.get("created_at") and hasattr(project.get("created_at"), "isoformat")
+                          else str(project.get("created_at")) if project.get("created_at") else None),
+            "updated_at": (project.get("updated_at").isoformat() if project.get("updated_at") and hasattr(project.get("updated_at"), "isoformat")
+                          else str(project.get("updated_at")) if project.get("updated_at") else None),
+        }
+        for project in data["projects"]
+    ]
+    
+    context = {
+        "request": request,
+        "companies": data["companies"],
+        "projects": data["projects"],
+        "companies_js": companies_js,
+        "projects_js": projects_js,
+        "current_user": current_user
+    }
+    return templates.TemplateResponse("ar-content/form.html", context)
+
+@router.get("/ar-content/{ar_content_id}/edit", response_class=HTMLResponse)
+async def ar_content_edit(
+   ar_content_id: str,
+   request: Request,
+   current_user=Depends(get_current_user_optional),
+   db: AsyncSession = Depends(get_html_db)
+):
+   """AR Content edit page."""
+   if not current_user:
+       # Redirect to login page if user is not authenticated
+       return RedirectResponse(url="/admin/login", status_code=303)
+   
+   if not current_user.is_active:
+       # Redirect to login page if user is not active
+       return RedirectResponse(url="/admin/login", status_code=303)
+   
+   try:
+       # Get the AR content
+       result = await get_ar_content_by_id_legacy(int(ar_content_id), db)
+       
+       # Convert to dict and handle datetime serialization
+       if hasattr(result, 'model_dump'):
+           ar_content = result.model_dump()
+       elif hasattr(result, '__dict__'):
+           ar_content = result.__dict__
+       else:
+           ar_content = dict(result)
+       
+       # Convert datetime objects to strings for template and JSON serialization
+       def convert_datetimes(obj):
+           if isinstance(obj, dict):
+               return {k: convert_datetimes(v) for k, v in obj.items()}
+           elif isinstance(obj, list):
+               return [convert_datetimes(item) for item in obj]
+           elif hasattr(obj, 'isoformat'):  # datetime objects
+               return obj.isoformat()
+           else:
+               return obj
+       
+       ar_content = convert_datetimes(ar_content)
+       
+       # Get companies and projects
+       companies_task = list_companies(page=1, page_size=100, db=db, current_user=current_user)
+       projects_task = list_projects(page=1, page_size=100, db=db, current_user=current_user)
+       
+       import asyncio
+       companies_result, projects_result = await asyncio.gather(
+           companies_task, projects_task, return_exceptions=True
+       )
+       
+       if isinstance(companies_result, Exception):
+           raise companies_result
+       if isinstance(projects_result, Exception):
+           raise projects_result
+           
+       companies = [dict(item) for item in companies_result.items]
+       projects = [dict(item) for item in projects_result.items]
+       
+       # Create safe JavaScript versions of the data
+       companies_js = [
+           {
+               "id": company.get("id"),
+               "name": company.get("name"),
+               "status": company.get("status"),
+               "contact_email": company.get("contact_email"),
+               "created_at": (company.get("created_at").isoformat() if company.get("created_at") and hasattr(company.get("created_at"), "isoformat")
+                             else str(company.get("created_at")) if company.get("created_at") else None),
+               "updated_at": (company.get("updated_at").isoformat() if company.get("updated_at") and hasattr(company.get("updated_at"), "isoformat")
+                             else str(company.get("updated_at")) if company.get("updated_at") else None),
+           }
+           for company in companies
+       ]
+       
+       projects_js = [
+           {
+               "id": project.get("id"),
+               "name": project.get("name"),
+               "company_id": project.get("company_id"),
+               "status": project.get("status"),
+               "description": project.get("description"),
+               "created_at": (project.get("created_at").isoformat() if project.get("created_at") and hasattr(project.get("created_at"), "isoformat")
+                             else str(project.get("created_at")) if project.get("created_at") else None),
+               "updated_at": (project.get("updated_at").isoformat() if project.get("updated_at") and hasattr(project.get("updated_at"), "isoformat")
+                             else str(project.get("updated_at")) if project.get("updated_at") else None),
+           }
+           for project in projects
+       ]
+       
+   except Exception:
+       # fallback to mock data
+       ar_content = {**AR_CONTENT_DETAIL_MOCK_DATA, "id": ar_content_id}
+       companies = PROJECT_CREATE_MOCK_DATA["companies"]
+       projects = PROJECT_CREATE_MOCK_DATA["projects"]
+       
+       # Create safe JavaScript versions of the mock data
+       companies_js = [
+           {
+               "id": company.get("id"),
+               "name": company.get("name"),
+               "status": company.get("status"),
+               "contact_email": company.get("contact_email"),
+               "created_at": str(company.get("created_at")) if company.get("created_at") else None,
+               "updated_at": str(company.get("updated_at")) if company.get("updated_at") else None,
+           }
+           for company in companies
+       ]
+       
+       projects_js = [
+           {
+               "id": project.get("id"),
+               "name": project.get("name"),
+               "company_id": project.get("company_id"),
+               "status": project.get("status"),
+               "description": project.get("description"),
+               "created_at": str(project.get("created_at")) if project.get("created_at") else None,
+               "updated_at": str(project.get("updated_at")) if project.get("updated_at") else None,
+           }
+           for project in projects
+       ]
+   
+   context = {
+       "request": request,
+       "ar_content": ar_content,
+       "companies": companies,
+       "projects": projects,
+       "companies_js": companies_js,
+       "projects_js": projects_js,
+       "current_user": current_user
+   }
+   return templates.TemplateResponse("ar-content/form.html", context)
+
 @router.get("/ar-content/{ar_content_id}", response_class=HTMLResponse)
 async def ar_content_detail(
     ar_content_id: str,
     request: Request,
-    current_user=CurrentActiveUser,
+    current_user=Depends(get_current_user_optional),
     db: AsyncSession = Depends(get_html_db)
 ):
     """AR Content detail page."""
+    if not current_user:
+        # Redirect to login page if user is not authenticated
+        return RedirectResponse(url="/admin/login", status_code=303)
+    
+    if not current_user.is_active:
+        # Redirect to login page if user is not active
+        return RedirectResponse(url="/admin/login", status_code=303)
     try:
         result = await get_ar_content_by_id_legacy(int(ar_content_id), db)
         print(f"🔍 Result type: {type(result)}")
@@ -112,8 +354,8 @@ async def ar_content_detail(
             'views_count': ar_content.get('views_count'),
             'views_30_days': ar_content.get('views_30_days'),
             'active_video_title': ar_content.get('active_video_title'),
-            'created_at': ar_content.get('created_at'),
-            'updated_at': ar_content.get('updated_at')
+            'created_at': ar_content.get('created_at').isoformat() if ar_content.get('created_at') and hasattr(ar_content.get('created_at'), 'isoformat') else ar_content.get('created_at'),
+            'updated_at': ar_content.get('updated_at').isoformat() if ar_content.get('updated_at') and hasattr(ar_content.get('updated_at'), 'isoformat') else ar_content.get('updated_at')
         }
         
         # Debug: check for any remaining datetime objects
@@ -163,8 +405,8 @@ async def ar_content_detail(
             'views_count': ar_content.get('views_count'),
             'views_30_days': ar_content.get('views_30_days'),
             'active_video_title': ar_content.get('active_video_title'),
-            'created_at': ar_content.get('created_at'),
-            'updated_at': ar_content.get('updated_at')
+            'created_at': ar_content.get('created_at').isoformat() if ar_content.get('created_at') and hasattr(ar_content.get('created_at'), 'isoformat') else ar_content.get('created_at'),
+            'updated_at': ar_content.get('updated_at').isoformat() if ar_content.get('updated_at') and hasattr(ar_content.get('updated_at'), 'isoformat') else ar_content.get('updated_at')
         }
     
     context = {
@@ -174,43 +416,3 @@ async def ar_content_detail(
         "current_user": current_user
     }
     return templates.TemplateResponse("ar-content/detail.html", context)
-
-@router.get("/ar-content/create", response_class=HTMLResponse)
-async def ar_content_create(
-    request: Request,
-    current_user=CurrentActiveUser,
-    db: AsyncSession = Depends(get_html_db)
-):
-    """AR Content create page."""
-    try:
-        companies_task = list_companies(page=1, page_size=100, db=db, current_user=current_user)
-        projects_task = list_projects(page=1, page_size=100, db=db, current_user=current_user)
-        
-        import asyncio
-        companies_result, projects_result = await asyncio.gather(
-            companies_task, projects_task, return_exceptions=True
-        )
-        
-        if isinstance(companies_result, Exception):
-            raise companies_result
-        if isinstance(projects_result, Exception):
-            raise projects_result
-            
-        companies = [dict(item) for item in companies_result.items]
-        projects = [dict(item) for item in projects_result.items]
-        
-        data = {
-            "companies": companies,
-            "projects": projects
-        }
-    except Exception:
-        # fallback to mock data
-        data = PROJECT_CREATE_MOCK_DATA
-    
-    context = {
-        "request": request,
-        "companies": data["companies"],
-        "projects": data["projects"],
-        "current_user": current_user
-    }
-    return templates.TemplateResponse("ar-content/form.html", context)

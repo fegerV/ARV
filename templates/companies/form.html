@@ -1,88 +1,56 @@
 {% extends "base.html" %}
 
-{% block title %}{% if company %}Edit Company - Vertex AR Admin{% else %}Create Company - Vertex AR Admin{% endif %}{% endblock %}
+{% block title %}{% if company %}Edit Company - {{ company.name }}{% else %}Create Company{% endif %} - Vertex AR Admin{% endblock %}
 {% block page_title %}{% if company %}Edit Company{% else %}Create Company{% endif %}{% endblock %}
 
 {% block content %}
 <div x-data="companyForm()">
     <div class="max-w-3xl mx-auto">
-        <form :action="formAction" method="post" class="bg-white dark:bg-gray-800 shadow rounded-lg p-6">
-            <div class="grid grid-cols-1 gap-6">
-                <div>
-                    <label for="name" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Company Name</label>
-                    <input type="text" name="name" id="name" 
-                           class="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 py-2 px-3 shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm dark:text-white"
-                           :value="company ? company.name : ''"
-                           x-model="formData.name"
-                           required>
+        <div class="bg-white dark:bg-gray-900 shadow rounded-lg p-6">
+            <form method="POST" action="{% if company %}/companies/{{ company.id }}{% else %}/companies{% endif %}">
+                <div class="space-y-6">
+                    <div>
+                        <label for="name" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Company Name *</label>
+                        <input type="text" name="name" id="name" 
+                               value="{% if company %}{{ company.name }}{% endif %}"
+                               class="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 py-2 px-3 shadow-sm focus:outline-none focus:ring-indigo-50 focus:border-indigo-500 sm:text-sm dark:text-white"
+                               required>
+                    </div>
+                    
+                    <div>
+                        <label for="contact_email" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Contact Email</label>
+                        <input type="email" name="contact_email" id="contact_email" 
+                               value="{% if company %}{{ company.contact_email }}{% endif %}"
+                               class="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 py-2 px-3 shadow-sm focus:outline-none focus:ring-indigo-50 focus:border-indigo-500 sm:text-sm dark:text-white">
+                    </div>
+                    
+                    <div>
+                        <label for="status" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Status</label>
+                        <select name="status" id="status" 
+                                class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 py-2 px-3 shadow-sm focus:outline-none focus:ring-indigo-50 focus:border-indigo-500 sm:text-sm dark:text-white">
+                            <option value="active" {% if not company or company.status == 'active' %}selected{% endif %}>Active</option>
+                            <option value="inactive" {% if company and company.status == 'inactive' %}selected{% endif %}>Inactive</option>
+                        </select>
+                    </div>
                 </div>
                 
-                <div>
-                    <label for="contact_email" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Contact Email</label>
-                    <input type="email" name="contact_email" id="contact_email" 
-                           class="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 py-2 px-3 shadow-sm focus:outline-none focus:ring-indigo-50 focus:border-indigo-500 sm:text-sm dark:text-white"
-                           :value="company ? company.contact_email : ''"
-                           x-model="formData.contact_email"
-                           required>
-                </div>
-                
-                <div>
-                    <label for="storage_provider" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Storage Provider</label>
-                    <select name="storage_provider" id="storage_provider" 
-                            class="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 py-2 px-3 shadow-sm focus:outline-none focus:ring-indigo-50 focus:border-indigo-500 sm:text-sm dark:text-white"
-                            x-model="formData.storage_provider">
-                        <option value="local">Local</option>
-                        <option value="aws_s3">AWS S3</option>
-                        <option value="minio">MinIO</option>
-                        <option value="yandex_disk">Yandex Disk</option>
-                    </select>
-                </div>
-                
-                <div>
-                    <label for="status" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Status</label>
-                    <select name="status" id="status" 
-                            class="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 py-2 px-3 shadow-sm focus:outline-none focus:ring-indigo-50 focus:border-indigo-500 sm:text-sm dark:text-white"
-                            x-model="formData.status">
-                        <option value="active">Active</option>
-                        <option value="inactive">Inactive</option>
-                    </select>
-                </div>
-                
-                <div class="flex justify-end space-x-3">
-                    <a href="/companies" class="inline-flex items-center px-4 py-2 border border-gray-300 dark:border-gray-600 text-sm font-medium rounded-md text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600">
+                <div class="mt-8 flex justify-end space-x-3">
+                    <a href="/companies" class="inline-flex items-center px-4 py-2 border border-gray-30 dark:border-gray-600 shadow-sm text-sm font-medium rounded-md text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
                         Cancel
                     </a>
-                    <button type="submit" 
-                            class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-                            :disabled="!isValid"
-                            :class="{'opacity-50 cursor-not-allowed': !isValid}">
-                        {% if company %}Update{% else %}Create{% endif %} Company
+                    <button type="submit" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                        {% if company %}Update Company{% else %}Create Company{% endif %}
                     </button>
                 </div>
-            </div>
-        </form>
+            </form>
+        </div>
     </div>
 </div>
 
 <script>
 function companyForm() {
     return {
-        formData: {
-            name: '{{ company.name if company else "" }}',
-            contact_email: '{{ company.contact_email if company else "" }}',
-            storage_provider: '{{ company.storage_provider if company else "local" }}',
-            status: '{{ company.status if company else "active" }}'
-        },
-        
-        get formAction() {
-            return this.formData.id ? `/api/companies/${this.formData.id}` : '/api/companies';
-        },
-        
-        get isValid() {
-            return this.formData.name && 
-                   this.formData.contact_email && 
-                   this.formData.contact_email.includes('@');
-        }
+        // Empty for now, but available for future enhancements
     };
 }
 </script>

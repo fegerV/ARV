@@ -5,6 +5,8 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi import APIRouter
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.html.deps import get_html_db, CurrentActiveUser
+from app.api.routes.auth import get_current_user_optional
+from fastapi import HTTPException, status
 from app.api.routes.analytics import analytics_summary
 from app.html.mock import DASHBOARD_MOCK_DATA
 from app.api.routes.auth import get_current_user_optional
@@ -20,8 +22,16 @@ templates.env.filters["datetime_format"] = datetime_format
 async def admin_dashboard(
     request: Request,
     db: AsyncSession = Depends(get_html_db),
-    current_user=CurrentActiveUser,
+    current_user=Depends(get_current_user_optional),
 ):
+    if not current_user:
+        # Redirect to login page if user is not authenticated
+        return RedirectResponse(url="/admin/login", status_code=303)
+    
+    if not current_user.is_active:
+        # Redirect to login page if user is not active
+        return RedirectResponse(url="/admin/login", status_code=303)
+    
     try:
         result = await analytics_summary(db=db)
         dashboard_data = dict(result)

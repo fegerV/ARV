@@ -1,17 +1,17 @@
 {% extends "base.html" %}
 
-{% block title %}{% if ar_content %}Edit AR Content - Vertex AR Admin{% else %}Create AR Content - Vertex AR Admin{% endif %}{% endblock %}
-{% block page_title %}{% if ar_content %}Edit AR Content{% else %}Create AR Content{% endif %}{% endblock %}
+{% block title %}{% if ar_content and ar_content.id %}Edit AR Content - Vertex AR Admin{% else %}Create AR Content - Vertex AR Admin{% endif %}{% endblock %}
+{% block page_title %}{% if ar_content and ar_content.id %}Edit AR Content{% else %}Create AR Content{% endif %}{% endblock %}
 
 {% block content %}
-<div x-data="arContentForm({{ ar_content|tojson if ar_content else '{}' }, {{ companies|tojson }}, {{ projects|tojson }})">
+<div x-data="arContentForm({% if ar_content %}{{ ar_content|tojson }}{% else %}{}{% endif %}, {{ companies_js|tojson }}, {{ projects_js|tojson }})">
     <div class="max-w-4xl mx-auto">
         <!-- Header -->
         <div class="flex justify-between items-center mb-6">
             <h1 class="text-2xl font-bold text-gray-900 dark:text-white">
-                {% if ar_content %}Редактировать AR контент{% else %}Создать AR контент{% endif %}
+                {% if ar_content and ar_content.id %}Редактировать AR контент{% else %}Создать AR контент{% endif %}
             </h1>
-            <a href="/ar-content" class="btn btn-secondary">
+            <a href="{% if ar_content %}/ar-content/{{ ar_content.id }}{% else %}/ar-content{% endif %}" class="btn btn-secondary">
                 <span class="material-icons mr-2">arrow_back</span>Назад
             </a>
         </div>
@@ -158,7 +158,7 @@
                                     </label>
                                     <p class="pl-1" x-show="!videoFile">или перетащите сюда</p>
                                 </div>
-                                <p class="text-xs text-gray-500 dark:text-gray-400">
+                                <p class="text-xs text-gray-50 dark:text-gray-400">
                                     MP4, WebM, MOV до 100MB
                                 </p>
                             </div>
@@ -168,7 +168,7 @@
             </div>
 
             <!-- Status (only for edit) -->
-            <div class="p-6 border-b border-gray-200 dark:border-gray-700" x-show="ar_content && ar_content.id">
+            <div class="p-6 border-b border-gray-200 dark:border-gray-700" x-show="arContent && arContent.id">
                 <h3 class="text-lg font-medium text-gray-900 dark:text-white mb-4">Статус</h3>
                 <div>
                     <label for="status" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
@@ -188,7 +188,7 @@
             <!-- Actions -->
             <div class="p-6 bg-gray-50 dark:bg-gray-700 rounded-b-lg">
                 <div class="flex justify-end space-x-3">
-                    <a href="/ar-content" class="btn btn-secondary">
+                    <a href="{% if ar_content %}/ar-content/{{ ar_content.id }}{% else %}/ar-content{% endif %}" class="btn btn-secondary">
                         Отмена
                     </a>
                     <button type="submit" 
@@ -197,7 +197,7 @@
                             class="btn btn-primary">
                         <span class="material-icons mr-2" x-show="!submitting">save</span>
                         <span class="material-icons mr-2 animate-spin" x-show="submitting">refresh</span>
-                        <span x-show="!submitting">{% if ar_content %}Обновить{% else %}Создать{% endif %} AR контент</span>
+                        <span x-show="!submitting">{% if ar_content and ar_content.id %}Обновить{% else %}Создать{% endif %} AR контент</span>
                         <span x-show="submitting">Сохранение...</span>
                     </button>
                 </div>
@@ -227,7 +227,11 @@ function arContentForm(arContent = {}, companies = [], projects = []) {
         
         get filteredProjects() {
             if (!this.formData.company_id) return [];
-            return this.projects.filter(project => project.company_id == this.formData.company_id);
+            return this.projects.filter(project =>
+                project.company_id &&
+                this.formData.company_id &&
+                String(project.company_id) === String(this.formData.company_id)
+            );
         },
         
         get photoPreview() {
@@ -309,7 +313,7 @@ function arContentForm(arContent = {}, companies = [], projects = []) {
                     // Update existing AR content
                     formData.append('_method', 'PUT');
                     
-                    const response = await fetch(`/api/companies/${this.formData.company_id}/projects/${this.formData.project_id}/ar-content/${this.arContent.id}`, {
+                    const response = await fetch(`/companies/${this.formData.company_id}/projects/${this.formData.project_id}/ar-content/${this.arContent.id}`, {
                         method: 'POST',
                         body: formData
                     });
@@ -322,7 +326,7 @@ function arContentForm(arContent = {}, companies = [], projects = []) {
                     }
                 } else {
                     // Create new AR content
-                    const response = await fetch(`/api/companies/${this.formData.company_id}/projects/${this.formData.project_id}/ar-content`, {
+                    const response = await fetch(`/companies/${this.formData.company_id}/projects/${this.formData.project_id}/ar-content`, {
                         method: 'POST',
                         body: formData
                     });

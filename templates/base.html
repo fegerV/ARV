@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en" x-data="darkMode()" class="h-full">
+<html lang="en" x-data x-init="$store.darkMode.init()" class="h-full">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -169,9 +169,9 @@
     {% include "components/modals.html" %}
     
     <script>
-        // Dark mode functionality
-        function darkMode() {
-            return {
+        // Initialize Alpine.js stores
+        document.addEventListener('alpine:init', () => {
+            Alpine.store('darkMode', {
                 darkMode: localStorage.getItem('darkMode') === 'true',
                 
                 init() {
@@ -190,6 +190,28 @@
                     } else {
                         document.documentElement.classList.remove('dark');
                     }
+                }
+            });
+        });
+        
+        // Dark mode functionality (for backward compatibility)
+        function darkMode() {
+            return {
+                get darkMode() {
+                    return Alpine.store('darkMode').darkMode;
+                },
+                
+                init() {
+                    // Initialize from store
+                    if (Alpine.store('darkMode').darkMode) {
+                        document.documentElement.classList.add('dark');
+                    } else {
+                        document.documentElement.classList.remove('dark');
+                    }
+                },
+                
+                toggle() {
+                    Alpine.store('darkMode').toggle();
                 }
             }
         }

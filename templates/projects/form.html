@@ -1,86 +1,79 @@
 {% extends "base.html" %}
 
-{% block title %}{% if project %}Edit Project - Vertex AR Admin{% else %}Create Project - Vertex AR Admin{% endif %}{% endblock %}
+{% block title %}{% if project %}Edit Project - {{ project.name }}{% else %}Create Project{% endif %} - Vertex AR Admin{% endblock %}
 {% block page_title %}{% if project %}Edit Project{% else %}Create Project{% endif %}{% endblock %}
 
 {% block content %}
 <div x-data="projectForm()">
     <div class="max-w-3xl mx-auto">
-        <form :action="formAction" method="post" class="bg-white dark:bg-gray-800 shadow rounded-lg p-6">
-            <div class="grid grid-cols-1 gap-6">
-                <div>
-                    <label for="name" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Project Name</label>
-                    <input type="text" name="name" id="name" 
-                           class="mt-1 block w-full rounded-md border border-gray-30 dark:border-gray-600 bg-white dark:bg-gray-700 py-2 px-3 shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm dark:text-white"
-                           :value="project ? project.name : ''"
-                           x-model="formData.name"
-                           required>
+        <div class="bg-white dark:bg-gray-900 shadow rounded-lg p-6">
+            {% if error %}
+            <div class="mb-6 bg-red-50 border-red-200 text-red-700 px-4 py-3 rounded relative" role="alert">
+                <strong class="font-bold">Error! </strong>
+                <span class="block sm:inline">{{ error }}</span>
+            </div>
+            {% endif %}
+            
+            <form method="POST" action="{% if project %}/projects/{{ project.id }}{% else %}/projects{% endif %}">
+                <div class="space-y-6">
+                    <div>
+                        <label for="name" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Project Name *</label>
+                        <input type="text" name="name" id="name" 
+                               value="{% if project %}{{ project.name }}{% endif %}"
+                               class="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 py-2 px-3 shadow-sm focus:outline-none focus:ring-indigo-50 focus:border-indigo-500 sm:text-sm dark:text-white"
+                               required>
+                    </div>
+                    
+                    <div>
+                        <label for="company_id" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Company *</label>
+                        <select name="company_id" id="company_id" 
+                                class="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 py-2 px-3 shadow-sm focus:outline-none focus:ring-indigo-50 focus:border-indigo-500 sm:text-sm dark:text-white"
+                                required>
+                            <option value="">Select a company</option>
+                            {% for company in companies %}
+                            <option value="{{ company.id }}" 
+                                    {% if project and project.company_id == company.id %}selected{% endif %}>
+                                {{ company.name }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    
+                    <div>
+                        <label for="status" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Status</label>
+                        <select name="status" id="status" 
+                                class="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 py-2 px-3 shadow-sm focus:outline-none focus:ring-indigo-50 focus:border-indigo-500 sm:text-sm dark:text-white">
+                            <option value="active" {% if not project or project.status == 'active' %}selected{% endif %}>Active</option>
+                            <option value="inactive" {% if project and project.status == 'inactive' %}selected{% endif %}>Inactive</option>
+                            <option value="archived" {% if project and project.status == 'archived' %}selected{% endif %}>Archived</option>
+                        </select>
+                    </div>
+                    
+                    <div>
+                        <label for="description" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Description</label>
+                        <textarea name="description" id="description" 
+                                  rows="4"
+                                  class="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 py-2 px-3 shadow-sm focus:outline-none focus:ring-indigo-50 focus:border-indigo-500 sm:text-sm dark:text-white">{% if project %}{{ project.description }}{% endif %}</textarea>
+                    </div>
                 </div>
                 
-                <div>
-                    <label for="company_id" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Company</label>
-                    <select name="company_id" id="company_id" 
-                            class="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 py-2 px-3 shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm dark:text-white"
-                            x-model="formData.company_id"
-                            required>
-                        <option value="">Select a company</option>
-                        {% for company in companies %}
-                        <option value="{{ company.id }}">{{ company.name }}</option>
-                        {% endfor %}
-                    </select>
-                </div>
-                
-                <div>
-                    <label for="status" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Status</label>
-                    <select name="status" id="status" 
-                            class="mt-1 block w-full rounded-md border border-gray-30 dark:border-gray-600 bg-white dark:bg-gray-700 py-2 px-3 shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm dark:text-white"
-                            x-model="formData.status">
-                        <option value="active">Active</option>
-                        <option value="inactive">Inactive</option>
-                        <option value="archived">Archived</option>
-                    </select>
-                </div>
-                
-                <div>
-                    <label for="description" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Description</label>
-                    <textarea name="description" id="description" rows="3"
-                              class="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 py-2 px-3 shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm dark:text-white"
-                              x-model="formData.description"> {{ project.description if project else "" }}</textarea>
-                </div>
-                
-                <div class="flex justify-end space-x-3">
-                    <a href="/projects" class="inline-flex items-center px-4 py-2 border border-gray-300 dark:border-gray-600 text-sm font-medium rounded-md text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600">
+                <div class="mt-8 flex justify-end space-x-3">
+                    <a href="/projects" class="inline-flex items-center px-4 py-2 border border-gray-300 dark:border-gray-600 shadow-sm text-sm font-medium rounded-md text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
                         Cancel
                     </a>
-                    <button type="submit" 
-                            class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-                            :disabled="!isValid"
-                            :class="{'opacity-50 cursor-not-allowed': !isValid}">
-                        {% if project %}Update{% else %}Create{% endif %} Project
+                    <button type="submit" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-60 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                        {% if project %}Update Project{% else %}Create Project{% endif %}
                     </button>
                 </div>
-            </div>
-        </form>
+            </form>
+        </div>
     </div>
 </div>
 
 <script>
 function projectForm() {
     return {
-        formData: {
-            name: '{{ project.name if project else "" }}',
-            company_id: '{{ project.company_id if project else "" }}',
-            status: '{{ project.status if project else "active" }}',
-            description: '{{ project.description if project else "" }}'
-        },
-        
-        get formAction() {
-            return this.formData.id ? `/api/projects/${this.formData.id}` : '/api/projects';
-        },
-        
-        get isValid() {
-            return this.formData.name && this.formData.company_id;
-        }
+        // Empty for now, but available for future enhancements
     };
 }
 </script>
