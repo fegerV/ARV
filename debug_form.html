@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - Vertex AR Admin</title>
+    
+    <!-- Tailwind CSS from CDN with dark mode configuration -->
+    <script src="https://cdn.tailwindcss.com?plugins=forms,typography,aspect-ratio"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class', // Enable class-based dark mode
+            theme: {
+                extend: {}
+            }
+        }
+    </script>
+    
+    <!-- htmx from CDN -->
+    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+    
+    <!-- Alpine.js from CDN -->
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    
+    <!-- Alpine.js Inter from CDN -->
+    <script defer src="https://cdn.jsdelivr.net/npm/@alpinejs/intersect@3.x/dist/cdn.min.js"></script>
+    
+    <!-- Alpine.js Focus from CDN -->
+    <script defer src="https://cdn.jsdelivr.net/npm/@alpinejs/focus@3.x/dist/cdn.min.js"></script>
+    
+    <style>
+        [x-cloak] { display: none !important; }
+        
+        /* Custom styles for the admin interface */
+        .material-icons {
+            font-family: 'Material Icons';
+            font-weight: normal;
+            font-style: normal;
+            font-size: 24px;
+            line-height: 1;
+            letter-spacing: normal;
+            text-transform: none;
+            display: inline-block;
+            white-space: nowrap;
+            word-wrap: normal;
+            direction: ltr;
+            -webkit-font-feature-settings: 'liga';
+            -webkit-font-smoothing: antialiased;
+        }
+        
+        /* Custom dark mode styles */
+        .dark .bg-gray-50 {
+            background-color: #111827;
+        }
+        
+        .dark .text-gray-900 {
+            color: #f9fafb;
+        }
+        
+        /* Enhanced button styles */
+        .btn {
+            @apply inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500;
+        }
+        
+        .btn-primary {
+            @apply bg-indigo-600 hover:bg-indigo-700 focus:ring-indigo-500;
+        }
+        
+        .btn-secondary {
+            @apply bg-gray-600 hover:bg-gray-700 focus:ring-gray-500;
+        }
+        
+        .btn-danger {
+            @apply bg-red-600 hover:bg-red-700 focus:ring-red-500;
+        }
+        
+        .btn-success {
+            @apply bg-green-600 hover:bg-green-700 focus:ring-green-500;
+        }
+        
+        /* Enhanced table styles */
+        .table {
+            @apply min-w-full divide-y divide-gray-200 dark:divide-gray-700;
+        }
+        
+        .table thead {
+            @apply bg-gray-50 dark:bg-gray-800;
+        }
+        
+        .table th {
+            @apply px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider;
+        }
+        
+        .table td {
+            @apply px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400;
+        }
+        
+        /* Enhanced card styles */
+        .card {
+            @apply bg-white dark:bg-gray-800 shadow rounded-lg p-6;
+        }
+        
+        /* Enhanced form styles */
+        .form-input {
+            @apply block w-full rounded-md border-gray-300 dark:border-gray-600 shadow-sm focus:ring-indigo-50 focus:border-indigo-500 sm:text-sm dark:bg-gray-700 dark:text-white;
+        }
+        
+        .form-select {
+            @apply block w-full rounded-md border-gray-300 dark:border-gray-600 shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm dark:bg-gray-700 dark:text-white;
+        }
+        
+        /* Enhanced modal styles */
+        .modal {
+            @apply fixed inset-0 z-50 overflow-y-auto;
+        }
+        
+        .modal-content {
+            @apply inline-block align-bottom bg-white dark:bg-gray-800 rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full;
+        }
+        
+        /* Enhanced toast styles */
+        .toast {
+            @apply text-white p-4 rounded shadow-lg mb-2 transition-opacity duration-300;
+        }
+    </style>
+    
+    
+</head>
+<body class="min-h-screen bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100">
+    <!-- Main content area without sidebar -->
+    <div class="min-h-screen">
+        <!-- Main content -->
+        <main class="pt-0 pb-8">
+            
+                
+<div class="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 py-12 px-4 sm:px-6 lg:px-8">
+    <div class="max-w-md w-full space-y-8">
+        <div>
+            <h2 class="mt-6 text-center text-3xl font-extrabold text-gray-900 dark:text-white">
+                Sign in to your account
+            </h2>
+            <p class="mt-2 text-center text-sm text-gray-600 dark:text-gray-400">
+                Enter your credentials to access the admin panel
+            </p>
+        </div>
+        <div class="mt-8 bg-white dark:bg-gray-800 py-8 px-4 shadow rounded-lg sm:px-10">
+            <form class="space-y-6" action="/admin/login-form" method="post">
+                <div>
+                    <label for="email" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Email address</label>
+                    <div class="mt-1">
+                        <input id="email" name="username" type="email" autocomplete="email" required class="appearance-none block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm dark:bg-gray-700 dark:text-white">
+                    </div>
+                </div>
+
+                <div>
+                    <label for="password" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Password</label>
+                    <div class="mt-1">
+                        <input id="password" name="password" type="password" autocomplete="current-password" required class="appearance-none block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm dark:bg-gray-700 dark:text-white">
+                    </div>
+                </div>
+
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center">
+                        <input id="remember-me" name="remember-me" type="checkbox" class="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded">
+                        <label for="remember-me" class="ml-2 block text-sm text-gray-900 dark:text-gray-300">Remember me</label>
+                    </div>
+
+                    <div class="text-sm flex items-center space-x-2">
+                        <!-- Theme toggle -->
+                        <button @click="toggleTheme()" class="p-2 rounded-md bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600">
+                            <span x-show="!isDarkMode">🌙</span>
+                            <span x-show="isDarkMode">☀️</span>
+                        </button>
+                        <a href="#" class="font-medium text-indigo-600 hover:text-indigo-500 dark:text-indigo-400 dark:hover:text-indigo-300">
+                            Forgot your password?
+                        </a>
+                    </div>
+                </div>
+
+                <div>
+                    <button type="submit" class="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                        Sign in
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+            
+        </main>
+    </div>
+    
+    <!-- Include toast component -->
+    <!-- Toast Notification System -->
+<div id="toast-container" class="fixed top-4 right-4 z-50 space-y-2"></div>
+    
+    <!-- Include modal component -->
+    <!-- Modal System -->
+<div id="modal-container" class="fixed inset-0 z-50 overflow-y-auto" style="display: none;">
+    <div class="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
+        <div class="fixed inset-0 transition-opacity" aria-hidden="true">
+            <div class="absolute inset-0 bg-gray-500 opacity-75" onclick="closeModal()"></div>
+        </div>
+        <span class="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
+        <div id="modal-content" class="inline-block align-bottom bg-white dark:bg-gray-800 rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+            <div id="modal-body" class="p-6"></div>
+            <div class="bg-gray-50 dark:bg-gray-700 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                <button type="button" class="btn btn-primary" onclick="closeModal()">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+    
+    <script>
+        
+        // Toast notification functions
+        function showToast(message, type = 'info') {
+            const toastId = 'toast-' + Date.now();
+            const toastClass = type === 'error' ? 'bg-red-500' : 
+                              type === 'success' ? 'bg-green-500' : 
+                              type === 'warning' ? 'bg-yellow-500' : 'bg-blue-500';
+            
+            const toast = document.createElement('div');
+            toast.id = toastId;
+            toast.className = `toast ${toastClass} text-white p-4 rounded shadow-lg mb-2 transition-opacity duration-300`;
+            toast.innerHTML = `
+                <div class="flex items-center justify-between">
+                    <span>${message}</span>
+                    <button onclick="removeToast('${toastId}')" class="ml-4 text-white">×</button>
+                </div>
+            `;
+            
+            document.getElementById('toast-container').appendChild(toast);
+            
+            // Auto remove after 5 seconds
+            setTimeout(() => {
+                removeToast(toastId);
+            }, 5000);
+        }
+        
+        function removeToast(toastId) {
+            const toast = document.getElementById(toastId);
+            if (toast) {
+                toast.style.opacity = '0';
+                setTimeout(() => {
+                    toast.remove();
+                }, 300);
+            }
+        }
+        
+        // Modal functions
+        function showModal(content) {
+            document.getElementById('modal-body').innerHTML = content;
+            document.getElementById('modal-container').style.display = 'block';
+        }
+        
+        function closeModal() {
+            document.getElementById('modal-container').style.display = 'none';
+        }
+        
+        // Form submission with htmx
+        function submitForm(url, data, method = 'POST') {
+            const element = document.createElement('div');
+            element.setAttribute('hx-' + method.toLowerCase(), url);
+            element.setAttribute('hx-headers', JSON.stringify(data));
+            element.setAttribute('hx-target', 'body');
+            element.setAttribute('hx-swap', 'innerHTML');
+            
+            htmx.process(element);
+            element.click();
+        }
+    </script>
+    
+    
+<script>
+    // Theme toggle functionality
+    let isDarkMode = localStorage.getItem('darkMode') === 'true';
+    
+    function toggleTheme() {
+        isDarkMode = !isDarkMode;
+        localStorage.setItem('darkMode', isDarkMode);
+        
+        if (isDarkMode) {
+            document.documentElement.classList.add('dark');
+            document.querySelectorAll('[x-show="!isDarkMode"]').forEach(el => {
+                el.style.display = 'none';
+            });
+            document.querySelectorAll('[x-show="isDarkMode"]').forEach(el => {
+                el.style.display = 'inline';
+            });
+        } else {
+            document.documentElement.classList.remove('dark');
+            document.querySelectorAll('[x-show="!isDarkMode"]').forEach(el => {
+                el.style.display = 'inline';
+            });
+            document.querySelectorAll('[x-show="isDarkMode"]').forEach(el => {
+                el.style.display = 'none';
+            });
+        }
+    }
+
+    // Initialize theme on page load
+    document.addEventListener('DOMContentLoaded', function() {
+        if (isDarkMode) {
+            document.documentElement.classList.add('dark');
+            document.querySelectorAll('[x-show="!isDarkMode"]').forEach(el => {
+                el.style.display = 'none';
+            });
+            document.querySelectorAll('[x-show="isDarkMode"]').forEach(el => {
+                el.style.display = 'inline';
+            });
+        } else {
+            document.querySelectorAll('[x-show="!isDarkMode"]').forEach(el => {
+                el.style.display = 'inline';
+            });
+            document.querySelectorAll('[x-show="isDarkMode"]').forEach(el => {
+                el.style.display = 'none';
+            });
+        }
+    });
+</script>
+
+</body>
+</html>
