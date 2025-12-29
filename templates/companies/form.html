@@ -13,7 +13,7 @@
                         <label for="name" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Company Name *</label>
                         <input type="text" name="name" id="name" 
                                value="{% if company %}{{ company.name }}{% endif %}"
-                               class="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 py-2 px-3 shadow-sm focus:outline-none focus:ring-indigo-50 focus:border-indigo-500 sm:text-sm dark:text-white"
+                               class="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 py-2 px-3 shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm dark:text-white"
                                required>
                     </div>
                     
@@ -21,13 +21,13 @@
                         <label for="contact_email" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Contact Email</label>
                         <input type="email" name="contact_email" id="contact_email" 
                                value="{% if company %}{{ company.contact_email }}{% endif %}"
-                               class="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 py-2 px-3 shadow-sm focus:outline-none focus:ring-indigo-50 focus:border-indigo-500 sm:text-sm dark:text-white">
+                               class="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 py-2 px-3 shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm dark:text-white">
                     </div>
                     
                     <div>
                         <label for="status" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Status</label>
                         <select name="status" id="status" 
-                                class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 py-2 px-3 shadow-sm focus:outline-none focus:ring-indigo-50 focus:border-indigo-500 sm:text-sm dark:text-white">
+                                class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 py-2 px-3 shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm dark:text-white">
                             <option value="active" {% if not company or company.status == 'active' %}selected{% endif %}>Active</option>
                             <option value="inactive" {% if company and company.status == 'inactive' %}selected{% endif %}>Inactive</option>
                         </select>

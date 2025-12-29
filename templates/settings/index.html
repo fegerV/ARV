@@ -11,7 +11,7 @@
                 <div>
                     <label for="site_title" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Site Title</label>
                     <input type="text" name="site_title" id="site_title" 
-                           class="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 py-2 px-3 shadow-sm focus:outline-none focus:ring-indigo-50 focus:border-indigo-500 sm:text-sm dark:text-white"
+                           class="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 py-2 px-3 shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm dark:text-white"
                            x-model="settings.site_title"
                            :value="settings.site_title">
                 </div>
@@ -19,7 +19,7 @@
                 <div>
                     <label for="admin_email" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Admin Email</label>
                     <input type="email" name="admin_email" id="admin_email" 
-                           class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 py-2 px-3 shadow-sm focus:outline-none focus:ring-indigo-50 focus:border-indigo-500 sm:text-sm dark:text-white"
+                           class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 py-2 px-3 shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm dark:text-white"
                            x-model="settings.admin_email"
                            :value="settings.admin_email">
                 </div>
@@ -27,14 +27,14 @@
                 <div class="md:col-span-2">
                     <label for="site_description" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Site Description</label>
                     <textarea name="site_description" id="site_description" rows="3"
-                              class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 py-2 px-3 shadow-sm focus:outline-none focus:ring-indigo-50 focus:border-indigo-500 sm:text-sm dark:text-white"
+                              class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 py-2 px-3 shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm dark:text-white"
                               x-model="settings.site_description">{{ settings.site_description }}</textarea>
                 </div>
                 
                 <div>
                     <label for="password_min_length" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Minimum Password Length</label>
                     <input type="number" name="password_min_length" id="password_min_length" min="6" max="128"
-                           class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 py-2 px-3 shadow-sm focus:outline-none focus:ring-indigo-50 focus:border-indigo-500 sm:text-sm dark:text-white"
+                           class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 py-2 px-3 shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm dark:text-white"
                            x-model="settings.password_min_length"
                            :value="settings.password_min_length">
                 </div>
