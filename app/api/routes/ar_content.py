@@ -252,7 +252,7 @@ async def _create_ar_content(
     # For now, we'll assume the files are within limits
     
     # Generate unique identifier
-    unique_id = uuid4()
+    unique_id = str(uuid4())
     
     # Generate order number
     order_number = generate_order_number()

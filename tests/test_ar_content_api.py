@@ -90,7 +90,7 @@ async def test_list_ar_content_with_data(async_client: AsyncClient, db: AsyncSes
     # Create sample AR content
     ar_content = ARContent(
         project_id=sample_project.id,
-        unique_id=uuid.uuid4(),
+        unique_id=str(uuid.uuid4()),
         order_number="AR-20250624-0001",
         customer_name="John Doe",
         customer_email="john@example.com",
@@ -125,7 +125,7 @@ async def test_list_ar_content_with_filters(async_client: AsyncClient, db: Async
     for i in range(3):
         ar_content = ARContent(
             project_id=sample_project.id,
-            unique_id=uuid.uuid4(),
+            unique_id=str(uuid.uuid4()),
             order_number=f"AR-20250624-{i+1:04d}",
             customer_name=f"Customer {i+1}",
             customer_email=f"customer{i+1}@example.com",
@@ -249,7 +249,7 @@ async def test_get_ar_content_details(async_client: AsyncClient, db: AsyncSessio
     # Create sample AR content
     ar_content = ARContent(
         project_id=sample_project.id,
-        unique_id=uuid.uuid4(),
+        unique_id=str(uuid.uuid4()),
         order_number="AR-20250624-0001",
         customer_name="John Doe",
         customer_email="john@example.com",
@@ -296,7 +296,7 @@ async def test_update_ar_content(async_client: AsyncClient, db: AsyncSession, sa
     # Create sample AR content
     ar_content = ARContent(
         project_id=sample_project.id,
-        unique_id=uuid.uuid4(),
+        unique_id=str(uuid.uuid4()),
         order_number="AR-20250624-0001",
         customer_name="John Doe",
         customer_email="john@example.com",
@@ -334,7 +334,7 @@ async def test_upload_ar_content_video(async_client: AsyncClient, db: AsyncSessi
     # Create sample AR content
     ar_content = ARContent(
         project_id=sample_project.id,
-        unique_id=uuid.uuid4(),
+        unique_id=str(uuid.uuid4()),
         order_number="AR-20250624-0001"
     )
     db.add(ar_content)
@@ -377,7 +377,7 @@ async def test_upload_ar_content_video_invalid_type(async_client: AsyncClient, d
     # Create sample AR content
     ar_content = ARContent(
         project_id=sample_project.id,
-        unique_id=uuid.uuid4(),
+        unique_id=str(uuid.uuid4()),
         order_number="AR-20250624-0001"
     )
     db.add(ar_content)
@@ -403,7 +403,7 @@ async def test_set_active_video(async_client: AsyncClient, db: AsyncSession, sam
     # Create sample AR content and video
     ar_content = ARContent(
         project_id=sample_project.id,
-        unique_id=uuid.uuid4(),
+        unique_id=str(uuid.uuid4()),
         order_number="AR-20250624-0001"
     )
     db.add(ar_content)
@@ -432,7 +432,7 @@ async def test_delete_ar_content_video(async_client: AsyncClient, db: AsyncSessi
     # Create sample AR content and multiple videos
     ar_content = ARContent(
         project_id=sample_project.id,
-        unique_id=uuid.uuid4(),
+        unique_id=str(uuid.uuid4()),
         order_number="AR-20250624-0001"
     )
     db.add(ar_content)
@@ -475,7 +475,7 @@ async def test_delete_last_video_fails(async_client: AsyncClient, db: AsyncSessi
     # Create sample AR content with single video
     ar_content = ARContent(
         project_id=sample_project.id,
-        unique_id=uuid.uuid4(),
+        unique_id=str(uuid.uuid4()),
         order_number="AR-20250624-0001"
     )
     db.add(ar_content)
@@ -500,7 +500,7 @@ async def test_delete_ar_content(async_client: AsyncClient, db: AsyncSession, sa
     # Create sample AR content
     ar_content = ARContent(
         project_id=sample_project.id,
-        unique_id=uuid.uuid4(),
+        unique_id=str(uuid.uuid4()),
         order_number="AR-20250624-0001"
     )
     db.add(ar_content)
@@ -523,7 +523,7 @@ async def test_list_ar_content_videos(async_client: AsyncClient, db: AsyncSessio
     # Create sample AR content
     ar_content = ARContent(
         project_id=sample_project.id,
-        unique_id=uuid.uuid4(),
+        unique_id=str(uuid.uuid4()),
         order_number="AR-20250624-0001"
     )
     db.add(ar_content)

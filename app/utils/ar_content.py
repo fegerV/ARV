@@ -1,7 +1,6 @@
 """
 AR Content utilities for storage paths and QR code generation.
 """
-import uuid
 from pathlib import Path
 from typing import Optional
 import qrcode
@@ -14,7 +13,7 @@ from app.core.config import settings
 from app.core.storage import get_storage_provider_instance
 
 
-def build_ar_content_storage_path(company_id: int, project_id: int, unique_id: uuid.UUID) -> Path:
+def build_ar_content_storage_path(company_id: int, project_id: int, unique_id: str) -> Path:
     """Build the storage path for AR content following the new hierarchy.
     
     Args:
@@ -54,7 +53,7 @@ def build_public_url(storage_path: Path) -> str:
         return f"/storage/{storage_path.name}"
 
 
-def build_unique_link(unique_id: uuid.UUID) -> str:
+def build_unique_link(unique_id: str) -> str:
     """Build the unique public link for AR content.
     
     Args:
@@ -66,7 +65,7 @@ def build_unique_link(unique_id: uuid.UUID) -> str:
     return f"/view/{unique_id}"
 
 
-async def generate_qr_code(unique_id: uuid.UUID, storage_path: Path) -> str:
+async def generate_qr_code(unique_id: str, storage_path: Path) -> str:
     """Generate QR code for AR content and save it to storage.
     
     Args:

@@ -343,7 +343,7 @@ async def create_ar_content(
         raise HTTPException(status_code=400, detail="Project does not belong to company")
     
     # Generate unique identifiers
-    unique_id = uuid.uuid4()
+    unique_id = str(uuid.uuid4())
     order_number = await generate_order_number(db)
     
     # Build storage path
