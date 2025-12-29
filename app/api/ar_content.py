@@ -343,7 +343,7 @@ async def create_ar_content(
         raise HTTPException(status_code=400, detail="Project does not belong to company")
     
     # Generate unique identifiers
-    unique_id = uuid.uuid4()
+    unique_id = str(uuid.uuid4())
     order_number = await generate_order_number(db)
     
     # Build storage path
@@ -641,7 +641,7 @@ async def upload_ar_content_video(
     storage_path = build_ar_content_storage_path(company.id, str(project.id), ar_content.unique_id)
     
     # Save video
-    video_filename = f"video_{uuid.uuid4()}{Path(video_file.filename).suffix}"
+    video_filename = f"video_{str(uuid.uuid4())}{Path(video_file.filename).suffix}"
     video_path = storage_path / video_filename
     await save_uploaded_file(video_file, video_path)
     
