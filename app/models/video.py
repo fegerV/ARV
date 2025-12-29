@@ -21,7 +21,6 @@ class Video(Base):
     video_url = Column(String(500), nullable=True)
 
     thumbnail_path = Column(String(500), nullable=True)
-    thumbnail_url = Column(String(500), nullable=True)
     preview_url = Column(String(500), nullable=True)
     
     # Video metadata
