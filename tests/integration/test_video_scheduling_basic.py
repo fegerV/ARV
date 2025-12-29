@@ -51,7 +51,7 @@ class TestVideoSchedulingBasic:
         ar_content = ARContent(
             company_id=1,
             project_id=1,
-            unique_id=uuid.uuid4(),
+            unique_id=str(uuid.uuid4()),
             name="Test AR Content",
             created_at=datetime.utcnow(),
             updated_at=datetime.utcnow()
@@ -105,7 +105,7 @@ class TestVideoSchedulingBasic:
         ar_content = ARContent(
             company_id=1,
             project_id=1,
-            unique_id=uuid.uuid4(),
+            unique_id=str(uuid.uuid4()),
             name="Test AR Content",
             created_at=datetime.utcnow(),
             updated_at=datetime.utcnow()
@@ -169,7 +169,7 @@ class TestVideoSchedulingBasic:
         ar_content = ARContent(
             company_id=1,
             project_id=1,
-            unique_id=uuid.uuid4(),
+            unique_id=str(uuid.uuid4()),
             name="Test AR Content",
             created_at=datetime.utcnow(),
             updated_at=datetime.utcnow()
@@ -225,7 +225,7 @@ class TestVideoSchedulingBasic:
         ar_content = ARContent(
             company_id=1,
             project_id=1,
-            unique_id=uuid.uuid4(),
+            unique_id=str(uuid.uuid4()),
             name="Test AR Content",
             created_at=datetime.utcnow(),
             updated_at=datetime.utcnow()

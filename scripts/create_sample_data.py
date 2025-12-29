@@ -145,7 +145,7 @@ async def create_sample_data():
                 num_content = random.randint(3, 5)
                 
                 for k in range(num_content):
-                    unique_id = uuid4()
+                    unique_id = str(uuid4())
                     order_number = f"ORD-{content_counter:04d}"
                     
                     # Create directory structure for this AR content
