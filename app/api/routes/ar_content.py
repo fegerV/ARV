@@ -617,9 +617,7 @@ async def get_ar_content(
     content_data.project_id = ar_content.project_id
     # Set storage path
     from app.utils.ar_content import build_ar_content_storage_path
-    import uuid
-    unique_id = uuid.UUID(str(ar_content.unique_id))
-    storage_path = build_ar_content_storage_path(ar_content.company_id, ar_content.project_id, unique_id)
+    storage_path = build_ar_content_storage_path(ar_content.company_id, ar_content.project_id, ar_content.unique_id)
     content_data.storage_path = str(storage_path)
     # Set company and project names
     if ar_content.company:
@@ -774,9 +772,7 @@ async def get_ar_content_by_id(
     content_data.project_id = ar_content.project_id
     # Set storage path
     from app.utils.ar_content import build_ar_content_storage_path
-    import uuid
-    unique_id = uuid.UUID(str(ar_content.unique_id))
-    storage_path = build_ar_content_storage_path(ar_content.company_id, ar_content.project_id, unique_id)
+    storage_path = build_ar_content_storage_path(ar_content.company_id, ar_content.project_id, ar_content.unique_id)
     content_data.storage_path = str(storage_path)
     # Set company and project names
     if ar_content.company:
@@ -853,8 +849,8 @@ async def get_ar_viewer(unique_id: str, db: AsyncSession = Depends(get_db)):
         # Validate UUID format
         parsed_uuid = UUID(unique_id)
         
-        # Find AR content by unique_id
-        stmt = select(ARContent).where(ARContent.unique_id == parsed_uuid)
+        # Find AR content by unique_id (using string directly since model expects string)
+        stmt = select(ARContent).where(ARContent.unique_id == unique_id)
         result = await db.execute(stmt)
         ar_content = result.scalar()
         
@@ -960,10 +956,11 @@ async def get_ar_viewer(unique_id: str, db: AsyncSession = Depends(get_db)):
 async def get_ar_marker(unique_id: str, db: AsyncSession = Depends(get_db)):
     """Get AR marker file by unique_id"""
     try:
+        # Validate UUID format
         parsed_uuid = UUID(unique_id)
         
-        # Find AR content by unique_id
-        stmt = select(ARContent).where(ARContent.unique_id == parsed_uuid)
+        # Find AR content by unique_id (using string directly since model expects string)
+        stmt = select(ARContent).where(ARContent.unique_id == unique_id)
         result = await db.execute(stmt)
         ar_content = result.scalar()
         
@@ -986,10 +983,11 @@ async def get_ar_marker(unique_id: str, db: AsyncSession = Depends(get_db)):
 async def get_ar_image(unique_id: str, db: AsyncSession = Depends(get_db)):
     """Get AR target image by unique_id"""
     try:
+        # Validate UUID format
         parsed_uuid = UUID(unique_id)
         
-        # Find AR content by unique_id
-        stmt = select(ARContent).where(ARContent.unique_id == parsed_uuid)
+        # Find AR content by unique_id (using string directly since model expects string)
+        stmt = select(ARContent).where(ARContent.unique_id == unique_id)
         result = await db.execute(stmt)
         ar_content = result.scalar()
         
