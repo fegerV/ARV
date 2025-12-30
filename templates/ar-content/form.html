@@ -279,18 +279,46 @@
             <!-- Actions -->
             <div class="p-6 bg-gray-50 dark:bg-gray-700 rounded-b-lg">
                 <div class="flex justify-end space-x-3">
-                    <a href="{% if ar_content %}/ar-content/{{ ar_content.id }}{% else %}/ar-content{% endif %}" class="btn btn-secondary">
+                    <a href="{% if ar_content %}/ar-content/{{ ar_content.id }}{% else %}/ar-content{% endif %}" 
+                       class="btn btn-secondary inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-gray-600 hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 dark:bg-gray-600 dark:hover:bg-gray-700">
+                        <span class="material-icons mr-2">close</span>
                         Отмена
                     </a>
                     <button type="submit" 
                             :disabled="!isValid || submitting"
                             :class="{'opacity-50 cursor-not-allowed': !isValid || submitting}"
-                            class="btn btn-primary">
+                            class="btn btn-primary inline-flex items-center px-6 py-3 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed dark:bg-indigo-600 dark:hover:bg-indigo-700">
                         <span class="material-icons mr-2" x-show="!submitting">save</span>
                         <span class="material-icons mr-2 animate-spin" x-show="submitting">refresh</span>
                         <span x-show="!submitting">{% if ar_content and ar_content.id %}Обновить{% else %}Создать{% endif %} AR контент</span>
                         <span x-show="submitting">Сохранение...</span>
                     </button>
+                </div>
+                
+                <!-- Debug information -->
+                <div x-show="!isValid" class="mt-4 p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-md">
+                    <p class="text-sm text-yellow-800 dark:text-yellow-200 mb-2">
+                        <span class="material-icons text-sm mr-1">info</span>
+                        Пожалуйста, заполните все обязательные поля:
+                    </p>
+                    <ul class="text-xs text-yellow-700 dark:text-yellow-300 list-disc list-inside">
+                        <li x-show="!formData.company_id">Компания</li>
+                        <li x-show="!formData.project_id">Проект</li>
+                        <li x-show="!formData.customer_name">Имя заказчика</li>
+                        <li x-show="!formData.duration_years">Период действия</li>
+                        <li x-show="!arContent || !arContent.id">
+                            <span x-show="!formData.photo_file">Портрет (изображение)</span>
+                            <span x-show="!formData.video_file">Видео</span>
+                        </li>
+                    </ul>
+                </div>
+                
+                <!-- Development helper - remove in production -->
+                <div x-show="canSubmitWithoutFiles && !isValid" class="mt-2 p-2 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-md">
+                    <p class="text-xs text-blue-700 dark:text-blue-300">
+                        <span class="material-icons text-xs mr-1">bug_report</span>
+                        Для тестирования: загрузите изображения и видео, чтобы активировать кнопку создания
+                    </p>
                 </div>
             </div>
         </form>
@@ -474,6 +502,14 @@ function arContentForm(arContent = {}, companies = [], projects = []) {
     // Store instance globally for child components
     window.arContentFormInstance = this;
     
+    console.log('Initializing AR Content Form with data:', {
+        arContent,
+        companies: companies.length,
+        projects: projects.length,
+        companiesData: companies,
+        projectsData: projects
+    });
+    
     return {
         arContent: arContent,
         companies: companies,
@@ -493,23 +529,52 @@ function arContentForm(arContent = {}, companies = [], projects = []) {
         
         get filteredProjects() {
             if (!this.formData.company_id) return [];
-            return this.projects.filter(project => {
-                // Convert both to strings for comparison to handle type mismatches
+            
+            console.log('Filtering projects for company:', this.formData.company_id);
+            console.log('Available projects:', this.projects);
+            
+            const filtered = this.projects.filter(project => {
+                // Handle both string and integer company_id comparisons
                 const projectCompanyId = String(project.company_id);
                 const selectedCompanyId = String(this.formData.company_id);
-                return projectCompanyId === selectedCompanyId;
+                const matches = projectCompanyId === selectedCompanyId;
+                
+                if (matches) {
+                    console.log('Project matches:', project.name, 'company_id:', project.company_id);
+                }
+                
+                return matches;
             });
+            
+            console.log('Filtered projects:', filtered);
+            return filtered;
         },
         
         get isValid() {
             // Для новых записей требуем наличие файлов
             if (!this.arContent || !this.arContent.id) {
-                return this.formData.company_id &&
+                const hasBasicFields = this.formData.company_id &&
                        this.formData.project_id &&
                        this.formData.customer_name &&
-                       this.formData.duration_years &&
-                       this.formData.photo_file &&
-                       this.formData.video_file;
+                       this.formData.duration_years;
+                       
+                const hasFiles = this.formData.photo_file && this.formData.video_file;
+                
+                const isValid = hasBasicFields && hasFiles;
+                
+                console.log('Validation check:', {
+                    company_id: this.formData.company_id,
+                    project_id: this.formData.project_id,
+                    customer_name: this.formData.customer_name,
+                    duration_years: this.formData.duration_years,
+                    photo_file: this.formData.photo_file,
+                    video_file: this.formData.video_file,
+                    hasBasicFields,
+                    hasFiles,
+                    isValid: isValid
+                });
+                
+                return isValid;
             } else {
                 // Для редактирования разрешаем сохранение без новых файлов, если уже есть существующие
                 const hasPhoto = this.formData.photo_file || (this.arContent && this.arContent.photo_url);
@@ -522,6 +587,14 @@ function arContentForm(arContent = {}, companies = [], projects = []) {
                        hasPhoto &&
                        hasVideo;
             }
+        },
+        
+        get canSubmitWithoutFiles() {
+            // Allow form submission without files for testing/debugging
+            return this.formData.company_id &&
+                   this.formData.project_id &&
+                   this.formData.customer_name &&
+                   this.formData.duration_years;
         },
         
         updateProjects() {

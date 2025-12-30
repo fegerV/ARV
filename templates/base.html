@@ -180,7 +180,7 @@
             @apply bg-gray-700 text-white;
         }
         
-        /* Ensure dropdowns are visible in dark mode */
+        /* Ensure dropdowns are visible in dark mode - Higher specificity */
         .dark select {
             background-color: #374151 !important;
             color: #f9fafb !important;
@@ -188,6 +188,24 @@
         }
         
         .dark select option {
+            background-color: #374151 !important;
+            color: #f9fafb !important;
+        }
+        
+        /* Additional specific selectors for dropdown options */
+        .dark .form-select option,
+        .dark .form-input option,
+        .dark select.form-select option,
+        .dark select.form-input option {
+            background-color: #374151 !important;
+            color: #f9fafb !important;
+        }
+        
+        /* Force dark mode styling for all select elements and options */
+        .dark select,
+        .dark select *,
+        .dark option,
+        .dark optgroup {
             background-color: #374151 !important;
             color: #f9fafb !important;
         }
