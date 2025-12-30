@@ -97,6 +97,33 @@
             @apply bg-green-600 hover:bg-green-700 focus:ring-green-500;
         }
         
+        /* Dark mode button fixes */
+        .dark .btn {
+            @apply text-white;
+        }
+        
+        .dark .btn-primary {
+            @apply bg-indigo-600 hover:bg-indigo-700;
+        }
+        
+        .dark .btn-secondary {
+            @apply bg-gray-600 hover:bg-gray-700;
+        }
+        
+        .dark .btn-danger {
+            @apply bg-red-600 hover:bg-red-700;
+        }
+        
+        .dark .btn-success {
+            @apply bg-green-600 hover:bg-green-700;
+        }
+        
+        /* Disabled button styles for dark mode */
+        .dark .btn:disabled,
+        .dark .btn.opacity-50 {
+            @apply opacity-50 cursor-not-allowed bg-gray-600;
+        }
+        
         /* Enhanced table styles */
         .table {
             @apply min-w-full divide-y divide-gray-200 dark:divide-gray-700;
@@ -137,6 +164,32 @@
         select.form-input option,
         select.form-select option {
             @apply dark:bg-gray-700 dark:text-white;
+        }
+        
+        /* Additional dark mode fixes for form elements */
+        .dark .form-input {
+            @apply bg-gray-700 text-white border-gray-600 placeholder-gray-400;
+        }
+        
+        .dark .form-select {
+            @apply bg-gray-700 text-white border-gray-600;
+        }
+        
+        .dark select.form-input option,
+        .dark select.form-select option {
+            @apply bg-gray-700 text-white;
+        }
+        
+        /* Ensure dropdowns are visible in dark mode */
+        .dark select {
+            background-color: #374151 !important;
+            color: #f9fafb !important;
+            border-color: #4b5563 !important;
+        }
+        
+        .dark select option {
+            background-color: #374151 !important;
+            color: #f9fafb !important;
         }
         
         /* Enhanced modal styles */

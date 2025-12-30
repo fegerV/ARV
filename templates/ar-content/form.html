@@ -26,7 +26,7 @@
                             Компания <span class="text-red-500">*</span>
                         </label>
                         <select name="company_id" id="company_id" 
-                                class="form-input"
+                                class="form-select"
                                 x-model="formData.company_id"
                                 @change="updateProjects"
                                 required>
@@ -42,7 +42,7 @@
                             Проект <span class="text-red-500">*</span>
                         </label>
                         <select name="project_id" id="project_id" 
-                                class="form-input"
+                                class="form-select"
                                 x-model="formData.project_id"
                                 required>
                             <option value="">Выберите проект</option>
@@ -98,7 +98,7 @@
                         Период действия <span class="text-red-500">*</span>
                     </label>
                     <select name="duration_years" id="duration_years" 
-                            class="form-input"
+                            class="form-select"
                             x-model="formData.duration_years"
                             required>
                         <option value="1">1 год</option>
@@ -266,7 +266,7 @@
                         Статус заказа
                     </label>
                     <select name="status" id="status" 
-                            class="form-input"
+                            class="form-select"
                             x-model="formData.status">
                         <option value="pending">В ожидании</option>
                         <option value="processing">В обработке</option>
@@ -497,78 +497,36 @@ function arContentForm(arContent = {}, companies = [], projects = []) {
                 // Convert both to strings for comparison to handle type mismatches
                 const projectCompanyId = String(project.company_id);
                 const selectedCompanyId = String(this.formData.company_id);
-                console.log(`Filtering project: ${project.name} (company_id: ${projectCompanyId}) vs selected: ${selectedCompanyId}`);
-                return project.company_id && this.formData.company_id && projectCompanyId === selectedCompanyId;
+                return projectCompanyId === selectedCompanyId;
             });
         },
         
         get isValid() {
             // Для новых записей требуем наличие файлов
             if (!this.arContent || !this.arContent.id) {
-                const isValid = this.formData.company_id &&
+                return this.formData.company_id &&
                        this.formData.project_id &&
                        this.formData.customer_name &&
                        this.formData.duration_years &&
                        this.formData.photo_file &&
                        this.formData.video_file;
-                
-                // Debug validation state
-                console.log('Validation state for new AR content:', {
-                    company_id: this.formData.company_id,
-                    project_id: this.formData.project_id,
-                    customer_name: this.formData.customer_name,
-                    duration_years: this.formData.duration_years,
-                    photo_file: this.formData.photo_file,
-                    video_file: this.formData.video_file,
-                    isValid: isValid
-                });
-                
-                return isValid;
             } else {
                 // Для редактирования разрешаем сохранение без новых файлов, если уже есть существующие
                 const hasPhoto = this.formData.photo_file || (this.arContent && this.arContent.photo_url);
                 const hasVideo = this.formData.video_file || (this.arContent && this.arContent.video_url);
                 
-                const isValid = this.formData.company_id &&
+                return this.formData.company_id &&
                        this.formData.project_id &&
                        this.formData.customer_name &&
                        this.formData.duration_years &&
                        hasPhoto &&
                        hasVideo;
-                
-                // Debug validation state for edit
-                console.log('Validation state for edit AR content:', {
-                    company_id: this.formData.company_id,
-                    project_id: this.formData.project_id,
-                    customer_name: this.formData.customer_name,
-                    duration_years: this.formData.duration_years,
-                    hasPhoto: hasPhoto,
-                    hasVideo: hasVideo,
-                    photo_file: this.formData.photo_file,
-                    video_file: this.formData.video_file,
-                    existing_photo_url: this.arContent && this.arContent.photo_url,
-                    existing_video_url: this.arContent && this.arContent.video_url,
-                    isValid: isValid
-                });
-                
-                return isValid;
             }
         },
         
         updateProjects() {
             // Reset project selection when company changes
             this.formData.project_id = '';
-            
-            // Debug company selection and available projects
-            console.log('Company selection changed:', {
-                selected_company_id: this.formData.company_id,
-                total_projects: this.projects.length,
-                filtered_projects: this.filteredProjects.length
-            });
-            
-            // Log all projects for debugging
-            console.log('All available projects:', this.projects);
-            console.log('Filtered projects:', this.filteredProjects);
         },
         
         async handleSubmit() {
