@@ -121,13 +121,13 @@
                                 <div x-show="!photoPreview" class="text-gray-400">
                                     <span class="material-icons text-4xl mb-2">image</span>
                                 </div>
-                                <img x-show="photoPreview" :src="photoPreview" class="mx-auto h-32 w-32 object-cover rounded">
+                                <img x-show="photoPreview" :src="photoPreview" class="mx-auto h-32 w-32 object-cover rounded border border-gray-300" alt="Preview">
                                 <div class="flex text-sm text-gray-600 dark:text-gray-400">
-                                    <label for="photo_file" class="relative cursor-pointer rounded-md font-medium text-indigo-600 hover:text-indigo-500 dark:text-indigo-400 dark:hover:text-indigo-300">
+                                    <div class="relative cursor-pointer rounded-md font-medium text-indigo-60 hover:text-indigo-500 dark:text-indigo-40 dark:hover:text-indigo-300 block w-full text-center" @click="selectPhotoFile()" style="z-index: 10; position: relative;">
                                         <span x-show="!photoPreview">Выберите файл</span>
                                         <span x-show="photoPreview">Изменить файл</span>
-                                        <input id="photo_file" name="photo_file" type="file" class="sr-only" accept="image/*" @change="handlePhotoChange">
-                                    </label>
+                                        <input id="photo_file" name="photo_file" type="file" x-ref="photoInput" style="position: absolute; left: 0; top: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; z-index: 1;" accept="image/*" @change="handlePhotoChange">
+                                    </div>
                                     <p class="pl-1" x-show="!photoPreview">или перетащите сюда</p>
                                 </div>
                                 <p class="text-xs text-gray-500 dark:text-gray-400">
@@ -147,15 +147,15 @@
                                     <span class="material-icons text-4xl mb-2">videocam</span>
                                 </div>
                                 <div x-show="videoFile" class="text-center">
-                                    <span class="material-icons text-4xl mb-2 text-green-500">check_circle</span>
-                                    <p class="text-sm text-gray-600 dark:text-gray-400" x-text="videoFile.name"></p>
+                                    <video :src="videoPreview" class="mx-auto h-32 w-32 object-cover rounded border border-gray-300" controls></video>
+                                    <p class="text-sm text-gray-600 dark:text-gray-400 mt-1" x-text="videoFileName"></p>
                                 </div>
                                 <div class="flex text-sm text-gray-600 dark:text-gray-400">
-                                    <label for="video_file" class="relative cursor-pointer rounded-md font-medium text-indigo-600 hover:text-indigo-500 dark:text-indigo-400 dark:hover:text-indigo-300">
+                                    <div class="relative cursor-pointer rounded-md font-medium text-indigo-600 hover:text-indigo-500 dark:text-indigo-400 dark:hover:text-indigo-300 block w-full text-center" @click="selectVideoFile()" style="z-index: 10; position: relative;">
                                         <span x-show="!videoFile">Выберите файл</span>
                                         <span x-show="videoFile">Изменить файл</span>
-                                        <input id="video_file" name="video_file" type="file" class="sr-only" accept="video/*" @change="handleVideoChange">
-                                    </label>
+                                        <input id="video_file" name="video_file" type="file" x-ref="videoInput" style="position: absolute; left: 0; top: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; z-index: 1;" accept="video/*" @change="handleVideoChange">
+                                    </div>
                                     <p class="pl-1" x-show="!videoFile">или перетащите сюда</p>
                                 </div>
                                 <p class="text-xs text-gray-50 dark:text-gray-400">
@@ -235,20 +235,57 @@ function arContentForm(arContent = {}, companies = [], projects = []) {
         },
         
         get photoPreview() {
-            return this.formData.photo_file ? URL.createObjectURL(this.formData.photo_file) : (this.arContent.photo_url || null);
+            if (this.formData.photo_file) {
+                return URL.createObjectURL(this.formData.photo_file);
+            } else if (this.arContent && this.arContent.photo_url) {
+                return this.arContent.photo_url;
+            }
+            return null;
         },
         
         get videoFile() {
             return this.formData.video_file;
         },
         
+        get videoPreview() {
+            if (this.formData.video_file) {
+                return URL.createObjectURL(this.formData.video_file);
+            } else if (this.arContent && this.arContent.video_url) {
+                return this.arContent.video_url;
+            }
+            return null;
+        },
+        
+        get videoFileName() {
+            if (this.formData.video_file) {
+                return this.formData.video_file.name;
+            } else if (this.arContent && this.arContent.video_url) {
+                return this.arContent.video_url.split('/').pop();
+            }
+            return null;
+        },
+        
         get isValid() {
-            return this.formData.company_id && 
-                   this.formData.project_id && 
-                   this.formData.customer_name && 
-                   this.formData.duration_years && 
-                   this.formData.photo_file && 
-                   this.formData.video_file;
+            // Для новых записей требуем наличие файлов
+            if (!this.arContent || !this.arContent.id) {
+                return this.formData.company_id &&
+                       this.formData.project_id &&
+                       this.formData.customer_name &&
+                       this.formData.duration_years &&
+                       this.formData.photo_file &&
+                       this.formData.video_file;
+            } else {
+                // Для редактирования разрешаем сохранение без новых файлов, если уже есть существующие
+                const hasPhoto = this.formData.photo_file || (this.arContent && this.arContent.photo_url);
+                const hasVideo = this.formData.video_file || (this.arContent && this.arContent.video_url);
+                
+                return this.formData.company_id &&
+                       this.formData.project_id &&
+                       this.formData.customer_name &&
+                       this.formData.duration_years &&
+                       hasPhoto &&
+                       hasVideo;
+            }
         },
         
         updateProjects() {
@@ -271,6 +308,14 @@ function arContentForm(arContent = {}, companies = [], projects = []) {
                 }
                 this.formData.photo_file = file;
             }
+        },
+        
+        selectPhotoFile() {
+            this.$refs.photoInput.click();
+        },
+        
+        selectVideoFile() {
+            this.$refs.videoInput.click();
         },
         
         handleVideoChange(event) {
@@ -306,8 +351,14 @@ function arContentForm(arContent = {}, companies = [], projects = []) {
                 formData.append('customer_phone', this.formData.customer_phone);
                 formData.append('customer_email', this.formData.customer_email);
                 formData.append('duration_years', this.formData.duration_years);
-                formData.append('photo_file', this.formData.photo_file);
-                formData.append('video_file', this.formData.video_file);
+                
+                // Добавляем файлы только если они были выбраны
+                if (this.formData.photo_file) {
+                    formData.append('photo_file', this.formData.photo_file);
+                }
+                if (this.formData.video_file) {
+                    formData.append('video_file', this.formData.video_file);
+                }
                 
                 if (this.arContent && this.arContent.id) {
                     // Update existing AR content

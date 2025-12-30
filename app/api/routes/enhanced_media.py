@@ -439,16 +439,16 @@ async def generate_ar_content_thumbnails(
         except ValueError:
             raise HTTPException(status_code=400, detail="Invalid content ID format")
         
-        # Get AR content
-        stmt = select(ARContent).where(ARContent.id == content_uuid)
+        # Get AR content by unique_id (string), not by UUID object
+        stmt = select(ARContent).where(ARContent.unique_id == content_id)
         result = await db.execute(stmt)
         ar_content = result.scalar_one_or_none()
         
         if not ar_content:
             raise HTTPException(status_code=404, detail="AR content not found")
         
-        # Get associated videos
-        videos_stmt = select(Video).where(Video.ar_content_id == content_uuid)
+        # Get associated videos using the actual AR content ID
+        videos_stmt = select(Video).where(Video.ar_content_id == ar_content.id)
         videos_result = await db.execute(videos_stmt)
         videos = videos_result.scalars().all()
         
