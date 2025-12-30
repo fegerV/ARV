@@ -112,55 +112,146 @@
             <div class="p-6 border-b border-gray-200 dark:border-gray-700">
                 <h3 class="text-lg font-medium text-gray-900 dark:text-white mb-4">Файлы контента</h3>
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <!-- Photo Upload -->
                     <div>
                         <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                             Портрет (изображение) <span class="text-red-500">*</span>
                         </label>
-                        <div class="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 dark:border-gray-600 border-dashed rounded-md hover:border-gray-400 dark:hover:border-gray-500 transition-colors">
-                            <div class="space-y-1 text-center">
-                                <div x-show="!photoPreview" class="text-gray-400">
-                                    <span class="material-icons text-4xl mb-2">image</span>
-                                </div>
-                                <img x-show="photoPreview" :src="photoPreview" class="mx-auto h-32 w-32 object-cover rounded border border-gray-300" alt="Preview">
-                                <div class="flex text-sm text-gray-600 dark:text-gray-400">
-                                    <div class="relative cursor-pointer rounded-md font-medium text-indigo-60 hover:text-indigo-500 dark:text-indigo-40 dark:hover:text-indigo-300 block w-full text-center" @click="selectPhotoFile()" style="z-index: 10; position: relative;">
-                                        <span x-show="!photoPreview">Выберите файл</span>
-                                        <span x-show="photoPreview">Изменить файл</span>
-                                        <input id="photo_file" name="photo_file" type="file" x-ref="photoInput" style="position: absolute; left: 0; top: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; z-index: 1;" accept="image/*" @change="handlePhotoChange">
+                        <div class="relative">
+                            <div class="photo-upload-area"
+                                 x-data="photoUploader()"
+                                 x-init="init()"
+                                 @click="triggerFileInput()"
+                                 @dragover.prevent="dragOver = true"
+                                 @dragleave.prevent="dragOver = false"
+                                 @drop.prevent="handleDrop($event)"
+                                 :class="dragOver ? 'border-blue-400 bg-blue-50 dark:bg-blue-900/20' : 'border-gray-300 dark:border-gray-600'"
+                                 class="relative cursor-pointer rounded-lg border-2 border-dashed p-6 text-center hover:border-gray-400 dark:hover:border-gray-500 transition-all duration-200">
+                                
+                                <!-- Hidden file input -->
+                                <input type="file" 
+                                       x-ref="fileInput" 
+                                       accept="image/*" 
+                                       @change="handleFileSelect($event)"
+                                       class="hidden">
+                                
+                                <!-- Upload icon and text -->
+                                <div x-show="!selectedFile" class="space-y-2">
+                                    <div class="text-gray-400">
+                                        <span class="material-icons text-4xl">cloud_upload</span>
                                     </div>
-                                    <p class="pl-1" x-show="!photoPreview">или перетащите сюда</p>
+                                    <p class="text-sm text-gray-600 dark:text-gray-400">
+                                        <span class="font-medium text-indigo-600 dark:text-indigo-400">Нажмите для выбора</span> или перетащите файл сюда
+                                    </p>
+                                    <p class="text-xs text-gray-500 dark:text-gray-400">
+                                        PNG, JPG до 10MB
+                                    </p>
                                 </div>
-                                <p class="text-xs text-gray-500 dark:text-gray-400">
-                                    PNG, JPG до 10MB
-                                </p>
+                                
+                                <!-- Preview area -->
+                                <div x-show="selectedFile" class="space-y-3">
+                                    <div class="relative inline-block">
+                                        <img :src="previewUrl" 
+                                             alt="Preview" 
+                                             class="mx-auto h-32 w-32 object-cover rounded-lg border border-gray-300 dark:border-gray-600">
+                                        <button type="button"
+                                                @click.stop="removeFile()"
+                                                class="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600 transition-colors">
+                                            <span class="material-icons text-sm">close</span>
+                                        </button>
+                                    </div>
+                                    <div class="text-sm">
+                                        <p class="font-medium text-gray-900 dark:text-white" x-text="selectedFile.name"></p>
+                                        <p class="text-gray-500 dark:text-gray-400" x-text="formatFileSize(selectedFile.size)"></p>
+                                    </div>
+                                </div>
+                                
+                                <!-- Loading overlay -->
+                                <div x-show="uploading" 
+                                     x-transition:enter="transition-opacity duration-300"
+                                     x-transition:enter-start="opacity-0"
+                                     x-transition:enter-end="opacity-100"
+                                     x-transition:leave="transition-opacity duration-300"
+                                     x-transition:leave-start="opacity-100"
+                                     x-transition:leave-end="opacity-0"
+                                     class="absolute inset-0 bg-white/80 dark:bg-gray-900/80 rounded-lg flex items-center justify-center">
+                                    <div class="text-center">
+                                        <span class="material-icons text-3xl text-blue-500 animate-spin">refresh</span>
+                                        <p class="text-sm text-gray-600 dark:text-gray-400 mt-2">Загрузка...</p>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
                     
+                    <!-- Video Upload -->
                     <div>
                         <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                             Видео <span class="text-red-500">*</span>
                         </label>
-                        <div class="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 dark:border-gray-600 border-dashed rounded-md hover:border-gray-400 dark:hover:border-gray-500 transition-colors">
-                            <div class="space-y-1 text-center">
-                                <div x-show="!videoFile" class="text-gray-400">
-                                    <span class="material-icons text-4xl mb-2">videocam</span>
-                                </div>
-                                <div x-show="videoFile" class="text-center">
-                                    <video :src="videoPreview" class="mx-auto h-32 w-32 object-cover rounded border border-gray-300" controls></video>
-                                    <p class="text-sm text-gray-600 dark:text-gray-400 mt-1" x-text="videoFileName"></p>
-                                </div>
-                                <div class="flex text-sm text-gray-600 dark:text-gray-400">
-                                    <div class="relative cursor-pointer rounded-md font-medium text-indigo-600 hover:text-indigo-500 dark:text-indigo-400 dark:hover:text-indigo-300 block w-full text-center" @click="selectVideoFile()" style="z-index: 10; position: relative;">
-                                        <span x-show="!videoFile">Выберите файл</span>
-                                        <span x-show="videoFile">Изменить файл</span>
-                                        <input id="video_file" name="video_file" type="file" x-ref="videoInput" style="position: absolute; left: 0; top: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; z-index: 1;" accept="video/*" @change="handleVideoChange">
+                        <div class="relative">
+                            <div class="video-upload-area"
+                                 x-data="videoUploader()"
+                                 x-init="init()"
+                                 @click="triggerFileInput()"
+                                 @dragover.prevent="dragOver = true"
+                                 @dragleave.prevent="dragOver = false"
+                                 @drop.prevent="handleDrop($event)"
+                                 :class="dragOver ? 'border-blue-400 bg-blue-50 dark:bg-blue-900/20' : 'border-gray-300 dark:border-gray-600'"
+                                 class="relative cursor-pointer rounded-lg border-2 border-dashed p-6 text-center hover:border-gray-400 dark:hover:border-gray-500 transition-all duration-200">
+                                
+                                <!-- Hidden file input -->
+                                <input type="file" 
+                                       x-ref="fileInput" 
+                                       accept="video/*" 
+                                       @change="handleFileSelect($event)"
+                                       class="hidden">
+                                
+                                <!-- Upload icon and text -->
+                                <div x-show="!selectedFile" class="space-y-2">
+                                    <div class="text-gray-400">
+                                        <span class="material-icons text-4xl">videocam</span>
                                     </div>
-                                    <p class="pl-1" x-show="!videoFile">или перетащите сюда</p>
+                                    <p class="text-sm text-gray-600 dark:text-gray-400">
+                                        <span class="font-medium text-indigo-600 dark:text-indigo-400">Нажмите для выбора</span> или перетащите файл сюда
+                                    </p>
+                                    <p class="text-xs text-gray-500 dark:text-gray-400">
+                                        MP4, WebM, MOV до 100MB
+                                    </p>
                                 </div>
-                                <p class="text-xs text-gray-50 dark:text-gray-400">
-                                    MP4, WebM, MOV до 100MB
-                                </p>
+                                
+                                <!-- Preview area -->
+                                <div x-show="selectedFile" class="space-y-3">
+                                    <div class="relative inline-block">
+                                        <video :src="previewUrl" 
+                                               class="mx-auto h-32 w-32 object-cover rounded-lg border border-gray-300 dark:border-gray-600"
+                                               controls></video>
+                                        <button type="button"
+                                                @click.stop="removeFile()"
+                                                class="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600 transition-colors">
+                                            <span class="material-icons text-sm">close</span>
+                                        </button>
+                                    </div>
+                                    <div class="text-sm">
+                                        <p class="font-medium text-gray-900 dark:text-white" x-text="selectedFile.name"></p>
+                                        <p class="text-gray-500 dark:text-gray-400" x-text="formatFileSize(selectedFile.size)"></p>
+                                    </div>
+                                </div>
+                                
+                                <!-- Loading overlay -->
+                                <div x-show="uploading" 
+                                     x-transition:enter="transition-opacity duration-300"
+                                     x-transition:enter-start="opacity-0"
+                                     x-transition:enter-end="opacity-100"
+                                     x-transition:leave="transition-opacity duration-300"
+                                     x-transition:leave-start="opacity-100"
+                                     x-transition:leave-end="opacity-0"
+                                     class="absolute inset-0 bg-white/80 dark:bg-gray-900/80 rounded-lg flex items-center justify-center">
+                                    <div class="text-center">
+                                        <span class="material-icons text-3xl text-blue-500 animate-spin">refresh</span>
+                                        <p class="text-sm text-gray-600 dark:text-gray-400 mt-2">Загрузка...</p>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -207,7 +298,182 @@
 </div>
 
 <script>
+// Photo uploader component
+function photoUploader() {
+    return {
+        selectedFile: null,
+        previewUrl: null,
+        uploading: false,
+        dragOver: false,
+        
+        init() {
+            // Initialize with existing photo if editing
+            if (window.arContentFormInstance && window.arContentFormInstance.arContent && window.arContentFormInstance.arContent.photo_url) {
+                this.previewUrl = window.arContentFormInstance.arContent.photo_url;
+            }
+        },
+        
+        triggerFileInput() {
+            this.$refs.fileInput.click();
+        },
+        
+        handleFileSelect(event) {
+            const file = event.target.files[0];
+            if (file) {
+                this.processFile(file);
+            }
+        },
+        
+        handleDrop(event) {
+            this.dragOver = false;
+            const files = event.dataTransfer.files;
+            if (files.length > 0) {
+                this.processFile(files[0]);
+            }
+        },
+        
+        processFile(file) {
+            // Validate file type
+            if (!file.type.startsWith('image/')) {
+                this.showToast('Пожалуйста, выберите изображение', 'error');
+                return;
+            }
+            
+            // Validate file size (10MB)
+            if (file.size > 10 * 1024 * 1024) {
+                this.showToast('Размер файла не должен превышать 10MB', 'error');
+                return;
+            }
+            
+            this.selectedFile = file;
+            this.previewUrl = URL.createObjectURL(file);
+            
+            // Update parent form data
+            if (window.arContentFormInstance) {
+                window.arContentFormInstance.formData.photo_file = file;
+            }
+        },
+        
+        removeFile() {
+            this.selectedFile = null;
+            if (this.previewUrl && this.previewUrl.startsWith('blob:')) {
+                URL.revokeObjectURL(this.previewUrl);
+            }
+            this.previewUrl = null;
+            this.$refs.fileInput.value = '';
+            
+            // Update parent form data
+            if (window.arContentFormInstance) {
+                window.arContentFormInstance.formData.photo_file = null;
+            }
+        },
+        
+        formatFileSize(bytes) {
+            if (bytes === 0) return '0 Bytes';
+            const k = 1024;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        },
+        
+        showToast(message, type = 'info') {
+            if (window.arContentFormInstance) {
+                window.arContentFormInstance.showToast(message, type);
+            }
+        }
+    }
+}
+
+// Video uploader component
+function videoUploader() {
+    return {
+        selectedFile: null,
+        previewUrl: null,
+        uploading: false,
+        dragOver: false,
+        
+        init() {
+            // Initialize with existing video if editing
+            if (window.arContentFormInstance && window.arContentFormInstance.arContent && window.arContentFormInstance.arContent.video_url) {
+                this.previewUrl = window.arContentFormInstance.arContent.video_url;
+            }
+        },
+        
+        triggerFileInput() {
+            this.$refs.fileInput.click();
+        },
+        
+        handleFileSelect(event) {
+            const file = event.target.files[0];
+            if (file) {
+                this.processFile(file);
+            }
+        },
+        
+        handleDrop(event) {
+            this.dragOver = false;
+            const files = event.dataTransfer.files;
+            if (files.length > 0) {
+                this.processFile(files[0]);
+            }
+        },
+        
+        processFile(file) {
+            // Validate file type
+            if (!file.type.startsWith('video/')) {
+                this.showToast('Пожалуйста, выберите видеофайл', 'error');
+                return;
+            }
+            
+            // Validate file size (100MB)
+            if (file.size > 100 * 1024 * 1024) {
+                this.showToast('Размер файла не должен превышать 100MB', 'error');
+                return;
+            }
+            
+            this.selectedFile = file;
+            this.previewUrl = URL.createObjectURL(file);
+            
+            // Update parent form data
+            if (window.arContentFormInstance) {
+                window.arContentFormInstance.formData.video_file = file;
+            }
+        },
+        
+        removeFile() {
+            this.selectedFile = null;
+            if (this.previewUrl && this.previewUrl.startsWith('blob:')) {
+                URL.revokeObjectURL(this.previewUrl);
+            }
+            this.previewUrl = null;
+            this.$refs.fileInput.value = '';
+            
+            // Update parent form data
+            if (window.arContentFormInstance) {
+                window.arContentFormInstance.formData.video_file = null;
+            }
+        },
+        
+        formatFileSize(bytes) {
+            if (bytes === 0) return '0 Bytes';
+            const k = 1024;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        },
+        
+        showToast(message, type = 'info') {
+            if (window.arContentFormInstance) {
+                window.arContentFormInstance.showToast(message, type);
+            }
+        }
+    }
+}
+
 function arContentForm(arContent = {}, companies = [], projects = []) {
+    // Store instance globally for child components
+    window.arContentFormInstance = this;
+    
     return {
         arContent: arContent,
         companies: companies,
@@ -232,37 +498,6 @@ function arContentForm(arContent = {}, companies = [], projects = []) {
                 this.formData.company_id &&
                 String(project.company_id) === String(this.formData.company_id)
             );
-        },
-        
-        get photoPreview() {
-            if (this.formData.photo_file) {
-                return URL.createObjectURL(this.formData.photo_file);
-            } else if (this.arContent && this.arContent.photo_url) {
-                return this.arContent.photo_url;
-            }
-            return null;
-        },
-        
-        get videoFile() {
-            return this.formData.video_file;
-        },
-        
-        get videoPreview() {
-            if (this.formData.video_file) {
-                return URL.createObjectURL(this.formData.video_file);
-            } else if (this.arContent && this.arContent.video_url) {
-                return this.arContent.video_url;
-            }
-            return null;
-        },
-        
-        get videoFileName() {
-            if (this.formData.video_file) {
-                return this.formData.video_file.name;
-            } else if (this.arContent && this.arContent.video_url) {
-                return this.arContent.video_url.split('/').pop();
-            }
-            return null;
         },
         
         get isValid() {
@@ -291,48 +526,6 @@ function arContentForm(arContent = {}, companies = [], projects = []) {
         updateProjects() {
             // Reset project selection when company changes
             this.formData.project_id = '';
-        },
-        
-        handlePhotoChange(event) {
-            const file = event.target.files[0];
-            if (file) {
-                if (!file.type.startsWith('image/')) {
-                    this.showToast('Пожалуйста, выберите изображение', 'error');
-                    event.target.value = '';
-                    return;
-                }
-                if (file.size > 10 * 1024 * 1024) {
-                    this.showToast('Размер файла не должен превышать 10MB', 'error');
-                    event.target.value = '';
-                    return;
-                }
-                this.formData.photo_file = file;
-            }
-        },
-        
-        selectPhotoFile() {
-            this.$refs.photoInput.click();
-        },
-        
-        selectVideoFile() {
-            this.$refs.videoInput.click();
-        },
-        
-        handleVideoChange(event) {
-            const file = event.target.files[0];
-            if (file) {
-                if (!file.type.startsWith('video/')) {
-                    this.showToast('Пожалуйста, выберите видеофайл', 'error');
-                    event.target.value = '';
-                    return;
-                }
-                if (file.size > 100 * 1024 * 1024) {
-                    this.showToast('Размер файла не должен превышать 100MB', 'error');
-                    event.target.value = '';
-                    return;
-                }
-                this.formData.video_file = file;
-            }
         },
         
         async handleSubmit() {
