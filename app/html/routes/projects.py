@@ -92,9 +92,29 @@ async def projects_list(
         from app.api.routes.companies import list_companies
         companies_result = await list_companies(page=1, page_size=100, db=db, current_user=current_user)
         companies = [dict(item) for item in companies_result.items]
-    except Exception:
-        # fallback to mock data
-        companies = PROJECT_CREATE_MOCK_DATA["companies"]
+    except Exception as e:
+        # Log error and try direct database query as fallback
+        print(f"Error fetching companies via API: {e}")
+        try:
+            from sqlalchemy import select
+            from app.models.company import Company
+            
+            companies_query = select(Company)
+            companies_result = await db.execute(companies_query)
+            companies = []
+            for company in companies_result.scalars().all():
+                companies.append({
+                    "id": company.id,
+                    "name": company.name,
+                    "contact_email": company.contact_email,
+                    "status": company.status,
+                    "created_at": company.created_at,
+                    "updated_at": company.updated_at
+                })
+        except Exception as db_error:
+            print(f"Error fetching companies from database: {db_error}")
+            # fallback to mock data only as last resort
+            companies = PROJECT_CREATE_MOCK_DATA["companies"]
     
     # Calculate total pages
     total_count = result.total if 'result' in locals() else len(projects)
@@ -136,9 +156,29 @@ async def project_create(
         from app.api.routes.companies import list_companies
         companies_result = await list_companies(page=1, page_size=100, db=db, current_user=current_user)
         companies = [dict(item) for item in companies_result.items]
-    except Exception:
-        # fallback to mock data
-        companies = PROJECT_CREATE_MOCK_DATA["companies"]
+    except Exception as e:
+        # Log error and try direct database query as fallback
+        print(f"Error fetching companies via API: {e}")
+        try:
+            from sqlalchemy import select
+            from app.models.company import Company
+            
+            companies_query = select(Company)
+            companies_result = await db.execute(companies_query)
+            companies = []
+            for company in companies_result.scalars().all():
+                companies.append({
+                    "id": company.id,
+                    "name": company.name,
+                    "contact_email": company.contact_email,
+                    "status": company.status,
+                    "created_at": company.created_at,
+                    "updated_at": company.updated_at
+                })
+        except Exception as db_error:
+            print(f"Error fetching companies from database: {db_error}")
+            # fallback to mock data only as last resort
+            companies = PROJECT_CREATE_MOCK_DATA["companies"]
     
     context = {
         "request": request,
@@ -175,9 +215,29 @@ async def project_detail(
         from app.api.routes.companies import list_companies
         companies_result = await list_companies(page=1, page_size=100, db=db, current_user=current_user)
         companies = [dict(item) for item in companies_result.items]
-    except Exception:
-        # fallback to mock data
-        companies = PROJECT_CREATE_MOCK_DATA["companies"]
+    except Exception as e:
+        # Log error and try direct database query as fallback
+        print(f"Error fetching companies via API: {e}")
+        try:
+            from sqlalchemy import select
+            from app.models.company import Company
+            
+            companies_query = select(Company)
+            companies_result = await db.execute(companies_query)
+            companies = []
+            for company in companies_result.scalars().all():
+                companies.append({
+                    "id": company.id,
+                    "name": company.name,
+                    "contact_email": company.contact_email,
+                    "status": company.status,
+                    "created_at": company.created_at,
+                    "updated_at": company.updated_at
+                })
+        except Exception as db_error:
+            print(f"Error fetching companies from database: {db_error}")
+            # fallback to mock data only as last resort
+            companies = PROJECT_CREATE_MOCK_DATA["companies"]
     
     context = {
         "request": request,
@@ -215,9 +275,29 @@ async def project_edit(
         from app.api.routes.companies import list_companies
         companies_result = await list_companies(page=1, page_size=100, db=db, current_user=current_user)
         companies = [dict(item) for item in companies_result.items]
-    except Exception:
-        # fallback to mock data
-        companies = PROJECT_CREATE_MOCK_DATA["companies"]
+    except Exception as e:
+        # Log error and try direct database query as fallback
+        print(f"Error fetching companies via API: {e}")
+        try:
+            from sqlalchemy import select
+            from app.models.company import Company
+            
+            companies_query = select(Company)
+            companies_result = await db.execute(companies_query)
+            companies = []
+            for company in companies_result.scalars().all():
+                companies.append({
+                    "id": company.id,
+                    "name": company.name,
+                    "contact_email": company.contact_email,
+                    "status": company.status,
+                    "created_at": company.created_at,
+                    "updated_at": company.updated_at
+                })
+        except Exception as db_error:
+            print(f"Error fetching companies from database: {db_error}")
+            # fallback to mock data only as last resort
+            companies = PROJECT_CREATE_MOCK_DATA["companies"]
     
     context = {
         "request": request,
