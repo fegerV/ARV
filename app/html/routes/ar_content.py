@@ -76,44 +76,40 @@ async def ar_content_create(
         # Redirect to login page if user is not active
         return RedirectResponse(url="/admin/login", status_code=303)
     try:
-        # Query companies and projects directly to avoid user dependency issues
-        from sqlalchemy import select
-        from app.models.company import Company
-        from app.models.project import Project
+        # Query companies and projects using the API routes to ensure proper access control
+        from app.api.routes.companies import list_companies
+        from app.api.routes.projects import list_projects
         
-        # Get all companies
-        companies_query = select(Company)
-        companies_result = await db.execute(companies_query)
-        companies = []
-        for company in companies_result.scalars().all():
-            companies.append({
-                "id": company.id,
-                "name": company.name,
-                "contact_email": company.contact_email,
-                "status": company.status,
-                "created_at": company.created_at,
-                "updated_at": company.updated_at
-            })
+        # Get all companies and projects with proper access control
+        # Pass only the required parameters to avoid Query object binding issues
+        companies_result = await list_companies(
+            page=1,
+            page_size=100,
+            db=db,
+            current_user=current_user,
+            search=None,  # Explicitly pass None for optional search parameter
+            status=None   # Explicitly pass None for optional status parameter
+        )
+        companies = [dict(item) for item in companies_result.items]
         
-        # Get all projects
-        projects_query = select(Project)
-        projects_result = await db.execute(projects_query)
-        projects = []
-        for project in projects_result.scalars().all():
-            projects.append({
-                "id": project.id,
-                "name": project.name,
-                "company_id": project.company_id,
-                "status": project.status,
-                "created_at": project.created_at,
-                "updated_at": project.updated_at
-            })
+        projects_result = await list_projects(
+            page=1,
+            page_size=100,
+            db=db,
+            current_user=current_user,
+            company_id=None # Explicitly pass None for optional company_id parameter
+        )
+        projects = [dict(item) for item in projects_result.items]
         
         data = {
             "companies": companies,
             "projects": projects
         }
-    except Exception:
+    except Exception as e:
+        # Log the error for debugging
+        print(f"Error fetching companies/projects for AR content creation: {e}")
+        import traceback
+        traceback.print_exc()
         # fallback to mock data
         data = PROJECT_CREATE_MOCK_DATA
     

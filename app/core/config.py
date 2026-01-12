@@ -42,7 +42,7 @@ class Settings(BaseSettings):
     
     # Database
     DATABASE_URL: str = Field(
-        default="postgresql+asyncpg://vertex_ar:password@localhost:5432/vertex_ar"
+        default="sqlite+aiosqlite:///./test_vertex_ar.db"
     )
     DB_POOL_SIZE: int = 20
     DB_MAX_OVERFLOW: int = 10

@@ -78,50 +78,103 @@
         
         /* Enhanced button styles */
         .btn {
-            @apply inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500;
+            display: inline-flex;
+            align-items: center;
+            padding: 0.5rem 1rem;
+            border: 1px solid transparent;
+            font-size: 0.875rem;
+            font-weight: 500;
+            border-radius: 0.375rem;
+            box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+            color: white;
+            background-color: #4f46e5;
+            transition: background-color 0.2s;
+        }
+        
+        .btn:hover {
+            background-color: #4338ca;
+        }
+        
+        .btn:focus {
+            outline: none;
+            box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.5);
         }
         
         .btn-primary {
-            @apply bg-indigo-600 hover:bg-indigo-700 focus:ring-indigo-500;
+            background-color: #4f46e5;
+        }
+        
+        .btn-primary:hover {
+            background-color: #4338ca;
         }
         
         .btn-secondary {
-            @apply bg-gray-600 hover:bg-gray-700 focus:ring-gray-500;
+            background-color: #4b5563;
+        }
+        
+        .btn-secondary:hover {
+            background-color: #374151;
         }
         
         .btn-danger {
-            @apply bg-red-600 hover:bg-red-700 focus:ring-red-500;
+            background-color: #dc2626;
+        }
+        
+        .btn-danger:hover {
+            background-color: #b91c1c;
         }
         
         .btn-success {
-            @apply bg-green-600 hover:bg-green-700 focus:ring-green-500;
+            background-color: #16a34a;
+        }
+        
+        .btn-success:hover {
+            background-color: #15803d;
         }
         
         /* Dark mode button fixes */
         .dark .btn {
-            @apply text-white;
+            color: white;
         }
         
         .dark .btn-primary {
-            @apply bg-indigo-600 hover:bg-indigo-700;
+            background-color: #4f46e5;
+        }
+        
+        .dark .btn-primary:hover {
+            background-color: #4338ca;
         }
         
         .dark .btn-secondary {
-            @apply bg-gray-600 hover:bg-gray-700;
+            background-color: #4b5563;
+        }
+        
+        .dark .btn-secondary:hover {
+            background-color: #374151;
         }
         
         .dark .btn-danger {
-            @apply bg-red-600 hover:bg-red-700;
+            background-color: #dc2626;
+        }
+        
+        .dark .btn-danger:hover {
+            background-color: #b91c1c;
         }
         
         .dark .btn-success {
-            @apply bg-green-600 hover:bg-green-700;
+            background-color: #16a34a;
+        }
+        
+        .dark .btn-success:hover {
+            background-color: #15803d;
         }
         
         /* Disabled button styles for dark mode */
         .dark .btn:disabled,
         .dark .btn.opacity-50 {
-            @apply opacity-50 cursor-not-allowed bg-gray-600;
+            opacity: 0.5;
+            cursor: not-allowed;
+            background-color: #4b5563;
         }
         
         /* Enhanced table styles */
@@ -208,6 +261,30 @@
         .dark optgroup {
             background-color: #374151 !important;
             color: #f9fafb !important;
+        }
+        
+        /* Additional input fixes for dark mode */
+        input.form-input,
+        textarea.form-input {
+            @apply dark:bg-gray-700 dark:text-white dark:border-gray-60 dark:placeholder-gray-400;
+        }
+        
+        /* More specific selectors to ensure all input types are properly styled */
+        .dark input[type="text"],
+        .dark input[type="email"],
+        .dark input[type="tel"],
+        .dark input[type="password"],
+        .dark input[type="number"],
+        .dark textarea {
+            background-color: #374151 !important;
+            color: #f9fafb !important;
+            border-color: #4b5563 !important;
+        }
+        
+        /* Override any conflicting styles for input placeholders in dark mode */
+        .dark input::placeholder,
+        .dark textarea::placeholder {
+            color: #9ca3af !important; /* gray-400 */
         }
         
         /* Enhanced modal styles */

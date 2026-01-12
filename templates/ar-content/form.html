@@ -4,7 +4,170 @@
 {% block page_title %}{% if ar_content and ar_content.id %}Edit AR Content{% else %}Create AR Content{% endif %}{% endblock %}
 
 {% block content %}
-<div x-data="arContentForm({% if ar_content %}{{ ar_content|tojson }}{% else %}{}{% endif %}, {{ companies_js|tojson }}, {{ projects_js|tojson }})">
+<div x-data="{
+    companies: {{ companies_js | tojson }},
+    projects: [],
+    selectedCompany: '{{ ar_content.company_id if ar_content and ar_content.company_id else '' }}',
+    selectedProject: '{{ ar_content.project_id if ar_content and ar_content.project_id else '' }}',
+    arContent: {{ ar_content|tojson if ar_content else 'null' }},
+    loading: false,
+    submitting: false,
+    
+    async loadProjects() {
+        if (!this.selectedCompany) {
+            this.projects = [];
+            this.selectedProject = '';
+            return;
+        }
+        
+        this.loading = true;
+        try {
+            const response = await fetch(`/api/projects/by-company/${this.selectedCompany}`);
+            if (response.ok) {
+                const data = await response.json();
+                this.projects = data.projects || [];
+                // Сбросить выбранный проект, если он не принадлежит новой компании
+                if (!this.projects.some(p => p.id == this.selectedProject)) {
+                    this.selectedProject = '';
+                }
+            } else {
+                console.error('Ошибка загрузки проектов:', response.statusText);
+                this.projects = [];
+                this.selectedProject = '';
+            }
+        } catch (error) {
+            console.error('Ошибка при загрузке проектов:', error);
+            this.projects = [];
+            this.selectedProject = '';
+        } finally {
+            this.loading = false;
+        }
+    },
+    
+    get isValid() {
+        // Для новых записей требуем наличие файлов
+        if (!this.arContent || !this.arContent.id) {
+            const hasBasicFields = this.selectedCompany &&
+                   this.selectedProject &&
+                   document.getElementById('customer_name')?.value &&
+                   document.getElementById('duration_years')?.value;
+                   
+            // Проверяем наличие файлов через DOM
+            const photoInput = document.querySelector('input[type="file"][name="photo_file"]');
+            const videoInput = document.querySelector('input[type="file"][name="video_file"]');
+            const hasFiles = (photoInput && photoInput.files.length > 0) &&
+                            (videoInput && videoInput.files.length > 0);
+                   
+            return hasBasicFields && hasFiles;
+        } else {
+            // Для редактирования
+            const hasBasicFields = this.selectedCompany &&
+                   this.selectedProject &&
+                   document.getElementById('customer_name')?.value &&
+                   document.getElementById('duration_years')?.value;
+            
+            // При редактировании файлы могут быть уже загружены
+            const photoInput = document.querySelector('input[type="file"][name="photo_file"]');
+            const videoInput = document.querySelector('input[type="file"][name="video_file"]');
+            const hasNewFiles = (!photoInput || photoInput.files.length === 0) &&
+                               (!videoInput || videoInput.files.length === 0);
+            
+            // Если нет новых файлов, проверяем, были ли файлы ранее
+            if (hasNewFiles && this.arContent) {
+                const hasExistingFiles = this.arContent.photo_url &&
+                                        this.arContent.video_url;
+                return hasBasicFields && hasExistingFiles;
+            }
+            
+            const hasFiles = (photoInput && photoInput.files.length > 0) &&
+                            (videoInput && videoInput.files.length > 0);
+            
+            return hasBasicFields && hasFiles;
+        }
+    },
+    
+    async submitForm() {
+        if (!this.isValid) {
+            this.showToast('Пожалуйста, заполните все обязательные поля', 'error');
+            return;
+        }
+        
+        this.submitting = true;
+        
+        try {
+            const formData = new FormData();
+            formData.append('company_id', this.selectedCompany);
+            formData.append('project_id', this.selectedProject);
+            formData.append('customer_name', document.getElementById('customer_name').value);
+            formData.append('customer_phone', document.getElementById('customer_phone').value);
+            formData.append('customer_email', document.getElementById('customer_email').value);
+            formData.append('duration_years', document.getElementById('duration_years').value);
+            
+            // Добавляем файлы из соответствующих input'ов
+            const photoInput = document.querySelector('input[type="file"][name="photo_file"]');
+            const videoInput = document.querySelector('input[type="file"][name="video_file"]');
+            
+            if (photoInput && photoInput.files.length > 0) {
+                formData.append('photo_file', photoInput.files[0]);
+            }
+            if (videoInput && videoInput.files.length > 0) {
+                formData.append('video_file', videoInput.files[0]);
+            }
+            
+            let url, method;
+            if (this.arContent && this.arContent.id) {
+                // Update existing AR content
+                url = `/companies/${this.selectedCompany}/projects/${this.selectedProject}/ar-content/${this.arContent.id}`;
+                method = 'POST';
+                formData.append('_method', 'PUT');
+            } else {
+                // Create new AR content
+                url = `/companies/${this.selectedCompany}/projects/${this.selectedProject}/ar-content`;
+                method = 'POST';
+            }
+            
+            const response = await fetch(url, {
+                method: method,
+                body: formData
+            });
+            
+            if (response.ok) {
+                const result = await response.json();
+                this.showToast(this.arContent && this.arContent.id ? 'AR контент успешно обновлен' : 'AR контент успешно создан', 'success');
+                window.location.href = `/ar-content/${result.id || this.arContent.id}`;
+            } else {
+                throw new Error('Request failed');
+            }
+        } catch (error) {
+            this.showToast('Не удалось сохранить AR контент', 'error');
+            console.error('Submit error:', error);
+        } finally {
+            this.submitting = false;
+        }
+    },
+    
+    showToast(message, type = 'info') {
+        const toast = document.createElement('div');
+        const bgColor = type === 'success' ? 'bg-green-500' : type === 'error' ? 'bg-red-500' : 'bg-blue-500';
+        toast.className = `fixed bottom-4 right-4 ${bgColor} text-white px-4 py-2 rounded shadow z-50`;
+        toast.textContent = message;
+        document.body.appendChild(toast);
+        
+        setTimeout(() => {
+            if (document.body.contains(toast)) {
+                document.body.removeChild(toast);
+            }
+        }, 3000);
+    }
+}"
+     x-init="setTimeout(() => {
+         console.log('Cascade Select Component initialized');
+         console.log('companies count:', {{ companies_js|length }});
+         {% if ar_content and ar_content.company_id %}
+             selectedCompany = '{{ ar_content.company_id }}';
+             loadProjects();
+         {% endif %}
+     }, 200);">
     <div class="max-w-4xl mx-auto">
         <!-- Header -->
         <div class="flex justify-between items-center mb-6">
@@ -16,7 +179,7 @@
             </a>
         </div>
 
-        <form @submit.prevent="handleSubmit" method="post" enctype="multipart/form-data" class="bg-white dark:bg-gray-800 shadow rounded-lg">
+        <form @submit.prevent="submitForm" method="post" enctype="multipart/form-data" class="bg-white dark:bg-gray-800 shadow rounded-lg">
             <!-- Company & Project Selection -->
             <div class="p-6 border-b border-gray-200 dark:border-gray-700">
                 <h3 class="text-lg font-medium text-gray-900 dark:text-white mb-4">Компания и проект</h3>
@@ -25,15 +188,15 @@
                         <label for="company_id" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                             Компания <span class="text-red-500">*</span>
                         </label>
-                        <select name="company_id" id="company_id" 
+                        <select name="company_id" id="company_id"
                                 class="form-select"
-                                x-model="formData.company_id"
-                                @change="updateProjects"
-                                required>
+                                x-model="selectedCompany"
+                                @change="loadProjects()"
+                                required x-cloak>
                             <option value="">Выберите компанию</option>
-                            {% for company in companies %}
-                            <option value="{{ company.id }}">{{ company.name }}</option>
-                            {% endfor %}
+                            <template x-for="company in companies" :key="company.id">
+                                <option :value="company.id" x-text="company.name"></option>
+                            </template>
                         </select>
                     </div>
                     
@@ -41,15 +204,21 @@
                         <label for="project_id" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                             Проект <span class="text-red-500">*</span>
                         </label>
-                        <select name="project_id" id="project_id" 
-                                class="form-select"
-                                x-model="formData.project_id"
-                                required>
-                            <option value="">Выберите проект</option>
-                            <template x-for="project in filteredProjects" :key="project.id">
-                                <option :value="project.id" x-text="project.name"></option>
-                            </template>
-                        </select>
+                        <div class="relative">
+                            <select name="project_id" id="project_id"
+                                    class="form-select"
+                                    x-model="selectedProject"
+                                    :disabled="loading"
+                                    required x-cloak>
+                                <option value="">Выберите проект</option>
+                                <template x-for="project in projects" :key="project.id">
+                                    <option :value="project.id" x-text="project.name"></option>
+                                </template>
+                            </select>
+                            <div x-show="loading" class="absolute inset-y-0 right-0 flex items-center pr-3">
+                                <span class="animate-spin material-icons text-gray-400">autorenew</span>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -62,30 +231,27 @@
                         <label for="customer_name" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                             Имя заказчика
                         </label>
-                        <input type="text" name="customer_name" id="customer_name" 
+                        <input type="text" name="customer_name" id="customer_name"
                                class="form-input"
-                               x-model="formData.customer_name"
-                               placeholder="Имя Фамилия">
+                               placeholder="Имя Фамилия" x-cloak>
                     </div>
                     
                     <div>
                         <label for="customer_phone" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                             Телефон
                         </label>
-                        <input type="tel" name="customer_phone" id="customer_phone" 
+                        <input type="tel" name="customer_phone" id="customer_phone"
                                class="form-input"
-                               x-model="formData.customer_phone"
-                               placeholder="+7 (999) 123-45-67">
+                               placeholder="+7 (999) 123-45-67" x-cloak>
                     </div>
                     
                     <div>
                         <label for="customer_email" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                             Email
                         </label>
-                        <input type="email" name="customer_email" id="customer_email" 
+                        <input type="email" name="customer_email" id="customer_email"
                                class="form-input"
-                               x-model="formData.customer_email"
-                               placeholder="customer@example.com">
+                               placeholder="customer@example.com" x-cloak>
                     </div>
                 </div>
             </div>
@@ -97,10 +263,9 @@
                     <label for="duration_years" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                         Период действия <span class="text-red-500">*</span>
                     </label>
-                    <select name="duration_years" id="duration_years" 
+                    <select name="duration_years" id="duration_years"
                             class="form-select"
-                            x-model="formData.duration_years"
-                            required>
+                            required x-cloak>
                         <option value="1">1 год</option>
                         <option value="3">3 года</option>
                         <option value="5">5 лет</option>
@@ -265,9 +430,9 @@
                     <label for="status" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                         Статус заказа
                     </label>
-                    <select name="status" id="status" 
+                    <select name="status" id="status"
                             class="form-select"
-                            x-model="formData.status">
+                            x-cloak>
                         <option value="pending">В ожидании</option>
                         <option value="processing">В обработке</option>
                         <option value="ready">Готов</option>
@@ -278,19 +443,32 @@
 
             <!-- Actions -->
             <div class="p-6 bg-gray-50 dark:bg-gray-700 rounded-b-lg">
+                <!-- Debug info for troubleshooting -->
+                <div class="mb-4 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-md text-sm">
+                    <p class="font-medium text-blue-800 dark:text-blue-200">Debug Info:</p>
+                    <ul class="text-blue-700 dark:text-blue-300 mt-1">
+                        <li>arContent: <span x-text="JSON.stringify(arContent)"></span></li>
+                        <li>isValid exists: <span x-text="typeof isValid !== 'undefined'"></span></li>
+                        <li>isValid value: <span x-text="typeof isValid !== 'undefined' ? isValid : 'undefined'"></span></li>
+                        <li>submitting: <span x-text="typeof submitting !== 'undefined' ? submitting : 'undefined'"></span></li>
+                    </ul>
+                </div>
+                
                 <div class="flex justify-end space-x-3">
                     <a href="{% if ar_content %}/ar-content/{{ ar_content.id }}{% else %}/ar-content{% endif %}" 
                        class="btn btn-secondary inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-gray-600 hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 dark:bg-gray-600 dark:hover:bg-gray-700">
                         <span class="material-icons mr-2">close</span>
                         Отмена
                     </a>
-                    <button type="submit" 
-                            :disabled="!isValid || submitting"
-                            :class="{'opacity-50 cursor-not-allowed': !isValid || submitting}"
-                            class="btn btn-primary inline-flex items-center px-6 py-3 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed dark:bg-indigo-600 dark:hover:bg-indigo-700">
+                    <button type="submit"
+                            x-bind:disabled="!isValid || submitting"
+                            x-bind:class="{'opacity-50 cursor-not-allowed': !isValid || submitting}"
+                            class="btn btn-primary inline-flex items-center px-6 py-3 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed">
                         <span class="material-icons mr-2" x-show="!submitting">save</span>
                         <span class="material-icons mr-2 animate-spin" x-show="submitting">refresh</span>
-                        <span x-show="!submitting">{% if ar_content and ar_content.id %}Обновить{% else %}Создать{% endif %} AR контент</span>
+                        <span x-show="!submitting">
+                            {% if ar_content and ar_content.id %}Обновить AR контент{% else %}Создать AR контент{% endif %}
+                        </span>
                         <span x-show="submitting">Сохранение...</span>
                     </button>
                 </div>
@@ -302,22 +480,22 @@
                         Пожалуйста, заполните все обязательные поля:
                     </p>
                     <ul class="text-xs text-yellow-700 dark:text-yellow-300 list-disc list-inside">
-                        <li x-show="!formData.company_id">Компания</li>
-                        <li x-show="!formData.project_id">Проект</li>
-                        <li x-show="!formData.customer_name">Имя заказчика</li>
-                        <li x-show="!formData.duration_years">Период действия</li>
+                        <li x-show="!selectedCompany">Компания</li>
+                        <li x-show="!selectedProject">Проект</li>
+                        <li x-show="!document.getElementById('customer_name')?.value">Имя заказчика</li>
+                        <li x-show="!document.getElementById('duration_years')?.value">Период действия</li>
                         <li x-show="!arContent || !arContent.id">
-                            <span x-show="!formData.photo_file">Портрет (изображение)</span>
-                            <span x-show="!formData.video_file">Видео</span>
+                            <span x-show="!document.querySelector('input[type=file][name=photo_file]')?.files.length > 0">Портрет (изображение)</span>
+                            <span x-show="!document.querySelector('input[type=file][name=video_file]')?.files.length > 0">Видео</span>
                         </li>
                     </ul>
                 </div>
                 
                 <!-- Development helper - remove in production -->
-                <div x-show="canSubmitWithoutFiles && !isValid" class="mt-2 p-2 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-md">
+                <div x-show="!isValid && (arContent && arContent.id)" class="mt-2 p-2 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-md">
                     <p class="text-xs text-blue-700 dark:text-blue-300">
                         <span class="material-icons text-xs mr-1">bug_report</span>
-                        Для тестирования: загрузите изображения и видео, чтобы активировать кнопку создания
+                        Для тестирования: проверьте правильность заполнения полей
                     </p>
                 </div>
             </div>
@@ -336,8 +514,8 @@ function photoUploader() {
         
         init() {
             // Initialize with existing photo if editing
-            if (window.arContentFormInstance && window.arContentFormInstance.arContent && window.arContentFormInstance.arContent.photo_url) {
-                this.previewUrl = window.arContentFormInstance.arContent.photo_url;
+            if (this.$root.arContent && this.$root.arContent.photo_url) {
+                this.previewUrl = this.$root.arContent.photo_url;
             }
         },
         
@@ -375,11 +553,6 @@ function photoUploader() {
             
             this.selectedFile = file;
             this.previewUrl = URL.createObjectURL(file);
-            
-            // Update parent form data
-            if (window.arContentFormInstance) {
-                window.arContentFormInstance.formData.photo_file = file;
-            }
         },
         
         removeFile() {
@@ -389,11 +562,6 @@ function photoUploader() {
             }
             this.previewUrl = null;
             this.$refs.fileInput.value = '';
-            
-            // Update parent form data
-            if (window.arContentFormInstance) {
-                window.arContentFormInstance.formData.photo_file = null;
-            }
         },
         
         formatFileSize(bytes) {
@@ -405,8 +573,8 @@ function photoUploader() {
         },
         
         showToast(message, type = 'info') {
-            if (window.arContentFormInstance) {
-                window.arContentFormInstance.showToast(message, type);
+            if (this.$root.showToast) {
+                this.$root.showToast(message, type);
             }
         }
     }
@@ -422,8 +590,8 @@ function videoUploader() {
         
         init() {
             // Initialize with existing video if editing
-            if (window.arContentFormInstance && window.arContentFormInstance.arContent && window.arContentFormInstance.arContent.video_url) {
-                this.previewUrl = window.arContentFormInstance.arContent.video_url;
+            if (this.$root.arContent && this.$root.arContent.video_url) {
+                this.previewUrl = this.$root.arContent.video_url;
             }
         },
         
@@ -461,11 +629,6 @@ function videoUploader() {
             
             this.selectedFile = file;
             this.previewUrl = URL.createObjectURL(file);
-            
-            // Update parent form data
-            if (window.arContentFormInstance) {
-                window.arContentFormInstance.formData.video_file = file;
-            }
         },
         
         removeFile() {
@@ -475,11 +638,6 @@ function videoUploader() {
             }
             this.previewUrl = null;
             this.$refs.fileInput.value = '';
-            
-            // Update parent form data
-            if (window.arContentFormInstance) {
-                window.arContentFormInstance.formData.video_file = null;
-            }
         },
         
         formatFileSize(bytes) {
@@ -491,192 +649,9 @@ function videoUploader() {
         },
         
         showToast(message, type = 'info') {
-            if (window.arContentFormInstance) {
-                window.arContentFormInstance.showToast(message, type);
+            if (this.$root.showToast) {
+                this.$root.showToast(message, type);
             }
-        }
-    }
-}
-
-function arContentForm(arContent = {}, companies = [], projects = []) {
-    // Store instance globally for child components
-    window.arContentFormInstance = this;
-    
-    console.log('Initializing AR Content Form with data:', {
-        arContent,
-        companies: companies.length,
-        projects: projects.length,
-        companiesData: companies,
-        projectsData: projects
-    });
-    
-    return {
-        arContent: arContent,
-        companies: companies,
-        projects: projects,
-        submitting: false,
-        formData: {
-            company_id: arContent.company_id || '',
-            project_id: arContent.project_id || '',
-            customer_name: arContent.customer_name || '',
-            customer_phone: arContent.customer_phone || '',
-            customer_email: arContent.customer_email || '',
-            duration_years: arContent.duration_years || '1',
-            photo_file: null,
-            video_file: null,
-            status: arContent.status || 'pending'
-        },
-        
-        get filteredProjects() {
-            if (!this.formData.company_id) return [];
-            
-            console.log('Filtering projects for company:', this.formData.company_id);
-            console.log('Available projects:', this.projects);
-            
-            const filtered = this.projects.filter(project => {
-                // Handle both string and integer company_id comparisons
-                const projectCompanyId = String(project.company_id);
-                const selectedCompanyId = String(this.formData.company_id);
-                const matches = projectCompanyId === selectedCompanyId;
-                
-                if (matches) {
-                    console.log('Project matches:', project.name, 'company_id:', project.company_id);
-                }
-                
-                return matches;
-            });
-            
-            console.log('Filtered projects:', filtered);
-            return filtered;
-        },
-        
-        get isValid() {
-            // Для новых записей требуем наличие файлов
-            if (!this.arContent || !this.arContent.id) {
-                const hasBasicFields = this.formData.company_id &&
-                       this.formData.project_id &&
-                       this.formData.customer_name &&
-                       this.formData.duration_years;
-                       
-                const hasFiles = this.formData.photo_file && this.formData.video_file;
-                
-                const isValid = hasBasicFields && hasFiles;
-                
-                console.log('Validation check:', {
-                    company_id: this.formData.company_id,
-                    project_id: this.formData.project_id,
-                    customer_name: this.formData.customer_name,
-                    duration_years: this.formData.duration_years,
-                    photo_file: this.formData.photo_file,
-                    video_file: this.formData.video_file,
-                    hasBasicFields,
-                    hasFiles,
-                    isValid: isValid
-                });
-                
-                return isValid;
-            } else {
-                // Для редактирования разрешаем сохранение без новых файлов, если уже есть существующие
-                const hasPhoto = this.formData.photo_file || (this.arContent && this.arContent.photo_url);
-                const hasVideo = this.formData.video_file || (this.arContent && this.arContent.video_url);
-                
-                return this.formData.company_id &&
-                       this.formData.project_id &&
-                       this.formData.customer_name &&
-                       this.formData.duration_years &&
-                       hasPhoto &&
-                       hasVideo;
-            }
-        },
-        
-        get canSubmitWithoutFiles() {
-            // Allow form submission without files for testing/debugging
-            return this.formData.company_id &&
-                   this.formData.project_id &&
-                   this.formData.customer_name &&
-                   this.formData.duration_years;
-        },
-        
-        updateProjects() {
-            // Reset project selection when company changes
-            this.formData.project_id = '';
-        },
-        
-        async handleSubmit() {
-            if (!this.isValid) {
-                this.showToast('Пожалуйста, заполните все обязательные поля', 'error');
-                return;
-            }
-            
-            this.submitting = true;
-            
-            try {
-                const formData = new FormData();
-                formData.append('company_id', this.formData.company_id);
-                formData.append('project_id', this.formData.project_id);
-                formData.append('customer_name', this.formData.customer_name);
-                formData.append('customer_phone', this.formData.customer_phone);
-                formData.append('customer_email', this.formData.customer_email);
-                formData.append('duration_years', this.formData.duration_years);
-                
-                // Добавляем файлы только если они были выбраны
-                if (this.formData.photo_file) {
-                    formData.append('photo_file', this.formData.photo_file);
-                }
-                if (this.formData.video_file) {
-                    formData.append('video_file', this.formData.video_file);
-                }
-                
-                if (this.arContent && this.arContent.id) {
-                    // Update existing AR content
-                    formData.append('_method', 'PUT');
-                    
-                    const response = await fetch(`/companies/${this.formData.company_id}/projects/${this.formData.project_id}/ar-content/${this.arContent.id}`, {
-                        method: 'POST',
-                        body: formData
-                    });
-                    
-                    if (response.ok) {
-                        this.showToast('AR контент успешно обновлен', 'success');
-                        window.location.href = `/ar-content/${this.arContent.id}`;
-                    } else {
-                        throw new Error('Update failed');
-                    }
-                } else {
-                    // Create new AR content
-                    const response = await fetch(`/companies/${this.formData.company_id}/projects/${this.formData.project_id}/ar-content`, {
-                        method: 'POST',
-                        body: formData
-                    });
-                    
-                    if (response.ok) {
-                        const result = await response.json();
-                        this.showToast('AR контент успешно создан', 'success');
-                        window.location.href = `/ar-content/${result.id}`;
-                    } else {
-                        throw new Error('Create failed');
-                    }
-                }
-            } catch (error) {
-                this.showToast('Не удалось сохранить AR контент', 'error');
-                console.error('Submit error:', error);
-            } finally {
-                this.submitting = false;
-            }
-        },
-        
-        showToast(message, type = 'info') {
-            const toast = document.createElement('div');
-            const bgColor = type === 'success' ? 'bg-green-500' : type === 'error' ? 'bg-red-500' : 'bg-blue-500';
-            toast.className = `fixed bottom-4 right-4 ${bgColor} text-white px-4 py-2 rounded shadow z-50`;
-            toast.textContent = message;
-            document.body.appendChild(toast);
-            
-            setTimeout(() => {
-                if (document.body.contains(toast)) {
-                    document.body.removeChild(toast);
-                }
-            }, 3000);
         }
     }
 }
