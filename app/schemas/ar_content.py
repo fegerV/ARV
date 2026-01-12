@@ -131,18 +131,25 @@ class ARContentWithLinks(BaseModel):
     id: int
     order_number: str
     unique_link: Optional[str] = None
-    public_url: Optional[str] = None # Public URL for AR viewer
+    public_url: Optional[str] = None  # Public URL for AR viewer
     company_id: int  # Company ID
-    project_id: int # Project ID
+    project_id: int  # Project ID
     storage_path: Optional[str] = None  # Local storage path
+
+    customer_name: Optional[str] = None
+    customer_phone: Optional[str] = None
+    customer_email: Optional[str] = None
+    duration_years: Optional[int] = None
+
     qr_code_url: str
     photo_url: str
-    thumbnail_url: Optional[str] = None # Thumbnail URL for photo preview
+    thumbnail_url: Optional[str] = None  # Thumbnail URL for photo preview
     video_url: str
     views_count: int
     status: str
     created_at: datetime
     updated_at: datetime
+
     company_name: Optional[str] = None  # Company name
     project_name: Optional[str] = None  # Project name
     marker_url: Optional[str] = None  # URL to the AR marker file
@@ -150,7 +157,7 @@ class ARContentWithLinks(BaseModel):
     marker_metadata: Optional[Dict[str, Any]] = None  # Additional marker metadata
     videos: List[VideoResponse] = []
     active_video: Optional[VideoResponse] = None
-    
+
     class Config:
         from_attributes = True
 

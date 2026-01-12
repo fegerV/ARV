@@ -28,7 +28,7 @@ def _generate_project_links(project_id: int) -> ProjectLinks:
 
 
 # Эндпоинт для получения проектов по ID компании (для использования в формах)
-@router.get("/api/projects/by-company/{company_id}")
+@router.get("/projects/by-company/{company_id}")
 async def get_projects_by_company(
     company_id: int,
     db: AsyncSession = Depends(get_db),
@@ -36,25 +36,29 @@ async def get_projects_by_company(
 ):
     """Get projects filtered by company ID - specifically for form dropdowns"""
     logger = structlog.get_logger()
-    
+
     # Verify company exists
     company = await db.get(Company, company_id)
     if not company:
         raise HTTPException(status_code=404, detail="Company not found")
-    
+
     # Get projects for the company
     query = select(Project).where(Project.company_id == company_id).order_by(Project.name)
     result = await db.execute(query)
     projects = result.scalars().all()
-    
+
     # Format response for frontend
     projects_data = []
     for project in projects:
         # Count AR content for this project
-        ar_content_count_query = select(func.count()).select_from(ARContent).where(ARContent.project_id == project.id)
+        ar_content_count_query = (
+            select(func.count())
+            .select_from(ARContent)
+            .where(ARContent.project_id == project.id)
+        )
         ar_content_count_result = await db.execute(ar_content_count_query)
         ar_content_count = ar_content_count_result.scalar()
-        
+
         projects_data.append({
             "id": project.id,
             "name": project.name,
@@ -62,11 +66,11 @@ async def get_projects_by_company(
             "company_id": project.company_id,
             "ar_content_count": ar_content_count,
             "created_at": project.created_at.isoformat() if project.created_at else None,
-            "updated_at": project.updated_at.isoformat() if project.updated_at else None
+            "updated_at": project.updated_at.isoformat() if project.updated_at else None,
         })
-    
+
     logger.info("company_projects_fetched", company_id=company_id, count=len(projects_data))
-    
+
     return {"projects": projects_data}
 
 

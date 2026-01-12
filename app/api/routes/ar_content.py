@@ -658,6 +658,75 @@ async def update_ar_content(
     return ARContentSchema.model_validate(ar_content)
 
 
+@router.patch("/companies/{company_id}/projects/{project_id}/ar-content/{content_id}/photo", response_model=ARContentSchema, tags=["AR Content"])
+async def update_ar_content_photo(
+    company_id: int,
+    project_id: int,
+    content_id: int,
+    photo: UploadFile = File(...),
+    db: AsyncSession = Depends(get_db)
+):
+    """Replace the photo for AR content and re-generate dependent assets (thumbnail, marker)."""
+    # Validate company and project relationship
+    await validate_company_project(company_id, project_id, db)
+
+    # Get AR content
+    ar_content = await get_ar_content_or_404(content_id, db)
+
+    # Verify it belongs to the specified company and project
+    if ar_content.company_id != company_id or ar_content.project_id != project_id:
+        raise HTTPException(status_code=404, detail="AR content not found in specified project")
+
+    # Build storage path
+    storage_path = build_ar_content_storage_path(company_id, project_id, ar_content.unique_id)
+    storage_path.mkdir(parents=True, exist_ok=True)
+
+    # Save new photo
+    photo_filename = f"photo{Path(photo.filename).suffix}"
+    photo_path = storage_path / photo_filename
+    await save_uploaded_file(photo, photo_path)
+
+    # Update database
+    ar_content.photo_path = str(photo_path)
+    ar_content.photo_url = build_public_url(photo_path)
+
+    # (Best-effort) regenerate thumbnail
+    try:
+        thumbnail_result = await thumbnail_service.generate_image_thumbnail(
+            image_path=str(photo_path),
+            company_id=company_id,
+        )
+        if thumbnail_result.get("status") == "ready":
+            ar_content.thumbnail_url = thumbnail_result.get("thumbnail_url")
+        else:
+            logger.warning("photo_thumbnail_generation_failed", error=thumbnail_result.get("error"))
+    except Exception as e:
+        logger.error("photo_thumbnail_generation_exception", error=str(e))
+
+    # (Best-effort) regenerate MindAR marker
+    try:
+        marker_result = await marker_service.generate_marker(
+            ar_content_id=ar_content.id,
+            image_path=str(photo_path),
+            output_dir=str(storage_path),
+        )
+
+        ar_content.marker_path = marker_result.get("marker_path")
+        ar_content.marker_url = marker_result.get("marker_url")
+        ar_content.marker_status = marker_result.get("status")
+        ar_content.marker_metadata = marker_result.get("metadata")
+
+        if marker_result.get("status") == "failed":
+            logger.error("marker_generation_failed", error=marker_result.get("error"))
+    except Exception as e:
+        logger.error("marker_generation_exception", error=str(e))
+
+    await db.commit()
+    await db.refresh(ar_content)
+
+    return ARContentSchema.model_validate(ar_content)
+
+
 @router.patch("/companies/{company_id}/projects/{project_id}/ar-content/{content_id}/video", response_model=ARContentSchema, tags=["AR Content"])
 async def update_ar_content_video(
     company_id: int,
