@@ -47,6 +47,7 @@ class ProjectListItem(BaseModel):
     id: str
     name: str
     status: ProjectStatus
+    company_id: int = Field(..., description="Company ID")
     ar_content_count: int = Field(..., description="Number of AR content items for this project")
     created_at: datetime
     _links: ProjectLinks
