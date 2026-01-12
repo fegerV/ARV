@@ -81,3 +81,10 @@ celerybeat.pid
 # OS
 Thumbs.db
 .DS_Store
+
+# Test scripts and helpers
+test_admin_pages.py
+test_api_and_pages.py
+create_test_projects.py
+final_admin_check.py
+server.log
