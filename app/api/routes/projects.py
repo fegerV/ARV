@@ -126,6 +126,7 @@ async def list_projects(
            id=str(project.id),
            name=project.name,
            status=project.status,
+           company_id=project.company_id,
            ar_content_count=ar_content_count,
            created_at=project.created_at,
            _links=_generate_project_links(project.id)
@@ -190,6 +191,7 @@ async def list_projects_for_company(
             id=str(project.id),
             name=project.name,
             status=project.status,
+            company_id=project.company_id,
             ar_content_count=ar_content_count,
             created_at=project.created_at,
             _links=_generate_project_links(project.id)

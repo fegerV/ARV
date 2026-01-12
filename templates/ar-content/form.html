@@ -6,6 +6,7 @@
 {% block content %}
 <div x-data="{
     companies: {{ companies_js | tojson }},
+    allProjects: {{ projects_js | tojson }},
     projects: [],
     selectedCompany: '{{ ar_content.company_id if ar_content and ar_content.company_id else '' }}',
     selectedProject: '{{ ar_content.project_id if ar_content and ar_content.project_id else '' }}',
@@ -14,11 +15,15 @@
     submitting: false,
 
     init() {
-        if (this.arContent && this.arContent.company_id) {
-            this.selectedCompany = String(this.arContent.company_id);
-            this.selectedProject = String(this.arContent.project_id || '');
+        // Initial projects load if company is pre-selected (e.g. in edit mode)
+        if (this.selectedCompany) {
             this.loadProjects();
         }
+
+        // Watch for company changes to reload projects
+        this.$watch('selectedCompany', (value) => {
+            this.loadProjects();
+        });
     },
 
     async loadProjects() {
@@ -29,29 +34,52 @@
         }
 
         this.loading = true;
+
+        // Step 1: Try to filter from allProjects first (optimistic load)
+        const localProjects = this.allProjects.filter(p => String(p.company_id) === String(this.selectedCompany));
+        if (localProjects.length > 0) {
+            this.projects = localProjects;
+            // We still continue to fetch from API to get the most fresh/complete list
+        }
+
         try {
             const response = await fetch(`/api/projects/by-company/${this.selectedCompany}`);
             if (!response.ok) {
-                let errorPayload = null;
-                try {
-                    errorPayload = await response.json();
-                } catch (e) {
-                    // ignore
+                // If local projects exist, we don't throw to avoid UI disruption
+                if (this.projects.length === 0) {
+                    let errorPayload = null;
+                    try {
+                        errorPayload = await response.json();
+                    } catch (e) {}
+                    throw new Error(errorPayload?.detail || response.statusText || 'Не удалось загрузить проекты');
                 }
-                throw new Error(errorPayload?.detail || response.statusText || 'Не удалось загрузить проекты');
+                return;
             }
 
             const data = await response.json();
-            this.projects = data.projects || [];
+            const apiProjects = data.projects || [];
 
+            // Merge or replace projects
+            if (apiProjects.length > 0) {
+                this.projects = apiProjects;
+            } else if (localProjects.length > 0) {
+                // Keep local ones if API returned empty but we have some locals
+                this.projects = localProjects;
+            } else {
+                this.projects = [];
+            }
+
+            // Validate selected project
             if (this.selectedProject && !this.projects.some(p => String(p.id) === String(this.selectedProject))) {
                 this.selectedProject = '';
             }
         } catch (error) {
             console.error('Ошибка при загрузке проектов:', error);
-            this.projects = [];
-            this.selectedProject = '';
-            this.showToast(error?.message || 'Не удалось загрузить проекты', 'error');
+            if (this.projects.length === 0) {
+                this.projects = [];
+                this.selectedProject = '';
+                this.showToast(error?.message || 'Не удалось загрузить проекты', 'error');
+            }
         } finally {
             this.loading = false;
         }
