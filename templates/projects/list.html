@@ -305,24 +305,29 @@ function projectsManager() {
             if (!this.deleteProject.id) return;
             
             this.isDeleting = true;
+            const projectId = this.deleteProject.id;
             
-            fetch(`/projects/${this.deleteProject.id}`, {
+            console.log('Attempting to delete project:', projectId);
+            
+            fetch(`/projects/${projectId}`, {
                 method: 'DELETE',
                 headers: {
                     'Content-Type': 'application/json'
                 }
             })
             .then(response => {
+                console.log('Delete response status:', response.status);
                 if (response.ok) {
                     // Remove row from table with animation
-                    const row = document.getElementById(`project-${this.deleteProject.id}`);
+                    const row = document.getElementById(`project-${projectId}`);
+                    console.log('Found row element:', !!row);
                     if (row) {
                         row.style.transition = 'opacity 0.3s ease';
                         row.style.opacity = '0';
                         setTimeout(() => {
                             row.remove();
                             // Update count
-                            this.projects = this.projects.filter(p => p.id != this.deleteProject.id);
+                            this.projects = this.projects.filter(p => p.id != projectId);
                             this.totalCount--;
                         }, 300);
                     }

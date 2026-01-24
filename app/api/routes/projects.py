@@ -391,7 +391,7 @@ async def delete_project_general(
        )
    
    # Delete project
-   await db.delete(project)
+   db.delete(project)
    await db.commit()
    
    logger.info("project_deleted", project_id=project_id, name=project.name)
@@ -550,7 +550,7 @@ async def delete_project(
         )
     
     # Delete project
-    await db.delete(project)
+    db.delete(project)
     await db.commit()
     
     logger.info("project_deleted", project_id=project_id, name=project.name)
