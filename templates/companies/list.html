@@ -4,149 +4,334 @@
 {% block page_title %}Companies{% endblock %}
 
 {% block content %}
-<div x-data="companiesList()" class="page-container">
-    <div class="page-header">
+<div x-data="companiesManager()" class="space-y-6">
+    <!-- Page Header -->
+    <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-            <h2 class="page-title">Companies</h2>
-            <p class="page-subtitle">Manage companies and their storage providers</p>
+            <h2 class="text-2xl font-semibold text-gray-900 dark:text-white">Companies</h2>
+            <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">Manage organizations and their storage configurations</p>
         </div>
-        <div class="page-actions">
-            <a href="/companies/create" class="btn btn-primary">
-                Add Company
-            </a>
-        </div>
+        <a href="/companies/create" class="btn btn-primary inline-flex items-center gap-2">
+            <span class="material-icons text-lg">add</span>
+            New Company
+        </a>
     </div>
-    
-    <!-- Filters -->
-    <div class="card mb-6">
-        <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+
+    <!-- Filters Card -->
+    <div class="bg-white dark:bg-gray-800 shadow rounded-lg p-6">
+        <div class="flex items-center justify-between mb-4">
+            <h3 class="text-lg font-medium text-gray-900 dark:text-white">Filters</h3>
+            <button @click="resetFilters" class="text-sm text-indigo-600 hover:text-indigo-700 dark:text-indigo-400 dark:hover:text-indigo-300 font-medium">
+                Reset
+            </button>
+        </div>
+        
+        <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            <!-- Status Filter -->
             <div>
-                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Status</label>
-                <select class="form-select"
-                        x-model="filters.status">
+                <label for="status-filter" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Status
+                </label>
+                <select 
+                    id="status-filter"
+                    x-model="filters.status"
+                    @change="applyFilters"
+                    class="form-select w-full">
                     <option value="">All Statuses</option>
                     <option value="active">Active</option>
                     <option value="inactive">Inactive</option>
                 </select>
             </div>
+
+            <!-- Search -->
             <div>
-                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Storage Provider</label>
-                <select class="form-select"
-                        x-model="filters.storageProvider">
-                    <option value="">All Providers</option>
-                    <option value="local">Local</option>
-                    <option value="aws_s3">AWS S3</option>
-                    <option value="minio">MinIO</option>
-                    <option value="yandex_disk">Yandex Disk</option>
-                </select>
+                <label for="search-input" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Search
+                </label>
+                <input 
+                    id="search-input"
+                    type="text" 
+                    placeholder="Search by name or email..."
+                    x-model="filters.search"
+                    @input.debounce.300ms="applyFilters"
+                    class="form-input w-full border border-gray-300 dark:border-gray-600 rounded-lg px-4 py-2">
             </div>
-            <div>
-                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Search</label>
-                <input type="text" placeholder="Search companies..."
-                       class="form-input"
-                       x-model="filters.search"
-                       @input.debounce.300ms="searchCompanies">
-            </div>
+
+            <!-- Info -->
             <div class="flex items-end">
-                <button class="btn btn-primary w-full"
-                        @click="applyFilters">
-                    Apply Filters
+                <div class="w-full p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+                    <p class="text-sm text-blue-800 dark:text-blue-200">
+                        Showing <span x-text="companies.length" class="font-semibold">{{ companies|length }}</span> 
+                        of <span x-text="totalCount" class="font-semibold">{{ total_count }}</span> companies
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Companies Table -->
+    <div class="bg-white dark:bg-gray-800 shadow rounded-lg overflow-hidden">
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                <thead class="bg-gray-50 dark:bg-gray-900">
+                    <tr>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                            Company Name
+                        </th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                            Contact Email
+                        </th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                            Status
+                        </th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                            Projects
+                        </th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                            Created
+                        </th>
+                        <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                            Actions
+                        </th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
+                    {% if companies %}
+                        {% for company in companies %}
+                        <tr class="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors" id="company-{{ company.id }}">
+                            <td class="px-6 py-4 text-sm font-medium text-gray-900 dark:text-white">
+                                <a href="/companies/{{ company.id }}/edit" class="text-indigo-600 hover:text-indigo-700 dark:text-indigo-400 dark:hover:text-indigo-300">
+                                    {{ company.name }}
+                                </a>
+                            </td>
+                            <td class="px-6 py-4 text-sm text-gray-600 dark:text-gray-400">
+                                {{ company.contact_email }}
+                            </td>
+                            <td class="px-6 py-4 text-sm">
+                                {% if company.status == 'active' %}
+                                    <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-200">
+                                        <span class="inline-block w-2 h-2 bg-green-600 rounded-full"></span>
+                                        Active
+                                    </span>
+                                {% else %}
+                                    <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-200">
+                                        <span class="inline-block w-2 h-2 bg-yellow-600 rounded-full"></span>
+                                        Inactive
+                                    </span>
+                                {% endif %}
+                            </td>
+                            <td class="px-6 py-4 text-sm text-gray-600 dark:text-gray-400">
+                                <span class="inline-flex items-center justify-center w-7 h-7 rounded-full bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 text-xs font-semibold">
+                                    {{ company.projects_count|default('0') }}
+                                </span>
+                            </td>
+                            <td class="px-6 py-4 text-sm text-gray-600 dark:text-gray-400">
+                                {{ company.created_at }}
+                            </td>
+                            <td class="px-6 py-4 text-right">
+                                <div class="flex items-center justify-end gap-2">
+                                    <a href="/companies/{{ company.id }}/edit" 
+                                       class="inline-flex items-center gap-1 px-3 py-2 text-sm font-medium text-indigo-600 hover:bg-indigo-50 dark:text-indigo-400 dark:hover:bg-indigo-900/20 rounded-lg transition-colors"
+                                       title="Edit company">
+                                        <span class="material-icons text-base">edit</span>
+                                        <span class="hidden sm:inline">Edit</span>
+                                    </a>
+                                    <button @click="openDeleteModal('{{ company.id }}', '{{ company.name }}')" 
+                                       class="inline-flex items-center gap-1 px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20 rounded-lg transition-colors"
+                                       title="Delete company">
+                                        <span class="material-icons text-base">delete</span>
+                                        <span class="hidden sm:inline">Delete</span>
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    {% else %}
+                        <tr>
+                            <td colspan="6" class="px-6 py-12 text-center">
+                                <div class="flex flex-col items-center gap-2">
+                                    <span class="material-icons text-4xl text-gray-300 dark:text-gray-600">business</span>
+                                    <p class="text-gray-500 dark:text-gray-400">No companies found</p>
+                                    <a href="/companies/create" class="mt-2 text-sm text-indigo-600 hover:text-indigo-700 dark:text-indigo-400 dark:hover:text-indigo-300 font-medium">
+                                        Create your first company &rarr;
+                                    </a>
+                                </div>
+                            </td>
+                        </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Pagination -->
+    {% if total_pages > 1 %}
+    <nav class="flex items-center justify-between" aria-label="Pagination">
+        <a href="{% if page > 1 %}?page={{ page - 1 }}{% if search %}&search={{ search }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}{% else %}#{% endif %}"
+           class="inline-flex items-center gap-2 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm font-medium {% if page <= 1 %}text-gray-300 dark:text-gray-600 cursor-not-allowed{% else %}text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700{% endif %}">
+            <span class="material-icons text-base">chevron_left</span>
+            Previous
+        </a>
+        
+        <div class="flex items-center gap-2">
+            <span class="text-sm text-gray-600 dark:text-gray-400">
+                Page <span class="font-semibold">{{ page }}</span> of <span class="font-semibold">{{ total_pages }}</span>
+            </span>
+        </div>
+        
+        <a href="{% if page < total_pages %}?page={{ page + 1 }}{% if search %}&search={{ search }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}{% else %}#{% endif %}"
+           class="inline-flex items-center gap-2 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm font-medium {% if page >= total_pages %}text-gray-300 dark:text-gray-600 cursor-not-allowed{% else %}text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700{% endif %}">
+            Next
+            <span class="material-icons text-base">chevron_right</span>
+        </a>
+    </nav>
+    {% endif %}
+</div>
+
+<!-- Delete Confirmation Modal -->
+<div x-show="showDeleteModal" 
+     x-transition
+     @click.away="showDeleteModal = false"
+     class="fixed inset-0 z-50 overflow-y-auto" 
+     style="display: none;">
+    <div class="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+        <!-- Backdrop -->
+        <div x-show="showDeleteModal" 
+             x-transition.opacity
+             class="fixed inset-0 bg-gray-500 dark:bg-gray-900 bg-opacity-75 dark:bg-opacity-75 transition-opacity"
+             @click="showDeleteModal = false">
+        </div>
+
+        <!-- Modal Panel -->
+        <div x-show="showDeleteModal"
+             x-transition
+             class="inline-block align-bottom bg-white dark:bg-gray-800 rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+            
+            <div class="bg-white dark:bg-gray-800 px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                <div class="flex items-center justify-center w-12 h-12 mx-auto bg-red-100 dark:bg-red-900/20 rounded-full">
+                    <span class="material-icons text-red-600 dark:text-red-400">delete_outline</span>
+                </div>
+                
+                <h3 class="mt-4 text-lg font-medium text-gray-900 dark:text-white text-center">
+                    Delete Company
+                </h3>
+                
+                <p class="mt-2 text-sm text-gray-500 dark:text-gray-400 text-center">
+                    Are you sure you want to delete <span x-text="deleteCompany.name" class="font-semibold text-gray-900 dark:text-white"></span>? 
+                    This action cannot be undone.
+                </p>
+            </div>
+
+            <div class="bg-gray-50 dark:bg-gray-700/50 px-4 py-3 sm:flex sm:flex-row-reverse sm:px-6 gap-3">
+                <button @click="confirmDelete" 
+                        :disabled="isDeleting"
+                        class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-red-600 text-base font-medium text-white hover:bg-red-700 dark:bg-red-700 dark:hover:bg-red-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors sm:w-auto">
+                    <span x-show="!isDeleting">Delete Company</span>
+                    <span x-show="isDeleting" class="flex items-center gap-2">
+                        <span class="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+                        Deleting...
+                    </span>
+                </button>
+                <button @click="showDeleteModal = false"
+                        :disabled="isDeleting"
+                        class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 dark:border-gray-600 shadow-sm px-4 py-2 bg-white dark:bg-gray-800 text-base font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors sm:mt-0 sm:w-auto">
+                    Cancel
                 </button>
             </div>
         </div>
     </div>
-    
-    <!-- Companies table -->
-    <div class="card-table">
-        <div class="overflow-x-auto">
-            <table class="table">
-                <thead>
-                    <tr>
-                        <th scope="col">Name</th>
-                        <th scope="col">Contact Email</th>
-                        <th scope="col">Storage Provider</th>
-                        <th scope="col">Status</th>
-                        <th scope="col">Projects</th>
-                        <th scope="col">Created</th>
-                        <th scope="col" class="text-right">Actions</th>
-                    </tr>
-                </thead>
-                <tbody class="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-700">
-                    {% for company in companies %}
-                    <tr class="hover:bg-gray-50 dark:hover:bg-gray-800" id="company-{{ company.id }}">
-                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">{{ company.name }}</td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{{ company.contact_email }}</td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{{ company.storage_provider }}</td>
-                        <td class="px-6 py-4 whitespace-nowrap">
-                            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
-                                {% if company.status == 'active' %}bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-100
-                                {% else %}bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-100{% endif %}">
-                                {{ company.status }}
-                            </span>
-                        </td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{{ company.projects_count }}</td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{{ company.created_at | datetime_format }}</td>
-                        <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                            <a href="/companies/{{ company.id }}/edit" class="text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:hover:text-indigo-300 mr-3">Edit</a>
-                            <button @click="deleteCompany('{{ company.id }}')" 
-                                    class="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300">Delete</button>
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
-        
-        <!-- Pagination -->
-        {% include "components/pagination.html" %}
-    </div>
 </div>
 
 <script>
-function companiesList() {
+function companiesManager() {
     return {
         filters: {
-            status: '',
-            storageProvider: '',
-            search: ''
+            status: '{{ status_filter }}',
+            search: '{{ search }}'
         },
-        
-        showCreateForm() {
-            window.location.href = '/companies/create';
-        },
-        
-        searchCompanies() {
-            // Debounced search implementation
-            this.applyFilters();
-        },
-        
+        companies: {{ companies|tojson }},
+        totalCount: {{ total_count }},
+        showDeleteModal: false,
+        isDeleting: false,
+        deleteCompany: { id: null, name: '' },
+
         applyFilters() {
-            // Apply filters by updating URL parameters
             const params = new URLSearchParams();
             
-            if (this.filters.status) params.append('status', this.filters.status);
-            if (this.filters.storageProvider) params.append('storage_provider', this.filters.storageProvider);
-            if (this.filters.search) params.append('search', this.filters.search);
+            if (this.filters.status) {
+                params.append('status', this.filters.status);
+            }
+            if (this.filters.search) {
+                params.append('search', this.filters.search);
+            }
             
-            // Add pagination parameters if they exist
+            // Preserve page if set
             const urlParams = new URLSearchParams(window.location.search);
-            if (urlParams.get('page')) params.append('page', urlParams.get('page'));
-            if (urlParams.get('page_size')) params.append('page_size', urlParams.get('page_size'));
+            const page = urlParams.get('page');
+            if (page) {
+                params.append('page', page);
+            }
             
             window.location.search = params.toString();
         },
-        
-        deleteCompany(id) {
-            if (confirm('Are you sure you want to delete this company?')) {
-                // Using htmx to handle the delete request
-                htmx.ajax('DELETE', `/api/companies/${id}`, {
-                    target: `#company-${id}`,
-                    swap: 'outerHTML',
-                    headers: {
-                        'X-CSRF-Token': 'token' // Add CSRF token if required
+
+        resetFilters() {
+            this.filters.status = '';
+            this.filters.search = '';
+            window.location.href = '/companies';
+        },
+
+        openDeleteModal(companyId, companyName) {
+            this.deleteCompany = { id: companyId, name: companyName };
+            this.showDeleteModal = true;
+        },
+
+        confirmDelete() {
+            if (!this.deleteCompany.id) return;
+            
+            this.isDeleting = true;
+            const companyId = this.deleteCompany.id;
+            
+            console.log('Attempting to delete company:', companyId);
+            
+            fetch(`/companies/${companyId}`, {
+                method: 'DELETE',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            })
+            .then(response => {
+                console.log('Delete response status:', response.status);
+                if (response.ok) {
+                    // Remove row from table with animation
+                    const row = document.getElementById(`company-${companyId}`);
+                    console.log('Found row element:', !!row);
+                    if (row) {
+                        row.style.transition = 'opacity 0.3s ease';
+                        row.style.opacity = '0';
+                        setTimeout(() => {
+                            row.remove();
+                            // Update count
+                            this.companies = this.companies.filter(c => c.id != companyId);
+                            this.totalCount--;
+                        }, 300);
                     }
-                });
-            }
+                    this.showDeleteModal = false;
+                    this.isDeleting = false;
+                    
+                    // Show success toast
+                    showToast('Company deleted successfully', 'success');
+                } else {
+                    return response.json().then(data => {
+                        throw new Error(data.detail || 'Failed to delete company');
+                    });
+                }
+            })
+            .catch(error => {
+                console.error('Delete error:', error);
+                showToast('Error: ' + error.message, 'error');
+                this.isDeleting = false;
+            });
         }
     };
 }
