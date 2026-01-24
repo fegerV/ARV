@@ -23,27 +23,24 @@ async def projects_list(
     current_user=Depends(get_current_user_optional),
     db: AsyncSession = Depends(get_html_db)
 ):
-    """Projects list page."""
+    """Projects list page with filtering and pagination."""
     if not current_user:
-        # Redirect to login page if user is not authenticated
         return RedirectResponse(url="/admin/login", status_code=303)
     
     if not current_user.is_active:
-        # Redirect to login page if user is not active
         return RedirectResponse(url="/admin/login", status_code=303)
     
+    # Get query parameters
+    page = int(request.query_params.get("page", 1))
+    page_size = int(request.query_params.get("page_size", 20))
+    company_filter = request.query_params.get("company", "")
+    status_filter = request.query_params.get("status", "")
+    
+    # Convert filters to appropriate types
+    company_id_filter = int(company_filter) if company_filter and company_filter.isdigit() else None
+    
     try:
-        # Get query parameters for filtering and pagination
-        page = int(request.query_params.get("page", 1))
-        page_size = int(request.query_params.get("page_size", 10))
-        status_filter = request.query_params.get("status", "")
-        company_filter = request.query_params.get("company", "")
-        search_filter = request.query_params.get("search", "")
-        
-        # Prepare filter parameters for API
-        company_id_filter = int(company_filter) if company_filter and company_filter.isdigit() else None
-        
-        # Get projects from API with filters
+        # Get projects with filters
         result = await list_projects(
             page=page,
             page_size=page_size,
@@ -51,74 +48,54 @@ async def projects_list(
             db=db,
             current_user=current_user
         )
-        projects = [dict(item) for item in result.items]
         
-        # Get company names and AR content count for each project
-        from app.api.routes.companies import get_company
-        from app.models.ar_content import ARContent
+        projects = []
+        from app.models.company import Company
         from sqlalchemy import select
         
-        for project in projects:
-            try:
-                company = await get_company(int(project["company_id"]), db)
-                project["company_name"] = company.name
-            except Exception:
-                project["company_name"] = "Unknown Company"
+        for item in result.items:
+            project_dict = dict(item)
             
+            # Get company name
             try:
-                # Get AR content count for the project
-                from sqlalchemy import select
-                ar_content_count_query = select(func.count()).select_from(ARContent).where(ARContent.project_id == int(project["id"]))
-                ar_content_count_result = await db.execute(ar_content_count_query)
-                ar_content_count = ar_content_count_result.scalar()
-                project["ar_content_count"] = ar_content_count or 0
+                company = await db.get(Company, project_dict["company_id"])
+                project_dict["company_name"] = company.name if company else "Unknown"
             except Exception:
-                project["ar_content_count"] = 0
-    except Exception as e:
-        # Log the error for debugging
-        print(f"Error in projects_list: {str(e)}")
-        import traceback
-        traceback.print_exc()
+                project_dict["company_name"] = "Unknown"
+            
+            # Apply status filter if specified
+            if status_filter and project_dict.get("status") != status_filter:
+                continue
+            
+            projects.append(project_dict)
         
-        # For any error, return an empty list instead of mock data
-        # This prevents showing potentially outdated mock data when real data should be shown
+        total_count = result.total
+        total_pages = result.total_pages
+        
+    except Exception as e:
+        import structlog
+        logger = structlog.get_logger()
+        logger.error("projects_list_error", error=str(e))
         projects = []
-        # Also make sure total_count and total_pages are set appropriately
         total_count = 0
-        total_pages = 0
+        total_pages = 1
     
     # Get companies for filter dropdown
     try:
-        from app.api.routes.companies import list_companies
-        companies_result = await list_companies(page=1, page_size=100, db=db, current_user=current_user)
-        companies = [dict(item) for item in companies_result.items]
+        from app.models.company import Company
+        from sqlalchemy import select
+        
+        companies_query = select(Company).order_by(Company.name)
+        companies_result = await db.execute(companies_query)
+        companies = [
+            {"id": c.id, "name": c.name}
+            for c in companies_result.scalars().all()
+        ]
     except Exception as e:
-        # Log error and try direct database query as fallback
-        print(f"Error fetching companies via API: {e}")
-        try:
-            from sqlalchemy import select
-            from app.models.company import Company
-            
-            companies_query = select(Company)
-            companies_result = await db.execute(companies_query)
-            companies = []
-            for company in companies_result.scalars().all():
-                companies.append({
-                    "id": company.id,
-                    "name": company.name,
-                    "contact_email": company.contact_email,
-                    "status": company.status,
-                    "created_at": company.created_at,
-                    "updated_at": company.updated_at
-                })
-        except Exception as db_error:
-            print(f"Error fetching companies from database: {db_error}")
-            # fallback to mock data only as last resort
-            companies = PROJECT_CREATE_MOCK_DATA["companies"]
-    
-    # Calculate total pages
-    total_count = result.total if 'result' in locals() else len(projects)
-    total_pages = result.total_pages if 'result' in locals() else 1
+        import structlog
+        logger = structlog.get_logger()
+        logger.error("companies_fetch_error", error=str(e))
+        companies = []
     
     context = {
         "request": request,
@@ -128,13 +105,11 @@ async def projects_list(
         "page": page,
         "page_size": page_size,
         "total_count": total_count,
-        "total_pages": total_pages
+        "total_pages": total_pages,
+        "company_filter": company_filter,
+        "status_filter": status_filter
     }
     
-    # Handle the case where there was an exception and result is not defined
-    if 'result' not in locals():
-        context["total_count"] = len(projects)
-        context["total_pages"] = 1
     return templates.TemplateResponse("projects/list.html", context)
 
 @router.get("/projects/create", response_class=HTMLResponse)
