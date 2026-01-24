@@ -32,6 +32,13 @@ def _convert_enum_to_string(data_dict):
     """Convert enum values to strings in dictionary."""
     if "status" in data_dict and hasattr(data_dict["status"], "value"):
         data_dict["status"] = data_dict["status"].value
+    
+    # Convert datetime to ISO string if present
+    if "created_at" in data_dict and hasattr(data_dict["created_at"], "isoformat"):
+        data_dict["created_at"] = data_dict["created_at"].isoformat()
+    if "updated_at" in data_dict and hasattr(data_dict["updated_at"], "isoformat"):
+        data_dict["updated_at"] = data_dict["updated_at"].isoformat()
+    
     return data_dict
 
 @router.get("/projects", response_class=HTMLResponse)
