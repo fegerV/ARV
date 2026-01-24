@@ -120,7 +120,7 @@ class ThumbnailService:
             # Определяем имя файла превью
             if not thumbnail_name:
                 image_filename = Path(image_path).stem
-                thumbnail_name = f"{image_filename}_thumb.jpg"
+                thumbnail_name = f"{image_filename}_thumb.webp"
             
             # Генерируем превью в памяти
             with Image.open(image_path) as img:
@@ -134,7 +134,7 @@ class ThumbnailService:
                 # Сохраняем превью в байты
                 from io import BytesIO
                 buffer = BytesIO()
-                img.save(buffer, 'JPEG', quality=self.quality, optimize=True)
+                img.save(buffer, 'WEBP', quality=self.quality, method=6)
                 thumbnail_data = buffer.getvalue()
             
             # Если предоставлен провайдер, загружаем через него
@@ -145,7 +145,7 @@ class ThumbnailService:
                     thumbnail_data,
                     provider,
                     storage_path,
-                    "image/jpeg"
+                    "image/webp"
                 )
                 thumbnail_path = storage_path
             else:
@@ -229,7 +229,7 @@ class ThumbnailService:
             # Определяем имя файла превью
             if not thumbnail_name:
                 video_filename = Path(video_path).stem
-                thumbnail_name = f"{video_filename}_thumb.jpg"
+                thumbnail_name = f"{video_filename}_thumb.webp"
 
             # Путь к временному файлу кадра
             temp_frame_file = tempfile.NamedTemporaryFile(suffix='.png', delete=False)
@@ -276,7 +276,7 @@ class ThumbnailService:
                 # Сохраняем превью в байты
                 from io import BytesIO
                 buffer = BytesIO()
-                img.save(buffer, 'JPEG', quality=self.quality, optimize=True)
+                img.save(buffer, 'WEBP', quality=self.quality, method=6)
                 thumbnail_data = buffer.getvalue()
 
             # Удаляем временный файл
@@ -292,7 +292,7 @@ class ThumbnailService:
                     thumbnail_data,
                     provider,
                     storage_path,
-                    "image/jpeg"
+                    "image/webp"
                 )
                 thumbnail_path = storage_path
             else:

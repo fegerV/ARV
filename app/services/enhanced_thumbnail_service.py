@@ -98,7 +98,7 @@ class EnhancedThumbnailService:
         self.default_configs = [
             ThumbnailConfig(ThumbnailSize.SMALL, ThumbnailFormat.WEBP, 80),
             ThumbnailConfig(ThumbnailSize.MEDIUM, ThumbnailFormat.WEBP, 85),
-            ThumbnailConfig(ThumbnailSize.LARGE, ThumbnailFormat.JPEG, 90),
+            ThumbnailConfig(ThumbnailSize.LARGE, ThumbnailFormat.WEBP, 90),
         ]
         self.cache_ttl = 86400 * 30  # 30 days
         self.max_file_size = 50 * 1024 * 1024  # 50MB for source files

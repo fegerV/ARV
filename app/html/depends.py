@@ -5,8 +5,11 @@ from typing import List, Dict, Any, Optional
 from fastapi import Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
+import structlog
+
 from app.models.user import User
 from app.core.database import get_db
+from app.core.config import settings
 from app.api.routes.auth import get_current_active_user
 from app.api.routes.companies import list_companies, get_company
 from app.api.routes.projects import list_projects, get_project
@@ -17,6 +20,17 @@ from app.mock_data import (
     AR_CONTENT_DETAIL_MOCK_DATA, PROJECTS_MOCK_DATA, PROJECT_CREATE_MOCK_DATA,
     STORAGE_MOCK_DATA, ANALYTICS_MOCK_DATA, NOTIFICATIONS_MOCK_DATA, SETTINGS_MOCK_DATA
 )
+
+
+logger = structlog.get_logger()
+
+
+def _raise_or_use_mock(error: Exception) -> None:
+    """Raise in production; allow mock fallback in debug."""
+    if settings.DEBUG:
+        return
+    logger.exception("html_data_fetch_failed", error=str(error))
+    raise error
 
 
 async def get_dashboard_data(db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_active_user)) -> Dict[str, Any]:
@@ -46,8 +60,8 @@ async def get_dashboard_data(db: AsyncSession = Depends(get_db), current_user: U
             "companies": companies,
             "ar_content": ar_content
         }
-    except Exception:
-        # Fallback to mock data if API call fails
+    except Exception as exc:
+        _raise_or_use_mock(exc)
         return {
             "dashboard_data": DASHBOARD_MOCK_DATA,
             "companies": COMPANIES_MOCK_DATA,
@@ -60,8 +74,8 @@ async def get_companies_list(db: AsyncSession = Depends(get_db), current_user: U
     try:
         result = await list_companies(page=1, page_size=10, db=db, current_user=current_user)
         return [dict(item) for item in result.items]
-    except Exception:
-        # Fallback to mock data if API call fails
+    except Exception as exc:
+        _raise_or_use_mock(exc)
         return COMPANIES_MOCK_DATA
 
 
@@ -71,8 +85,8 @@ async def get_company_detail(company_id: int, db: AsyncSession = Depends(get_db)
         from app.schemas.company import Company as CompanySchema
         company = await get_company(company_id, db)
         return CompanySchema.model_validate(company).dict()
-    except Exception:
-        # Fallback to mock data if API call fails
+    except Exception as exc:
+        _raise_or_use_mock(exc)
         return {**AR_CONTENT_DETAIL_MOCK_DATA, "id": str(company_id)}
 
 
@@ -91,8 +105,8 @@ async def get_ar_content_list(db: AsyncSession = Depends(get_db), current_user: 
             "unique_companies": unique_companies,
             "unique_statuses": unique_statuses
         }
-    except Exception:
-        # Fallback to mock data if API call fails
+    except Exception as exc:
+        _raise_or_use_mock(exc)
         return {
             "ar_content_list": AR_CONTENT_MOCK_DATA,
             "unique_companies": PROJECT_CREATE_MOCK_DATA["companies"],
@@ -113,8 +127,8 @@ async def get_ar_content_detail(ar_content_id: int, db: AsyncSession = Depends(g
             ar_content['updated_at'] = ar_content['updated_at'].isoformat()
             
         return ar_content
-    except Exception:
-        # Fallback to mock data if API call fails
+    except Exception as exc:
+        _raise_or_use_mock(exc)
         return {**AR_CONTENT_DETAIL_MOCK_DATA, "id": str(ar_content_id)}
 
 
@@ -140,8 +154,8 @@ async def get_ar_content_create_data(db: AsyncSession = Depends(get_db), current
             "companies": companies,
             "projects": projects
         }
-    except Exception:
-        # Fallback to mock data if API call fails
+    except Exception as exc:
+        _raise_or_use_mock(exc)
         return PROJECT_CREATE_MOCK_DATA
 
 
@@ -150,8 +164,8 @@ async def get_projects_list(db: AsyncSession = Depends(get_db), current_user: Us
     try:
         result = await list_projects(page=1, page_size=10, db=db, current_user=current_user)
         return [dict(item) for item in result.items]
-    except Exception:
-        # Fallback to mock data if API call fails
+    except Exception as exc:
+        _raise_or_use_mock(exc)
         return PROJECTS_MOCK_DATA
 
 
@@ -160,8 +174,8 @@ async def get_project_detail(project_id: int, db: AsyncSession = Depends(get_db)
     try:
         project = await get_project(project_id, db)
         return dict(project)
-    except Exception:
-        # Fallback to mock data if API call fails
+    except Exception as exc:
+        _raise_or_use_mock(exc)
         return {**PROJECTS_MOCK_DATA[0], "id": str(project_id)}
 
 
@@ -170,8 +184,8 @@ async def get_project_create_data(db: AsyncSession = Depends(get_db), current_us
     try:
         companies_result = await list_companies(page=1, page_size=100, db=db, current_user=current_user)
         return [dict(item) for item in companies_result.items]
-    except Exception:
-        # Fallback to mock data if API call fails
+    except Exception as exc:
+        _raise_or_use_mock(exc)
         return PROJECT_CREATE_MOCK_DATA["companies"]
 
 

@@ -35,7 +35,7 @@ echo OK: Миграции применены
 echo.
 
 echo [4/4] Создание тестовых данных...
-python create_test_data.py
+python scripts\legacy\create_test_data.py
 echo.
 
 echo ========================================

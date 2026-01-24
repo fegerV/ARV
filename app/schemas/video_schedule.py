@@ -1,6 +1,5 @@
 from datetime import datetime
 from typing import Optional, List
-from uuid import UUID
 from pydantic import BaseModel, Field
 
 
@@ -11,7 +10,7 @@ class VideoScheduleBase(BaseModel):
 
 
 class VideoScheduleCreate(VideoScheduleBase):
-    video_id: UUID
+    video_id: int
 
 
 class VideoScheduleUpdate(BaseModel):
@@ -21,8 +20,8 @@ class VideoScheduleUpdate(BaseModel):
 
 
 class VideoScheduleInDBBase(VideoScheduleBase):
-    id: UUID
-    video_id: UUID
+    id: int
+    video_id: int
     status: str
     created_at: datetime
     updated_at: datetime
@@ -45,12 +44,12 @@ class VideoRotationUpdate(BaseModel):
 
 class VideoSetActiveResponse(BaseModel):
     status: str
-    active_video_id: UUID
+    active_video_id: int
     message: str
 
 
 class VideoStatusResponse(BaseModel):
-    id: UUID
+    id: int
     title: Optional[str]
     video_url: Optional[str]
     preview_url: Optional[str]

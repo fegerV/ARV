@@ -6,14 +6,14 @@
 {% block content %}
 <div x-data="companyForm()">
     <div class="max-w-3xl mx-auto">
-        <div class="bg-white dark:bg-gray-900 shadow rounded-lg p-6">
+        <div class="card">
             <form method="POST" action="{% if company %}/companies/{{ company.id }}{% else %}/companies{% endif %}">
                 <div class="space-y-6">
                     <div>
                         <label for="name" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Company Name *</label>
                         <input type="text" name="name" id="name" 
                                value="{% if company %}{{ company.name }}{% endif %}"
-                               class="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 py-2 px-3 shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm dark:text-white"
+                               class="form-input mt-1"
                                required>
                     </div>
                     
@@ -21,13 +21,13 @@
                         <label for="contact_email" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Contact Email</label>
                         <input type="email" name="contact_email" id="contact_email" 
                                value="{% if company %}{{ company.contact_email }}{% endif %}"
-                               class="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 py-2 px-3 shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm dark:text-white">
+                               class="form-input mt-1">
                     </div>
                     
                     <div>
                         <label for="status" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Status</label>
                         <select name="status" id="status" 
-                                class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 py-2 px-3 shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm dark:text-white">
+                                class="form-select mt-1">
                             <option value="active" {% if not company or company.status == 'active' %}selected{% endif %}>Active</option>
                             <option value="inactive" {% if company and company.status == 'inactive' %}selected{% endif %}>Inactive</option>
                         </select>
@@ -35,10 +35,10 @@
                 </div>
                 
                 <div class="mt-8 flex justify-end space-x-3">
-                    <a href="/companies" class="inline-flex items-center px-4 py-2 border border-gray-30 dark:border-gray-600 shadow-sm text-sm font-medium rounded-md text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                    <a href="/companies" class="btn btn-secondary">
                         Cancel
                     </a>
-                    <button type="submit" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                    <button type="submit" class="btn btn-primary">
                         {% if company %}Update Company{% else %}Create Company{% endif %}
                     </button>
                 </div>

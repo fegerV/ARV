@@ -15,6 +15,15 @@
             }
         }
     </script>
+    <script>
+        (function () {
+            const stored = localStorage.getItem('darkMode');
+            const enabled = stored === null ? true : stored === 'true';
+            if (enabled) {
+                document.documentElement.classList.add('dark');
+            }
+        })();
+    </script>
     
     <!-- htmx from CDN -->
     <script src="https://unpkg.com/htmx.org@1.9.10"></script>
@@ -194,9 +203,38 @@
             @apply px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400;
         }
         
+        /* Page layout helpers */
+        .page-container {
+            @apply max-w-7xl mx-auto space-y-6;
+        }
+
+        .page-header {
+            @apply flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between;
+        }
+
+        .page-title {
+            @apply text-2xl font-semibold text-gray-900 dark:text-white;
+        }
+
+        .page-subtitle {
+            @apply text-sm text-gray-500 dark:text-gray-400;
+        }
+
+        .page-actions {
+            @apply flex items-center gap-2;
+        }
+
         /* Enhanced card styles */
         .card {
             @apply bg-white dark:bg-gray-800 shadow rounded-lg p-6;
+        }
+
+        .card-muted {
+            @apply border border-gray-200 dark:border-gray-700;
+        }
+
+        .card-table {
+            @apply bg-white dark:bg-gray-900 shadow rounded-lg overflow-hidden;
         }
         
         /* Enhanced form styles */
@@ -304,7 +342,7 @@
     
     {% block extra_head %}{% endblock %}
 </head>
-<body class="min-h-screen bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-10">
+<body class="min-h-screen bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100">
     <!-- Include sidebar component -->
     {% include "components/sidebar.html" %}
     
@@ -331,9 +369,13 @@
         // Initialize Alpine.js stores
         document.addEventListener('alpine:init', () => {
             Alpine.store('darkMode', {
-                darkMode: localStorage.getItem('darkMode') === 'true',
-                
+                darkMode: localStorage.getItem('darkMode') !== 'false',
+
                 init() {
+                    if (localStorage.getItem('darkMode') === null) {
+                        localStorage.setItem('darkMode', 'true');
+                    }
+                    this.darkMode = localStorage.getItem('darkMode') === 'true';
                     if (this.darkMode) {
                         document.documentElement.classList.add('dark');
                     } else {

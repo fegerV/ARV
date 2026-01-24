@@ -572,6 +572,12 @@ class EnhancedValidationService:
             edge_density = np.sum(edges > 0) / edges.size
             
             result.metadata['edge_density'] = float(edge_density)
+
+            # Brightness, contrast, and sharpness metrics
+            gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+            result.metadata['brightness'] = float(np.mean(gray))
+            result.metadata['contrast'] = float(np.std(gray))
+            result.metadata['sharpness'] = float(cv2.Laplacian(gray, cv2.CV_64F).var())
             
             if edge_density < 0.01:
                 result.warnings.append("Very low edge density - possibly simple graphic")

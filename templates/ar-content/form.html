@@ -4,247 +4,11 @@
 {% block page_title %}{% if ar_content and ar_content.id %}Edit AR Content{% else %}Create AR Content{% endif %}{% endblock %}
 
 {% block content %}
-<div x-data="{
-    companies: {{ companies_js | tojson }},
-    allProjects: {{ projects_js | tojson }},
-    projects: [],
-    selectedCompany: '{{ ar_content.company_id if ar_content and ar_content.company_id else '' }}',
-    selectedProject: '{{ ar_content.project_id if ar_content and ar_content.project_id else '' }}',
-    arContent: {{ ar_content|tojson if ar_content else 'null' }},
-    loading: false,
-    submitting: false,
+<script type="application/json" id="companies-data">{{ companies_js | tojson }}</script>
+<script type="application/json" id="projects-data">{{ projects_js | tojson }}</script>
+<script type="application/json" id="ar-content-data">{{ ar_content | tojson if ar_content else 'null' }}</script>
 
-    init() {
-        // Initial projects load if company is pre-selected (e.g. in edit mode)
-        if (this.selectedCompany) {
-            this.loadProjects();
-        }
-
-        // Watch for company changes to reload projects
-        this.$watch('selectedCompany', (value) => {
-            this.loadProjects();
-        });
-    },
-
-    async loadProjects() {
-        if (!this.selectedCompany) {
-            this.projects = [];
-            this.selectedProject = '';
-            return;
-        }
-
-        this.loading = true;
-
-        // Step 1: Try to filter from allProjects first (optimistic load)
-        const localProjects = this.allProjects.filter(p => String(p.company_id) === String(this.selectedCompany));
-        if (localProjects.length > 0) {
-            this.projects = localProjects;
-            // We still continue to fetch from API to get the most fresh/complete list
-        }
-
-        try {
-            const response = await fetch(`/api/projects/by-company/${this.selectedCompany}`);
-            if (!response.ok) {
-                // If local projects exist, we don't throw to avoid UI disruption
-                if (this.projects.length === 0) {
-                    let errorPayload = null;
-                    try {
-                        errorPayload = await response.json();
-                    } catch (e) {}
-                    throw new Error(errorPayload?.detail || response.statusText || 'Не удалось загрузить проекты');
-                }
-                return;
-            }
-
-            const data = await response.json();
-            const apiProjects = data.projects || [];
-
-            // Merge or replace projects
-            if (apiProjects.length > 0) {
-                this.projects = apiProjects;
-            } else if (localProjects.length > 0) {
-                // Keep local ones if API returned empty but we have some locals
-                this.projects = localProjects;
-            } else {
-                this.projects = [];
-            }
-
-            // Validate selected project
-            if (this.selectedProject && !this.projects.some(p => String(p.id) === String(this.selectedProject))) {
-                this.selectedProject = '';
-            }
-        } catch (error) {
-            console.error('Ошибка при загрузке проектов:', error);
-            if (this.projects.length === 0) {
-                this.projects = [];
-                this.selectedProject = '';
-                this.showToast(error?.message || 'Не удалось загрузить проекты', 'error');
-            }
-        } finally {
-            this.loading = false;
-        }
-    },
-
-    get isValid() {
-        const customerName = document.getElementById('customer_name')?.value;
-        const durationYears = document.getElementById('duration_years')?.value;
-
-        const hasBasicFields = this.selectedCompany &&
-            this.selectedProject &&
-            customerName &&
-            durationYears;
-
-        const photoInput = document.querySelector('input[type="file"][name="photo_file"]');
-        const videoInput = document.querySelector('input[type="file"][name="video_file"]');
-
-        const hasNewPhoto = !!(photoInput && photoInput.files.length > 0);
-        const hasNewVideo = !!(videoInput && videoInput.files.length > 0);
-
-        if (!this.arContent || !this.arContent.id) {
-            return hasBasicFields && hasNewPhoto && hasNewVideo;
-        }
-
-        const hasExistingPhoto = !!this.arContent.photo_url;
-        const hasExistingVideo = !!this.arContent.video_url;
-
-        return hasBasicFields && (hasNewPhoto || hasExistingPhoto) && (hasNewVideo || hasExistingVideo);
-    },
-
-    async _readError(response) {
-        try {
-            const data = await response.json();
-            if (typeof data?.detail === 'string') return data.detail;
-            if (Array.isArray(data?.detail)) return 'Ошибка валидации';
-            return 'Ошибка запроса';
-        } catch (e) {
-            return response.statusText || 'Ошибка запроса';
-        }
-    },
-
-    async _patchFile(url, fieldName, file) {
-        const fd = new FormData();
-        fd.append(fieldName, file);
-
-        const response = await fetch(url, {
-            method: 'PATCH',
-            body: fd,
-        });
-
-        if (!response.ok) {
-            throw new Error(await this._readError(response));
-        }
-
-        return await response.json().catch(() => null);
-    },
-
-    async submitForm() {
-        if (!this.isValid) {
-            this.showToast('Пожалуйста, заполните все обязательные поля', 'error');
-            return;
-        }
-
-        this.submitting = true;
-
-        try {
-            const customerName = document.getElementById('customer_name')?.value?.trim() || '';
-            const customerPhone = document.getElementById('customer_phone')?.value?.trim() || '';
-            const customerEmail = document.getElementById('customer_email')?.value?.trim() || '';
-            const durationYears = document.getElementById('duration_years')?.value;
-
-            const photoInput = document.querySelector('input[type="file"][name="photo_file"]');
-            const videoInput = document.querySelector('input[type="file"][name="video_file"]');
-
-            const photoFile = photoInput?.files?.[0] || null;
-            const videoFile = videoInput?.files?.[0] || null;
-
-            if (this.arContent && this.arContent.id) {
-                const updateUrl = `/api/companies/${this.selectedCompany}/projects/${this.selectedProject}/ar-content/${this.arContent.id}`;
-
-                const payload = {
-                    customer_name: customerName,
-                    customer_phone: customerPhone || null,
-                    customer_email: customerEmail || null,
-                    duration_years: Number(durationYears),
-                    status: document.getElementById('status')?.value,
-                };
-
-                const updateResponse = await fetch(updateUrl, {
-                    method: 'PUT',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify(payload),
-                });
-
-                if (!updateResponse.ok) {
-                    throw new Error(await this._readError(updateResponse));
-                }
-
-                await updateResponse.json().catch(() => null);
-
-                if (photoFile) {
-                    await this._patchFile(`${updateUrl}/photo`, 'photo', photoFile);
-                }
-
-                if (videoFile) {
-                    await this._patchFile(`${updateUrl}/video`, 'video', videoFile);
-                }
-
-                this.showToast('AR контент успешно обновлен', 'success');
-                window.location.href = `/ar-content/${this.arContent.id}`;
-                return;
-            }
-
-            const createUrl = `/api/companies/${this.selectedCompany}/projects/${this.selectedProject}/ar-content`;
-            const formData = new FormData();
-
-            formData.append('customer_name', customerName);
-            formData.append('customer_phone', customerPhone);
-            if (customerEmail) {
-                formData.append('customer_email', customerEmail);
-            }
-            formData.append('duration_years', durationYears);
-            if (photoFile) {
-                formData.append('photo_file', photoFile);
-            }
-            if (videoFile) {
-                formData.append('video_file', videoFile);
-            }
-
-            const createResponse = await fetch(createUrl, {
-                method: 'POST',
-                body: formData,
-            });
-
-            if (!createResponse.ok) {
-                throw new Error(await this._readError(createResponse));
-            }
-
-            const result = await createResponse.json();
-            this.showToast('AR контент успешно создан', 'success');
-            window.location.href = `/ar-content/${result.id}`;
-        } catch (error) {
-            console.error('Submit error:', error);
-            this.showToast(error?.message || 'Не удалось сохранить AR контент', 'error');
-        } finally {
-            this.submitting = false;
-        }
-    },
-
-    showToast(message, type = 'info') {
-        const toast = document.createElement('div');
-        const bgColor = type === 'success' ? 'bg-green-500' : type === 'error' ? 'bg-red-500' : 'bg-blue-500';
-        toast.className = `fixed bottom-4 right-4 ${bgColor} text-white px-4 py-2 rounded shadow z-50`;
-        toast.textContent = message;
-        document.body.appendChild(toast);
-
-        setTimeout(() => {
-            if (document.body.contains(toast)) {
-                document.body.removeChild(toast);
-            }
-        }, 3000);
-    }
-}" x-init="init()">
+<div x-data="arContentForm()" x-init="init()" @photo-selected.window="hasNewPhoto = $event.detail" @video-selected.window="hasNewVideo = $event.detail">
     <div class="max-w-4xl mx-auto">
         <!-- Header -->
         <div class="flex justify-between items-center mb-6">
@@ -311,6 +75,7 @@
                         </label>
                         <input type="text" name="customer_name" id="customer_name"
                                class="form-input"
+                               x-model="customerName"
                                placeholder="Имя Фамилия"
                                value="{{ ar_content.customer_name if ar_content and ar_content.customer_name else '' }}"
                                required x-cloak>
@@ -322,6 +87,7 @@
                         </label>
                         <input type="tel" name="customer_phone" id="customer_phone"
                                class="form-input"
+                               x-model="customerPhone"
                                placeholder="+7 (999) 123-45-67"
                                value="{{ ar_content.customer_phone if ar_content and ar_content.customer_phone else '' }}" x-cloak>
                     </div>
@@ -332,6 +98,7 @@
                         </label>
                         <input type="email" name="customer_email" id="customer_email"
                                class="form-input"
+                               x-model="customerEmail"
                                placeholder="customer@example.com"
                                value="{{ ar_content.customer_email if ar_content and ar_content.customer_email else '' }}" x-cloak>
                     </div>
@@ -347,6 +114,7 @@
                     </label>
                     <select name="duration_years" id="duration_years"
                             class="form-select"
+                            x-model="durationYears"
                             required x-cloak>
                         <option value="1" {% if not ar_content or ar_content.duration_years == 1 or ar_content.duration_years == '1' %}selected{% endif %}>1 год</option>
                         <option value="3" {% if ar_content and (ar_content.duration_years == 3 or ar_content.duration_years == '3') %}selected{% endif %}>3 года</option>
@@ -559,10 +327,10 @@
                     <ul class="text-xs text-yellow-700 dark:text-yellow-300 list-disc list-inside">
                         <li x-show="!selectedCompany">Компания</li>
                         <li x-show="!selectedProject">Проект</li>
-                        <li x-show="!document.getElementById('customer_name')?.value">Имя заказчика</li>
-                        <li x-show="!document.getElementById('duration_years')?.value">Период действия</li>
-                        <li x-show="(!arContent || !arContent.id) && !(document.querySelector('input[type=file][name=photo_file]')?.files.length > 0)">Портрет (изображение)</li>
-                        <li x-show="(!arContent || !arContent.id) && !(document.querySelector('input[type=file][name=video_file]')?.files.length > 0)">Видео</li>
+                        <li x-show="!customerName">Имя заказчика</li>
+                        <li x-show="!durationYears">Период действия</li>
+                        <li x-show="(!arContent || !arContent.id) && !hasNewPhoto">Портрет (изображение)</li>
+                        <li x-show="(!arContent || !arContent.id) && !hasNewVideo">Видео</li>
                     </ul>
                 </div>
             </div>
@@ -571,6 +339,255 @@
 </div>
 
 <script>
+function arContentForm() {
+    const companies = JSON.parse(document.getElementById('companies-data')?.textContent || '[]');
+    const allProjects = JSON.parse(document.getElementById('projects-data')?.textContent || '[]');
+    const arContent = JSON.parse(document.getElementById('ar-content-data')?.textContent || 'null');
+    const selectedCompany = arContent?.company_id ? String(arContent.company_id) : '';
+    const selectedProject = arContent?.project_id ? String(arContent.project_id) : '';
+
+    return {
+        companies,
+        allProjects,
+        projects: [],
+        selectedCompany,
+        selectedProject,
+        arContent,
+        customerName: arContent?.customer_name ? String(arContent.customer_name) : '',
+        customerPhone: arContent?.customer_phone ? String(arContent.customer_phone) : '',
+        customerEmail: arContent?.customer_email ? String(arContent.customer_email) : '',
+        durationYears: arContent?.duration_years ? String(arContent.duration_years) : '1',
+        hasNewPhoto: false,
+        hasNewVideo: false,
+        loading: false,
+        submitting: false,
+
+        init() {
+            // Initial projects load if company is pre-selected (e.g. in edit mode)
+            if (this.selectedCompany) {
+                this.loadProjects();
+            }
+
+            // Watch for company changes to reload projects
+            this.$watch('selectedCompany', () => {
+                this.loadProjects();
+            });
+        },
+
+        async loadProjects() {
+            if (!this.selectedCompany) {
+                this.projects = [];
+                this.selectedProject = '';
+                return;
+            }
+
+            this.loading = true;
+
+            // Step 1: Try to filter from allProjects first (optimistic load)
+            const localProjects = this.allProjects.filter(
+                (project) => String(project.company_id) === String(this.selectedCompany)
+            );
+            if (localProjects.length > 0) {
+                this.projects = localProjects;
+                // We still continue to fetch from API to get the most fresh/complete list
+            }
+
+            try {
+                const response = await fetch(`/api/projects/by-company/${this.selectedCompany}`, {
+                    credentials: 'same-origin',
+                });
+                if (!response.ok) {
+                    // If local projects exist, we don't throw to avoid UI disruption
+                    if (this.projects.length === 0) {
+                        let errorPayload = null;
+                        try {
+                            errorPayload = await response.json();
+                        } catch (e) {}
+                        throw new Error(
+                            errorPayload?.detail || response.statusText || 'Не удалось загрузить проекты'
+                        );
+                    }
+                    return;
+                }
+
+                const data = await response.json();
+                const apiProjects = data.projects || [];
+
+                // Merge or replace projects
+                if (apiProjects.length > 0) {
+                    this.projects = apiProjects;
+                } else if (localProjects.length > 0) {
+                    // Keep local ones if API returned empty but we have some locals
+                    this.projects = localProjects;
+                } else {
+                    this.projects = [];
+                }
+
+                // Validate selected project
+                if (this.selectedProject && !this.projects.some((p) => String(p.id) === String(this.selectedProject))) {
+                    this.selectedProject = '';
+                }
+            } catch (error) {
+                console.error('Ошибка при загрузке проектов:', error);
+                if (this.projects.length === 0) {
+                    this.projects = [];
+                    this.selectedProject = '';
+                    this.showToast(error?.message || 'Не удалось загрузить проекты', 'error');
+                }
+            } finally {
+                this.loading = false;
+            }
+        },
+
+        get isValid() {
+            const hasBasicFields =
+                this.selectedCompany &&
+                this.selectedProject &&
+                this.customerName &&
+                this.durationYears;
+
+            if (!this.arContent || !this.arContent.id) {
+                return hasBasicFields && this.hasNewPhoto && this.hasNewVideo;
+            }
+
+            const hasExistingPhoto = !!this.arContent.photo_url;
+            const hasExistingVideo = !!this.arContent.video_url;
+            return (
+                hasBasicFields &&
+                (this.hasNewPhoto || hasExistingPhoto) &&
+                (this.hasNewVideo || hasExistingVideo)
+            );
+        },
+
+        async _readError(response) {
+            try {
+                const data = await response.json();
+                if (typeof data?.detail === 'string') return data.detail;
+                if (Array.isArray(data?.detail)) return 'Ошибка валидации';
+                return 'Ошибка запроса';
+            } catch (e) {
+                return response.statusText || 'Ошибка запроса';
+            }
+        },
+
+        async _patchFile(url, fieldName, file) {
+            const fd = new FormData();
+            fd.append(fieldName, file);
+            const response = await fetch(url, {
+                method: 'PATCH',
+                body: fd,
+            });
+            if (!response.ok) {
+                throw new Error(await this._readError(response));
+            }
+            return await response.json().catch(() => null);
+        },
+
+        async submitForm() {
+            if (!this.isValid) {
+                this.showToast('Пожалуйста, заполните все обязательные поля', 'error');
+                return;
+            }
+
+            this.submitting = true;
+            try {
+            const customerName = this.customerName?.trim() || '';
+            const customerPhone = this.customerPhone?.trim() || '';
+            const customerEmail = this.customerEmail?.trim() || '';
+            const durationYears = this.durationYears;
+
+                const photoInput = document.querySelector('input[type="file"][name="photo_file"]');
+                const videoInput = document.querySelector('input[type="file"][name="video_file"]');
+                const photoFile = photoInput?.files?.[0] || null;
+                const videoFile = videoInput?.files?.[0] || null;
+
+                if (this.arContent && this.arContent.id) {
+                    const updateUrl = `/api/companies/${this.selectedCompany}/projects/${this.selectedProject}/ar-content/${this.arContent.id}`;
+                    const payload = {
+                        customer_name: customerName,
+                        customer_phone: customerPhone || null,
+                        customer_email: customerEmail || null,
+                        duration_years: Number(durationYears),
+                        status: document.getElementById('status')?.value,
+                    };
+
+                    const updateResponse = await fetch(updateUrl, {
+                        method: 'PUT',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify(payload),
+                    });
+
+                    if (!updateResponse.ok) {
+                        throw new Error(await this._readError(updateResponse));
+                    }
+
+                    await updateResponse.json().catch(() => null);
+
+                    if (photoFile) {
+                        await this._patchFile(`${updateUrl}/photo`, 'photo', photoFile);
+                    }
+                    if (videoFile) {
+                        await this._patchFile(`${updateUrl}/video`, 'video', videoFile);
+                    }
+
+                    this.showToast('AR контент успешно обновлен', 'success');
+                    window.location.href = `/ar-content/${this.arContent.id}`;
+                    return;
+                }
+
+                const createUrl = `/api/companies/${this.selectedCompany}/projects/${this.selectedProject}/ar-content`;
+                const formData = new FormData();
+            formData.append('customer_name', customerName);
+            formData.append('customer_phone', customerPhone);
+                if (customerEmail) {
+                    formData.append('customer_email', customerEmail);
+                }
+            formData.append('duration_years', durationYears);
+                if (photoFile) {
+                    formData.append('photo_file', photoFile);
+                }
+                if (videoFile) {
+                    formData.append('video_file', videoFile);
+                }
+
+                const createResponse = await fetch(createUrl, {
+                    method: 'POST',
+                    body: formData,
+                });
+
+                if (!createResponse.ok) {
+                    throw new Error(await this._readError(createResponse));
+                }
+
+                const result = await createResponse.json();
+                this.showToast('AR контент успешно создан', 'success');
+                window.location.href = `/ar-content/${result.id}`;
+            } catch (error) {
+                console.error('Submit error:', error);
+                this.showToast(error?.message || 'Не удалось сохранить AR контент', 'error');
+            } finally {
+                this.submitting = false;
+            }
+        },
+
+        showToast(message, type = 'info') {
+            const toast = document.createElement('div');
+            const bgColor = type === 'success' ? 'bg-green-500' : type === 'error' ? 'bg-red-500' : 'bg-blue-500';
+            toast.className = `fixed bottom-4 right-4 ${bgColor} text-white px-4 py-2 rounded shadow z-50`;
+            toast.textContent = message;
+            document.body.appendChild(toast);
+
+            setTimeout(() => {
+                if (document.body.contains(toast)) {
+                    document.body.removeChild(toast);
+                }
+            }, 3000);
+        },
+    };
+}
+
 // Photo uploader component
 function photoUploader() {
     return {
@@ -608,18 +625,21 @@ function photoUploader() {
         processFile(file) {
             // Validate file type
             if (!file.type.startsWith('image/')) {
+                this.$dispatch('photo-selected', false);
                 this.showToast('Пожалуйста, выберите изображение', 'error');
                 return;
             }
             
             // Validate file size (10MB)
             if (file.size > 10 * 1024 * 1024) {
+                this.$dispatch('photo-selected', false);
                 this.showToast('Размер файла не должен превышать 10MB', 'error');
                 return;
             }
             
             this.selectedFile = file;
             this.previewUrl = URL.createObjectURL(file);
+            this.$dispatch('photo-selected', true);
         },
         
         removeFile() {
@@ -633,6 +653,7 @@ function photoUploader() {
             }
             this.previewUrl = existingUrl;
             this.$refs.fileInput.value = '';
+            this.$dispatch('photo-selected', false);
         },
         
         formatFileSize(bytes) {
@@ -688,18 +709,21 @@ function videoUploader() {
         processFile(file) {
             // Validate file type
             if (!file.type.startsWith('video/')) {
+                this.$dispatch('video-selected', false);
                 this.showToast('Пожалуйста, выберите видеофайл', 'error');
                 return;
             }
             
             // Validate file size (100MB)
             if (file.size > 100 * 1024 * 1024) {
+                this.$dispatch('video-selected', false);
                 this.showToast('Размер файла не должен превышать 100MB', 'error');
                 return;
             }
             
             this.selectedFile = file;
             this.previewUrl = URL.createObjectURL(file);
+            this.$dispatch('video-selected', true);
         },
         
         removeFile() {
@@ -713,6 +737,7 @@ function videoUploader() {
             }
             this.previewUrl = existingUrl;
             this.$refs.fileInput.value = '';
+            this.$dispatch('video-selected', false);
         },
         
         formatFileSize(bytes) {

@@ -12,6 +12,7 @@ class CompanyStatus(str, Enum):
 class ProjectStatus(str, Enum):
     """Project status enum"""
     ACTIVE = "active"
+    INACTIVE = "inactive"
     ARCHIVED = "archived"
 
 

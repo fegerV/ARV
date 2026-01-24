@@ -1,10 +1,9 @@
 from typing import Optional
-from uuid import UUID
 from pydantic import BaseModel, Field
 
 
 class VideoCreate(BaseModel):
-    ar_content_id: UUID
+    ar_content_id: int
     filename: str = Field(..., min_length=1, description="Video filename from file upload")
     set_as_active: Optional[bool] = Field(default=False, description="Set this video as the active one")
     
@@ -20,8 +19,8 @@ class VideoUpdate(BaseModel):
 
 
 class VideoResponse(BaseModel):
-    id: UUID
-    ar_content_id: UUID
+    id: int
+    ar_content_id: int
     filename: str
     duration: Optional[int] = None
     size: Optional[int] = None

@@ -4,13 +4,18 @@
 {% block page_title %}AR Content{% endblock %}
 
 {% block content %}
-<div x-data="arContentList()">
-    <div class="flex justify-between items-center mb-6">
-        <h2 class="text-2xl font-bold text-gray-800 dark:text-white">AR Content</h2>
-        <button class="btn btn-primary"
-                @click="showCreateForm()">
-            Add AR Content
-        </button>
+{% include 'components/universal-lightbox.html' %}
+<div x-data="arContentList()" class="page-container">
+    <div class="page-header">
+        <div>
+            <h2 class="page-title">AR Content</h2>
+            <p class="page-subtitle">Create and manage AR content across projects</p>
+        </div>
+        <div class="page-actions">
+            <button class="btn btn-primary" @click="showCreateForm()">
+                Add AR Content
+            </button>
+        </div>
     </div>
     
     <!-- Filters -->
@@ -52,52 +57,99 @@
         </div>
     
     <!-- AR Content table -->
-    <div class="bg-white dark:bg-gray-900 shadow rounded-lg overflow-hidden">
+    <div class="card-table">
         <div class="overflow-x-auto">
             <table class="table">
                 <thead>
                     <tr>
-                        <th scope="col">Order #</th>
-                        <th scope="col">Company</th>
-                        <th scope="col">Thumbnail</th>
-                        <th scope="col">Created</th>
-                        <th scope="col">Status</th>
-                        <th scope="col">Views</th>
-                        <th scope="col">30-day</th>
-                        <th scope="col" class="text-right">Actions</th>
+                        <th scope="col">№ заказа</th>
+                        <th scope="col">Статус</th>
+                        <th scope="col">Фото</th>
+                        <th scope="col">Активное видео</th>
+                        <th scope="col">Имя</th>
+                        <th scope="col">Телефон</th>
+                        <th scope="col">Просмотры</th>
+                        <th scope="col">Ссылка</th>
+                        <th scope="col">QR-код</th>
+                        <th scope="col">Создан</th>
+                        <th scope="col" class="text-right">Действия</th>
                     </tr>
                 </thead>
                 <tbody class="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-700">
                     {% for item in ar_content_list %}
                     <tr class="{% if item.status == 'deleted' %}opacity-50 {% endif %}hover:bg-gray-50 dark:hover:bg-gray-800" id="row-{{ item.id }}">
                         <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">{{ item.order_number }}</td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{{ item.company_name }}</td>
                         <td class="px-6 py-4 whitespace-nowrap">
-                            {% if item.thumbnail_url %}
-                            <img src="{{ item.thumbnail_url }}" alt="Thumbnail" loading="lazy" class="h-10 w-10 object-cover rounded">
+                            <span class="inline-flex items-center justify-center h-3 w-3 rounded-full
+                                {% if item.status in ['ready', 'active'] %}bg-green-500
+                                {% elif item.status in ['processing', 'pending'] %}bg-yellow-500
+                                {% elif item.status in ['failed', 'deleted'] %}bg-red-500
+                                {% else %}bg-gray-500{% endif %}"
+                                title="{{ item.status }}"></span>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            {% if item.thumbnail_url or item.photo_url %}
+                            <button type="button"
+                                    class="h-10 w-10 rounded overflow-hidden focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
+                                    @click="openLightboxImage('{{ (item.thumbnail_url or item.photo_url) | e }}', 'Фото заказа {{ item.order_number }}')">
+                                <img src="{{ item.thumbnail_url or item.photo_url }}" alt="Thumbnail" loading="lazy" class="h-10 w-10 object-cover rounded">
+                            </button>
                             {% else %}
                             <div class="h-10 w-10 bg-gray-200 dark:bg-gray-700 rounded flex items-center justify-center">
-                                <span class="text-gray-500 dark:text-gray-400">No Image</span>
+                                <span class="text-gray-500 dark:text-gray-400">Нет фото</span>
                             </div>
                             {% endif %}
                         </td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{{ item.created_at | datetime_format }}</td>
-                        <td class="px-6 py-4 whitespace-nowrap">
-                            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
-                                {% if item.status == 'ready' %}bg-green-100 text-green-800 dark:bg-green-80 dark:text-green-100
-                                {% elif item.status == 'processing' %}bg-yellow-100 text-yellow-800 dark:bg-yellow-80 dark:text-yellow-100
-                                {% elif item.status == 'failed' %}bg-red-100 text-red-800 dark:bg-red-800 dark:text-red-100
-                                {% else %}bg-gray-100 text-gray-800 dark:bg-gray-80 dark:text-gray-100{% endif %}">
-                                {{ item.status }}
-                            </span>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                            {% if item.video_url %}
+                            <button type="button"
+                                    class="inline-flex items-center gap-1 text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:hover:text-indigo-300"
+                                    @click="openLightboxVideo('{{ item.video_url | e }}', '{{ item.active_video_title or 'Видео' }}')">
+                                <span class="material-icons text-sm">play_arrow</span>
+                                {{ item.active_video_title or 'Видео' }}
+                            </button>
+                            {% else %}
+                            Нет видео
+                            {% endif %}
                         </td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{{ item.views_count }}</td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{{ item.views_30_days }}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{{ item.customer_name or '—' }}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{{ item.customer_phone or '—' }}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{{ item.views_count or 0 }}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                            <a href="{{ item.public_link or item.unique_link or '#' }}" class="text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:hover:text-indigo-300 mr-3" target="_blank" rel="noopener">Открыть</a>
+                            <button class="btn-sm text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300"
+                                    hx-post="/htmx/ar-content/{{ item.id }}/copy-link"
+                                    hx-target="this"
+                                    hx-swap="innerHTML"
+                                    x-data
+                                    @htmx:after-request="navigator.clipboard.writeText(JSON.parse(event.detail.xhr.responseText).link);
+                                                         $el.innerText = 'Скопировано'; setTimeout(()=>$el.innerText='Копировать', 1500)">
+                                Копировать
+                            </button>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            {% if item.qr_code_url %}
+                            <button type="button"
+                                    class="h-10 w-10 rounded overflow-hidden focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
+                                    @click="openLightboxImage('{{ item.qr_code_url | e }}', 'QR для заказа {{ item.order_number }}')">
+                                <img src="{{ item.qr_code_url }}" alt="QR" loading="lazy" class="h-10 w-10 object-cover rounded">
+                            </button>
+                            {% else %}
+                            <span class="text-gray-500 dark:text-gray-400">Нет QR</span>
+                            {% endif %}
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{{ item.created_at | datetime_format }}</td>
                         <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                            <a :href="`/ar-content/${item.id}/view`" class="text-indigo-60 hover:text-indigo-900 dark:text-indigo-400 dark:hover:text-indigo-300 mr-3">View</a>
-                            <a :href="`/ar-content/${item.id}/edit`" class="text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:hover:text-indigo-30 mr-3">Edit</a>
-                            {% from 'macros/ar_actions.html' import ar_actions %}
-                            {{ ar_actions(item.id) }}
+                            <a href="/ar-content/{{ item.id }}" class="text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:hover:text-indigo-300 mr-3" title="Детали">
+                                <span class="material-icons text-base">edit</span>
+                            </a>
+                            <button class="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300"
+                                    hx-delete="/htmx/ar-content/{{ item.id }}"
+                                    hx-target="#row-{{ item.id }}"
+                                    hx-swap="outerHTML"
+                                    hx-confirm="Удалить?">
+                                <span class="material-icons text-base">delete</span>
+                            </button>
                         </td>
                     </tr>
                     {% endfor %}
@@ -121,6 +173,32 @@ function arContentList() {
         
         showCreateForm() {
             window.location.href = '/ar-content/create';
+        },
+        
+        openLightboxImage(url, caption) {
+            if (!url) {
+                return;
+            }
+            const items = [{
+                type: 'image',
+                url,
+                alt: caption || 'Preview',
+                caption: caption || ''
+            }];
+            document.dispatchEvent(new CustomEvent('open-lightbox', { detail: { items, index: 0 } }));
+        },
+        
+        openLightboxVideo(url, caption) {
+            if (!url) {
+                return;
+            }
+            const items = [{
+                type: 'video',
+                url,
+                thumbnail: '',
+                caption: caption || 'Видео'
+            }];
+            document.dispatchEvent(new CustomEvent('open-lightbox', { detail: { items, index: 0 } }));
         },
         
         searchContent() {

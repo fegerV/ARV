@@ -5,21 +5,37 @@
 {% block page_title %}{{ ar_content.order_number }}{% endblock %}
 
 {% block content %}
-<div x-data="arContentDetail({{ ar_content_js | tojson }})">
+<script type="application/json" id="ar-content-data">{{ ar_content_js | tojson }}</script>
+<script type="application/json" id="ar-content-videos">{{ videos_js | default([]) | tojson }}</script>
+<script type="application/json" id="ar-content-active-video">{{ active_video_js | default(None) | tojson }}</script>
+<script type="application/json" id="ar-content-marker-metrics">{{ marker_metrics | default({}) | tojson }}</script>
+
+<div x-data="arContentDetail()" x-init="init()" class="page-container">
     <!-- Header -->
-    <div class="flex justify-between items-center mb-6">
-        <div class="flex items-center gap-2">
+    <div class="page-header">
+        <div class="flex items-center gap-3">
             <button @click="window.history.back()" class="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded">
                 <span class="material-icons">arrow_back</span>
             </button>
-            <h1 class="text-2xl font-bold text-gray-900 dark:text-white">Заказ {{ ar_content.order_number }}</h1>
+            <div>
+                <h1 class="page-title">Заказ {{ ar_content.order_number }}</h1>
+                <p class="page-subtitle">Детали AR контента и доступные действия</p>
+            </div>
         </div>
-        <div class="flex gap-2">
+        <div class="page-actions">
             <button @click="showQRDialog = true" class="btn btn-secondary">
                 <span class="material-icons mr-2">qr_code</span>QR-код
             </button>
             <button @click="window.location.href='/ar-content/{{ ar_content.id }}/edit'" class="btn btn-secondary">
                 <span class="material-icons mr-2">edit</span>Редактировать
+            </button>
+            <button @click="regenerateMedia()" 
+                    :disabled="regeneratingMedia"
+                    class="btn btn-primary">
+                <span class="material-icons mr-2" x-show="!regeneratingMedia">auto_fix_high</span>
+                <span class="material-icons mr-2 animate-spin" x-show="regeneratingMedia">refresh</span>
+                <span x-show="!regeneratingMedia">Перегенерировать превью/маркер</span>
+                <span x-show="regeneratingMedia">Обновление...</span>
             </button>
             <button @click="showDeleteDialog = true" class="btn btn-danger">
                 <span class="material-icons mr-2">delete</span>Удалить
@@ -28,7 +44,7 @@
     </div>
 
     <!-- Company & Project Info -->
-    <div class="bg-white dark:bg-gray-800 p-4 rounded-lg shadow mb-6">
+    <div class="card p-4">
         <div class="flex flex-wrap gap-2">
             <span class="inline-flex items-center px-3 py-1 rounded-full text-sm bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
                 <span class="material-icons text-xs mr-1">business</span>
@@ -52,12 +68,12 @@
     <!-- Portrait + Customer Info -->
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
         <div>
-            <div class="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
-                <div class="p-4">
+            <div class="card p-4">
+                <div>
                     <h3 class="text-lg font-medium text-gray-900 dark:text-white mb-4">Портрет</h3>
                     <div class="aspect-square bg-gray-100 dark:bg-gray-700 rounded-lg overflow-hidden">
-                        {% if ar_content.photo_url %}
-                        <img src="{{ ar_content.photo_url }}"
+                        {% if ar_content.photo_url or ar_content.thumbnail_url %}
+                        <img :src="portraitUrl"
                              alt="Portrait"
                              loading="lazy"
                              @click="showPortraitLightbox = true"
@@ -72,15 +88,15 @@
                         {% endif %}
                     </div>
                     <p class="mt-2 text-sm text-gray-500 dark:text-gray-400 text-center">
-                        {% if ar_content.photo_url %}Кликните для просмотра в полный размер{% else %}—{% endif %}
+                        {% if ar_content.photo_url or ar_content.thumbnail_url %}Кликните для просмотра в полный размер{% else %}—{% endif %}
                     </p>
                 </div>
             </div>
         </div>
         
         <div>
-            <div class="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
-                <div class="p-4">
+            <div class="card p-4">
+                <div>
                     <h3 class="text-lg font-medium text-gray-900 dark:text-white mb-4 flex items-center">
                         <span class="material-icons mr-2">person</span>Заказчик
                     </h3>
@@ -109,41 +125,133 @@
                             {{ ar_content.storage_path or 'Путь не определен' }}
                         </p>
                     </div>
-                    
+
+                    {% if debug_info %}
                     <hr class="my-4 border-gray-200 dark:border-gray-700">
-                    
-                    <div>
-                        <h4 class="text-md font-medium text-gray-900 dark:text-white mb-3 flex items-center">
-                            <span class="material-icons mr-2">videocam</span>Видео
+                    <div class="bg-gray-50 dark:bg-gray-700/60 p-3 rounded-lg">
+                        <h4 class="text-md font-medium text-gray-900 dark:text-white mb-2 flex items-center">
+                            <span class="material-icons mr-2">bug_report</span>Debug: пути и статусы
                         </h4>
-                        <p class="text-sm text-gray-900 dark:text-white mb-3">
-                            Активное: {{ ar_content.active_video_title or '—' }}
-                        </p>
-                        <button @click="showUploadDialog = true" class="btn btn-secondary w-full">
-                            <span class="material-icons mr-2">upload</span>Загрузить новое видео
-                        </button>
+                        <div class="text-xs text-gray-700 dark:text-gray-300 space-y-1">
+                            <div><span class="font-medium">Storage:</span> {{ debug_info.storage_path or '—' }}</div>
+                            <div><span class="font-medium">Photo:</span> {{ debug_info.photo_path or '—' }}</div>
+                            <div><span class="font-medium">Video:</span> {{ debug_info.video_path or '—' }}</div>
+                            <div><span class="font-medium">QR:</span> {{ debug_info.qr_code_path or '—' }}</div>
+                            <div><span class="font-medium">Thumbnail:</span> {{ debug_info.thumbnail_url or '—' }}</div>
+                            <div><span class="font-medium">Marker:</span> {{ debug_info.marker_path or '—' }}</div>
+                            <div><span class="font-medium">Marker URL:</span> {{ debug_info.marker_url or '—' }}</div>
+                            <div><span class="font-medium">Marker status:</span> {{ debug_info.marker_status or '—' }}</div>
+                        </div>
                     </div>
+                    {% endif %}
+                    
                 </div>
             </div>
         </div>
     </div>
         
+    <!-- Video Management -->
+    <div class="card p-4 mb-6">
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
+            <h3 class="text-lg font-medium text-gray-900 dark:text-white flex items-center">
+                <span class="material-icons mr-2">videocam</span>Видео
+            </h3>
+            <button @click="showUploadDialog = true" class="btn btn-secondary">
+                <span class="material-icons mr-2">upload</span>Загрузить видео
+            </button>
+        </div>
+
+        <template x-if="videos.length === 0">
+            <div class="bg-gray-50 dark:bg-gray-700/60 p-4 rounded-lg text-sm text-gray-600 dark:text-gray-300">
+                Видео не загружены
+            </div>
+        </template>
+
+        <template x-if="videos.length > 0">
+            <div class="space-y-4">
+                <div class="bg-gray-50 dark:bg-gray-700/60 p-4 rounded-lg">
+                    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                        <div>
+                            <div class="text-sm text-gray-500 dark:text-gray-300">Активное видео</div>
+                            <div class="text-gray-900 dark:text-white font-medium" x-text="activeVideoTitle || '—'"></div>
+                            <div class="text-xs text-gray-500 dark:text-gray-400" x-text="activeVideoSourceLabel"></div>
+                        </div>
+                        <div class="text-xs text-gray-500 dark:text-gray-400" x-show="activeVideoSchedule">
+                            Расписание: <span x-text="formatSchedule(activeVideoSchedule)"></span>
+                        </div>
+                    </div>
+                    <div class="mt-3 aspect-video bg-black/5 dark:bg-black/30 rounded-lg overflow-hidden">
+                        <template x-if="activeVideo && isImagePreview(activeVideo.preview_url)">
+                            <img :src="activeVideo.preview_url" alt="Active video preview" class="w-full h-full object-cover">
+                        </template>
+                        <template x-if="activeVideo && !isImagePreview(activeVideo.preview_url)">
+                            <video :src="activeVideo.video_url" controls class="w-full h-full object-cover"></video>
+                        </template>
+                        <template x-if="!activeVideo">
+                            <div class="w-full h-full flex items-center justify-center text-gray-500 dark:text-gray-400 text-sm">
+                                Нет активного видео
+                            </div>
+                        </template>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <template x-for="video in videos" :key="video.id">
+                        <div class="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
+                            <div class="aspect-video bg-black/5 dark:bg-black/30">
+                                <template x-if="isImagePreview(video.preview_url)">
+                                    <img :src="video.preview_url" alt="Video preview" class="w-full h-full object-cover">
+                                </template>
+                                <template x-if="!isImagePreview(video.preview_url)">
+                                    <video :src="video.video_url" controls class="w-full h-full object-cover"></video>
+                                </template>
+                            </div>
+                            <div class="p-3 space-y-2">
+                                <div class="flex items-center justify-between">
+                                    <div class="text-sm font-medium text-gray-900 dark:text-white" x-text="video.title || 'Видео'"></div>
+                                    <span class="text-xs px-2 py-0.5 rounded-full" :class="videoStatusClass(video.status)" x-text="video.status"></span>
+                                </div>
+                                <div class="text-xs text-gray-500 dark:text-gray-400">
+                                    <span x-text="video.days_remaining !== null ? `Осталось дней: ${video.days_remaining}` : 'Без срока'"></span>
+                                </div>
+                                <div class="text-xs text-gray-500 dark:text-gray-400">
+                                    Расписаний: <span x-text="video.schedules_count"></span>
+                                </div>
+                                <div class="flex items-center gap-2">
+                                    <button @click="setActiveVideo(video.id)"
+                                            :disabled="video.is_active"
+                                            class="btn btn-secondary text-xs px-3 py-1">
+                                        <span x-show="!video.is_active">Сделать активным</span>
+                                        <span x-show="video.is_active">Активное</span>
+                                    </button>
+                                    <button @click="openVideo(video.video_url)" class="btn btn-secondary text-xs px-3 py-1">
+                                        Смотреть
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </template>
+                </div>
+            </div>
+        </template>
+    </div>
+
     <!-- Statistics Section -->
-    <div class="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden mb-6">
-        <div class="p-4">
+    <div class="card p-4">
+        <div>
             <h3 class="text-lg font-medium text-gray-900 dark:text-white mb-4 flex items-center">
                 <span class="material-icons mr-2">analytics</span>Статистика
             </h3>
             <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div class="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg">
+                <div class="bg-gray-50 dark:bg-gray-700/60 p-4 rounded-lg">
                     <div class="text-sm font-medium text-gray-500 dark:text-gray-300">Всего просмотров</div>
                     <div class="text-2xl font-bold text-gray-900 dark:text-white">{{ ar_content.views_count or 0 }}</div>
                 </div>
-                <div class="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg">
+                <div class="bg-gray-50 dark:bg-gray-700/60 p-4 rounded-lg">
                     <div class="text-sm font-medium text-gray-500 dark:text-gray-300">Просмотров (30 дней)</div>
                     <div class="text-2xl font-bold text-gray-900 dark:text-white">{{ ar_content.views_30_days or 0 }}</div>
                 </div>
-                <div class="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg">
+                <div class="bg-gray-50 dark:bg-gray-700/60 p-4 rounded-lg">
                     <div class="text-sm font-medium text-gray-500 dark:text-gray-300">Активное видео</div>
                     <div class="text-sm text-gray-900 dark:text-white">{{ ar_content.active_video_title or '—' }}</div>
                 </div>
@@ -151,9 +259,64 @@
         </div>
     </div>
 
+    <!-- Marker & Image Quality -->
+    <div class="card p-4">
+        <div>
+            <h3 class="text-lg font-medium text-gray-900 dark:text-white mb-4 flex items-center">
+                <span class="material-icons mr-2">qr_code_2</span>Маркер и качество изображения
+            </h3>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div class="bg-gray-50 dark:bg-gray-700/60 p-4 rounded-lg">
+                    <div class="text-sm font-medium text-gray-500 dark:text-gray-300">Статус маркера</div>
+                    <div class="text-sm text-gray-900 dark:text-white" x-text="arContent.marker_status || '—'"></div>
+                </div>
+                <div class="bg-gray-50 dark:bg-gray-700/60 p-4 rounded-lg">
+                    <div class="text-sm font-medium text-gray-500 dark:text-gray-300">Вес маркера</div>
+                    <div class="text-sm text-gray-900 dark:text-white" x-text="formatBytes(markerMetrics.file_size_bytes)"></div>
+                </div>
+                <div class="bg-gray-50 dark:bg-gray-700/60 p-4 rounded-lg">
+                    <div class="text-sm font-medium text-gray-500 dark:text-gray-300">Скорость генерации</div>
+                    <div class="text-sm text-gray-900 dark:text-white" x-text="formatSeconds(markerMetrics.generation_time_seconds)"></div>
+                </div>
+                <div class="bg-gray-50 dark:bg-gray-700/60 p-4 rounded-lg">
+                    <div class="text-sm font-medium text-gray-500 dark:text-gray-300">Features</div>
+                    <div class="text-sm text-gray-900 dark:text-white" x-text="markerMetrics.features_count ?? '—'"></div>
+                </div>
+                <div class="bg-gray-50 dark:bg-gray-700/60 p-4 rounded-lg">
+                    <div class="text-sm font-medium text-gray-500 dark:text-gray-300">Плотность features</div>
+                    <div class="text-sm text-gray-900 dark:text-white" x-text="formatScore(markerMetrics.features_density)"></div>
+                </div>
+                <div class="bg-gray-50 dark:bg-gray-700/60 p-4 rounded-lg">
+                    <div class="text-sm font-medium text-gray-500 dark:text-gray-300">Вероятность распознавания</div>
+                    <div class="text-sm text-gray-900 dark:text-white" x-text="formatPercent(markerMetrics.image_quality?.recognition_probability)"></div>
+                </div>
+                <div class="bg-gray-50 dark:bg-gray-700/60 p-4 rounded-lg">
+                    <div class="text-sm font-medium text-gray-500 dark:text-gray-300">Контраст</div>
+                    <div class="text-sm text-gray-900 dark:text-white" x-text="formatScore(markerMetrics.image_quality?.contrast)"></div>
+                </div>
+                <div class="bg-gray-50 dark:bg-gray-700/60 p-4 rounded-lg">
+                    <div class="text-sm font-medium text-gray-500 dark:text-gray-300">Яркость</div>
+                    <div class="text-sm text-gray-900 dark:text-white" x-text="formatScore(markerMetrics.image_quality?.brightness)"></div>
+                </div>
+                <div class="bg-gray-50 dark:bg-gray-700/60 p-4 rounded-lg">
+                    <div class="text-sm font-medium text-gray-500 dark:text-gray-300">Резкость</div>
+                    <div class="text-sm text-gray-900 dark:text-white" x-text="formatScore(markerMetrics.image_quality?.sharpness)"></div>
+                </div>
+            </div>
+            <div class="mt-4 flex flex-wrap items-center gap-3">
+                <a :href="arContent.marker_url" target="_blank" class="btn btn-secondary" x-show="arContent.marker_url">
+                    <span class="material-icons mr-2">download</span>Скачать маркер
+                </a>
+                <div class="text-xs text-gray-500 dark:text-gray-400" x-show="!arContent.marker_url">
+                    Маркер не доступен для скачивания
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Links & QR Code Section -->
-    <div class="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden mb-6">
-        <div class="p-4">
+    <div class="card p-4">
+        <div>
             <h3 class="text-lg font-medium text-gray-900 dark:text-white mb-4 flex items-center">
                 <span class="material-icons mr-2">link</span>Ссылки и QR-код
             </h3>
@@ -161,7 +324,7 @@
                 <input type="text" 
                        :value="fullArUrl" 
                        readonly
-                       class="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white">
+                       class="form-input flex-1">
                 <button @click="copyLink" class="btn btn-secondary">
                     <span class="material-icons mr-2">content_copy</span>Копировать
                 </button>
@@ -177,11 +340,14 @@
                 </button>
                 {% endif %}
             </div>
+            <p class="text-xs text-gray-500 dark:text-gray-400 mb-3">
+                Ссылка для отправки клиенту
+            </p>
             
             <!-- QR Code Preview -->
-            <div class="flex items-center justify-center p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
+            <div class="flex items-center justify-center p-4 bg-gray-50 dark:bg-gray-700/60 rounded-lg">
                 <div class="text-center">
-                    <img :src="'https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=' + encodeURIComponent(fullArUrl)"
+                    <img :src="qrCodeUrl(150)"
                          :alt="'QR Code for ' + ar_content.order_number"
                          loading="lazy"
                          class="mx-auto mb-2">
@@ -194,26 +360,39 @@
 
 <!-- Portrait Lightbox -->
 <div x-show="showPortraitLightbox" 
-     @click="showPortraitLightbox = false"
+     @click.self="showPortraitLightbox = false"
      @keydown.escape.window="showPortraitLightbox = false"
-     class="fixed inset-0 z-50 overflow-y-auto" 
+     class="fixed inset-0 z-50 overflow-y-auto"
+     x-transition:enter="transition ease-out duration-200"
+     x-transition:enter-start="opacity-0"
+     x-transition:enter-end="opacity-100"
+     x-transition:leave="transition ease-in duration-150"
+     x-transition:leave-start="opacity-100"
+     x-transition:leave-end="opacity-0"
      role="dialog" 
      aria-modal="true"
      x-cloak>
     <div class="flex items-center justify-center min-h-screen p-4">
-        <div class="fixed inset-0 bg-black bg-opacity-75" aria-hidden="true"></div>
+        <div class="fixed inset-0 bg-black/80 backdrop-blur-sm" aria-hidden="true"></div>
         
-        <div class="relative z-10 max-w-4xl w-full">
-            <div class="bg-white dark:bg-gray-800 rounded-lg shadow-xl overflow-hidden">
+        <div class="relative z-10 max-w-4xl w-full"
+             x-transition:enter="transition ease-out duration-200"
+             x-transition:enter-start="opacity-0 translate-y-2 scale-95"
+             x-transition:enter-end="opacity-100 translate-y-0 scale-100"
+             x-transition:leave="transition ease-in duration-150"
+             x-transition:leave-start="opacity-100 translate-y-0 scale-100"
+             x-transition:leave-end="opacity-0 translate-y-2 scale-95">
+            <div class="bg-white dark:bg-gray-800 rounded-lg shadow-xl overflow-hidden ring-1 ring-black/5 dark:ring-white/10">
                 <div class="flex justify-between items-center p-4 border-b border-gray-200 dark:border-gray-700">
                     <h3 class="text-lg font-medium text-gray-900 dark:text-white">Портрет</h3>
-                    <button @click="showPortraitLightbox = false" class="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded">
+                    <button @click="showPortraitLightbox = false"
+                            class="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500">
                         <span class="material-icons">close</span>
                     </button>
                 </div>
                 <div class="p-4">
-                    {% if ar_content.photo_url %}
-                    <img src="{{ ar_content.photo_url }}" alt="Portrait" loading="lazy" class="w-full h-auto max-h-[80vh] object-contain">
+                    {% if ar_content.photo_url or ar_content.thumbnail_url %}
+                    <img :src="arContent.photo_url || arContent.thumbnail_url" alt="Portrait" loading="lazy" class="w-full h-auto max-h-[80vh] object-contain">
                     {% endif %}
                 </div>
             </div>
@@ -223,20 +402,33 @@
 
 <!-- QR Code Modal -->
 <div x-show="showQRDialog" 
-     @click="showQRDialog = false"
+     @click.self="showQRDialog = false"
      @keydown.escape.window="showQRDialog = false"
-     class="fixed inset-0 z-50 overflow-y-auto" 
+     class="fixed inset-0 z-50 overflow-y-auto"
+     x-transition:enter="transition ease-out duration-200"
+     x-transition:enter-start="opacity-0"
+     x-transition:enter-end="opacity-100"
+     x-transition:leave="transition ease-in duration-150"
+     x-transition:leave-start="opacity-100"
+     x-transition:leave-end="opacity-0"
      role="dialog" 
      aria-modal="true"
      x-cloak>
     <div class="flex items-center justify-center min-h-screen p-4">
-        <div class="fixed inset-0 bg-black bg-opacity-75" aria-hidden="true"></div>
+        <div class="fixed inset-0 bg-black/80 backdrop-blur-sm" aria-hidden="true"></div>
         
-        <div class="relative z-10 max-w-lg w-full">
-            <div class="bg-white dark:bg-gray-800 rounded-lg shadow-xl overflow-hidden">
+        <div class="relative z-10 max-w-lg w-full"
+             x-transition:enter="transition ease-out duration-200"
+             x-transition:enter-start="opacity-0 translate-y-2 scale-95"
+             x-transition:enter-end="opacity-100 translate-y-0 scale-100"
+             x-transition:leave="transition ease-in duration-150"
+             x-transition:leave-start="opacity-100 translate-y-0 scale-100"
+             x-transition:leave-end="opacity-0 translate-y-2 scale-95">
+            <div class="bg-white dark:bg-gray-800 rounded-lg shadow-xl overflow-hidden ring-1 ring-black/5 dark:ring-white/10">
                 <div class="flex justify-between items-center p-4 border-b border-gray-200 dark:border-gray-700">
                     <h3 class="text-lg font-medium text-gray-900 dark:text-white">QR-код</h3>
-                    <button @click="showQRDialog = false" class="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded">
+                    <button @click="showQRDialog = false"
+                            class="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500">
                         <span class="material-icons">close</span>
                     </button>
                 </div>
@@ -244,12 +436,12 @@
                     <div class="text-center mb-4">
                         <div class="bg-white p-4 rounded-lg inline-block">
                             <canvas x-ref="qrCanvas" class="hidden"></canvas>
-                            <img :src="'https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=' + encodeURIComponent(fullArUrl)"
+                            <img :src="qrCodeUrl(200)"
                                  :alt="'QR Code for ' + ar_content.order_number"
                                  loading="lazy"
                                  class="mx-auto">
                         </div>
-                        <p class="mt-2 text-sm text-gray-600 dark:text-gray-400">{{ ar_content.public_url }}</p>
+                        <p class="mt-2 text-sm text-gray-600 dark:text-gray-400" x-text="fullArUrl || '—'"></p>
                     </div>
                     
                     <div class="flex flex-col sm:flex-row gap-2">
@@ -277,20 +469,33 @@
 
 <!-- Video Upload Modal -->
 <div x-show="showUploadDialog" 
-     @click="showUploadDialog = false"
+     @click.self="showUploadDialog = false"
      @keydown.escape.window="showUploadDialog = false"
-     class="fixed inset-0 z-50 overflow-y-auto" 
+     class="fixed inset-0 z-50 overflow-y-auto"
+     x-transition:enter="transition ease-out duration-200"
+     x-transition:enter-start="opacity-0"
+     x-transition:enter-end="opacity-100"
+     x-transition:leave="transition ease-in duration-150"
+     x-transition:leave-start="opacity-100"
+     x-transition:leave-end="opacity-0"
      role="dialog" 
      aria-modal="true"
      x-cloak>
     <div class="flex items-center justify-center min-h-screen p-4">
-        <div class="fixed inset-0 bg-black bg-opacity-75" aria-hidden="true"></div>
+        <div class="fixed inset-0 bg-black/80 backdrop-blur-sm" aria-hidden="true"></div>
         
-        <div class="relative z-10 max-w-lg w-full">
-            <div class="bg-white dark:bg-gray-800 rounded-lg shadow-xl overflow-hidden">
+        <div class="relative z-10 max-w-lg w-full"
+             x-transition:enter="transition ease-out duration-200"
+             x-transition:enter-start="opacity-0 translate-y-2 scale-95"
+             x-transition:enter-end="opacity-100 translate-y-0 scale-100"
+             x-transition:leave="transition ease-in duration-150"
+             x-transition:leave-start="opacity-100 translate-y-0 scale-100"
+             x-transition:leave-end="opacity-0 translate-y-2 scale-95">
+            <div class="bg-white dark:bg-gray-800 rounded-lg shadow-xl overflow-hidden ring-1 ring-black/5 dark:ring-white/10">
                 <div class="flex justify-between items-center p-4 border-b border-gray-200 dark:border-gray-700">
                     <h3 class="text-lg font-medium text-gray-900 dark:text-white">Загрузить видео</h3>
-                    <button @click="showUploadDialog = false" class="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded">
+                    <button @click="showUploadDialog = false"
+                            class="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500">
                         <span class="material-icons">close</span>
                     </button>
                 </div>
@@ -303,7 +508,7 @@
                             <input type="file" 
                                    accept="video/*" 
                                    @change="handleVideoFileChange"
-                                   class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
+                                   class="form-input w-full">
                             <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
                                 Поддерживаемые форматы: MP4, WebM, MOV
                             </p>
@@ -329,17 +534,29 @@
 
 <!-- Delete Confirmation Modal -->
 <div x-show="showDeleteDialog" 
-     @click="showDeleteDialog = false"
+     @click.self="showDeleteDialog = false"
      @keydown.escape.window="showDeleteDialog = false"
-     class="fixed inset-0 z-50 overflow-y-auto" 
+     class="fixed inset-0 z-50 overflow-y-auto"
+     x-transition:enter="transition ease-out duration-200"
+     x-transition:enter-start="opacity-0"
+     x-transition:enter-end="opacity-100"
+     x-transition:leave="transition ease-in duration-150"
+     x-transition:leave-start="opacity-100"
+     x-transition:leave-end="opacity-0"
      role="dialog" 
      aria-modal="true"
      x-cloak>
     <div class="flex items-center justify-center min-h-screen p-4">
-        <div class="fixed inset-0 bg-black bg-opacity-75" aria-hidden="true"></div>
+        <div class="fixed inset-0 bg-black/80 backdrop-blur-sm" aria-hidden="true"></div>
         
-        <div class="relative z-10 max-w-lg w-full">
-            <div class="bg-white dark:bg-gray-800 rounded-lg shadow-xl overflow-hidden">
+        <div class="relative z-10 max-w-lg w-full"
+             x-transition:enter="transition ease-out duration-200"
+             x-transition:enter-start="opacity-0 translate-y-2 scale-95"
+             x-transition:enter-end="opacity-100 translate-y-0 scale-100"
+             x-transition:leave="transition ease-in duration-150"
+             x-transition:leave-start="opacity-100 translate-y-0 scale-100"
+             x-transition:leave-end="opacity-0 translate-y-2 scale-95">
+            <div class="bg-white dark:bg-gray-800 rounded-lg shadow-xl overflow-hidden ring-1 ring-black/5 dark:ring-white/10">
                 <div class="p-6">
                     <div class="flex items-center mb-4">
                         <div class="mx-auto flex-shrink-0 flex items-center justify-center h-12 w-12 rounded-full bg-red-100 dark:bg-red-900">
@@ -373,9 +590,17 @@
 </div>
 
 <script>
-function arContentDetail(arContent) {
+function arContentDetail() {
+    const arContent = JSON.parse(document.getElementById('ar-content-data')?.textContent || '{}');
+    const videos = JSON.parse(document.getElementById('ar-content-videos')?.textContent || '[]');
+    const activeVideoInfo = JSON.parse(document.getElementById('ar-content-active-video')?.textContent || 'null');
+    const markerMetrics = JSON.parse(document.getElementById('ar-content-marker-metrics')?.textContent || '{}');
+
     return {
-        arContent: arContent,
+        arContent,
+        videos: Array.isArray(videos) ? videos : [],
+        activeVideoInfo,
+        markerMetrics: markerMetrics || {},
         showPortraitLightbox: false,
         showQRDialog: false,
         showUploadDialog: false,
@@ -383,33 +608,167 @@ function arContentDetail(arContent) {
         downloadingQR: false,
         uploadingVideo: false,
         deleting: false,
+        regeneratingMedia: false,
         videoFile: null,
-        
+
+        init() {
+            this.normalizeMarkerMetrics();
+            this.loadVideos();
+        },
+
         get fullArUrl() {
             const url = this.arContent.public_url || this.arContent.unique_link || '';
             return url.startsWith('/') ? window.location.origin + url : url;
         },
-        
+
+        get portraitUrl() {
+            return this.arContent.thumbnail_url || this.arContent.photo_url || '';
+        },
+
+        get activeVideo() {
+            if (this.activeVideoInfo?.id) {
+                return this.videos.find(video => video.id === this.activeVideoInfo.id) || this.activeVideoInfo;
+            }
+            return this.videos.find(video => video.is_active) || null;
+        },
+
+        get activeVideoTitle() {
+            return this.activeVideo?.title || this.arContent.active_video_title || '';
+        },
+
+        get activeVideoSourceLabel() {
+            const source = this.activeVideoInfo?.source;
+            if (source === 'schedule') return 'Источник: расписание';
+            if (source === 'rotation') return 'Источник: ротация';
+            if (source === 'active_default') return 'Источник: активное видео';
+            return this.activeVideo ? 'Источник: вручную' : '';
+        },
+
+        get activeVideoSchedule() {
+            return this.activeVideoInfo?.schedule || null;
+        },
+
+        qrCodeUrl(size) {
+            const qrUrl = this.resolveUrl(this.arContent.qr_code_url);
+            if (qrUrl) {
+                return qrUrl;
+            }
+            return `https://api.qrserver.com/v1/create-qr-code/?size=${size}x${size}&data=${encodeURIComponent(this.fullArUrl)}`;
+        },
+
+        resolveUrl(url) {
+            if (!url) return '';
+            return url.startsWith('/') ? `${window.location.origin}${url}` : url;
+        },
+
+        isImagePreview(url) {
+            if (!url) return false;
+            return /\.(webp|png|jpe?g|gif)$/i.test(url);
+        },
+
+        videoStatusClass(status) {
+            switch (status) {
+                case 'active':
+                    return 'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-100';
+                case 'expiring':
+                    return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/40 dark:text-yellow-100';
+                case 'expired':
+                    return 'bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-100';
+                default:
+                    return 'bg-gray-100 text-gray-800 dark:bg-gray-900/40 dark:text-gray-100';
+            }
+        },
+
+        formatBytes(value) {
+            if (!value && value !== 0) return '—';
+            if (value === 0) return '0 B';
+            const sizes = ['B', 'KB', 'MB', 'GB'];
+            const index = Math.min(Math.floor(Math.log(value) / Math.log(1024)), sizes.length - 1);
+            return `${(value / Math.pow(1024, index)).toFixed(2)} ${sizes[index]}`;
+        },
+
+        formatSeconds(value) {
+            if (!value && value !== 0) return '—';
+            return `${Number(value).toFixed(2)} сек`;
+        },
+
+        formatPercent(value) {
+            if (value === null || value === undefined) return '—';
+            return `${Math.round(Number(value) * 100)}%`;
+        },
+
+        formatScore(value) {
+            if (value === null || value === undefined) return '—';
+            return Number(value).toFixed(2);
+        },
+
+        formatSchedule(schedule) {
+            if (!schedule) return '—';
+            return `${schedule.start_time || '—'} → ${schedule.end_time || '—'}`;
+        },
+
+        normalizeMarkerMetrics() {
+            if (!this.markerMetrics || typeof this.markerMetrics !== 'object') {
+                this.markerMetrics = {};
+            }
+            if (!this.markerMetrics.image_quality || typeof this.markerMetrics.image_quality !== 'object') {
+                this.markerMetrics.image_quality = {};
+            }
+        },
+
+        async loadVideos() {
+            try {
+                const response = await fetch(`/api/videos/ar-content/${this.arContent.id}/videos?include_schedules=true`);
+                if (!response.ok) return;
+                const data = await response.json();
+                this.videos = Array.isArray(data) ? data : [];
+            } catch (error) {
+                console.error('Failed to load videos:', error);
+            }
+        },
+
+        openVideo(url) {
+            if (url) {
+                window.open(url, '_blank');
+            }
+        },
+
+        async setActiveVideo(videoId) {
+            try {
+                const response = await fetch(`/api/videos/ar-content/${this.arContent.id}/videos/${videoId}/set-active`, {
+                    method: 'PATCH'
+                });
+                if (!response.ok) {
+                    throw new Error('Set active failed');
+                }
+                await this.loadVideos();
+                this.showToast('Активное видео обновлено', 'success');
+            } catch (error) {
+                console.error('Set active error:', error);
+                this.showToast('Не удалось установить активное видео', 'error');
+            }
+        },
+
         copyLink() {
             if (!this.fullArUrl) {
                 this.showToast('Ссылка недоступна', 'error');
                 return;
             }
-            
+
             navigator.clipboard.writeText(this.fullArUrl).then(() => {
                 this.showToast('Ссылка скопирована в буфер обмена', 'success');
-            }).catch(err => {
+            }).catch(() => {
                 this.showToast('Не удалось скопировать ссылку', 'error');
             });
         },
-        
+
         async downloadQR(format) {
             if (this.downloadingQR) return;
-            
+
             this.downloadingQR = true;
             try {
                 const filename = `qr-${this.arContent.order_number}.${format}`;
-                
+
                 switch (format) {
                     case 'png':
                         await this.downloadQRAsPNG(filename);
@@ -421,7 +780,7 @@ function arContentDetail(arContent) {
                         await this.downloadQRAsPDF(filename);
                         break;
                 }
-                
+
                 this.showToast(`QR-код скачан как ${format.toUpperCase()}`, 'success');
             } catch (error) {
                 this.showToast('Не удалось скачать QR-код', 'error');
@@ -430,47 +789,52 @@ function arContentDetail(arContent) {
                 this.downloadingQR = false;
             }
         },
-        
+
+        downloadFile(url, filename) {
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = filename;
+            link.click();
+        },
+
         async downloadQRAsPNG(filename) {
+            const qrUrl = this.resolveUrl(this.arContent.qr_code_url);
+            if (qrUrl) {
+                this.downloadFile(qrUrl, filename);
+                return;
+            }
+
             const canvas = document.createElement('canvas');
             const ctx = canvas.getContext('2d');
             const img = new Image();
-            
-            img.src = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(this.fullArUrl)}`;
-            
+            img.src = this.qrCodeUrl(300);
+
             await new Promise(resolve => {
                 img.onload = resolve;
             });
-            
+
             canvas.width = img.width;
             canvas.height = img.height;
             ctx.drawImage(img, 0, 0);
-            
+
             canvas.toBlob(blob => {
                 const url = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = filename;
-                a.click();
+                this.downloadFile(url, filename);
                 URL.revokeObjectURL(url);
             });
         },
-        
+
         async downloadQRAsSVG(filename) {
             const response = await fetch(`https://api.qrserver.com/v1/create-qr-code/?size=300x300&format=svg&data=${encodeURIComponent(this.fullArUrl)}`);
             const svgText = await response.text();
-            
+
             const blob = new Blob([svgText], { type: 'image/svg+xml' });
             const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = filename;
-            a.click();
+            this.downloadFile(url, filename);
             URL.revokeObjectURL(url);
         },
-        
+
         async downloadQRAsPDF(filename) {
-            // Simple PDF download using print functionality
             const printWindow = window.open('', '_blank');
             printWindow.document.write(`
                 <html>
@@ -483,7 +847,7 @@ function arContentDetail(arContent) {
                     </head>
                     <body>
                         <h2>QR Code - ${this.arContent.order_number}</h2>
-                        <img src="https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(this.fullArUrl)}" loading="lazy" />
+                        <img src="${this.qrCodeUrl(300)}" loading="lazy" />
                         <p>${this.fullArUrl}</p>
                     </body>
                 </html>
@@ -491,7 +855,35 @@ function arContentDetail(arContent) {
             printWindow.document.close();
             printWindow.print();
         },
-        
+
+        async regenerateMedia() {
+            if (this.regeneratingMedia) return;
+            this.regeneratingMedia = true;
+            try {
+                const response = await fetch(`/api/ar-content/${this.arContent.id}/regenerate-media`, {
+                    method: 'POST'
+                });
+                const result = await response.json();
+                if (response.ok && result.status === 'completed') {
+                    this.arContent.thumbnail_url = result.thumbnail_url || this.arContent.thumbnail_url;
+                    this.arContent.marker_url = result.marker_url || this.arContent.marker_url;
+                    this.arContent.marker_status = result.marker_status || this.arContent.marker_status;
+                    if (result.marker_metadata) {
+                        this.markerMetrics = result.marker_metadata;
+                        this.normalizeMarkerMetrics();
+                    }
+                    this.showToast('Превью и маркер обновлены', 'success');
+                } else {
+                    this.showToast('Не удалось обновить превью/маркер', 'error');
+                }
+            } catch (error) {
+                console.error('Regenerate media error:', error);
+                this.showToast('Не удалось обновить превью/маркер', 'error');
+            } finally {
+                this.regeneratingMedia = false;
+            }
+        },
+
         handleVideoFileChange(event) {
             const file = event.target.files[0];
             if (file) {
@@ -503,26 +895,25 @@ function arContentDetail(arContent) {
                 this.videoFile = file;
             }
         },
-        
+
         async handleVideoUpload() {
             if (!this.videoFile) return;
-            
+
             this.uploadingVideo = true;
             try {
                 const formData = new FormData();
-                formData.append('video', this.videoFile);
-                
-                const response = await fetch(`/api/companies/${this.arContent.company_id}/projects/${this.arContent.project_id}/ar-content/${this.arContent.id}/video`, {
+                formData.append('videos', this.videoFile);
+
+                const response = await fetch(`/api/videos/ar-content/${this.arContent.id}/videos`, {
                     method: 'POST',
                     body: formData
                 });
-                
+
                 if (response.ok) {
                     this.showToast('Видео успешно загружено!', 'success');
                     this.showUploadDialog = false;
                     this.videoFile = null;
-                    // Reload page to show updated video
-                    window.location.reload();
+                    await this.loadVideos();
                 } else {
                     throw new Error('Upload failed');
                 }
@@ -533,14 +924,14 @@ function arContentDetail(arContent) {
                 this.uploadingVideo = false;
             }
         },
-        
+
         async handleDelete() {
             this.deleting = true;
             try {
                 const response = await fetch(`/api/ar-content/${this.arContent.id}`, {
                     method: 'DELETE'
                 });
-                
+
                 if (response.ok) {
                     this.showToast('AR контент успешно удален', 'success');
                     window.location.href = '/ar-content';
@@ -555,14 +946,14 @@ function arContentDetail(arContent) {
                 this.showDeleteDialog = false;
             }
         },
-        
+
         showToast(message, type = 'info') {
             const toast = document.createElement('div');
             const bgColor = type === 'success' ? 'bg-green-500' : type === 'error' ? 'bg-red-500' : 'bg-blue-500';
             toast.className = `fixed bottom-4 right-4 ${bgColor} text-white px-4 py-2 rounded shadow z-50`;
             toast.textContent = message;
             document.body.appendChild(toast);
-            
+
             setTimeout(() => {
                 if (document.body.contains(toast)) {
                     document.body.removeChild(toast);

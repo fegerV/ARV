@@ -5,20 +5,24 @@
 {% block page_title %}Notifications{% endblock %}
 
 {% block content %}
-<div class="flex justify-between items-center mb-6">
-    <h2 class="text-2xl font-bold text-gray-900 dark:text-white">Notifications</h2>
-    <div class="flex space-x-2">
-        <button onclick="markAllRead()" class="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded">
-            Mark All Read
-        </button>
-        <a href="/settings" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded inline-flex items-center">
-            <span class="material-icons mr-2">settings</span>
-            Settings
-        </a>
+<div class="page-container">
+    <div class="page-header">
+        <div>
+            <h2 class="page-title">Notifications</h2>
+            <p class="page-subtitle">Track system events and status updates</p>
+        </div>
+        <div class="page-actions">
+            <button onclick="markAllRead()" class="btn btn-secondary">
+                Mark All Read
+            </button>
+            <a href="/settings" class="btn btn-primary inline-flex items-center">
+                <span class="material-icons mr-2">settings</span>
+                Settings
+            </a>
+        </div>
     </div>
-</div>
 
-<div class="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
+    <div class="card p-0 overflow-hidden">
     {% if notifications %}
     <div class="divide-y divide-gray-200 dark:divide-gray-700">
         {% for notification in notifications %}
@@ -58,14 +62,14 @@
         {% endfor %}
     </div>
     {% else %}
-    <div class="p-6 text-center text-gray-500">
+    <div class="p-6 text-center text-gray-500 dark:text-gray-400">
         No notifications
     </div>
     {% endif %}
-</div>
+    </div>
 
 <!-- Pagination -->
-<div class="bg-white px-4 py-3 flex items-center justify-between border-t border-gray-200 dark:border-gray-700 sm:px-6 mt-4">
+<div class="card p-4 flex items-center justify-between border-t border-gray-200 dark:border-gray-700 sm:px-6 mt-4">
     <div class="flex-1 flex justify-between sm:hidden">
         <a href="#" class="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 dark:text-gray-300 dark:bg-gray-800 dark:hover:bg-gray-700">Previous</a>
         <a href="#" class="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 dark:text-gray-300 dark:bg-gray-800 dark:hover:bg-gray-700">Next</a>

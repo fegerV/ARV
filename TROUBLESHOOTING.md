@@ -22,7 +22,7 @@ After investigation, we identified several potential causes:
 First, check if your database contains the necessary records:
 
 ```bash
-cd ARV && python check_db.py
+cd ARV && python utilities/check_db.py
 ```
 
 Expected output should show:
@@ -76,7 +76,7 @@ Ensure:
 ### Security Changes
 - Changed password hashing from bcrypt to SHA-256 for better compatibility
 - Old bcrypt hashes were replaced with SHA-256 hashes during migration
-- The `create_admin.py` script ensures admin user exists with correct password hash
+- The `utilities/create_admin.py` script ensures admin user exists with correct password hash
 
 ### API Routes
 Key API routes for AR content creation:
@@ -90,7 +90,7 @@ Key API routes for AR content creation:
 After setup, verify the system works by running:
 
 ```bash
-cd ARV && python test_ar_content_simple.py
+cd ARV && python scripts/legacy/manual_testing_guide.py
 ```
 
 This test verifies:

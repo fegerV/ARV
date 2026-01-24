@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>AR Content Create Test</title>
+    <script src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
+</head>
+<body>
+    <div x-data="arContentForm({}, [{'id': 1, 'name': 'Vertex AR', 'status': 'active'}], [{'id': 1, 'name': 'Портреты', 'company_id': 1, 'status': 'active'}])">
+        <h1>AR Content Create Test</h1>
+        
+        <div>
+            <label>Company:</label>
+            <select x-model="formData.company_id" @change="updateProjects">
+                <option value="">Select company</option>
+                <template x-for="company in companies" :key="company.id">
+                    <option :value="company.id" x-text="company.name"></option>
+                </template>
+            </select>
+        </div>
+        
+        <div>
+            <label>Project:</label>
+            <select x-model="formData.project_id">
+                <option value="">Select project</option>
+                <template x-for="project in filteredProjects" :key="project.id">
+                    <option :value="project.id" x-text="project.name"></option>
+                </template>
+            </select>
+        </div>
+        
+        <div>
+            <p>Selected Company: <span x-text="formData.company_id"></span></p>
+            <p>Selected Project: <span x-text="formData.project_id"></span></p>
+            <p>Available Projects: <span x-text="filteredProjects.length"></span></p>
+            <p>Debug: <span x-text="JSON.stringify(filteredProjects)"></span></p>
+        </div>
+    </div>
+
+    <script>
+        function arContentForm(arContent = {}, companies = [], projects = []) {
+            console.log('Initializing AR Content Form with data:', {
+                arContent,
+                companies: companies.length,
+                projects: projects.length,
+                companiesData: companies,
+                projectsData: projects
+            });
+            
+            return {
+                arContent: arContent,
+                companies: companies,
+                projects: projects,
+                submitting: false,
+                formData: {
+                    company_id: arContent.company_id || '',
+                    project_id: arContent.project_id || '',
+                    customer_name: arContent.customer_name || '',
+                    customer_phone: arContent.customer_phone || '',
+                    customer_email: arContent.customer_email || '',
+                    duration_years: arContent.duration_years || '1',
+                    photo_file: null,
+                    video_file: null,
+                    status: arContent.status || 'pending'
+                },
+                
+                get filteredProjects() {
+                    if (!this.formData.company_id) return [];
+                    
+                    console.log('Filtering projects for company:', this.formData.company_id);
+                    console.log('Available projects:', this.projects);
+                    
+                    const filtered = this.projects.filter(project => {
+                        // Handle both string and integer company_id comparisons
+                        const projectCompanyId = String(project.company_id);
+                        const selectedCompanyId = String(this.formData.company_id);
+                        const matches = projectCompanyId === selectedCompanyId;
+                        
+                        if (matches) {
+                            console.log('Project matches:', project.name, 'company_id:', project.company_id);
+                        }
+                        
+                        return matches;
+                    });
+                    
+                    console.log('Filtered projects:', filtered);
+                    return filtered;
+                },
+                
+                updateProjects() {
+                    // Reset project selection when company changes
+                    this.formData.project_id = '';
+                    console.log('Company changed, reset project selection');
+                }
+            }
+        }
+    </script>
+</body>
+</html>

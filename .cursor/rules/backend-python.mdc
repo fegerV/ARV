@@ -1,0 +1,13 @@
+---
+description: Backend Python правила
+globs: app/**/*.py
+alwaysApply: false
+---
+
+# Backend Python
+
+- Используй `response_model` и явные `HTTPException` для ошибок.
+- Не делай `print`, только `structlog`.
+- Не ловить `Exception` без логирования и повторного raise.
+- Сессии БД — через зависимости и контекст; всегда rollback при ошибках.
+- Валидация входных данных — через Pydantic/Query/Form.

@@ -57,6 +57,12 @@ async def lifespan(app: FastAPI) -> AsyncGenerator:
         debug=settings.DEBUG,
         log_level=settings.LOG_LEVEL,
     )
+
+    try:
+        settings.validate_sensitive_defaults()
+    except ValueError as exc:
+        logger.error("insecure_defaults_detected", error=str(exc))
+        raise
     
     # Seed defaults (Vertex AR local storage and company)
     try:

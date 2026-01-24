@@ -153,14 +153,14 @@ async def list_all_ar_content(
     )
 
 
-# Additional route without trailing slash for compatibility
-@router.get("/ar-content", response_model=ARContentList, tags=["AR Content"])
+# Additional route with trailing slash for compatibility
+@router.get("/ar-content/", response_model=ARContentList, tags=["AR Content"])
 async def list_all_ar_content_no_slash(
     page: int = Query(1, ge=1, description="Page number"),
     page_size: int = Query(100, ge=1, le=1000, description="Number of items per page"),
     db: AsyncSession = Depends(get_db)
 ):
-    """List all AR content across all companies and projects (route without trailing slash for compatibility)."""
+    """List all AR content across all companies and projects (route with trailing slash for compatibility)."""
     # This is just a redirect to the main function
     return await list_all_ar_content(page=page, page_size=page_size, db=db)
 
@@ -274,6 +274,16 @@ async def _create_ar_content(
     
     # Generate QR code
     qr_code_url = await generate_qr_code(unique_id, storage_path)
+    logger.info(
+        "ar_content_storage_paths",
+        storage_path=str(storage_path),
+        photo_path=str(photo_path),
+        video_path=str(video_path),
+        qr_code_path=str(storage_path / "qr_code.png"),
+        photo_url=build_public_url(photo_path),
+        video_url=video_url,
+        qr_code_url=qr_code_url,
+    )
     
     # Create database record for AR content
     ar_content = ARContent(
@@ -312,6 +322,12 @@ async def _create_ar_content(
             # Commit the change to the database
             await db.commit()
             await db.refresh(ar_content)  # Refresh to ensure the change is saved
+            logger.info(
+                "photo_thumbnail_generation_saved",
+                ar_content_id=ar_content.id,
+                thumbnail_url=thumbnail_result.get("thumbnail_url"),
+                thumbnail_path=thumbnail_result.get("thumbnail_path"),
+            )
         else:
             logger.warning("photo_thumbnail_generation_failed", error=thumbnail_result.get("error"))
             # We won't fail the whole request if thumbnail generation fails
@@ -360,6 +376,13 @@ async def _create_ar_content(
             # Commit the marker information to database
             await db.commit()
             await db.refresh(ar_content)
+            logger.info(
+                "marker_generation_saved",
+                ar_content_id=ar_content.id,
+                marker_url=marker_result.get("marker_url"),
+                marker_path=marker_result.get("marker_path"),
+                marker_status=marker_result.get("status"),
+            )
     except Exception as e:
         logger.error("marker_generation_exception", error=str(e))
         # We won't fail the whole request if marker generation fails
@@ -372,6 +395,76 @@ async def _create_ar_content(
         photo_url=ar_content.photo_url,
         video_url=ar_content.video_url
     )
+
+
+@router.post("/ar-content/{ar_content_id}/regenerate-media", tags=["AR Content"])
+async def regenerate_media(
+    ar_content_id: int,
+    db: AsyncSession = Depends(get_db)
+):
+    """Regenerate preview thumbnail and marker for AR content."""
+    ar_content = await db.get(ARContent, ar_content_id)
+    if not ar_content:
+        raise HTTPException(status_code=404, detail="AR content not found")
+
+    if not ar_content.photo_path:
+        raise HTTPException(status_code=400, detail="Photo not found for AR content")
+
+    storage_path = Path(ar_content.storage_path) if ar_content.storage_path else None
+    if storage_path:
+        storage_path.mkdir(parents=True, exist_ok=True)
+
+    logger.info(
+        "ar_content_regeneration_started",
+        ar_content_id=ar_content.id,
+        photo_path=ar_content.photo_path,
+        storage_path=str(storage_path) if storage_path else None,
+    )
+
+    thumbnail_result = await thumbnail_service.generate_image_thumbnail(
+        image_path=ar_content.photo_path,
+        company_id=ar_content.company_id
+    )
+    if thumbnail_result.get("status") == "ready":
+        ar_content.thumbnail_url = thumbnail_result.get("thumbnail_url")
+    else:
+        logger.warning(
+            "photo_thumbnail_regeneration_failed",
+            ar_content_id=ar_content.id,
+            error=thumbnail_result.get("error"),
+        )
+
+    marker_result = await marker_service.generate_marker(
+        ar_content_id=ar_content.id,
+        image_path=ar_content.photo_path,
+        output_dir=str(storage_path) if storage_path else None
+    )
+    ar_content.marker_path = marker_result.get("marker_path")
+    ar_content.marker_url = marker_result.get("marker_url")
+    ar_content.marker_status = marker_result.get("status")
+    ar_content.marker_metadata = marker_result.get("metadata")
+
+    if marker_result.get("status") == "failed":
+        logger.error("marker_regeneration_failed", error=marker_result.get("error"))
+
+    await db.commit()
+    await db.refresh(ar_content)
+
+    logger.info(
+        "ar_content_regeneration_completed",
+        ar_content_id=ar_content.id,
+        thumbnail_url=ar_content.thumbnail_url,
+        marker_url=ar_content.marker_url,
+        marker_status=ar_content.marker_status,
+    )
+
+    return {
+        "status": "completed",
+        "thumbnail_url": ar_content.thumbnail_url,
+        "marker_url": ar_content.marker_url,
+        "marker_status": ar_content.marker_status,
+        "marker_metadata": ar_content.marker_metadata,
+    }
 
 
 @router.post("/ar-content", response_model=ARContentCreateResponse, tags=["AR Content"])

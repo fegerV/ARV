@@ -13,7 +13,7 @@ import qrcode
 from app.core.redis import redis_client
 from app.html.deps import get_html_db, CurrentActiveUser
 from app.api.routes.ar_content import (
-    get_ar_content_by_id_legacy,
+    get_ar_content_by_id,
     update_ar_content,
 )
 from app.schemas.ar_content import ARContentUpdate
@@ -31,10 +31,19 @@ async def copy_ar_content_link(
     current_user=CurrentActiveUser,
 ):
     """Возвращает JSON {link: ...}, фронт сам пишет в clipboard."""
-    content = await get_ar_content_by_id_legacy(int(ar_content_id), db)
+    content = await get_ar_content_by_id(int(ar_content_id), db)
     if not content:
         raise HTTPException(status_code=404, detail="AR content not found")
-    link = str(request.base_url) + f"view/{content['id']}"
+    if hasattr(content, "model_dump"):
+        content_data = content.model_dump()
+    elif hasattr(content, "__dict__"):
+        content_data = content.__dict__
+    else:
+        content_data = dict(content)
+    unique_link = content_data.get("unique_link") or content_data.get("public_url") or ""
+    link = unique_link
+    if unique_link.startswith("/"):
+        link = str(request.base_url) + unique_link.lstrip("/")
     return {"link": link}
 
 
@@ -46,29 +55,45 @@ async def get_ar_content_qr_code(
     db: AsyncSession = Depends(get_html_db),
     current_user=CurrentActiveUser,
 ):
-    content = await get_ar_content_by_id_legacy(int(ar_content_id), db)
+    content = await get_ar_content_by_id(int(ar_content_id), db)
     if not content:
         raise HTTPException(status_code=404, detail="AR content not found")
+    if hasattr(content, "model_dump"):
+        content_data = content.model_dump()
+    elif hasattr(content, "__dict__"):
+        content_data = content.__dict__
+    else:
+        content_data = dict(content)
 
     cache_key = f"qr:{ar_content_id}"
-    cached = await redis_client.get(cache_key)
+    cached = None
+    try:
+        cached = await redis_client.get(cache_key)
+    except Exception:
+        cached = None
     if cached:
         img_b64 = cached
     else:
-        public_url = str(request.base_url) + f"view/{content['id']}"
+        public_url = content_data.get("unique_link") or content_data.get("public_url") or ""
+        if public_url.startswith("/"):
+            public_url = str(request.base_url) + public_url.lstrip("/")
         qr = qrcode.make(public_url, image_factory=qrcode.image.pil.PilImage)
         buf = io.BytesIO()
         qr.save(buf, format="PNG")
         buf.seek(0)
         img_b64 = base64.b64encode(buf.read()).decode()
-        await redis_client.set(cache_key, img_b64, ex=QR_CACHE_TTL)
+        try:
+            await redis_client.set(cache_key, img_b64, ex=QR_CACHE_TTL)
+        except Exception:
+            pass
 
+    display_url = public_url if public_url else ""
     html = f"""
     <div class="flex flex-col items-center">
         <div class="bg-white p-4 rounded">
             <img src="data:image/png;base64,{img_b64}" alt="QR Code">
         </div>
-        <p class="mt-2 text-sm break-all max-w-xs">{request.base_url}view/{content['id']}</p>
+        <p class="mt-2 text-sm break-all max-w-xs">{display_url}</p>
     </div>
     """
     return HTMLResponse(html)
@@ -81,7 +106,7 @@ async def delete_ar_content_fragment(
     db: AsyncSession = Depends(get_html_db),
     current_user=CurrentActiveUser,
 ):
-    content = await get_ar_content_by_id_legacy(int(ar_content_id), db)
+    content = await get_ar_content_by_id(int(ar_content_id), db)
     if not content:
         raise HTTPException(status_code=404, detail="AR content not found")
     await update_ar_content(
@@ -91,7 +116,10 @@ async def delete_ar_content_fragment(
         current_user,
     )
     # сброс кеша QR, если вдруг восстановят
-    await redis_client.delete(f"qr:{ar_content_id}")
+    try:
+        await redis_client.delete(f"qr:{ar_content_id}")
+    except Exception:
+        pass
     return HTMLResponse("")   # outerHTML удалит <tr>
 
 
@@ -102,7 +130,7 @@ async def restore_ar_content_fragment(
     db: AsyncSession = Depends(get_html_db),
     current_user=CurrentActiveUser,
 ):
-    content = await get_ar_content_by_id_legacy(int(ar_content_id), db)
+    content = await get_ar_content_by_id(int(ar_content_id), db)
     if not content:
         raise HTTPException(status_code=404, detail="AR content not found")
     await update_ar_content(

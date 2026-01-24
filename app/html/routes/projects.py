@@ -1,10 +1,12 @@
 from fastapi import APIRouter, Request, Depends
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import func
+from sqlalchemy import func, select
 from fastapi.templating import Jinja2Templates
+import structlog
 from app.models.user import User
 from app.models.ar_content import ARContent
+from app.models.company import Company
 from app.api.routes.projects import list_projects, get_project
 from app.html.deps import get_html_db
 from app.api.routes.auth import get_current_user_optional
@@ -12,10 +14,25 @@ from app.html.mock import MOCK_PROJECTS, PROJECT_CREATE_MOCK_DATA
 from app.html.filters import datetime_format
 
 router = APIRouter()
+logger = structlog.get_logger()
 
 templates = Jinja2Templates(directory="templates")
 # Add datetime filter to templates
 templates.env.filters["datetime_format"] = datetime_format
+
+
+def _pydantic_to_dict(item):
+    """Convert Pydantic model to dict, excluding _links field."""
+    if hasattr(item, 'model_dump'):
+        return item.model_dump(exclude={"_links"})
+    return dict(item)
+
+
+def _convert_enum_to_string(data_dict):
+    """Convert enum values to strings in dictionary."""
+    if "status" in data_dict and hasattr(data_dict["status"], "value"):
+        data_dict["status"] = data_dict["status"].value
+    return data_dict
 
 @router.get("/projects", response_class=HTMLResponse)
 async def projects_list(
@@ -50,21 +67,22 @@ async def projects_list(
         )
         
         projects = []
-        from app.models.company import Company
-        from sqlalchemy import select
         
         for item in result.items:
-            project_dict = dict(item)
+            # Convert Pydantic model to dict using helper
+            project_dict = _pydantic_to_dict(item)
+            project_dict = _convert_enum_to_string(project_dict)
             
             # Get company name
             try:
                 company = await db.get(Company, project_dict["company_id"])
                 project_dict["company_name"] = company.name if company else "Unknown"
-            except Exception:
+            except Exception as err:
+                logger.error("get_company_error", project_id=project_dict["id"], error=str(err))
                 project_dict["company_name"] = "Unknown"
             
             # Apply status filter if specified
-            if status_filter and project_dict.get("status") != status_filter:
+            if status_filter and str(project_dict.get("status")) != status_filter:
                 continue
             
             projects.append(project_dict)
@@ -73,18 +91,14 @@ async def projects_list(
         total_pages = result.total_pages
         
     except Exception as e:
-        import structlog
         logger = structlog.get_logger()
-        logger.error("projects_list_error", error=str(e))
+        logger.error("projects_list_error", error=str(e), exc_info=True)
         projects = []
         total_count = 0
         total_pages = 1
     
     # Get companies for filter dropdown
     try:
-        from app.models.company import Company
-        from sqlalchemy import select
-        
         companies_query = select(Company).order_by(Company.name)
         companies_result = await db.execute(companies_query)
         companies = [
@@ -92,9 +106,7 @@ async def projects_list(
             for c in companies_result.scalars().all()
         ]
     except Exception as e:
-        import structlog
-        logger = structlog.get_logger()
-        logger.error("companies_fetch_error", error=str(e))
+        logger.error("companies_fetch_error", error=str(e), exc_info=True)
         companies = []
     
     context = {
@@ -120,24 +132,21 @@ async def project_create(
 ):
     """Project create page."""
     if not current_user:
-        # Redirect to login page if user is not authenticated
         return RedirectResponse(url="/admin/login", status_code=303)
     
     if not current_user.is_active:
-        # Redirect to login page if user is not active
         return RedirectResponse(url="/admin/login", status_code=303)
     
     try:
         from app.api.routes.companies import list_companies
         companies_result = await list_companies(page=1, page_size=100, db=db, current_user=current_user)
-        companies = [dict(item) for item in companies_result.items]
+        companies = []
+        for item in companies_result.items:
+            company_dict = _pydantic_to_dict(item)
+            companies.append(company_dict)
     except Exception as e:
-        # Log error and try direct database query as fallback
-        print(f"Error fetching companies via API: {e}")
+        logger.error("companies_fetch_error", error=str(e), exc_info=True)
         try:
-            from sqlalchemy import select
-            from app.models.company import Company
-            
             companies_query = select(Company)
             companies_result = await db.execute(companies_query)
             companies = []
@@ -151,15 +160,14 @@ async def project_create(
                     "updated_at": company.updated_at
                 })
         except Exception as db_error:
-            print(f"Error fetching companies from database: {db_error}")
-            # fallback to mock data only as last resort
+            logger.error("companies_db_error", error=str(db_error), exc_info=True)
             companies = PROJECT_CREATE_MOCK_DATA["companies"]
     
     context = {
         "request": request,
         "companies": companies,
         "current_user": current_user,
-        "project": None  # Explicitly set project to None for create form
+        "project": None
     }
     return templates.TemplateResponse("projects/form.html", context)
 
@@ -172,31 +180,27 @@ async def project_detail(
 ):
     """Project detail page."""
     if not current_user:
-        # Redirect to login page if user is not authenticated
         return RedirectResponse(url="/admin/login", status_code=303)
     
     if not current_user.is_active:
-        # Redirect to login page if user is not active
         return RedirectResponse(url="/admin/login", status_code=303)
+    
     try:
         project = await get_project(int(project_id), db)
-        project_data = dict(project)
-    except Exception:
-        # fallback to mock data
+        project_data = _pydantic_to_dict(project)
+        project_data = _convert_enum_to_string(project_data)
+    except Exception as e:
+        logger.error("project_detail_error", project_id=project_id, error=str(e))
         project_data = {**MOCK_PROJECTS[0], "id": project_id}
     
     # Get companies for edit form
     try:
         from app.api.routes.companies import list_companies
         companies_result = await list_companies(page=1, page_size=100, db=db, current_user=current_user)
-        companies = [dict(item) for item in companies_result.items]
+        companies = [_pydantic_to_dict(item) for item in companies_result.items]
     except Exception as e:
-        # Log error and try direct database query as fallback
-        print(f"Error fetching companies via API: {e}")
+        logger.error("companies_fetch_error", error=str(e))
         try:
-            from sqlalchemy import select
-            from app.models.company import Company
-            
             companies_query = select(Company)
             companies_result = await db.execute(companies_query)
             companies = []
@@ -210,8 +214,7 @@ async def project_detail(
                     "updated_at": company.updated_at
                 })
         except Exception as db_error:
-            print(f"Error fetching companies from database: {db_error}")
-            # fallback to mock data only as last resort
+            logger.error("companies_db_error", error=str(db_error))
             companies = PROJECT_CREATE_MOCK_DATA["companies"]
     
     context = {
@@ -231,32 +234,27 @@ async def project_edit(
 ):
     """Project edit page."""
     if not current_user:
-        # Redirect to login page if user is not authenticated
         return RedirectResponse(url="/admin/login", status_code=303)
     
     if not current_user.is_active:
-        # Redirect to login page if user is not active
         return RedirectResponse(url="/admin/login", status_code=303)
     
     try:
         project = await get_project(int(project_id), db)
-        project_data = dict(project)
-    except Exception:
-        # fallback to mock data
+        project_data = _pydantic_to_dict(project)
+        project_data = _convert_enum_to_string(project_data)
+    except Exception as e:
+        logger.error("project_edit_error", project_id=project_id, error=str(e))
         project_data = {**MOCK_PROJECTS[0], "id": project_id}
     
     # Get companies for edit form
     try:
         from app.api.routes.companies import list_companies
         companies_result = await list_companies(page=1, page_size=100, db=db, current_user=current_user)
-        companies = [dict(item) for item in companies_result.items]
+        companies = [_pydantic_to_dict(item) for item in companies_result.items]
     except Exception as e:
-        # Log error and try direct database query as fallback
-        print(f"Error fetching companies via API: {e}")
+        logger.error("companies_fetch_error", error=str(e))
         try:
-            from sqlalchemy import select
-            from app.models.company import Company
-            
             companies_query = select(Company)
             companies_result = await db.execute(companies_query)
             companies = []
@@ -270,8 +268,7 @@ async def project_edit(
                     "updated_at": company.updated_at
                 })
         except Exception as db_error:
-            print(f"Error fetching companies from database: {db_error}")
-            # fallback to mock data only as last resort
+            logger.error("companies_db_error", error=str(db_error))
             companies = PROJECT_CREATE_MOCK_DATA["companies"]
     
     context = {
@@ -309,7 +306,7 @@ async def project_create_post(
         try:
             from app.api.routes.companies import list_companies
             companies_result = await list_companies(page=1, page_size=100, db=db, current_user=current_user)
-            companies = [dict(item) for item in companies_result.items]
+            companies = [_pydantic_to_dict(item) for item in companies_result.items]
         except Exception:
             companies = PROJECT_CREATE_MOCK_DATA["companies"]
         
@@ -343,11 +340,12 @@ async def project_create_post(
         return RedirectResponse(url="/projects", status_code=303)
         
     except Exception as e:
+        logger.error("project_create_error", error=str(e), exc_info=True)
         # If creation fails, return to form with error
         try:
             from app.api.routes.companies import list_companies
             companies_result = await list_companies(page=1, page_size=100, db=db, current_user=current_user)
-            companies = [dict(item) for item in companies_result.items]
+            companies = [_pydantic_to_dict(item) for item in companies_result.items]
         except Exception:
             companies = PROJECT_CREATE_MOCK_DATA["companies"]
         
@@ -387,7 +385,7 @@ async def project_update_post(
         try:
             from app.api.routes.companies import list_companies
             companies_result = await list_companies(page=1, page_size=100, db=db, current_user=current_user)
-            companies = [dict(item) for item in companies_result.items]
+            companies = [_pydantic_to_dict(item) for item in companies_result.items]
         except Exception:
             companies = PROJECT_CREATE_MOCK_DATA["companies"]
         
@@ -423,11 +421,12 @@ async def project_update_post(
         return RedirectResponse(url="/projects", status_code=303)
         
     except Exception as e:
+        logger.error("project_update_error", project_id=project_id, error=str(e), exc_info=True)
         # If update fails, return to form with error
         try:
             from app.api.routes.companies import list_companies
             companies_result = await list_companies(page=1, page_size=100, db=db, current_user=current_user)
-            companies = [dict(item) for item in companies_result.items]
+            companies = [_pydantic_to_dict(item) for item in companies_result.items]
         except Exception:
             companies = PROJECT_CREATE_MOCK_DATA["companies"]
         
@@ -449,13 +448,9 @@ async def project_delete(
 ):
     """Handle project deletion."""
     if not current_user:
-        # Return 401 if user is not authenticated
-        from fastapi.responses import JSONResponse
         return JSONResponse(content={"error": "Unauthorized"}, status_code=401)
     
     if not current_user.is_active:
-        # Return 401 if user is not active
-        from fastapi.responses import JSONResponse
         return JSONResponse(content={"error": "Unauthorized"}, status_code=401)
     
     try:
@@ -469,10 +464,9 @@ async def project_delete(
         )
         
         # Return success response for JavaScript
-        from fastapi.responses import JSONResponse
         return JSONResponse(content={"status": "deleted"}, status_code=200)
         
     except Exception as e:
+        logger.error("project_delete_error", project_id=project_id, error=str(e), exc_info=True)
         # Return error response for JavaScript
-        from fastapi.responses import JSONResponse
         return JSONResponse(content={"error": f"Failed to delete project: {str(e)}"}, status_code=400)

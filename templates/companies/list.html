@@ -4,12 +4,17 @@
 {% block page_title %}Companies{% endblock %}
 
 {% block content %}
-<div x-data="companiesList()">
-    <div class="flex justify-between items-center mb-6">
-        <h2 class="text-2xl font-bold text-gray-800 dark:text-white">Companies</h2>
-        <a href="/companies/create" class="btn btn-primary">
-            Add Company
-        </a>
+<div x-data="companiesList()" class="page-container">
+    <div class="page-header">
+        <div>
+            <h2 class="page-title">Companies</h2>
+            <p class="page-subtitle">Manage companies and their storage providers</p>
+        </div>
+        <div class="page-actions">
+            <a href="/companies/create" class="btn btn-primary">
+                Add Company
+            </a>
+        </div>
     </div>
     
     <!-- Filters -->
@@ -52,7 +57,7 @@
     </div>
     
     <!-- Companies table -->
-    <div class="bg-white dark:bg-gray-900 shadow rounded-lg overflow-hidden">
+    <div class="card-table">
         <div class="overflow-x-auto">
             <table class="table">
                 <thead>
@@ -74,8 +79,8 @@
                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{{ company.storage_provider }}</td>
                         <td class="px-6 py-4 whitespace-nowrap">
                             <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
-                                {% if company.status == 'active' %}bg-green-100 text-green-800 dark:bg-green-80 dark:text-green-100
-                                {% else %}bg-red-100 text-red-800 dark:bg-red-800 dark:text-red-100{% endif %}">
+                                {% if company.status == 'active' %}bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-100
+                                {% else %}bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-100{% endif %}">
                                 {{ company.status }}
                             </span>
                         </td>
@@ -84,7 +89,7 @@
                         <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                             <a href="/companies/{{ company.id }}/edit" class="text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:hover:text-indigo-300 mr-3">Edit</a>
                             <button @click="deleteCompany('{{ company.id }}')" 
-                                    class="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-30">Delete</button>
+                                    class="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300">Delete</button>
                         </td>
                     </tr>
                     {% endfor %}

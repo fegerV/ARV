@@ -1,0 +1,21 @@
+---
+description: Базовые стандарты проекта (всегда)
+alwaysApply: true
+---
+
+# Базовые стандарты
+
+- Следуй SOLID, избегай неявной магии и побочных эффектов.
+- Пиши типизированный код (Python type hints), публичные функции и классы — с docstring.
+- Не используй `any`, `eval`, `exec`, динамические импорты без явного обоснования.
+- Не перезаписывай чужие изменения и не трогай несвязанные части кода.
+- Для ошибок используй явные исключения и логирование через `structlog`.
+
+Пример обработки ошибок:
+```python
+try:
+    result = await service.run()
+except ServiceError as exc:
+    logger.error("service_failed", error=str(exc))
+    raise HTTPException(status_code=502, detail="Upstream error")
+```

@@ -92,6 +92,7 @@ ARV/
 ├── alembic/               # Миграции базы данных
 ├── storage/               # Локальное хранилище контента
 ├── tests/                 # Тесты
+├── scripts/               # Вспомогательные скрипты
 ├── docker-compose.yml     # Конфигурация Docker Compose
 ├── Dockerfile             # Production Dockerfile
 ├── Dockerfile.dev         # Development Dockerfile
@@ -114,6 +115,19 @@ pytest tests/ -v --cov=app
 
 # Применение миграций
 alembic upgrade head
+```
+
+### Скрипты обслуживания
+```bash
+# Проверки
+python scripts/checks/final_system_check.py
+python scripts/checks/check_ar_content_pages.py
+
+# Тестовый сервер
+python scripts/servers/run_admin_test_server.py
+
+# Тестовые данные
+python scripts/test_data/create_sample_data.py
 ```
 
 ### Разработка шаблонов

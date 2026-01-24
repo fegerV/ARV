@@ -10,13 +10,32 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+def _is_sqlite_url(database_url: str) -> bool:
+    """Return True if the database URL points to SQLite."""
+    return database_url.startswith("sqlite")
+
+
+def _build_engine():
+    """Create async SQLAlchemy engine with safe defaults."""
+    if settings.DEBUG or not settings.is_production or _is_sqlite_url(settings.DATABASE_URL):
+        pool_options = {"poolclass": NullPool}
+    else:
+        pool_options = {
+            "pool_size": settings.DB_POOL_SIZE,
+            "max_overflow": settings.DB_MAX_OVERFLOW,
+            "pool_pre_ping": True,
+        }
+
+    return create_async_engine(
+        settings.DATABASE_URL,
+        echo=settings.DB_ECHO,
+        connect_args={},
+        **pool_options,
+    )
+
+
 # Create async engine with connection pooling
-engine = create_async_engine(
-    settings.DATABASE_URL,
-    poolclass=NullPool,  # Disable connection pooling for development
-    echo=settings.DEBUG,
-    connect_args={}
-)
+engine = _build_engine()
 
 # Create async session factory
 AsyncSessionLocal = async_sessionmaker(
@@ -41,8 +60,8 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
     async with AsyncSessionLocal() as session:
         try:
             yield session
-            await session.commit()
         except Exception:
+            logger.exception("database_session_failed")
             await session.rollback()
             raise
         finally:
@@ -107,9 +126,11 @@ async def seed_defaults() -> None:
             )
             session.add(admin_user)
             await session.flush()
+        else:
+            logger.info("default_admin_exists", user_id=admin_user.id)
 
         # Default local storage connection
-        res_storage = await session.execute(select(StorageConnection))
+        res_storage = await session.execute(select(StorageConnection).where(StorageConnection.name == "Local Storage"))
         default_storage = res_storage.scalar_one_or_none()
         if not default_storage:
             storage_path = Path("/tmp/storage/content")
@@ -128,7 +149,7 @@ async def seed_defaults() -> None:
             logger.info("local_storage_structure_created", base_path=str(storage_path))
 
         # Default company
-        res_company = await session.execute(select(Company))
+        res_company = await session.execute(select(Company).where(Company.name == "Vertex AR"))
         default_company = res_company.scalar_one_or_none()
         if not default_company:
             default_company = Company(
@@ -141,6 +162,11 @@ async def seed_defaults() -> None:
             await session.flush()
             
             logger.info("default_company_created", company_id=default_company.id)
+        else:
+            # Update the existing company if needed
+            default_company.slug = "vertex-ar"
+            default_company.contact_email = settings.ADMIN_EMAIL
+            default_company.status = CompanyStatus.ACTIVE
 
         await session.commit()
         logger.info("defaults_seeded")

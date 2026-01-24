@@ -488,7 +488,7 @@ async def generate_ar_content_thumbnails(
                 configs = [
                     ThumbnailConfig(ThumbnailSize.SMALL, ThumbnailFormat.WEBP, 80),
                     ThumbnailConfig(ThumbnailSize.MEDIUM, ThumbnailFormat.WEBP, 85),
-                    ThumbnailConfig(ThumbnailSize.LARGE, ThumbnailFormat.JPEG, 90),
+                    ThumbnailConfig(ThumbnailSize.LARGE, ThumbnailFormat.WEBP, 90),
                 ]
                 
                 thumbnail_results = await enhanced_thumbnail_service.generate_multiple_thumbnails(

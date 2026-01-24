@@ -1,5 +1,4 @@
 from typing import Optional, List
-import uuid
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, UploadFile, File, Form, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, and_, or_
@@ -30,11 +29,11 @@ from app.services.thumbnail_service import ThumbnailService
 from app.enums import VideoStatus
 
 
-async def _generate_video_thumbnail_task(video_id: uuid.UUID, video_path: str) -> None:
+async def _generate_video_thumbnail_task(video_id: int, video_path: str) -> None:
     svc = ThumbnailService()
     result = await svc.generate_video_thumbnail(
         video_path,
-        thumbnail_name=f"video_{video_id}_thumb.jpg",
+        thumbnail_name=f"video_{video_id}_thumb.webp",
     )
 
     if result.get("status") != "ready":
@@ -50,7 +49,7 @@ async def _generate_video_thumbnail_task(video_id: uuid.UUID, video_path: str) -
         if not v:
             return
         v.thumbnail_path = result.get("thumbnail_path")
-        v.thumbnail_url = result.get("thumbnail_url")
+        v.preview_url = result.get("thumbnail_url")
         v.status = VideoStatus.READY
         await session.commit()
 
@@ -89,11 +88,10 @@ async def upload_videos(
     Returns:
         List of created video objects with metadata
     """
-    # Parse UUIDs
     try:
-        content_uuid = uuid.UUID(str(content_id))
-    except Exception:
-        raise HTTPException(status_code=400, detail="content_id must be UUID")
+        content_uuid = int(content_id)
+    except (TypeError, ValueError):
+        raise HTTPException(status_code=400, detail="content_id must be int")
 
     # Verify AR content exists
     ar_content = await db.get(ARContent, content_uuid)
@@ -147,6 +145,7 @@ async def upload_videos(
             # Update video with metadata
             video.video_path = str(video_path)
             video.video_url = build_public_url(video_path)
+            video.preview_url = video.video_url
             video.duration = int(metadata["duration"]) if metadata.get("duration") is not None else None
             video.width = metadata.get("width")
             video.height = metadata.get("height")
@@ -171,7 +170,7 @@ async def upload_videos(
                 "title": video.filename,
                 "video_url": video.video_url,
                 "video_path": video.video_path,
-                "thumbnail_url": video.thumbnail_url,
+                "thumbnail_url": video.preview_url,
                 "preview_url": video.preview_url,
                 "duration": video.duration,
                 "width": video.width,
@@ -211,9 +210,9 @@ async def list_videos(
 ):
     """Get all videos for AR content with computed status and schedule info."""
     try:
-        content_uuid = uuid.UUID(str(content_id))
-    except Exception:
-        raise HTTPException(status_code=400, detail="content_id must be UUID")
+        content_uuid = int(content_id)
+    except (TypeError, ValueError):
+        raise HTTPException(status_code=400, detail="content_id must be int")
 
     # Verify AR content exists
     ar_content = await db.get(ARContent, content_uuid)
@@ -273,10 +272,10 @@ async def set_video_active(
 ):
     """Atomically set a video as the active one for AR content."""
     try:
-        content_uuid = uuid.UUID(str(content_id))
-        video_uuid = uuid.UUID(str(video_id))
-    except Exception:
-        raise HTTPException(status_code=400, detail="content_id and video_id must be UUID")
+        content_uuid = int(content_id)
+        video_uuid = int(video_id)
+    except (TypeError, ValueError):
+        raise HTTPException(status_code=400, detail="content_id and video_id must be int")
 
     # Verify AR content exists
     ar_content = await db.get(ARContent, content_uuid)
@@ -335,10 +334,10 @@ async def update_video_subscription(
 ):
     """Update video subscription end date."""
     try:
-        content_uuid = uuid.UUID(str(content_id))
-        video_uuid = uuid.UUID(str(video_id))
-    except Exception:
-        raise HTTPException(status_code=400, detail="content_id and video_id must be UUID")
+        content_uuid = int(content_id)
+        video_uuid = int(video_id)
+    except (TypeError, ValueError):
+        raise HTTPException(status_code=400, detail="content_id and video_id must be int")
 
     # Verify AR content exists
     ar_content = await db.get(ARContent, content_uuid)
@@ -389,10 +388,10 @@ async def update_video_rotation(
 ):
     """Update video rotation type and reset rotation state."""
     try:
-        content_uuid = uuid.UUID(str(content_id))
-        video_uuid = uuid.UUID(str(video_id))
-    except Exception:
-        raise HTTPException(status_code=400, detail="content_id and video_id must be UUID")
+        content_uuid = int(content_id)
+        video_uuid = int(video_id)
+    except (TypeError, ValueError):
+        raise HTTPException(status_code=400, detail="content_id and video_id must be int")
 
     # Verify AR content exists
     ar_content = await db.get(ARContent, content_uuid)
@@ -443,10 +442,10 @@ async def list_video_schedules(
 ):
     """Get all schedules for a video."""
     try:
-        content_uuid = uuid.UUID(str(content_id))
-        video_uuid = uuid.UUID(str(video_id))
-    except Exception:
-        raise HTTPException(status_code=400, detail="content_id and video_id must be UUID")
+        content_uuid = int(content_id)
+        video_uuid = int(video_id)
+    except (TypeError, ValueError):
+        raise HTTPException(status_code=400, detail="content_id and video_id must be int")
 
     # Verify video exists and belongs to this AR content
     video = await db.get(Video, video_uuid)
@@ -469,10 +468,10 @@ async def create_video_schedule(
 ):
     """Create a new schedule for a video."""
     try:
-        content_uuid = uuid.UUID(str(content_id))
-        video_uuid = uuid.UUID(str(video_id))
-    except Exception:
-        raise HTTPException(status_code=400, detail="content_id and video_id must be UUID")
+        content_uuid = int(content_id)
+        video_uuid = int(video_id)
+    except (TypeError, ValueError):
+        raise HTTPException(status_code=400, detail="content_id and video_id must be int")
 
     # Verify video exists and belongs to this AR content
     video = await db.get(Video, video_uuid)
@@ -543,11 +542,11 @@ async def update_video_schedule(
 ):
     """Update an existing schedule."""
     try:
-        content_uuid = uuid.UUID(str(content_id))
-        video_uuid = uuid.UUID(str(video_id))
-        schedule_uuid = uuid.UUID(str(schedule_id))
-    except Exception:
-        raise HTTPException(status_code=400, detail="content_id, video_id, schedule_id must be UUID")
+        content_uuid = int(content_id)
+        video_uuid = int(video_id)
+        schedule_uuid = int(schedule_id)
+    except (TypeError, ValueError):
+        raise HTTPException(status_code=400, detail="content_id, video_id, schedule_id must be int")
 
     # Verify video exists and belongs to this AR content
     video = await db.get(Video, video_uuid)
@@ -622,11 +621,11 @@ async def delete_video_schedule(
 ):
     """Delete a schedule."""
     try:
-        content_uuid = uuid.UUID(str(content_id))
-        video_uuid = uuid.UUID(str(video_id))
-        schedule_uuid = uuid.UUID(str(schedule_id))
-    except Exception:
-        raise HTTPException(status_code=400, detail="content_id, video_id, schedule_id must be UUID")
+        content_uuid = int(content_id)
+        video_uuid = int(video_id)
+        schedule_uuid = int(schedule_id)
+    except (TypeError, ValueError):
+        raise HTTPException(status_code=400, detail="content_id, video_id, schedule_id must be int")
 
     # Verify video exists and belongs to this AR content
     video = await db.get(Video, video_uuid)
@@ -654,9 +653,9 @@ async def delete_video_schedule(
 async def update_video(video_id: str, payload: dict, db: AsyncSession = Depends(get_db)):
     """Legacy endpoint - use specific PATCH endpoints instead."""
     try:
-        video_uuid = uuid.UUID(str(video_id))
-    except Exception:
-        raise HTTPException(status_code=400, detail="video_id must be UUID")
+        video_uuid = int(video_id)
+    except (TypeError, ValueError):
+        raise HTTPException(status_code=400, detail="video_id must be int")
 
     v = await db.get(Video, video_uuid)
     if not v:
@@ -672,9 +671,9 @@ async def update_video(video_id: str, payload: dict, db: AsyncSession = Depends(
 async def delete_video(video_id: str, db: AsyncSession = Depends(get_db)):
     """Delete a video and all its schedules."""
     try:
-        video_uuid = uuid.UUID(str(video_id))
-    except Exception:
-        raise HTTPException(status_code=400, detail="video_id must be UUID")
+        video_uuid = int(video_id)
+    except (TypeError, ValueError):
+        raise HTTPException(status_code=400, detail="video_id must be int")
 
     v = await db.get(Video, video_uuid)
     if not v:

@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en" x-data x-init="$store.darkMode.init()" class="h-full">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dark Theme Input Fix Test</title>
+    
+    <!-- Tailwind CSS from CDN with dark mode configuration -->
+    <script src="https://cdn.tailwindcss.com?plugins=forms,typography,aspect-ratio"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class', // Enable class-based dark mode
+            theme: {
+                extend: {}
+            }
+        }
+    </script>
+    
+    <!-- Alpine.js from CDN -->
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    
+    <style>
+        [x-cloak] { display: none !important; }
+        
+        /* Enhanced form styles - FIXED VERSION */
+        .form-input {
+            @apply block w-full rounded-md border-gray-300 dark:border-gray-600 shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm dark:bg-gray-700 dark:text-white;
+        }
+        
+        .form-select {
+            @apply block w-full rounded-md border-gray-300 dark:border-gray-600 shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm dark:bg-gray-700 dark:text-white;
+        }
+    </style>
+</head>
+<body class="min-h-screen bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 p-8">
+    <div class="max-w-2xl mx-auto">
+        <h1 class="text-2xl font-bold mb-6 dark:text-white">Dark Theme Input Fix Test</h1>
+        
+        <!-- Theme Toggle -->
+        <div class="mb-6">
+            <button @click="$store.darkMode.toggle()" class="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700">
+                Toggle Dark Mode
+            </button>
+        </div>
+        
+        <!-- Test Form -->
+        <form class="bg-white dark:bg-gray-800 shadow rounded-lg p-6 space-y-4">
+            <div>
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Text Input</label>
+                <input type="text" class="form-input" placeholder="Test input with proper focus ring">
+            </div>
+            
+            <div>
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Email Input</label>
+                <input type="email" class="form-input" placeholder="email@example.com">
+            </div>
+            
+            <div>
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Select Dropdown</label>
+                <select class="form-select">
+                    <option>Option 1</option>
+                    <option>Option 2</option>
+                    <option>Option 3</option>
+                </select>
+            </div>
+            
+            <div>
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Textarea</label>
+                <textarea class="form-input" rows="3" placeholder="Test textarea"></textarea>
+            </div>
+        </form>
+        
+        <div class="mt-6 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+            <h3 class="font-semibold mb-2 dark:text-white">What was fixed:</h3>
+            <ul class="list-disc list-inside text-sm dark:text-gray-300">
+                <li>Changed <code class="bg-gray-100 dark:bg-gray-700 px-1 rounded">focus:ring-indigo-50</code> to <code class="bg-gray-100 dark:bg-gray-700 px-1 rounded">focus:ring-indigo-500</code></li>
+                <li>This makes the focus ring visible in dark mode (indigo-50 was too light)</li>
+                <li>Applied to all form inputs, selects, and textareas across the admin interface</li>
+            </ul>
+        </div>
+    </div>
+
+    <script>
+        // Initialize Alpine.js stores
+        document.addEventListener('alpine:init', () => {
+            Alpine.store('darkMode', {
+                darkMode: localStorage.getItem('darkMode') === 'true',
+                
+                init() {
+                    if (this.darkMode) {
+                        document.documentElement.classList.add('dark');
+                    } else {
+                        document.documentElement.classList.remove('dark');
+                    }
+                },
+                
+                toggle() {
+                    this.darkMode = !this.darkMode;
+                    localStorage.setItem('darkMode', this.darkMode);
+                    if (this.darkMode) {
+                        document.documentElement.classList.add('dark');
+                    } else {
+                        document.documentElement.classList.remove('dark');
+                    }
+                }
+            });
+        });
+    </script>
+</body>
+</html>
