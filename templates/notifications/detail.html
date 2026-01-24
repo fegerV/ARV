@@ -1,0 +1,165 @@
+{% extends "base.html" %}
+
+{% block title %}Notification - Vertex AR Admin{% endblock %}
+{% block page_title %}Notification Details{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- Page Header -->
+    <div class="flex items-center justify-between">
+        <div>
+            <h2 class="text-2xl font-semibold text-gray-900 dark:text-white">
+                Notification Details
+            </h2>
+            <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                View and manage notification information
+            </p>
+        </div>
+        <a href="/notifications" class="text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white text-sm font-medium inline-flex items-center gap-1 transition-colors">
+            <span class="material-icons text-base">chevron_left</span>
+            Back to Notifications
+        </a>
+    </div>
+
+    <!-- Main Content Card -->
+    <div class="bg-white dark:bg-gray-800 shadow rounded-lg">
+        <div class="px-4 py-6 sm:px-6 space-y-6">
+            <!-- Notification ID (Read-only) -->
+            <div>
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Notification ID
+                </label>
+                <div class="px-4 py-2 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700 rounded-lg text-sm text-gray-900 dark:text-white font-mono">
+                    #{{ notification.id }}
+                </div>
+            </div>
+
+            <!-- Title -->
+            <div>
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Title
+                </label>
+                <div class="px-4 py-2 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700 rounded-lg text-sm text-gray-900 dark:text-white">
+                    {{ notification.title }}
+                </div>
+            </div>
+
+            <!-- Message -->
+            <div>
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Message
+                </label>
+                <div class="px-4 py-3 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700 rounded-lg text-sm text-gray-900 dark:text-white whitespace-pre-wrap">
+                    {{ notification.message or 'No message provided' }}
+                </div>
+            </div>
+
+            <!-- Type -->
+            <div>
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Notification Type
+                </label>
+                <div class="px-4 py-2 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700 rounded-lg text-sm text-gray-900 dark:text-white">
+                    {{ notification.notification_type|title }}
+                </div>
+            </div>
+
+            <!-- Context Information -->
+            <fieldset class="border border-gray-200 dark:border-gray-700 rounded-lg p-4">
+                <legend class="text-sm font-medium text-gray-700 dark:text-gray-300 px-2">
+                    Context Information
+                </legend>
+                
+                <div class="grid grid-cols-1 gap-4 mt-4 sm:grid-cols-3">
+                    <!-- Company -->
+                    <div>
+                        <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
+                            <span class="material-icons text-base inline-block mr-1">business</span>
+                            Company
+                        </label>
+                        <div class="text-sm text-gray-900 dark:text-white">
+                            {{ notification.company_name or '—' }}
+                        </div>
+                    </div>
+
+                    <!-- Project -->
+                    <div>
+                        <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
+                            <span class="material-icons text-base inline-block mr-1">folder</span>
+                            Project
+                        </label>
+                        <div class="text-sm text-gray-900 dark:text-white">
+                            {{ notification.project_name or '—' }}
+                        </div>
+                    </div>
+
+                    <!-- AR Content -->
+                    <div>
+                        <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
+                            <span class="material-icons text-base inline-block mr-1">view_in_ar</span>
+                            AR Content
+                        </label>
+                        <div class="text-sm text-gray-900 dark:text-white">
+                            {{ notification.ar_content_name or '—' }}
+                        </div>
+                    </div>
+                </div>
+            </fieldset>
+
+            <!-- Created Date (Read-only) -->
+            <div>
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Created At
+                </label>
+                <div class="px-4 py-2 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700 rounded-lg text-sm text-gray-900 dark:text-white">
+                    {{ notification.created_at }}
+                </div>
+            </div>
+
+            <!-- Status -->
+            <div>
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Status
+                </label>
+                <div>
+                    {% if notification.is_read %}
+                        <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300">
+                            <span class="inline-block w-2 h-2 bg-gray-600 rounded-full"></span>
+                            Read
+                        </span>
+                    {% else %}
+                        <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-200">
+                            <span class="inline-block w-2 h-2 bg-blue-600 rounded-full"></span>
+                            Unread
+                        </span>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Actions -->
+        <div class="px-4 py-4 sm:px-6 bg-gray-50 dark:bg-gray-900/50 border-t border-gray-200 dark:border-gray-700 flex items-center justify-between">
+            <a href="/notifications" class="text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white text-sm font-medium inline-flex items-center gap-1 transition-colors">
+                <span class="material-icons text-base">chevron_left</span>
+                Back to Notifications
+            </a>
+            <div class="flex gap-3">
+                <a href="/notifications" class="inline-flex items-center justify-center px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+                    Close
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Info Card -->
+    <div class="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+        <div class="flex gap-3">
+            <span class="material-icons text-blue-600 dark:text-blue-400 flex-shrink-0">info</span>
+            <div class="text-sm text-blue-800 dark:text-blue-200">
+                <p class="font-medium">About Notifications</p>
+                <p class="mt-1">Notifications provide real-time updates about system events, project changes, and important updates related to your AR content and projects.</p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
