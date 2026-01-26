@@ -1,10 +1,34 @@
-const { OfflineCompiler } = require('../../node_modules/mind-ar/src/image-target/offline-compiler.js');
-const { createCanvas, loadImage } = require('canvas');
-const fs = require('fs');
-const path = require('path');
+// Use dynamic import for ES6 modules
+import { createCanvas, loadImage } from 'canvas';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import { dirname } from 'path';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 async function generateMarker(imagePath, outputPath, maxFeatures = 1000) {
     try {
+        // Dynamically import OfflineCompiler (ES6 module)
+        let OfflineCompiler;
+        try {
+            // Try different possible paths
+            const mindarModule = await import('mind-ar/src/image-target/offline-compiler.js');
+            OfflineCompiler = mindarModule.OfflineCompiler;
+        } catch (e) {
+            try {
+                // Try relative path from project root
+                const projectRoot = path.resolve(__dirname, '../../..');
+                const mindarPath = path.join(projectRoot, 'node_modules', 'mind-ar', 'src', 'image-target', 'offline-compiler.js');
+                const mindarModule = await import('file:///' + mindarPath.replace(/\\/g, '/'));
+                OfflineCompiler = mindarModule.OfflineCompiler;
+            } catch (e2) {
+                console.error('Failed to load MindAR OfflineCompiler:', e2.message);
+                throw new Error('MindAR dependencies not found. Please run: npm install mind-ar canvas');
+            }
+        }
+        
         console.log('Loading image:', imagePath);
         const image = await loadImage(imagePath);
         
@@ -41,22 +65,26 @@ async function generateMarker(imagePath, outputPath, maxFeatures = 1000) {
         });
         
         console.log('Saving marker file...');
+        const trackingData = result[0] || {};
+        const featuresCount = trackingData.features ? trackingData.features.length : 0;
+        
         const markerData = {
             version: 2,
             type: 'image',
             width: image.width,
             height: image.height,
-            trackingData: result[0] // result is an array with tracking data
+            trackingData: trackingData
         };
         
         fs.writeFileSync(outputPath, JSON.stringify(markerData));
         console.log('Marker saved to:', outputPath);
+        console.log('Features extracted:', featuresCount);
         
         return {
             success: true,
             width: image.width,
             height: image.height,
-            features: result[0] ? Object.keys(result[0]).length : 0
+            features: featuresCount
         };
         
     } catch (error) {
@@ -69,7 +97,8 @@ async function generateMarker(imagePath, outputPath, maxFeatures = 1000) {
 }
 
 // Command line interface
-if (require.main === module) {
+// Check if this is the main module (ES6 way)
+if (import.meta.url === `file://${process.argv[1]}`.replace(/\\/g, '/')) {
     const imagePath = process.argv[2];
     const outputPath = process.argv[3];
     const maxFeatures = parseInt(process.argv[4]) || 1000;
@@ -96,4 +125,4 @@ if (require.main === module) {
         });
 }
 
-module.exports = { generateMarker };
+export { generateMarker };

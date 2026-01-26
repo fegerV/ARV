@@ -23,7 +23,7 @@ class Settings(BaseSettings):
 
     # Application
     DEBUG: bool = False
-    ENVIRONMENT: str = "production"
+    ENVIRONMENT: str = "development"  # Default to development for local setup
     LOG_LEVEL: str = "INFO"
     
     @property
@@ -78,10 +78,11 @@ class Settings(BaseSettings):
     STATIC_DIR: str = "/app/static"
     
     # Storage
-    STORAGE_BASE_PATH: str = "/tmp/storage/content"
+    # Default to ./storage relative to project root, or /tmp/storage if running in container
+    STORAGE_BASE_PATH: str = "./storage"
     
     # Local Storage
-    LOCAL_STORAGE_PATH: str = "/tmp/storage/content"
+    LOCAL_STORAGE_PATH: str = "./storage"
     LOCAL_STORAGE_PUBLIC_URL: str = "http://localhost:8000/storage"
     
     # File storage configuration

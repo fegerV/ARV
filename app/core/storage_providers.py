@@ -196,9 +196,12 @@ class LocalStorageProvider(StorageProvider):
     
     def get_public_url(self, storage_path: str) -> str:
         """Get public URL for a file in local storage."""
-        # Normalize path and remove leading slash
-        storage_path = storage_path.lstrip('/')
-        return f"{self.public_url_base.rstrip('/')}/{storage_path}"
+        # Normalize path: replace backslashes with forward slashes (Windows compatibility)
+        # and remove leading slash
+        storage_path = str(storage_path).replace('\\', '/').lstrip('/')
+        # Return relative URL (without domain) for use in HTML templates
+        # StaticFiles is mounted at /storage, so return /storage/... path
+        return f"/storage/{storage_path}"
     
     async def get_usage_stats(self, path: str = "") -> Dict[str, Any]:
         """Get storage usage statistics for local storage."""

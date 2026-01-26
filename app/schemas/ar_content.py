@@ -121,6 +121,7 @@ class ARContentCreateResponse(BaseModel):
     qr_code_url: str
     photo_url: str
     video_url: str
+    photo_analysis: Optional[Dict[str, Any]] = None
     
     class Config:
         from_attributes = True

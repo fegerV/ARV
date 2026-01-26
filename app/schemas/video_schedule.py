@@ -42,6 +42,16 @@ class VideoRotationUpdate(BaseModel):
     rotation_type: str = Field(..., pattern="^(none|sequential|cyclic)$")
 
 
+class VideoActiveUpdate(BaseModel):
+    is_active: bool
+
+
+class VideoPlaybackModeUpdate(BaseModel):
+    mode: str = Field(..., pattern="^(manual|sequential|cyclic)$")
+    active_video_id: Optional[int] = None
+    active_video_ids: Optional[List[int]] = None
+
+
 class VideoSetActiveResponse(BaseModel):
     status: str
     active_video_id: int

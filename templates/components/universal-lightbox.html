@@ -1,238 +1,55 @@
 <!-- Universal Lightbox Component -->
-<!-- Supports photos, videos, galleries with zoom, touch gestures, and accessibility -->
 
 <div x-data="universalLightbox($refs)" 
      x-init="init()"
      @keydown.escape.window="closeLightbox"
      @keydown.left.window="navigatePrevious"
      @keydown.right.window="navigateNext"
-     class="fixed inset-0 z-50"
+     class="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4"
      x-show="isOpen"
-     x-transition:enter="transition ease-out duration-200"
-     x-transition:enter-start="opacity-0"
-     x-transition:enter-end="opacity-100"
-     x-transition:leave="transition ease-in duration-150"
-     x-transition:leave-start="opacity-100"
-     x-transition:leave-end="opacity-0"
-     role="dialog"
-     aria-modal="true"
-     :aria-label="currentItem?.type === 'video' ? 'Video lightbox' : 'Image lightbox'"
+     @click.self="closeLightbox"
      x-cloak>
     
-    <!-- Backdrop -->
-    <div class="fixed inset-0 bg-black/90 backdrop-blur-sm transition-opacity duration-300"
-         :class="{ 'opacity-100': isOpen, 'opacity-0': !isOpen }"
-         @click="handleBackdropClick"
-         aria-hidden="true"></div>
+    <!-- Close Button -->
+    <button @click="closeLightbox"
+            class="absolute top-4 right-4 z-10 text-white hover:text-gray-300">
+        <span class="material-icons text-3xl">close</span>
+    </button>
     
-    <!-- Loading Indicator -->
-    <div x-show="isLoading" 
-         x-transition:enter="transition ease-out duration-200"
-         x-transition:enter-start="opacity-0"
-         x-transition:enter-end="opacity-100"
-         class="fixed inset-0 flex items-center justify-center z-10">
-        <div class="bg-white/10 backdrop-blur-md rounded-lg p-6 flex items-center space-x-3">
-            <div class="animate-spin rounded-full h-8 w-8 border-2 border-white border-t-transparent"></div>
-            <span class="text-white text-lg">Loading...</span>
-        </div>
-    </div>
+    <!-- Previous Button -->
+    <button x-show="hasMultipleItems && currentIndex > 0"
+            @click="navigatePrevious"
+            class="absolute left-4 z-10 text-white hover:text-gray-300">
+        <span class="material-icons text-3xl">chevron_left</span>
+    </button>
     
-    <!-- Main Content Container -->
-    <div class="relative h-full flex items-center justify-center p-4">
+    <!-- Next Button -->
+    <button x-show="hasMultipleItems && currentIndex < items.length - 1"
+            @click="navigateNext"
+            class="absolute right-4 z-10 text-white hover:text-gray-300">
+        <span class="material-icons text-3xl">chevron_right</span>
+    </button>
+    
+    <!-- Media Container -->
+    <div class="relative max-w-[90vw] max-h-[90vh] flex items-center justify-center">
         
-        <!-- Previous Button -->
-        <button x-show="hasMultipleItems && currentIndex > 0"
-                @click="navigatePrevious"
-                class="absolute left-4 z-20 bg-white/10 hover:bg-white/20 backdrop-blur-md text-white p-3 rounded-full transition-all duration-200 transform hover:scale-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60"
-                :aria-label="'Previous ' + (currentItem?.type || 'item')"
-                :disabled="isLoading">
-            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
-            </svg>
-        </button>
+        <!-- Image Content -->
+        <template x-if="currentItem?.type === 'image'">
+            <img :src="currentItem?.url"
+                 :alt="currentItem?.alt || 'Lightbox image'"
+                 class="max-w-full max-h-[90vh] object-contain">
+        </template>
         
-        <!-- Next Button -->
-        <button x-show="hasMultipleItems && currentIndex < items.length - 1"
-                @click="navigateNext"
-                class="absolute right-4 z-20 bg-white/10 hover:bg-white/20 backdrop-blur-md text-white p-3 rounded-full transition-all duration-200 transform hover:scale-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60"
-                :aria-label="'Next ' + (currentItem?.type || 'item')"
-                :disabled="isLoading">
-            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
-            </svg>
-        </button>
-        
-        <!-- Close Button -->
-        <button @click="closeLightbox"
-                class="absolute top-4 right-4 z-20 bg-white/10 hover:bg-white/20 backdrop-blur-md text-white p-3 rounded-full transition-all duration-200 transform hover:scale-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60"
-                aria-label="Close lightbox">
-            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-            </svg>
-        </button>
-        
-        <!-- Media Container -->
-        <div class="relative max-w-[90vw] max-h-[90vh] flex items-center justify-center">
-            
-            <!-- Image Content -->
-            <div x-show="currentItem?.type === 'image'"
-                 x-transition:enter="transition ease-out duration-300"
-                 x-transition:enter-start="opacity-0 scale-95"
-                 x-transition:enter-end="opacity-100 scale-100"
-                 class="relative">
-                
-                <!-- Zoomable Image Container -->
-                <div class="relative overflow-hidden rounded-lg"
-                     @wheel="handleZoom($event)"
-                     @touchstart="handleTouchStart($event)"
-                     @touchmove="handleTouchMove($event)"
-                     @touchend="handleTouchEnd($event)"
-                     :style="{ cursor: zoomLevel > 1 ? 'zoom-out' : 'zoom-in' }">
-                    
-                    <img :src="currentItem?.url"
-                         :alt="currentItem?.alt || 'Lightbox image'"
-                         :style="{ 
-                             transform: `scale(${zoomLevel}) translate(${translateX}px, ${translateY}px)`,
-                             transition: isDragging ? 'none' : 'transform 0.2s ease-out',
-                             maxWidth: '100%',
-                             maxHeight: '80vh',
-                             objectFit: 'contain'
-                         }"
-                         @load="onMediaLoad"
-                         @error="onMediaError"
-                         class="block"
-                         loading="eager">
-                </div>
-                
-                <!-- Image Caption -->
-                <div x-show="currentItem?.caption"
-                     x-transition:enter="transition ease-out duration-200"
-                     x-transition:enter-start="opacity-0 transform translate-y-2"
-                     x-transition:enter-end="opacity-100 transform translate-y-0"
-                     class="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-4 rounded-b-lg">
-                    <p class="text-white text-sm" x-text="currentItem?.caption"></p>
-                </div>
-            </div>
-            
-            <!-- Video Content -->
-            <div x-show="currentItem?.type === 'video'"
-                 x-transition:enter="transition ease-out duration-300"
-                 x-transition:enter-start="opacity-0 scale-95"
-                 x-transition:enter-end="opacity-100 scale-100"
-                 class="relative">
-                
-                <div class="relative rounded-lg overflow-hidden bg-black">
-                    <!-- Video Player -->
-                    <video :src="currentItem?.url"
-                           :poster="currentItem?.thumbnail"
-                           controls
-                           playsinline
-                           @loadedmetadata="onMediaLoad"
-                           @error="onMediaError"
-                           class="max-w-[90vw] max-h-[80vh]"
-                           :style="{ maxHeight: '80vh' }">
-                        Your browser does not support the video tag.
-                    </video>
-                    
-                    <!-- Video Caption -->
-                    <div x-show="currentItem?.caption"
-                         class="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-4">
-                        <p class="text-white text-sm" x-text="currentItem?.caption"></p>
-                    </div>
-                </div>
-            </div>
-            
-            <!-- Error State -->
-            <div x-show="hasError"
-                 class="text-center text-white p-8">
-                <svg class="w-16 h-16 mx-auto mb-4 text-white/50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"></path>
-                </svg>
-                <p class="text-lg mb-2">Failed to load media</p>
-                <p class="text-sm text-white/70" x-text="errorMessage"></p>
-                <button @click="retryLoad" 
-                        class="mt-4 px-4 py-2 bg-white/10 hover:bg-white/20 rounded-lg transition-colors">
-                    Try Again
-                </button>
-            </div>
-        </div>
-        
-        <!-- Controls Bar -->
-        <div x-show="currentItem"
-             x-transition:enter="transition ease-out duration-200"
-             x-transition:enter-start="opacity-0 transform translate-y-2"
-             x-transition:enter-end="opacity-100 transform translate-y-0"
-             class="absolute bottom-4 left-1/2 transform -translate-x-1/2 bg-black/40 backdrop-blur-md rounded-full px-4 py-2 flex items-center space-x-4 ring-1 ring-white/10">
-            
-            <!-- Counter -->
-            <span x-show="hasMultipleItems" 
-                  class="text-white text-sm font-medium">
-                <span x-text="currentIndex + 1"></span> / <span x-text="items.length"></span>
-            </span>
-            
-            <!-- Zoom Controls (for images) -->
-            <template x-if="currentItem?.type === 'image'">
-                <div class="flex items-center space-x-2">
-                    <button @click="zoomOut"
-                            :disabled="zoomLevel <= 1"
-                            class="text-white/70 hover:text-white disabled:text-white/30 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60 rounded"
-                            aria-label="Zoom out">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM13 10H7"></path>
-                        </svg>
-                    </button>
-                    <span class="text-white text-sm min-w-[3rem] text-center" x-text="Math.round(zoomLevel * 100) + '%'"></span>
-                    <button @click="zoomIn"
-                            :disabled="zoomLevel >= maxZoom"
-                            class="text-white/70 hover:text-white disabled:text-white/30 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60 rounded"
-                            aria-label="Zoom in">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v6m3-3H7"></path>
-                        </svg>
-                    </button>
-                    <button @click="resetZoom"
-                            class="text-white/70 hover:text-white transition-colors ml-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60 rounded"
-                            aria-label="Reset zoom">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
-                        </svg>
-                    </button>
-                </div>
-            </template>
-            
-            <!-- Fullscreen Toggle -->
-            <button @click="toggleFullscreen"
-                    class="text-white/70 hover:text-white transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60 rounded"
-                    :aria-label="isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'">
-                <svg x-show="!isFullscreen" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"></path>
-                </svg>
-                <svg x-show="isFullscreen" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-                </svg>
-            </button>
-        </div>
-        
-        <!-- Thumbnails Strip -->
-        <div x-show="hasMultipleItems && items.length > 1"
-             x-transition:enter="transition ease-out duration-200"
-             x-transition:enter-start="opacity-0 transform translate-y-2"
-             x-transition:enter-end="opacity-100 transform translate-y-0"
-             class="absolute bottom-20 left-1/2 transform -translate-x-1/2 flex space-x-2 max-w-[80vw] overflow-x-auto">
-            
-            <template x-for="(item, index) in items" :key="index">
-                <button @click="goToSlide(index)"
-                        class="flex-shrink-0 w-16 h-16 rounded overflow-hidden border-2 transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60"
-                        :class="{
-                            'border-white': index === currentIndex,
-                            'border-white/30 hover:border-white/50': index !== currentIndex
-                        }">
-                    <img :src="item.thumbnail || item.url"
-                         :alt="`Thumbnail ${index + 1}`"
-                         class="w-full h-full object-cover">
-                </button>
-            </template>
-        </div>
+        <!-- Video Content -->
+        <template x-if="currentItem?.type === 'video'">
+            <video :src="currentItem?.url"
+                   :poster="currentItem?.thumbnail"
+                   controls
+                   playsinline
+                   class="max-w-[90vw] max-h-[90vh]">
+                Your browser does not support the video tag.
+            </video>
+        </template>
     </div>
 </div>
 
@@ -240,23 +57,8 @@
 function universalLightbox(refs) {
     return {
         isOpen: false,
-        isLoading: false,
-        hasError: false,
-        errorMessage: '',
         items: [],
         currentIndex: 0,
-        zoomLevel: 1,
-        maxZoom: 5,
-        minZoom: 0.5,
-        translateX: 0,
-        translateY: 0,
-        isDragging: false,
-        dragStartX: 0,
-        dragStartY: 0,
-        dragStartTranslateX: 0,
-        dragStartTranslateY: 0,
-        lastTouchDistance: 0,
-        isFullscreen: false,
         
         get currentItem() {
             return this.items[this.currentIndex] || null;
@@ -267,227 +69,34 @@ function universalLightbox(refs) {
         },
         
         init() {
-            // Listen for custom events to open lightbox
             document.addEventListener('open-lightbox', (event) => {
                 this.openLightbox(event.detail.items, event.detail.index || 0);
             });
-            
-            // Handle fullscreen changes
-            document.addEventListener('fullscreenchange', () => {
-                this.isFullscreen = !!document.fullscreenElement;
-            });
-            
-            // Preload adjacent images
-            this.$watch('currentIndex', () => {
-                this.preloadAdjacent();
-            });
+            document.body.style.overflow = '';
         },
         
         openLightbox(items, index = 0) {
             this.items = Array.isArray(items) ? items : [items];
             this.currentIndex = Math.max(0, Math.min(index, this.items.length - 1));
             this.isOpen = true;
-            this.resetZoom();
-            this.hasError = false;
-            this.errorMessage = '';
-            
-            // Prevent body scroll
             document.body.style.overflow = 'hidden';
-            
-            // Preload current and adjacent items
-            this.preloadAdjacent();
         },
         
         closeLightbox() {
             this.isOpen = false;
-            this.resetZoom();
-            
-            // Restore body scroll
             document.body.style.overflow = '';
-            
-            // Exit fullscreen if needed
-            if (this.isFullscreen) {
-                document.exitFullscreen();
-            }
-        },
-        
-        handleBackdropClick(event) {
-            // Only close if clicking directly on backdrop
-            if (event.target === event.currentTarget) {
-                this.closeLightbox();
-            }
         },
         
         navigatePrevious() {
             if (this.currentIndex > 0) {
-                this.goToSlide(this.currentIndex - 1);
+                this.currentIndex--;
             }
         },
         
         navigateNext() {
             if (this.currentIndex < this.items.length - 1) {
-                this.goToSlide(this.currentIndex + 1);
+                this.currentIndex++;
             }
-        },
-        
-        goToSlide(index) {
-            if (index >= 0 && index < this.items.length) {
-                this.currentIndex = index;
-                this.resetZoom();
-                this.hasError = false;
-                this.errorMessage = '';
-            }
-        },
-        
-        // Zoom functionality
-        handleZoom(event) {
-            if (this.currentItem?.type !== 'image') return;
-            
-            event.preventDefault();
-            const delta = event.deltaY > 0 ? 0.9 : 1.1;
-            this.setZoom(this.zoomLevel * delta);
-        },
-        
-        zoomIn() {
-            this.setZoom(this.zoomLevel * 1.2);
-        },
-        
-        zoomOut() {
-            this.setZoom(this.zoomLevel * 0.8);
-        },
-        
-        resetZoom() {
-            this.zoomLevel = 1;
-            this.translateX = 0;
-            this.translateY = 0;
-        },
-        
-        setZoom(level) {
-            this.zoomLevel = Math.max(this.minZoom, Math.min(this.maxZoom, level));
-            this.constrainTranslation();
-        },
-        
-        // Touch gesture handling
-        handleTouchStart(event) {
-            if (this.currentItem?.type !== 'image') return;
-            
-            if (event.touches.length === 1) {
-                this.isDragging = true;
-                this.dragStartX = event.touches[0].clientX;
-                this.dragStartY = event.touches[0].clientY;
-                this.dragStartTranslateX = this.translateX;
-                this.dragStartTranslateY = this.translateY;
-            } else if (event.touches.length === 2) {
-                this.isDragging = false;
-                const touchDistance = Math.hypot(
-                    event.touches[1].clientX - event.touches[0].clientX,
-                    event.touches[1].clientY - event.touches[0].clientY
-                );
-                this.lastTouchDistance = touchDistance;
-            }
-        },
-        
-        handleTouchMove(event) {
-            if (this.currentItem?.type !== 'image') return;
-            
-            if (event.touches.length === 1 && this.isDragging) {
-                const deltaX = event.touches[0].clientX - this.dragStartX;
-                const deltaY = event.touches[0].clientY - this.dragStartY;
-                
-                this.translateX = this.dragStartTranslateX + deltaX;
-                this.translateY = this.dragStartTranslateY + deltaY;
-                this.constrainTranslation();
-            } else if (event.touches.length === 2) {
-                event.preventDefault();
-                const touchDistance = Math.hypot(
-                    event.touches[1].clientX - event.touches[0].clientX,
-                    event.touches[1].clientY - event.touches[0].clientY
-                );
-                
-                if (this.lastTouchDistance > 0) {
-                    const scale = touchDistance / this.lastTouchDistance;
-                    this.setZoom(this.zoomLevel * scale);
-                }
-                
-                this.lastTouchDistance = touchDistance;
-            }
-        },
-        
-        handleTouchEnd(event) {
-            this.isDragging = false;
-            this.lastTouchDistance = 0;
-        },
-        
-        constrainTranslation() {
-            if (this.zoomLevel <= 1) {
-                this.translateX = 0;
-                this.translateY = 0;
-                return;
-            }
-            
-            // Constrain translation to prevent image from going completely off-screen
-            const maxTranslate = (this.zoomLevel - 1) * 100;
-            this.translateX = Math.max(-maxTranslate, Math.min(maxTranslate, this.translateX));
-            this.translateY = Math.max(-maxTranslate, Math.min(maxTranslate, this.translateY));
-        },
-        
-        // Fullscreen functionality
-        toggleFullscreen() {
-            if (!document.fullscreenElement) {
-                document.documentElement.requestFullscreen();
-            } else {
-                document.exitFullscreen();
-            }
-        },
-        
-        // Media loading
-        onMediaLoad() {
-            this.isLoading = false;
-            this.hasError = false;
-            this.errorMessage = '';
-        },
-        
-        onMediaError(event) {
-            this.isLoading = false;
-            this.hasError = true;
-            this.errorMessage = 'Failed to load media. Please try again.';
-            console.error('Media loading error:', event);
-        },
-        
-        retryLoad() {
-            this.hasError = false;
-            this.errorMessage = '';
-            this.isLoading = true;
-            
-            // Trigger reload by changing the current index
-            const currentIndex = this.currentIndex;
-            this.currentIndex = -1;
-            this.$nextTick(() => {
-                this.currentIndex = currentIndex;
-            });
-        },
-        
-        preloadAdjacent() {
-            if (!this.items.length) return;
-            
-            // Preload previous and next images
-            const indicesToPreload = [];
-            
-            if (this.currentIndex > 0) {
-                indicesToPreload.push(this.currentIndex - 1);
-            }
-            
-            if (this.currentIndex < this.items.length - 1) {
-                indicesToPreload.push(this.currentIndex + 1);
-            }
-            
-            indicesToPreload.forEach(index => {
-                const item = this.items[index];
-                if (item?.type === 'image' && item.url) {
-                    const img = new Image();
-                    img.src = item.url;
-                }
-            });
         }
     }
 }

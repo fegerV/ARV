@@ -110,7 +110,7 @@
                 // Создаем видео элемент
                 const video = document.createElement('video');
                 video.src = videoData.video_url;
-                video.loop = true;
+                video.loop = false; // Отключаем loop для автоматического переключения
                 video.muted = true;
                 video.playsInline = true;
                 video.preload = "auto";
@@ -137,6 +137,44 @@
                 // Anchor
                 const anchor = mindarThree.addAnchor(0);
                 anchor.group.add(plane);
+                
+                // Функция для загрузки и переключения на следующее видео
+                async function loadNextVideo() {
+                    try {
+                        const nextVideoRes = await fetch(`${API_BASE}/api/ar/${PORTRAIT_UID}/active-video`);
+                        const nextVideoData = await nextVideoRes.json();
+                        
+                        if (nextVideoData.video_url && nextVideoData.video_url !== video.src) {
+                            video.src = nextVideoData.video_url;
+                            texture.needsUpdate = true;
+                            video.load();
+                            
+                            // Если маркер найден, сразу воспроизводим новое видео
+                            if (anchor.visible) {
+                                video.play().catch(e => console.error('Video play error:', e));
+                            }
+                        } else {
+                            // Если то же видео, просто перезапускаем
+                            video.currentTime = 0;
+                            if (anchor.visible) {
+                                video.play().catch(e => console.error('Video play error:', e));
+                            }
+                        }
+                    } catch (error) {
+                        console.error('Failed to load next video:', error);
+                        // В случае ошибки перезапускаем текущее видео
+                        video.currentTime = 0;
+                        if (anchor.visible) {
+                            video.play().catch(e => console.error('Video play error:', e));
+                        }
+                    }
+                }
+                
+                // Переключение видео после окончания воспроизведения
+                video.addEventListener('ended', () => {
+                    console.log('Video ended, switching to next');
+                    loadNextVideo();
+                });
                 
                 // Tracking events
                 anchor.onTargetFound = () => {

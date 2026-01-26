@@ -5,22 +5,190 @@
 
 {% block content %}
 {% include 'components/universal-lightbox.html' %}
-<div x-data="arContentList()" class="page-container">
-    <div class="page-header">
+
+<script>
+// Define function before Alpine.js tries to use it
+// Make it available globally to ensure it's loaded before Alpine.js initializes
+(function() {
+    'use strict';
+    
+    window.arContentList = function arContentList() {
+        return {
+            filters: {
+                company: '',
+                status: '',
+                search: ''
+            },
+            pageSize: {{ page_size }},
+            showDeleteModal: false,
+            isDeleting: false,
+            deleteArContent: { id: null, orderNumber: '' },
+        
+        showCreateForm() {
+            window.location.href = '/ar-content/create';
+        },
+        
+        openLightboxImage(url, caption) {
+            if (!url) {
+                return;
+            }
+            const items = [{
+                type: 'image',
+                url,
+                alt: caption || 'Preview',
+                caption: caption || ''
+            }];
+            document.dispatchEvent(new CustomEvent('open-lightbox', { detail: { items, index: 0 } }));
+        },
+        
+        openLightboxVideo(url, caption) {
+            if (!url) {
+                return;
+            }
+            const items = [{
+                type: 'video',
+                url,
+                thumbnail: '',
+                caption: caption || 'Видео'
+            }];
+            document.dispatchEvent(new CustomEvent('open-lightbox', { detail: { items, index: 0 } }));
+        },
+        
+        searchContent() {
+            // Debounced search implementation
+            this.applyFilters();
+        },
+        
+        applyFilters() {
+            // Apply filters by updating URL parameters
+            const params = new URLSearchParams();
+            
+            if (this.filters.company) params.append('company', this.filters.company);
+            if (this.filters.status) params.append('status', this.filters.status);
+            if (this.filters.search) params.append('search', this.filters.search);
+            
+            // Add pagination parameters
+            params.append('page', '1'); // Reset to first page when filtering
+            params.append('page_size', this.pageSize);
+            
+            window.location.search = params.toString();
+        },
+        
+        changePageSize() {
+            // Change page size and reset to first page
+            const params = new URLSearchParams();
+            
+            // Preserve filters
+            if (this.filters.company) params.append('company', this.filters.company);
+            if (this.filters.status) params.append('status', this.filters.status);
+            if (this.filters.search) params.append('search', this.filters.search);
+            
+            params.append('page', '1');
+            params.append('page_size', this.pageSize);
+            
+            window.location.search = params.toString();
+        },
+        
+        openDeleteModal(arContentId, orderNumber) {
+            this.deleteArContent = { id: arContentId, orderNumber: orderNumber };
+            this.showDeleteModal = true;
+        },
+        
+        confirmDelete() {
+            if (!this.deleteArContent.id) return;
+            
+            this.isDeleting = true;
+            const arContentId = this.deleteArContent.id;
+            
+            console.log('Attempting to delete AR content:', arContentId);
+            
+            fetch(`/api/ar-content/${arContentId}`, {
+                method: 'DELETE',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            })
+            .then(response => {
+                console.log('Delete response status:', response.status);
+                if (response.ok) {
+                    return response.json().catch(() => ({}));
+                } else {
+                    return response.json().then(data => {
+                        throw new Error(data.error || data.detail || 'Не удалось удалить AR контент');
+                    }).catch(err => {
+                        // If response is not JSON, use status text
+                        throw new Error(`Ошибка ${response.status}: ${response.statusText || 'Не удалось удалить AR контент'}`);
+                    });
+                }
+            })
+            .then(data => {
+                // Remove row from table with animation
+                const row = document.getElementById(`ar-content-${arContentId}`);
+                if (row) {
+                    row.style.transition = 'opacity 0.3s ease';
+                    row.style.opacity = '0';
+                    setTimeout(() => {
+                        row.remove();
+                    }, 300);
+                }
+                this.showDeleteModal = false;
+                this.isDeleting = false;
+                
+                // Show success toast
+                this.showToast('AR контент успешно удален', 'success');
+            })
+            .catch(error => {
+                console.error('Delete error:', error);
+                this.showToast('Ошибка: ' + (error.message || 'Не удалось удалить AR контент'), 'error');
+                this.isDeleting = false;
+            });
+        },
+        
+        showToast(message, type = 'info') {
+            // Try to use global showToast function if available
+            if (typeof window.showToast === 'function') {
+                window.showToast(message, type);
+                return;
+            }
+            
+            // Fallback: create toast manually
+            const toast = document.createElement('div');
+            const bgColor = type === 'success' ? 'bg-green-500' : type === 'error' ? 'bg-red-500' : 'bg-blue-500';
+            toast.className = `fixed bottom-4 right-4 ${bgColor} text-white px-4 py-2 rounded shadow z-50`;
+            toast.textContent = message;
+            document.body.appendChild(toast);
+            
+            setTimeout(() => {
+                if (document.body.contains(toast)) {
+                    toast.style.opacity = '0';
+                    toast.style.transition = 'opacity 0.3s';
+                    setTimeout(() => {
+                        document.body.removeChild(toast);
+                    }, 300);
+                }
+            }, 3000);
+        }
+    };
+    }
+})();
+</script>
+
+<div x-data="arContentList()" class="space-y-6">
+    <!-- Page Header -->
+    <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-            <h2 class="page-title">AR Content</h2>
-            <p class="page-subtitle">Create and manage AR content across projects</p>
+            <h2 class="text-2xl font-semibold text-gray-900 dark:text-white">AR Content</h2>
+            <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">Create and manage AR content across projects</p>
         </div>
-        <div class="page-actions">
-            <button class="btn btn-primary" @click="showCreateForm()">
-                Add AR Content
-            </button>
-        </div>
+        <a href="/ar-content/create" class="btn btn-primary inline-flex items-center gap-2">
+            <span class="material-icons text-lg">add</span>
+            New AR Content
+        </a>
     </div>
     
-    <!-- Filters -->
-    <div class="card mb-6">
-        <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+    <!-- Filters Card -->
+    <div class="bg-white dark:bg-gray-800 shadow rounded-lg p-6">
+        <div class="grid grid-cols-1 md:grid-cols-5 gap-4">
             <div>
                 <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Company</label>
                 <select class="form-select"
@@ -48,6 +216,17 @@
                        x-model="filters.search"
                        @input.debounce.300ms="searchContent">
             </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Записей на странице</label>
+                <select class="form-select"
+                        x-model="pageSize"
+                        @change="changePageSize">
+                    <option value="20" {% if page_size == 20 %}selected{% endif %}>20</option>
+                    <option value="30" {% if page_size == 30 %}selected{% endif %}>30</option>
+                    <option value="40" {% if page_size == 40 %}selected{% endif %}>40</option>
+                    <option value="50" {% if page_size == 50 %}selected{% endif %}>50</option>
+                </select>
+            </div>
             <div class="flex items-end">
                 <button class="btn btn-primary w-full"
                         @click="applyFilters">
@@ -55,9 +234,10 @@
                 </button>
             </div>
         </div>
-    
-    <!-- AR Content table -->
-    <div class="card-table">
+    </div>
+
+    <!-- AR Content Table -->
+    <div class="bg-white dark:bg-gray-800 shadow rounded-lg overflow-hidden">
         <div class="overflow-x-auto">
             <table class="table">
                 <thead>
@@ -77,15 +257,22 @@
                 </thead>
                 <tbody class="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-700">
                     {% for item in ar_content_list %}
-                    <tr class="{% if item.status == 'deleted' %}opacity-50 {% endif %}hover:bg-gray-50 dark:hover:bg-gray-800" id="row-{{ item.id }}">
-                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">{{ item.order_number }}</td>
+                    <tr class="{% if item.status == 'deleted' %}opacity-50 {% endif %}hover:bg-gray-50 dark:hover:bg-gray-800" id="ar-content-{{ item.id }}">
+                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">
+                            <a href="/ar-content/{{ item.id }}" class="text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:hover:text-indigo-300">
+                                {{ item.order_number }}
+                            </a>
+                        </td>
                         <td class="px-6 py-4 whitespace-nowrap">
-                            <span class="inline-flex items-center justify-center h-3 w-3 rounded-full
-                                {% if item.status in ['ready', 'active'] %}bg-green-500
-                                {% elif item.status in ['processing', 'pending'] %}bg-yellow-500
-                                {% elif item.status in ['failed', 'deleted'] %}bg-red-500
-                                {% else %}bg-gray-500{% endif %}"
-                                title="{{ item.status }}"></span>
+                            <div class="flex items-center gap-2">
+                                <span class="inline-flex items-center justify-center h-3 w-3 rounded-full
+                                    {% if item.status in ['ready', 'active'] %}bg-green-500
+                                    {% elif item.status in ['processing', 'pending'] %}bg-yellow-500
+                                    {% elif item.status in ['failed', 'deleted'] %}bg-red-500
+                                    {% else %}bg-gray-500{% endif %}"
+                                    title="{{ item.status }}"></span>
+                                <span class="text-xs text-gray-500 dark:text-gray-400 capitalize">{{ item.status }}</span>
+                            </div>
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap">
                             {% if item.thumbnail_url or item.photo_url %}
@@ -140,16 +327,20 @@
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{{ item.created_at | datetime_format }}</td>
                         <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                            <a href="/ar-content/{{ item.id }}" class="text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:hover:text-indigo-300 mr-3" title="Детали">
-                                <span class="material-icons text-base">edit</span>
-                            </a>
-                            <button class="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300"
-                                    hx-delete="/htmx/ar-content/{{ item.id }}"
-                                    hx-target="#row-{{ item.id }}"
-                                    hx-swap="outerHTML"
-                                    hx-confirm="Удалить?">
-                                <span class="material-icons text-base">delete</span>
-                            </button>
+                            <div class="flex items-center justify-end gap-2">
+                                <a href="/ar-content/{{ item.id }}/edit" 
+                                   class="inline-flex items-center gap-1 px-3 py-2 text-sm font-medium text-indigo-600 hover:bg-indigo-50 dark:text-indigo-400 dark:hover:bg-indigo-900/20 rounded-lg transition-colors"
+                                   title="Редактировать">
+                                    <span class="material-icons text-base">edit</span>
+                                    <span class="hidden sm:inline">Edit</span>
+                                </a>
+                                <button @click="openDeleteModal('{{ item.id }}', '{{ item.order_number }}')" 
+                                       class="inline-flex items-center gap-1 px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20 rounded-lg transition-colors"
+                                       title="Удалить">
+                                    <span class="material-icons text-base">delete</span>
+                                    <span class="hidden sm:inline">Delete</span>
+                                </button>
+                            </div>
                         </td>
                     </tr>
                     {% endfor %}
@@ -160,103 +351,55 @@
         <!-- Pagination -->
         {% include "components/pagination.html" %}
     </div>
-</div>
 
-<script>
-function arContentList() {
-    return {
-        filters: {
-            company: '',
-            status: '',
-            search: ''
-        },
-        
-        showCreateForm() {
-            window.location.href = '/ar-content/create';
-        },
-        
-        openLightboxImage(url, caption) {
-            if (!url) {
-                return;
-            }
-            const items = [{
-                type: 'image',
-                url,
-                alt: caption || 'Preview',
-                caption: caption || ''
-            }];
-            document.dispatchEvent(new CustomEvent('open-lightbox', { detail: { items, index: 0 } }));
-        },
-        
-        openLightboxVideo(url, caption) {
-            if (!url) {
-                return;
-            }
-            const items = [{
-                type: 'video',
-                url,
-                thumbnail: '',
-                caption: caption || 'Видео'
-            }];
-            document.dispatchEvent(new CustomEvent('open-lightbox', { detail: { items, index: 0 } }));
-        },
-        
-        searchContent() {
-            // Debounced search implementation
-            this.applyFilters();
-        },
-        
-        applyFilters() {
-            // Apply filters by updating URL parameters
-            const params = new URLSearchParams();
+    <!-- Delete Confirmation Modal -->
+    <div x-show="showDeleteModal" 
+     x-transition
+     @click.away="showDeleteModal = false"
+     @keydown.escape.window="showDeleteModal = false"
+     class="fixed inset-0 z-50 overflow-y-auto"
+     x-cloak>
+    <div class="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+        <!-- Backdrop -->
+        <div class="fixed inset-0 bg-gray-500 dark:bg-gray-900 bg-opacity-75 dark:bg-opacity-75 transition-opacity"
+             @click="showDeleteModal = false">
+        </div>
+
+        <!-- Modal Panel -->
+        <div class="inline-block align-bottom bg-white dark:bg-gray-800 rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
             
-            if (this.filters.company) params.append('company', this.filters.company);
-            if (this.filters.status) params.append('status', this.filters.status);
-            if (this.filters.search) params.append('search', this.filters.search);
-            
-            // Add pagination parameters if they exist
-            const urlParams = new URLSearchParams(window.location.search);
-            if (urlParams.get('page')) params.append('page', urlParams.get('page'));
-            if (urlParams.get('page_size')) params.append('page_size', urlParams.get('page_size'));
-            
-            window.location.search = params.toString();
-        },
-        
-        copyLink(url) {
-            navigator.clipboard.writeText(url).then(() => {
-                showToast('Link copied to clipboard', 'success');
-            }).catch(err => {
-                showToast('Failed to copy link', 'error');
-            });
-        },
-        
-        showQRCode(id) {
-            // Show QR code in modal
-            const qrCodeHtml = `
-                <div class="flex flex-col items-center">
-                    <div class="bg-white p-4 rounded">
-                        <img src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(`/ar-content/${id}/view`)}" alt="QR Code">
-                    </div>
-                    <p class="mt-2 text-sm">${window.location.origin}/ar-content/${id}/view</p>
+            <div class="bg-white dark:bg-gray-800 px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                <div class="flex items-center justify-center w-12 h-12 mx-auto bg-red-100 dark:bg-red-900/20 rounded-full">
+                    <span class="material-icons text-red-600 dark:text-red-400">delete_outline</span>
                 </div>
-            `;
-            
-            showModal(qrCodeHtml);
-        },
-        
-        deleteContent(id) {
-            if (confirm('Are you sure you want to delete this AR content?')) {
-                // Using htmx to handle the delete request
-                htmx.ajax('DELETE', `/api/ar-content/${id}`, {
-                    target: `#ar-content-${id}`,
-                    swap: 'outerHTML',
-                    headers: {
-                        'X-CSRF-Token': 'token' // Add CSRF token if required
-                    }
-                });
-            }
-        }
-    };
-}
-</script>
+                
+                <h3 class="mt-4 text-lg font-medium text-gray-900 dark:text-white text-center">
+                    Удалить AR контент
+                </h3>
+                
+                <p class="mt-2 text-sm text-gray-500 dark:text-gray-400 text-center">
+                    Вы уверены, что хотите удалить AR контент с номером заказа <strong x-text="deleteArContent.orderNumber"></strong>? Это действие нельзя отменить.
+                </p>
+            </div>
+
+            <div class="bg-gray-50 dark:bg-gray-700/50 px-4 py-3 sm:flex sm:flex-row-reverse sm:px-6 gap-3">
+                <button @click="confirmDelete" 
+                        :disabled="isDeleting"
+                        class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-red-600 text-base font-medium text-white hover:bg-red-700 dark:bg-red-700 dark:hover:bg-red-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors sm:w-auto">
+                    <span x-show="!isDeleting">Удалить</span>
+                    <span x-show="isDeleting" class="flex items-center gap-2">
+                        <span class="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+                        Удаление...
+                    </span>
+                </button>
+                <button @click="showDeleteModal = false"
+                        :disabled="isDeleting"
+                        class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 dark:border-gray-600 shadow-sm px-4 py-2 bg-white dark:bg-gray-800 text-base font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors sm:mt-0 sm:w-auto">
+                    Отмена
+                </button>
+            </div>
+        </div>
+    </div>
+    </div>
+</div>
 {% endblock %}

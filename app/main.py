@@ -1,14 +1,13 @@
 from contextlib import asynccontextmanager
+from pathlib import Path
 from fastapi import FastAPI, Request, status
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
-from fastapi.responses import ORJSONResponse
+from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, ORJSONResponse
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.requests import Request
-from starlette.responses import JSONResponse
 import structlog
 import os
 import sys
@@ -48,7 +47,6 @@ async def lifespan(app: FastAPI) -> AsyncGenerator:
     
     Handles startup and shutdown events.
     """
-    logger = structlog.get_logger()
     
     # Startup
     logger.info(
@@ -56,6 +54,13 @@ async def lifespan(app: FastAPI) -> AsyncGenerator:
         environment=settings.ENVIRONMENT,
         debug=settings.DEBUG,
         log_level=settings.LOG_LEVEL,
+    )
+    
+    # Log storage configuration
+    logger.info(
+        "storage_config",
+        storage_base_path=str(Path(settings.STORAGE_BASE_PATH).resolve()),
+        local_storage_path=str(Path(settings.LOCAL_STORAGE_PATH).resolve()),
     )
 
     try:
@@ -80,6 +85,9 @@ async def lifespan(app: FastAPI) -> AsyncGenerator:
 
 # Configure logging before creating app
 configure_logging()
+
+# Initialize logger after logging is configured
+logger = structlog.get_logger()
 
 # Create FastAPI application
 app = FastAPI(
@@ -175,29 +183,35 @@ async def api_protected_route(request: Request, path: str):
         content={"detail": "Not Found"}
     )
 
-@app.get("/storage/{path:path}")
-async def storage_protected_route(request: Request, path: str):
-    """Protected storage route that returns 404 JSON for any unmatched storage paths."""
-    return JSONResponse(
-        status_code=404,
-        content={"detail": "Not Found"}
-    )
-
-@app.get("/static/{path:path}")
-async def static_protected_route(request: Request, path: str):
-    """Protected static route that returns 404 JSON for any unmatched static paths."""
-    return JSONResponse(
-        status_code=404,
-        content={"detail": "Not Found"}
-    )
-
-# Mount static files AFTER protected path handlers to ensure they don't override API routes
+# Mount static files - StaticFiles will handle 404s automatically
 # NOTE: For production, consider serving static files through Nginx instead of Uvicorn
 # to avoid blocking I/O operations in a single worker environment
+os.makedirs(settings.STORAGE_BASE_PATH, exist_ok=True)
 os.makedirs(settings.MEDIA_ROOT, exist_ok=True)
 os.makedirs("static", exist_ok=True)
-app.mount("/storage", StaticFiles(directory=settings.MEDIA_ROOT), name="storage")
+# Mount storage using STORAGE_BASE_PATH (where AR content files are actually stored)
+storage_base = Path(settings.STORAGE_BASE_PATH).resolve()
+storage_dir = str(storage_base.resolve())
+
+# Mount StaticFiles for storage
+app.mount("/storage", StaticFiles(directory=storage_dir), name="storage")
 app.mount("/static", StaticFiles(directory="static"), name="static")
+
+logger.info("storage_mounted", storage_dir=storage_dir)
+
+# Add debug endpoint to test file access
+@app.get("/debug/storage-test")
+async def debug_storage_test():
+    """Debug endpoint to test file access."""
+    import os
+    test_path = os.path.join(storage_dir, "VertexAR", "Posters", "001_Vertex_AR", "Портреты", "ORD-20260125-1122", "thumbnail.webp")
+    exists = os.path.exists(test_path)
+    return {
+        "storage_dir": storage_dir,
+        "test_path": test_path,
+        "exists": exists,
+        "files_in_dir": os.listdir(os.path.dirname(test_path)) if os.path.exists(os.path.dirname(test_path)) else []
+    }
 
 
 # Favicon endpoint

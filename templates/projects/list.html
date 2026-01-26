@@ -26,7 +26,7 @@
             </button>
         </div>
         
-        <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <!-- Status Filter -->
             <div>
                 <label for="status-filter" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
@@ -58,6 +58,23 @@
                     {% for company in companies %}
                     <option value="{{ company.id }}">{{ company.name }}</option>
                     {% endfor %}
+                </select>
+            </div>
+
+            <!-- Page Size -->
+            <div>
+                <label for="page-size-select" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Записей на странице
+                </label>
+                <select 
+                    id="page-size-select"
+                    x-model="pageSize"
+                    @change="changePageSize"
+                    class="form-select w-full">
+                    <option value="20" {% if page_size == 20 %}selected{% endif %}>20</option>
+                    <option value="30" {% if page_size == 30 %}selected{% endif %}>30</option>
+                    <option value="40" {% if page_size == 40 %}selected{% endif %}>40</option>
+                    <option value="50" {% if page_size == 50 %}selected{% endif %}>50</option>
                 </select>
             </div>
 
@@ -180,31 +197,10 @@
     </div>
 
     <!-- Pagination -->
-    {% if total_pages > 1 %}
-    <nav class="flex items-center justify-between" aria-label="Pagination">
-        <a href="{% if page > 1 %}?page={{ page - 1 }}{% if company_filter %}&company={{ company_filter }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}{% else %}#{% endif %}"
-           class="inline-flex items-center gap-2 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm font-medium {% if page <= 1 %}text-gray-300 dark:text-gray-600 cursor-not-allowed{% else %}text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700{% endif %}">
-            <span class="material-icons text-base">chevron_left</span>
-            Previous
-        </a>
-        
-        <div class="flex items-center gap-2">
-            <span class="text-sm text-gray-600 dark:text-gray-400">
-                Page <span class="font-semibold">{{ page }}</span> of <span class="font-semibold">{{ total_pages }}</span>
-            </span>
-        </div>
-        
-        <a href="{% if page < total_pages %}?page={{ page + 1 }}{% if company_filter %}&company={{ company_filter }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}{% else %}#{% endif %}"
-           class="inline-flex items-center gap-2 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm font-medium {% if page >= total_pages %}text-gray-300 dark:text-gray-600 cursor-not-allowed{% else %}text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700{% endif %}">
-            Next
-            <span class="material-icons text-base">chevron_right</span>
-        </a>
-    </nav>
-    {% endif %}
-</div>
+    {% include "components/pagination.html" %}
 
-<!-- Delete Confirmation Modal -->
-<div x-show="showDeleteModal" 
+    <!-- Delete Confirmation Modal -->
+    <div x-show="showDeleteModal" 
      x-transition
      @click.away="showDeleteModal = false"
      class="fixed inset-0 z-50 overflow-y-auto" 
@@ -255,7 +251,9 @@
             </div>
         </div>
     </div>
+    <!-- End of Delete Confirmation Modal -->
 </div>
+<!-- End of x-data="projectsManager()" -->
 
 <script>
 function projectsManager() {
@@ -264,6 +262,7 @@ function projectsManager() {
             status: '{{ status_filter }}',
             company: '{{ company_filter }}'
         },
+        pageSize: {{ page_size }},
         projects: {{ projects|tojson }},
         totalCount: {{ total_count }},
         showDeleteModal: false,
@@ -280,12 +279,26 @@ function projectsManager() {
                 params.append('company', this.filters.company);
             }
             
-            // Preserve page if set
-            const urlParams = new URLSearchParams(window.location.search);
-            const page = urlParams.get('page');
-            if (page) {
-                params.append('page', page);
+            // Reset to first page when filtering
+            params.append('page', '1');
+            params.append('page_size', this.pageSize);
+            
+            window.location.search = params.toString();
+        },
+        
+        changePageSize() {
+            const params = new URLSearchParams();
+            
+            // Preserve filters
+            if (this.filters.status) {
+                params.append('status', this.filters.status);
             }
+            if (this.filters.company) {
+                params.append('company', this.filters.company);
+            }
+            
+            params.append('page', '1');
+            params.append('page_size', this.pageSize);
             
             window.location.search = params.toString();
         },
@@ -313,40 +326,106 @@ function projectsManager() {
                 method: 'DELETE',
                 headers: {
                     'Content-Type': 'application/json'
-                }
+                },
+                credentials: 'include'
             })
-            .then(response => {
+            .then(async response => {
                 console.log('Delete response status:', response.status);
+                
+                // Check content type to handle both JSON and HTML responses
+                const contentType = response.headers.get('content-type') || '';
+                const isJson = contentType.includes('application/json');
+                
                 if (response.ok) {
-                    // Remove row from table with animation
-                    const row = document.getElementById(`project-${projectId}`);
-                    console.log('Found row element:', !!row);
-                    if (row) {
-                        row.style.transition = 'opacity 0.3s ease';
-                        row.style.opacity = '0';
-                        setTimeout(() => {
-                            row.remove();
-                            // Update count
-                            this.projects = this.projects.filter(p => p.id != projectId);
-                            this.totalCount--;
-                        }, 300);
+                    if (isJson) {
+                        const data = await response.json();
+                        // Remove row from table with animation
+                        const row = document.getElementById(`project-${projectId}`);
+                        console.log('Found row element:', !!row);
+                        if (row) {
+                            row.style.transition = 'opacity 0.3s ease';
+                            row.style.opacity = '0';
+                            setTimeout(() => {
+                                row.remove();
+                                // Update count
+                                this.projects = this.projects.filter(p => p.id != projectId);
+                                this.totalCount--;
+                            }, 300);
+                        }
+                        this.showDeleteModal = false;
+                        this.isDeleting = false;
+                        
+                        // Show success toast
+                        this.showToast('Project deleted successfully', 'success');
+                    } else {
+                        // Non-JSON success response, reload page
+                        window.location.reload();
                     }
-                    this.showDeleteModal = false;
-                    this.isDeleting = false;
-                    
-                    // Show success toast
-                    showToast('Project deleted successfully', 'success');
                 } else {
-                    return response.json().then(data => {
-                        throw new Error(data.detail || 'Failed to delete project');
-                    });
+                    // Error response
+                    let errorMessage = `Ошибка ${response.status}: ${response.statusText || 'Не удалось удалить проект'}`;
+                    
+                    if (isJson) {
+                        try {
+                            const data = await response.json();
+                            errorMessage = data.error || data.detail || errorMessage;
+                        } catch (e) {
+                            // Failed to parse JSON, use default message
+                            console.error('Failed to parse error JSON:', e);
+                        }
+                    } else {
+                        // HTML error page, try to extract error message
+                        try {
+                            const text = await response.text();
+                            // Try to find error message in HTML
+                            const errorMatch = text.match(/<title>(.*?)<\/title>/i) || 
+                                             text.match(/<h1>(.*?)<\/h1>/i) ||
+                                             text.match(/error[^<]*/i);
+                            if (errorMatch) {
+                                errorMessage = errorMatch[1] || errorMatch[0] || errorMessage;
+                            }
+                        } catch (e) {
+                            console.error('Failed to parse error HTML:', e);
+                        }
+                    }
+                    
+                    throw new Error(errorMessage);
                 }
             })
             .catch(error => {
                 console.error('Delete error:', error);
-                showToast('Error: ' + error.message, 'error');
+                const errorMessage = error.message || 'Не удалось удалить проект';
+                // Show error toast with detailed message
+                this.showToast(errorMessage, 'error');
                 this.isDeleting = false;
+                // Keep modal open so user can see the error
+                // this.showDeleteModal = false; // Don't close modal on error
             });
+        },
+        
+        showToast(message, type = 'info') {
+            // Try to use global showToast function if available
+            if (typeof window.showToast === 'function') {
+                window.showToast(message, type);
+                return;
+            }
+            
+            // Fallback: create toast manually
+            const toast = document.createElement('div');
+            const bgColor = type === 'success' ? 'bg-green-500' : type === 'error' ? 'bg-red-500' : 'bg-blue-500';
+            toast.className = `fixed bottom-4 right-4 ${bgColor} text-white px-4 py-2 rounded shadow z-50`;
+            toast.textContent = message;
+            document.body.appendChild(toast);
+            
+            setTimeout(() => {
+                if (document.body.contains(toast)) {
+                    toast.style.opacity = '0';
+                    toast.style.transition = 'opacity 0.3s';
+                    setTimeout(() => {
+                        document.body.removeChild(toast);
+                    }, 300);
+                }
+            }, 3000);
         }
     };
 }

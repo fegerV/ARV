@@ -119,14 +119,14 @@ async def get_next_rotation_video(ar_content: ARContent, db: AsyncSession, now: 
         # For 'none', always return the first one
         return active_videos[0]
     elif rotation_type == "sequential":
-        # For 'sequential', advance to next but don't wrap around
-        if current_index < len(active_videos) - 1:
-            return active_videos[current_index + 1]
-        else:
-            # Stay at the last video
+        # For 'sequential', return current video based on rotation_state
+        # Don't wrap around - stay at last video
+        # rotation_state will be incremented after this call
+        if current_index >= len(active_videos):
             return active_videos[-1]
+        return active_videos[min(current_index, len(active_videos) - 1)]
     elif rotation_type == "cyclic":
-        # For 'cyclic', wrap around
+        # For 'cyclic', return current video, then wrap around on next call
         return active_videos[current_index % len(active_videos)]
     else:
         # Default to first video
@@ -215,5 +215,32 @@ async def get_active_video(ar_content_id: int, db: AsyncSession) -> Optional[Dic
 
 async def update_rotation_state(ar_content: ARContent, db: AsyncSession) -> None:
     """Update the rotation state for sequential/cyclic rotation."""
-    ar_content.rotation_state = (ar_content.rotation_state or 0) + 1
+    from sqlalchemy import select, and_
+    from app.models.video import Video
+    
+    # Get active videos to check rotation type and count
+    stmt = select(Video).where(
+        and_(
+            Video.ar_content_id == ar_content.id,
+            Video.is_active == True
+        )
+    ).order_by(Video.rotation_order.asc(), Video.id.asc())
+    
+    result = await db.execute(stmt)
+    active_videos = list(result.scalars().all())
+    
+    if not active_videos:
+        return
+    
+    rotation_type = active_videos[0].rotation_type
+    
+    # For sequential, don't increment beyond last video
+    if rotation_type == "sequential":
+        current_state = ar_content.rotation_state or 0
+        if current_state < len(active_videos) - 1:
+            ar_content.rotation_state = current_state + 1
+    elif rotation_type == "cyclic":
+        # For cyclic, always increment (will wrap around)
+        ar_content.rotation_state = (ar_content.rotation_state or 0) + 1
+    
     await db.commit()

@@ -6,7 +6,7 @@ from datetime import datetime
 
 from app.core.database import get_db
 from app.models.ar_content import ARContent
-from app.services.video_scheduler import get_active_video
+from app.services.video_scheduler import get_active_video, update_rotation_state
 
 router = APIRouter()
 
@@ -45,6 +45,10 @@ async def get_viewer_active_video(
     source = video_result["source"]
     schedule_id = video_result.get("schedule_id")
     expires_in = video_result.get("expires_in")
+    
+    # Update rotation state if video was selected via rotation (sequential/cyclic)
+    if source == "rotation" and video.rotation_type in ["sequential", "cyclic"]:
+        await update_rotation_state(ar_content, db)
     
     # Build response with video metadata and selection info
     response = {
@@ -97,6 +101,10 @@ async def get_viewer_active_video_by_unique_id(
     source = video_result["source"]
     schedule_id = video_result.get("schedule_id")
     expires_in = video_result.get("expires_in")
+    
+    # Update rotation state if video was selected via rotation (sequential/cyclic)
+    if source == "rotation" and video.rotation_type in ["sequential", "cyclic"]:
+        await update_rotation_state(ar_content, db)
 
     return {
         "id": video.id,

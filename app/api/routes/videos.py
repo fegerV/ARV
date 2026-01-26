@@ -12,6 +12,7 @@ from app.models.video_schedule import VideoSchedule as VideoScheduleModel
 from app.schemas.video_schedule import (
     VideoScheduleCreate, VideoScheduleUpdate, VideoSchedule as VideoScheduleSchema,
     VideoSubscriptionUpdate, VideoRotationUpdate, VideoSetActiveResponse,
+    VideoActiveUpdate, VideoPlaybackModeUpdate,
     VideoStatusResponse
 )
 from app.services.video_scheduler import (
@@ -88,13 +89,24 @@ async def upload_videos(
     Returns:
         List of created video objects with metadata
     """
+    import structlog
+    logger = structlog.get_logger()
+    
     try:
         content_uuid = int(content_id)
+        logger.info("video_upload_started", content_id=content_id, videos_count=len(videos))
     except (TypeError, ValueError):
+        logger.error("invalid_content_id", content_id=content_id)
         raise HTTPException(status_code=400, detail="content_id must be int")
 
-    # Verify AR content exists
-    ar_content = await db.get(ARContent, content_uuid)
+    # Verify AR content exists and load relations eagerly
+    from sqlalchemy.orm import selectinload
+    stmt_content = select(ARContent).options(
+        selectinload(ARContent.company),
+        selectinload(ARContent.project)
+    ).where(ARContent.id == content_uuid)
+    result_content = await db.execute(stmt_content)
+    ar_content = result_content.scalar_one_or_none()
     if not ar_content:
         raise HTTPException(status_code=404, detail="AR content not found")
     
@@ -104,11 +116,13 @@ async def upload_videos(
     )
     is_first_video = existing_videos_count == 0
     
-    # Build storage paths
+    # Build storage paths with company and project names
     storage_base_path = build_ar_content_storage_path(
-        ar_content.company_id, 
-        ar_content.project_id, 
-        ar_content.unique_id
+        company_id=ar_content.company_id,
+        project_id=ar_content.project_id,
+        order_number=ar_content.order_number,
+        company_name=ar_content.company.name if ar_content.company else None,
+        project_name=ar_content.project.name if ar_content.project else None
     )
     videos_storage_path = storage_base_path / "videos"
     previews_storage_path = storage_base_path / "previews"
@@ -187,11 +201,17 @@ async def upload_videos(
         except Exception as e:
             # Rollback this video's transaction
             await db.rollback()
+            logger.error("video_upload_failed", 
+                        content_id=content_id, 
+                        filename=upload_file.filename, 
+                        error=str(e), 
+                        exc_info=True)
             raise HTTPException(
                 status_code=500,
                 detail=f"Failed to process video {upload_file.filename}: {str(e)}"
             )
     
+    logger.info("video_upload_completed", content_id=content_id, videos_count=len(created_videos))
     return {
         "message": f"Successfully uploaded {len(created_videos)} video(s)",
         "videos": created_videos,
@@ -431,6 +451,123 @@ async def update_video_rotation(
     except Exception as e:
         await db.rollback()
         raise HTTPException(status_code=500, detail=f"Failed to update rotation: {str(e)}")
+
+
+@router.patch("/ar-content/{content_id}/videos/{video_id}/active")
+async def update_video_active_flag(
+    content_id: str,
+    video_id: str,
+    active_data: VideoActiveUpdate,
+    db: AsyncSession = Depends(get_db)
+):
+    """Toggle video active flag for rotation/scheduling."""
+    import structlog
+    log = structlog.get_logger()
+
+    try:
+        content_uuid = int(content_id)
+        video_uuid = int(video_id)
+    except (TypeError, ValueError):
+        raise HTTPException(status_code=400, detail="content_id and video_id must be int")
+
+    ar_content = await db.get(ARContent, content_uuid)
+    if not ar_content:
+        raise HTTPException(status_code=404, detail="AR content not found")
+
+    video = await db.get(Video, video_uuid)
+    if not video or video.ar_content_id != content_uuid:
+        raise HTTPException(status_code=404, detail="Video not found or doesn't belong to this AR content")
+
+    try:
+        video.is_active = bool(active_data.is_active)
+        if not video.is_active and ar_content.active_video_id == video_uuid:
+            ar_content.active_video_id = None
+
+        await db.commit()
+        await db.refresh(video)
+
+        return {
+            "status": "updated",
+            "video_id": video.id,
+            "is_active": video.is_active
+        }
+    except Exception as exc:
+        await db.rollback()
+        log.error("update_video_active_failed", error=str(exc), content_id=content_id, video_id=video_id)
+        raise HTTPException(status_code=500, detail=f"Failed to update video active flag: {str(exc)}")
+
+
+@router.patch("/ar-content/{content_id}/playback-mode")
+async def update_playback_mode(
+    content_id: str,
+    mode_data: VideoPlaybackModeUpdate,
+    db: AsyncSession = Depends(get_db)
+):
+    """Switch playback mode between manual and automatic rotation."""
+    import structlog
+    log = structlog.get_logger()
+
+    try:
+        content_uuid = int(content_id)
+    except (TypeError, ValueError):
+        raise HTTPException(status_code=400, detail="content_id must be int")
+
+    ar_content = await db.get(ARContent, content_uuid)
+    if not ar_content:
+        raise HTTPException(status_code=404, detail="AR content not found")
+
+    stmt = select(Video).where(Video.ar_content_id == content_uuid).order_by(Video.id.asc())
+    result = await db.execute(stmt)
+    videos = list(result.scalars().all())
+    if not videos:
+        raise HTTPException(status_code=400, detail="No videos found for this AR content")
+
+    try:
+        if mode_data.mode == "manual":
+            if not mode_data.active_video_id:
+                raise HTTPException(status_code=400, detail="active_video_id is required for manual mode")
+
+            target = next((v for v in videos if v.id == mode_data.active_video_id), None)
+            if not target:
+                raise HTTPException(status_code=404, detail="Active video not found for this AR content")
+
+            for v in videos:
+                v.is_active = (v.id == target.id)
+                v.rotation_type = "none"
+
+            ar_content.active_video_id = target.id
+            ar_content.rotation_state = 0
+        else:
+            active_ids = mode_data.active_video_ids or []
+            if not active_ids:
+                raise HTTPException(status_code=400, detail="active_video_ids is required for automatic mode")
+
+            active_set = set(active_ids)
+            unknown_ids = [vid for vid in active_ids if not any(v.id == vid for v in videos)]
+            if unknown_ids:
+                raise HTTPException(status_code=404, detail=f"Unknown video IDs: {unknown_ids}")
+
+            for v in videos:
+                v.is_active = v.id in active_set
+                v.rotation_type = mode_data.mode
+
+            ar_content.active_video_id = None
+            ar_content.rotation_state = 0
+
+        await db.commit()
+
+        return {
+            "status": "updated",
+            "mode": mode_data.mode,
+            "active_video_id": ar_content.active_video_id,
+            "active_video_ids": [v.id for v in videos if v.is_active]
+        }
+    except HTTPException:
+        raise
+    except Exception as exc:
+        await db.rollback()
+        log.error("update_playback_mode_failed", error=str(exc), content_id=content_id)
+        raise HTTPException(status_code=500, detail=f"Failed to update playback mode: {str(exc)}")
 
 
 # Schedule CRUD endpoints

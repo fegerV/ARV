@@ -91,9 +91,24 @@ async def validate_company_project(company_id: int, project_id: int, db: AsyncSe
     return company, project
 
 
-async def get_ar_content_or_404(content_id: int, db: AsyncSession) -> ARContent:
-    """Get AR content by ID or raise 404."""
-    content = await db.get(ARContent, content_id)
+async def get_ar_content_or_404(content_id: int, db: AsyncSession, load_relations: bool = False) -> ARContent:
+    """Get AR content by ID or raise 404.
+    
+    Args:
+        content_id: The AR content ID
+        db: Database session
+        load_relations: If True, load company and project relationships
+    """
+    if load_relations:
+        stmt = select(ARContent).options(
+            selectinload(ARContent.company),
+            selectinload(ARContent.project)
+        ).where(ARContent.id == content_id)
+        result = await db.execute(stmt)
+        content = result.scalar_one_or_none()
+    else:
+        content = await db.get(ARContent, content_id)
+    
     if not content:
         raise HTTPException(status_code=404, detail="AR content not found")
     return content
@@ -139,8 +154,11 @@ async def list_all_ar_content(
     # Calculate total pages
     total_pages = (total + page_size - 1) // page_size  # Ceiling division
     
-    # Get items with pagination
-    stmt = select(ARContent).options(selectinload(ARContent.company), selectinload(ARContent.project)).offset(skip).limit(page_size)
+    # Get items with pagination, sorted by created_at DESC (newest first)
+    stmt = select(ARContent).options(
+        selectinload(ARContent.company), 
+        selectinload(ARContent.project)
+    ).order_by(ARContent.created_at.desc()).offset(skip).limit(page_size)
     result = await db.execute(stmt)
     items = result.scalars().all()
     
@@ -153,14 +171,13 @@ async def list_all_ar_content(
     )
 
 
-# Additional route with trailing slash for compatibility
 @router.get("/ar-content/", response_model=ARContentList, tags=["AR Content"])
 async def list_all_ar_content_no_slash(
     page: int = Query(1, ge=1, description="Page number"),
     page_size: int = Query(100, ge=1, le=1000, description="Number of items per page"),
     db: AsyncSession = Depends(get_db)
 ):
-    """List all AR content across all companies and projects (route with trailing slash for compatibility)."""
+    """List all AR content across all companies and projects (route with trailing slash)."""
     # This is just a redirect to the main function
     return await list_all_ar_content(page=page, page_size=page_size, db=db)
 
@@ -218,6 +235,7 @@ async def _create_ar_content(
     duration_years: int,
     photo_file: UploadFile,
     video_file: UploadFile,
+    auto_enhance: bool,
     db: AsyncSession
 ):
     """Внутренняя функция для создания AR-контента"""
@@ -257,8 +275,14 @@ async def _create_ar_content(
     # Generate order number
     order_number = generate_order_number()
     
-    # Build storage path
-    storage_path = build_ar_content_storage_path(company_id, project_id, unique_id)
+    # Build storage path with company and project names
+    storage_path = build_ar_content_storage_path(
+        company_id=company_id,
+        project_id=project_id,
+        order_number=order_number,
+        company_name=company.name,
+        project_name=project.name
+    )
     storage_path.mkdir(parents=True, exist_ok=True)
     
     # Save photo
@@ -284,6 +308,35 @@ async def _create_ar_content(
         video_url=video_url,
         qr_code_url=qr_code_url,
     )
+
+    # Analyze photo quality and build recommendations
+    image_quality = marker_service.analyze_image_quality(str(photo_path))
+    recommendations = marker_service.build_image_recommendations(image_quality)
+    photo_analysis: dict = {
+        "metrics": image_quality,
+        "recommendations": recommendations,
+        "auto_enhanced": False,
+    }
+
+    marker_image_path = str(photo_path)
+    if auto_enhance:
+        if marker_service.should_auto_enhance(image_quality):
+            enhanced_photo_path = storage_path / "photo_enhanced.png"
+            enhanced_path = marker_service.enhance_image_for_marker(
+                image_path=str(photo_path),
+                output_path=str(enhanced_photo_path),
+            )
+            if enhanced_path:
+                marker_image_path = enhanced_path
+                enhanced_metrics = marker_service.analyze_image_quality(enhanced_path)
+                photo_analysis.update(
+                    {
+                        "auto_enhanced": True,
+                        "enhanced_metrics": enhanced_metrics,
+                    }
+                )
+        else:
+            photo_analysis["auto_enhance_skipped_reason"] = "quality_above_threshold"
     
     # Create database record for AR content
     ar_content = ARContent(
@@ -313,7 +366,8 @@ async def _create_ar_content(
     try:
         thumbnail_result = await thumbnail_service.generate_image_thumbnail(
             image_path=str(photo_path),
-            company_id=company_id
+            company_id=company_id,
+            storage_path=storage_path
         )
         
         if thumbnail_result.get("status") == "ready":
@@ -359,8 +413,8 @@ async def _create_ar_content(
     try:
         marker_result = await marker_service.generate_marker(
             ar_content_id=ar_content.id,
-            image_path=str(photo_path),
-            output_dir=str(storage_path)
+            image_path=marker_image_path,
+            storage_path=storage_path
         )
         
         # Update AR content with marker information
@@ -371,8 +425,10 @@ async def _create_ar_content(
         
         if marker_result.get("status") == "failed":
             logger.error("marker_generation_failed", error=marker_result.get("error"))
-            # We won't fail the whole request if marker generation fails
+            # Keep status as "pending" if marker generation failed
         else:
+            # Update status to "ready" after successful marker generation
+            ar_content.status = "ready"
             # Commit the marker information to database
             await db.commit()
             await db.refresh(ar_content)
@@ -382,6 +438,7 @@ async def _create_ar_content(
                 marker_url=marker_result.get("marker_url"),
                 marker_path=marker_result.get("marker_path"),
                 marker_status=marker_result.get("status"),
+                status="ready"
             )
     except Exception as e:
         logger.error("marker_generation_exception", error=str(e))
@@ -393,7 +450,8 @@ async def _create_ar_content(
         public_link=build_unique_link(ar_content.unique_id),
         qr_code_url=ar_content.qr_code_url,
         photo_url=ar_content.photo_url,
-        video_url=ar_content.video_url
+        video_url=ar_content.video_url,
+        photo_analysis=photo_analysis,
     )
 
 
@@ -403,52 +461,81 @@ async def regenerate_media(
     db: AsyncSession = Depends(get_db)
 ):
     """Regenerate preview thumbnail and marker for AR content."""
-    ar_content = await db.get(ARContent, ar_content_id)
-    if not ar_content:
-        raise HTTPException(status_code=404, detail="AR content not found")
+    try:
+        ar_content = await db.get(ARContent, ar_content_id)
+        if not ar_content:
+            logger.error("ar_content_not_found", ar_content_id=ar_content_id)
+            raise HTTPException(status_code=404, detail="AR content not found")
 
-    if not ar_content.photo_path:
-        raise HTTPException(status_code=400, detail="Photo not found for AR content")
+        if not ar_content.photo_path:
+            logger.error("photo_not_found", ar_content_id=ar_content_id)
+            raise HTTPException(status_code=400, detail="Photo not found for AR content")
 
-    storage_path = Path(ar_content.storage_path) if ar_content.storage_path else None
-    if storage_path:
-        storage_path.mkdir(parents=True, exist_ok=True)
-
-    logger.info(
-        "ar_content_regeneration_started",
-        ar_content_id=ar_content.id,
-        photo_path=ar_content.photo_path,
-        storage_path=str(storage_path) if storage_path else None,
-    )
-
-    thumbnail_result = await thumbnail_service.generate_image_thumbnail(
-        image_path=ar_content.photo_path,
-        company_id=ar_content.company_id
-    )
-    if thumbnail_result.get("status") == "ready":
-        ar_content.thumbnail_url = thumbnail_result.get("thumbnail_url")
-    else:
-        logger.warning(
-            "photo_thumbnail_regeneration_failed",
+        logger.info(
+            "ar_content_regeneration_started",
             ar_content_id=ar_content.id,
-            error=thumbnail_result.get("error"),
+            photo_path=ar_content.photo_path,
         )
 
-    marker_result = await marker_service.generate_marker(
-        ar_content_id=ar_content.id,
-        image_path=ar_content.photo_path,
-        output_dir=str(storage_path) if storage_path else None
-    )
-    ar_content.marker_path = marker_result.get("marker_path")
-    ar_content.marker_url = marker_result.get("marker_url")
-    ar_content.marker_status = marker_result.get("status")
-    ar_content.marker_metadata = marker_result.get("metadata")
+        # Get storage path for thumbnail
+        from app.utils.ar_content import get_ar_content_storage_path
+        try:
+            storage_path = await get_ar_content_storage_path(ar_content, db)
+            logger.info("storage_path_resolved", storage_path=str(storage_path))
+        except Exception as e:
+            logger.error("storage_path_resolution_failed", error=str(e), ar_content_id=ar_content.id)
+            # Try to use photo_path parent as fallback
+            if ar_content.photo_path:
+                storage_path = Path(ar_content.photo_path).parent
+            else:
+                raise HTTPException(status_code=500, detail="Could not determine storage path")
+        
+        # Generate thumbnail
+        try:
+            thumbnail_result = await thumbnail_service.generate_image_thumbnail(
+                image_path=ar_content.photo_path,
+                storage_path=storage_path,
+                company_id=ar_content.company_id
+            )
+            if thumbnail_result.get("status") == "ready":
+                ar_content.thumbnail_url = thumbnail_result.get("thumbnail_url")
+                logger.info("thumbnail_generated", thumbnail_url=ar_content.thumbnail_url)
+            else:
+                logger.warning(
+                    "photo_thumbnail_regeneration_failed",
+                    ar_content_id=ar_content.id,
+                    error=thumbnail_result.get("error"),
+                )
+        except Exception as e:
+            logger.error("thumbnail_generation_exception", error=str(e), ar_content_id=ar_content.id, exc_info=True)
 
-    if marker_result.get("status") == "failed":
-        logger.error("marker_regeneration_failed", error=marker_result.get("error"))
+        # Generate marker
+        try:
+            marker_result = await marker_service.generate_marker(
+                ar_content_id=ar_content.id,
+                image_path=ar_content.photo_path,
+                storage_path=storage_path
+            )
+            ar_content.marker_path = marker_result.get("marker_path")
+            ar_content.marker_url = marker_result.get("marker_url")
+            ar_content.marker_status = marker_result.get("status")
+            ar_content.marker_metadata = marker_result.get("metadata")
 
-    await db.commit()
-    await db.refresh(ar_content)
+            if marker_result.get("status") == "failed":
+                logger.error("marker_regeneration_failed", error=marker_result.get("error"), ar_content_id=ar_content.id)
+            else:
+                logger.info("marker_generated", marker_url=ar_content.marker_url, marker_status=ar_content.marker_status)
+        except Exception as e:
+            logger.error("marker_generation_exception", error=str(e), ar_content_id=ar_content.id, exc_info=True)
+
+        await db.commit()
+        await db.refresh(ar_content)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("regenerate_media_exception", error=str(e), ar_content_id=ar_content_id, exc_info=True)
+        await db.rollback()
+        raise HTTPException(status_code=500, detail=f"Failed to regenerate media: {str(e)}")
 
     logger.info(
         "ar_content_regeneration_completed",
@@ -458,12 +545,13 @@ async def regenerate_media(
         marker_status=ar_content.marker_status,
     )
 
+    # Return success response
     return {
         "status": "completed",
         "thumbnail_url": ar_content.thumbnail_url,
         "marker_url": ar_content.marker_url,
         "marker_status": ar_content.marker_status,
-        "marker_metadata": ar_content.marker_metadata,
+        "marker_metadata": ar_content.marker_metadata
     }
 
 
@@ -475,6 +563,7 @@ async def create_ar_content(
     customer_phone: Optional[str] = Form(None),
     customer_email: Optional[str] = Form(None),
     duration_years: int = Form(...),
+    auto_enhance: bool = Form(False),
     photo_file: UploadFile = File(...),
     video_file: UploadFile = File(...),
     db: AsyncSession = Depends(get_db)
@@ -489,6 +578,7 @@ async def create_ar_content(
         duration_years=duration_years,
         photo_file=photo_file,
         video_file=video_file,
+        auto_enhance=auto_enhance,
         db=db
     )
 
@@ -503,7 +593,14 @@ async def parse_ar_content_data(request: Request):
     """
     # Get form data
     form = await request.form()
-    
+
+    def _parse_bool(value: Optional[str]) -> bool:
+        if value is None:
+            return False
+        return str(value).strip().lower() in {"1", "true", "yes", "on"}
+
+    auto_enhance = _parse_bool(form.get("auto_enhance"))
+
     # Check if it's the legacy format (with content_metadata)
     if "content_metadata" in form:
         # Legacy format
@@ -572,7 +669,8 @@ async def parse_ar_content_data(request: Request):
         "customer_email": customer_email,
         "duration_years": duration_years,
         "photo_file": actual_photo_file,
-        "video_file": actual_video_file
+        "video_file": actual_video_file,
+        "auto_enhance": auto_enhance,
     }
 
 
@@ -594,6 +692,7 @@ async def create_ar_content_hierarchical(
         customer_phone=data["customer_phone"],
         customer_email=data["customer_email"],
         duration_years=data["duration_years"],
+        auto_enhance=data.get("auto_enhance"),
         photo_filename=data["photo_file"].filename if data["photo_file"] else None,
         video_filename=data["video_file"].filename if data["video_file"] else None
     )
@@ -607,6 +706,7 @@ async def create_ar_content_hierarchical(
         duration_years=data["duration_years"],
         photo_file=data["photo_file"],
         video_file=data["video_file"],
+        auto_enhance=bool(data.get("auto_enhance")),
         db=db
     )
 
@@ -668,6 +768,7 @@ async def create_ar_content_legacy(
         duration_years=duration_years,
         photo_file=image,  # Map 'image' to 'photo_file'
         video_file=video,  # Map 'video' to 'video_file'
+        auto_enhance=False,
         db=db
     )
 
@@ -710,7 +811,13 @@ async def get_ar_content(
     content_data.project_id = ar_content.project_id
     # Set storage path
     from app.utils.ar_content import build_ar_content_storage_path
-    storage_path = build_ar_content_storage_path(ar_content.company_id, ar_content.project_id, ar_content.unique_id)
+    storage_path = build_ar_content_storage_path(
+        company_id=ar_content.company_id,
+        project_id=ar_content.project_id,
+        order_number=ar_content.order_number,
+        company_name=ar_content.company.name if ar_content.company else None,
+        project_name=ar_content.project.name if ar_content.project else None
+    )
     content_data.storage_path = str(storage_path)
     # Set company and project names
     if ar_content.company:
@@ -763,15 +870,16 @@ async def update_ar_content_photo(
     # Validate company and project relationship
     await validate_company_project(company_id, project_id, db)
 
-    # Get AR content
-    ar_content = await get_ar_content_or_404(content_id, db)
+    # Get AR content with relations
+    ar_content = await get_ar_content_or_404(content_id, db, load_relations=True)
 
     # Verify it belongs to the specified company and project
     if ar_content.company_id != company_id or ar_content.project_id != project_id:
         raise HTTPException(status_code=404, detail="AR content not found in specified project")
 
-    # Build storage path
-    storage_path = build_ar_content_storage_path(company_id, project_id, ar_content.unique_id)
+    # Get storage path
+    from app.utils.ar_content import get_ar_content_storage_path
+    storage_path = await get_ar_content_storage_path(ar_content, db)
     storage_path.mkdir(parents=True, exist_ok=True)
 
     # Save new photo
@@ -801,7 +909,7 @@ async def update_ar_content_photo(
         marker_result = await marker_service.generate_marker(
             ar_content_id=ar_content.id,
             image_path=str(photo_path),
-            output_dir=str(storage_path),
+            storage_path=storage_path
         )
 
         ar_content.marker_path = marker_result.get("marker_path")
@@ -811,6 +919,9 @@ async def update_ar_content_photo(
 
         if marker_result.get("status") == "failed":
             logger.error("marker_generation_failed", error=marker_result.get("error"))
+        else:
+            # Update status to "ready" after successful marker generation
+            ar_content.status = "ready"
     except Exception as e:
         logger.error("marker_generation_exception", error=str(e))
 
@@ -832,15 +943,17 @@ async def update_ar_content_video(
     # Validate company and project relationship
     await validate_company_project(company_id, project_id, db)
     
-    # Get AR content
-    ar_content = await get_ar_content_or_404(content_id, db)
+    # Get AR content with relations
+    ar_content = await get_ar_content_or_404(content_id, db, load_relations=True)
     
     # Verify it belongs to the specified company and project
     if ar_content.company_id != company_id or ar_content.project_id != project_id:
         raise HTTPException(status_code=404, detail="AR content not found in specified project")
     
-    # Build storage path
-    storage_path = build_ar_content_storage_path(company_id, project_id, ar_content.unique_id)
+    # Get storage path
+    from app.utils.ar_content import get_ar_content_storage_path
+    storage_path = await get_ar_content_storage_path(ar_content, db)
+    storage_path.mkdir(parents=True, exist_ok=True)
     
     # Save new video
     video_filename = f"video{Path(video.filename).suffix}"
@@ -872,15 +985,16 @@ async def delete_ar_content(
     # Validate company and project relationship
     await validate_company_project(company_id, project_id, db)
     
-    # Get AR content
-    ar_content = await get_ar_content_or_404(content_id, db)
+    # Get AR content with relations
+    ar_content = await get_ar_content_or_404(content_id, db, load_relations=True)
     
     # Verify it belongs to the specified company and project
     if ar_content.company_id != company_id or ar_content.project_id != project_id:
         raise HTTPException(status_code=404, detail="AR content not found in specified project")
     
-    # Build storage path
-    storage_path = build_ar_content_storage_path(company_id, project_id, ar_content.unique_id)
+    # Get storage path
+    from app.utils.ar_content import get_ar_content_storage_path
+    storage_path = await get_ar_content_storage_path(ar_content, db)
     
     # Clear the active_video_id reference to avoid circular dependency
     ar_content.active_video_id = None
@@ -903,13 +1017,12 @@ async def delete_ar_content(
     return {"message": "AR content deleted successfully"}
 
 
-# Маршрут для получения AR-контента по ID без иерархии (для совместимости)
 @router.get("/ar-content/{content_id}", response_model=ARContentWithLinks, tags=["AR Content"])
 async def get_ar_content_by_id(
     content_id: int,
     db: AsyncSession = Depends(get_db)
 ):
-    """Get AR content by ID without requiring company/project context (for compatibility)"""
+    """Get AR content by ID without requiring company/project context"""
     # Get AR content with related videos, company, and project
     stmt = select(ARContent).options(
         selectinload(ARContent.videos),
@@ -934,7 +1047,13 @@ async def get_ar_content_by_id(
     content_data.project_id = ar_content.project_id
     # Set storage path
     from app.utils.ar_content import build_ar_content_storage_path
-    storage_path = build_ar_content_storage_path(ar_content.company_id, ar_content.project_id, ar_content.unique_id)
+    storage_path = build_ar_content_storage_path(
+        company_id=ar_content.company_id,
+        project_id=ar_content.project_id,
+        order_number=ar_content.order_number,
+        company_name=ar_content.company.name if ar_content.company else None,
+        project_name=ar_content.project.name if ar_content.project else None
+    )
     content_data.storage_path = str(storage_path)
     # Set company and project names
     if ar_content.company:
@@ -945,25 +1064,26 @@ async def get_ar_content_by_id(
     return content_data
 
 
-# Маршрут для удаления AR-контента по ID без иерархии (для совместимости)
 @router.delete("/ar-content/{content_id}", tags=["AR Content"])
 async def delete_ar_content_by_id(
     content_id: int,
     background_tasks: BackgroundTasks,
     db: AsyncSession = Depends(get_db)
 ):
-    """Delete AR content by ID without requiring company/project context (for compatibility)"""
-    # Get AR content
-    ar_content = await get_ar_content_or_404(content_id, db)
+    """Delete AR content by ID without requiring company/project context"""
+    # Get AR content with relations for building proper storage path
+    ar_content = await get_ar_content_or_404(content_id, db, load_relations=True)
     
-    # Build storage path
-    storage_path = build_ar_content_storage_path(ar_content.company_id, ar_content.project_id, ar_content.unique_id)
+    # Get storage path
+    from app.utils.ar_content import get_ar_content_storage_path
+    storage_path = await get_ar_content_storage_path(ar_content, db)
     
     # Clear the active_video_id reference to avoid circular dependency
     ar_content.active_video_id = None
     await db.commit()
     
     # Delete from database (this will cascade delete related videos due to cascade="all, delete-orphan")
+    # Use await for async delete operation
     await db.delete(ar_content)
     await db.commit()
     
@@ -980,13 +1100,12 @@ async def delete_ar_content_by_id(
     return {"message": "AR content deleted successfully"}
 
 
-# Legacy маршрут для совместимости
 @router.get("/{content_id}", response_model=ARContentWithLinks, tags=["AR Content"])
 async def get_ar_content_by_id_legacy(
     content_id: int,
     db: AsyncSession = Depends(get_db)
 ):
-    """Get AR content by ID without requiring company/project context (for compatibility)"""
+    """Get AR content by ID without requiring company/project context"""
     # Get AR content
     ar_content = await get_ar_content_or_404(content_id, db)
     
@@ -1035,13 +1154,86 @@ async def get_ar_viewer(unique_id: str, db: AsyncSession = Depends(get_db)):
             else:
                 raise HTTPException(status_code=400, detail="AR marker not available")
         
+        # Recalculate URLs from paths to ensure they are correct
+        from app.utils.ar_content import build_public_url
+        from pathlib import Path
+        from app.core.config import settings
+        
+        # Recalculate marker URL
+        marker_url = ar_content.marker_url
+        if ar_content.marker_path:
+            try:
+                marker_path = Path(ar_content.marker_path)
+                if marker_path.is_absolute():
+                    marker_url = build_public_url(marker_path)
+                else:
+                    marker_path_abs = Path(settings.STORAGE_BASE_PATH) / marker_path
+                    marker_url = build_public_url(marker_path_abs)
+            except Exception as e:
+                logger.warning("marker_url_recalc_failed", error=str(e), marker_path=ar_content.marker_path)
+        
+        if not marker_url:
+            raise HTTPException(status_code=400, detail="Marker URL not available")
+        
+        # Recalculate photo URL
+        photo_url = ar_content.photo_url
+        if ar_content.photo_path:
+            try:
+                photo_path = Path(ar_content.photo_path)
+                if photo_path.is_absolute():
+                    photo_url = build_public_url(photo_path)
+                else:
+                    photo_path_abs = Path(settings.STORAGE_BASE_PATH) / photo_path
+                    photo_url = build_public_url(photo_path_abs)
+            except Exception as e:
+                logger.warning("photo_url_recalc_failed", error=str(e), photo_path=ar_content.photo_path)
+        
+        if not photo_url:
+            raise HTTPException(status_code=400, detail="Photo URL not available")
+        
+        # Get active video URL
+        video_url = ar_content.video_url
+        try:
+            from app.services.video_scheduler import get_active_video
+            active_video_data = await get_active_video(ar_content.id, db)
+            if active_video_data and active_video_data.get("video"):
+                video_url = active_video_data["video"].video_url
+        except Exception as e:
+            logger.warning("active_video_fetch_failed", error=str(e), ar_content_id=ar_content.id)
+            # Fallback to ar_content.video_url
+        
+        # If still no video_url, try to recalculate from video_path
+        if not video_url and ar_content.video_path:
+            try:
+                video_path = Path(ar_content.video_path)
+                if video_path.is_absolute():
+                    video_url = build_public_url(video_path)
+                else:
+                    video_path_abs = Path(settings.STORAGE_BASE_PATH) / video_path
+                    video_url = build_public_url(video_path_abs)
+            except Exception as e:
+                logger.warning("video_url_recalc_failed", error=str(e), video_path=ar_content.video_path)
+        
+        if not video_url:
+            raise HTTPException(status_code=400, detail="Video not available for AR content")
+        
+        logger.info("ar_viewer_urls_prepared",
+                   unique_id=unique_id,
+                   marker_url=marker_url,
+                   photo_url=photo_url,
+                   video_url=video_url)
+        
+        # Escape only text content, not URLs (URLs are safe in HTML attributes)
+        import html
+        
         # Return the AR viewer page HTML
         html_content = f"""
         <!DOCTYPE html>
         <html>
         <head>
+            <meta charset="UTF-8">
             <meta name="viewport" content="width=device-width, initial-scale=1" />
-            <title>AR Viewer - {ar_content.order_number}</title>
+            <title>AR Viewer - {html.escape(ar_content.order_number)}</title>
             <script src="https://cdn.jsdelivr.net/gh/hiukim/mind-ar-js@1.2.5/dist/mindar-image.prod.js"></script>
             <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
             <script src="https://cdn.jsdelivr.net/gh/hiukim/mind-ar-js@1.2.5/dist/mindar-image-aframe.prod.js"></script>
@@ -1063,15 +1255,15 @@ async def get_ar_viewer(unique_id: str, db: AsyncSession = Depends(get_db)):
         <body>
             <div id="ar-container">
                 <a-scene
-                    mindar-image="imageTargetSrc: {ar_content.marker_url}; uiLoading: #uiLoading; uiError: #uiError;"
+                    mindar-image="imageTargetSrc: {marker_url}; uiLoading: #uiLoading; uiError: #uiError;"
                     color-space="sRGB"
                     renderer="colorManagement: true, physicallyCorrectLights"
                     vr-mode-ui="enabled: false"
                     device-orientation-permission-ui="enabled: false"
                 >
                     <a-assets>
-                        <img id="targetImage" src="{ar_content.photo_url}" />
-                        <a-asset-item id="videoModel" src="{ar_content.video_url}"></a-asset-item>
+                        <img id="targetImage" src="{photo_url}" />
+                        <a-asset-item id="videoModel" src="{video_url}"></a-asset-item>
                     </a-assets>
 
                     <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
@@ -1087,6 +1279,8 @@ async def get_ar_viewer(unique_id: str, db: AsyncSession = Depends(get_db)):
                             height="0.5"
                             position="0 0.1 0.01"
                             rotation="0 0 0"
+                            autoplay="true"
+                            loop="true"
                         ></a-video>
                     </a-entity>
                     
@@ -1102,15 +1296,124 @@ async def get_ar_viewer(unique_id: str, db: AsyncSession = Depends(get_db)):
         </html>
         """
         return HTMLResponse(content=html_content)
+    
+    except HTTPException:
+        raise
     except ValueError:
         raise HTTPException(status_code=400, detail="Invalid unique_id format")
+    except Exception as e:
+        logger.error("ar_viewer_error", unique_id=unique_id, error=str(e), exc_info=True)
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+
+@router.get("/ar-content/{ar_content_id}/marker/validate", tags=["AR Content"])
+async def validate_marker(
+    ar_content_id: int,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Validate AR marker quality and provide detailed information.
+    
+    Returns validation results including:
+    - Features count
+    - Validation warnings
+    - Marker quality assessment
+    - Recommendations for improvement
+    """
+    try:
+        ar_content = await db.get(ARContent, ar_content_id)
+        if not ar_content:
+            raise HTTPException(status_code=404, detail="AR content not found")
+        
+        if not ar_content.marker_path:
+            raise HTTPException(
+                status_code=400, 
+                detail="Marker not generated yet. Please regenerate media first."
+            )
+        
+        # Validate marker file
+        from app.services.mindar_generator import mindar_generator
+        marker_path = Path(ar_content.marker_path)
+        
+        if not marker_path.exists():
+            raise HTTPException(
+                status_code=404,
+                detail=f"Marker file not found at path: {ar_content.marker_path}"
+            )
+        
+        validation_result = mindar_generator.validate_marker_file(marker_path)
+        
+        # Get marker metadata if available
+        marker_metadata = ar_content.marker_metadata or {}
+        features_count = validation_result.get("features_count", 0) or marker_metadata.get("features_count", 0)
+        
+        # Assess quality
+        quality_assessment = "excellent"
+        recommendations = []
+        
+        if features_count == 0:
+            quality_assessment = "invalid"
+            recommendations.append("Marker has no features - AR tracking will not work")
+            recommendations.append("Check if Node.js and MindAR dependencies are installed")
+            recommendations.append("Try regenerating the marker with a higher quality image")
+        elif features_count < 10:
+            quality_assessment = "poor"
+            recommendations.append(f"Marker has very few features ({features_count}) - tracking will be unreliable")
+            recommendations.append("Use an image with more contrast and detail")
+            recommendations.append("Ensure good lighting when capturing the marker")
+        elif features_count < 50:
+            quality_assessment = "fair"
+            recommendations.append(f"Marker has few features ({features_count}) - tracking quality may be reduced")
+            recommendations.append("Consider using a higher resolution image")
+            recommendations.append("Ensure the image has good contrast and sharp edges")
+        elif features_count < 200:
+            quality_assessment = "good"
+            recommendations.append(f"Marker has {features_count} features - tracking should work well")
+        else:
+            quality_assessment = "excellent"
+            recommendations.append(f"Marker has {features_count} features - excellent tracking quality")
+        
+        # Add warnings to recommendations
+        for warning in validation_result.get("warnings", []):
+            recommendations.append(f"Warning: {warning}")
+        
+        logger.info("marker_validation_requested",
+                   ar_content_id=ar_content_id,
+                   features_count=features_count,
+                   quality=quality_assessment,
+                   is_valid=validation_result.get("is_valid", False))
+        
+        return {
+            "ar_content_id": ar_content_id,
+            "order_number": ar_content.order_number,
+            "marker_url": ar_content.marker_url,
+            "marker_path": ar_content.marker_path,
+            "validation": {
+                "is_valid": validation_result.get("is_valid", False),
+                "features_count": features_count,
+                "descriptors_count": validation_result.get("descriptors_count", 0),
+                "width": validation_result.get("width"),
+                "height": validation_result.get("height"),
+                "image_size": validation_result.get("image_size"),
+                "warnings": validation_result.get("warnings", []),
+                "quality_assessment": quality_assessment
+            },
+            "metadata": marker_metadata,
+            "recommendations": recommendations,
+            "status": "ready" if validation_result.get("is_valid", False) else "needs_attention"
+        }
+        
     except HTTPException:
-        # Re-raise HTTP exceptions (like 404) to be handled properly by FastAPI
         raise
     except Exception as e:
-        # Log unexpected errors
-        logger.error("ar_viewer_error", unique_id=unique_id, error=str(e))
-        raise HTTPException(status_code=500, detail="Internal server error")
+        logger.error("marker_validation_error", 
+                    error=str(e), 
+                    ar_content_id=ar_content_id,
+                    exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to validate marker: {str(e)}"
+        )
 
 
 # Endpoint to get marker file by unique_id

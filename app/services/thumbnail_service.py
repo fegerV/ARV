@@ -42,8 +42,14 @@ class ThumbnailService:
     """Сервис генерации превью изображений и видео"""
 
     def __init__(self):
-        self.thumbnail_size = (320, 240)  # Ширина x Высота
-        self.quality = 85  # Качество JPEG
+        # Multiple thumbnail sizes for different use cases
+        self.thumbnail_sizes = {
+            'small': (150, 112),    # For lists
+            'medium': (320, 240),   # Standard
+            'large': (640, 480),    # For lightbox
+        }
+        self.default_size = 'medium'
+        self.quality = 90  # Higher quality for WebP
 
     async def _save_thumbnail_with_provider(
         self,
@@ -89,10 +95,11 @@ class ThumbnailService:
     async def generate_image_thumbnail(
         self,
         image_path: str,
-        output_dir: Optional[str] = None,
+        storage_path: Path,
         thumbnail_name: Optional[str] = None,
-        provider=None,
-        company_id: Optional[int] = None
+        output_dir: Optional[str] = None,  # Deprecated, kept for compatibility
+        provider=None,  # Deprecated, kept for compatibility
+        company_id: Optional[int] = None,  # Deprecated, kept for compatibility
     ) -> dict:
         """
         Генерация превью для изображения
@@ -114,55 +121,66 @@ class ThumbnailService:
         log.info("image_thumbnail_generation_started")
         
         try:
-            if output_dir is None:
-                output_dir = str(Path(settings.MEDIA_ROOT) / "thumbnails")
-
-            # Определяем имя файла превью
-            if not thumbnail_name:
-                image_filename = Path(image_path).stem
-                thumbnail_name = f"{image_filename}_thumb.webp"
+            # Генерируем превью в разных размерах
+            if not storage_path:
+                raise ValueError("storage_path is required for thumbnail generation")
             
-            # Генерируем превью в памяти
+            storage_path.mkdir(parents=True, exist_ok=True)
+            
+            # Generate thumbnails in all sizes
+            generated_thumbnails = {}
             with Image.open(image_path) as img:
                 # Преобразуем в RGB если нужно (для PNG с прозрачностью)
+                original_mode = img.mode
                 if img.mode in ('RGBA', 'LA', 'P'):
+                    # Create white background for transparent images
+                    background = Image.new('RGB', img.size, (255, 255, 255))
+                    if img.mode == 'P':
+                        img = img.convert('RGBA')
+                    if img.mode == 'RGBA':
+                        background.paste(img, mask=img.split()[-1])
+                    img = background
+                elif img.mode not in ('RGB', 'L'):
                     img = img.convert('RGB')
                 
-                # Создаем превью с сохранением пропорций
-                img.thumbnail(self.thumbnail_size, Image.Resampling.LANCZOS)
-                
-                # Сохраняем превью в байты
-                from io import BytesIO
-                buffer = BytesIO()
-                img.save(buffer, 'WEBP', quality=self.quality, method=6)
-                thumbnail_data = buffer.getvalue()
+                # Generate each size
+                for size_name, size_dimensions in self.thumbnail_sizes.items():
+                    # Create a copy for this size
+                    thumb_img = img.copy()
+                    
+                    # Resize with high quality resampling
+                    thumb_img.thumbnail(size_dimensions, Image.Resampling.LANCZOS)
+                    
+                    # Save to bytes
+                    from io import BytesIO
+                    buffer = BytesIO()
+                    thumb_img.save(buffer, 'WEBP', quality=self.quality, method=6)
+                    thumbnail_data = buffer.getvalue()
+                    
+                    # Save to file
+                    thumbnail_filename = f"thumbnail_{size_name}.webp" if size_name != self.default_size else "thumbnail.webp"
+                    thumbnail_file_path = storage_path / thumbnail_filename
+                    
+                    with open(thumbnail_file_path, 'wb') as f:
+                        f.write(thumbnail_data)
+                    
+                    # Build URL for this thumbnail
+                    from app.utils.ar_content import build_public_url
+                    thumbnail_url = build_public_url(thumbnail_file_path)
+                    generated_thumbnails[size_name] = {
+                        'url': thumbnail_url,
+                        'path': str(thumbnail_file_path),
+                        'size': size_dimensions
+                    }
             
-            # Если предоставлен провайдер, загружаем через него
-            if provider:
-                # Формируем путь в хранилище
-                storage_path = f"thumbnails/{company_id}/{thumbnail_name}" if company_id else f"thumbnails/{thumbnail_name}"
-                thumbnail_url = await self._save_thumbnail_with_provider(
-                    thumbnail_data,
-                    provider,
-                    storage_path,
-                    "image/webp"
-                )
-                thumbnail_path = storage_path
-            else:
-                # Сохраняем локально
-                thumb_dir = Path(output_dir)
-                thumb_dir.mkdir(parents=True, exist_ok=True)
-                output_file = thumb_dir / thumbnail_name
-                
-                with open(output_file, 'wb') as f:
-                    f.write(thumbnail_data)
-                
-                # Проверяем что файл создан
-                if not output_file.exists():
-                    raise FileNotFoundError(f"Thumbnail file not created: {output_file}")
-                
-                thumbnail_path = str(output_file)
-                thumbnail_url = f"/storage/thumbnails/{thumbnail_name}"
+            # Use medium (default) thumbnail as main thumbnail
+            thumbnail_file_path = storage_path / "thumbnail.webp"
+            thumbnail_path = str(thumbnail_file_path)
+            thumbnail_url = generated_thumbnails[self.default_size]['url']
+            
+            # Проверяем что файл создан
+            if not thumbnail_file_path.exists():
+                raise FileNotFoundError(f"Thumbnail file not created: {thumbnail_file_path}")
             
             # Record metrics
             duration = time.time() - start_time
@@ -173,12 +191,14 @@ class ThumbnailService:
                 "image_thumbnail_generation_success",
                 thumbnail_url=thumbnail_url,
                 thumbnail_path=thumbnail_path,
+                sizes_generated=list(generated_thumbnails.keys()),
             )
 
             return {
                 "thumbnail_path": thumbnail_path,
                 "thumbnail_url": thumbnail_url,
                 "status": "ready",
+                "thumbnails": generated_thumbnails,  # All sizes available
             }
 
         except Exception as e:
@@ -271,7 +291,8 @@ class ThumbnailService:
                     img = img.convert('RGB')
                 
                 # Создаем превью с сохранением пропорций
-                img.thumbnail(self.thumbnail_size, Image.Resampling.LANCZOS)
+                # Use medium size for video thumbnails
+                img.thumbnail(self.thumbnail_sizes[self.default_size], Image.Resampling.LANCZOS)
                 
                 # Сохраняем превью в байты
                 from io import BytesIO

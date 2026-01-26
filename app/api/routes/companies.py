@@ -39,6 +39,9 @@ async def list_companies(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
 ):
+    # Validate page_size - only allow 20, 30, 40, 50
+    if page_size not in [20, 30, 40, 50]:
+        page_size = 20
     """List companies with pagination and filtering"""
     import structlog
     logger = structlog.get_logger()
@@ -161,12 +164,48 @@ async def create_company(
     """Create a new company"""
     logger = structlog.get_logger()
     
+    # Prevent creating duplicate default company
+    DEFAULT_COMPANY_NAMES = ["Vertex AR", "VertexAR", "vertex-ar", "vertexar"]
+    company_name_normalized = company_data.name.strip()
+    
+    # Check if trying to create default company
+    if any(company_name_normalized.lower() == default_name.lower() for default_name in DEFAULT_COMPANY_NAMES):
+        # Check if default company already exists
+        existing_default = await db.execute(
+            select(Company).where(
+                func.lower(Company.name).in_([name.lower() for name in DEFAULT_COMPANY_NAMES])
+            )
+        )
+        if existing_default.scalar_one_or_none():
+            raise HTTPException(
+                status_code=400,
+                detail="Default company 'Vertex AR' already exists. You cannot create duplicate default companies."
+            )
+    
+    # Check for duplicate name (case-insensitive)
+    existing_company = await db.execute(
+        select(Company).where(func.lower(Company.name) == company_name_normalized.lower())
+    )
+    if existing_company.scalar_one_or_none():
+        raise HTTPException(
+            status_code=400,
+            detail=f"Company with name '{company_data.name}' already exists"
+        )
+    
     # Generate slug from company name
     slug = generate_slug(company_data.name)
     
+    # Check for duplicate slug
+    existing_slug = await db.execute(select(Company).where(Company.slug == slug))
+    if existing_slug.scalar_one_or_none():
+        raise HTTPException(
+            status_code=400,
+            detail=f"Company with slug '{slug}' already exists"
+        )
+    
     # Create company
     company = Company(
-        name=company_data.name,
+        name=company_name_normalized,
         slug=slug,
         contact_email=company_data.contact_email,
         status=company_data.status

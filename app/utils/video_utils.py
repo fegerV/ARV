@@ -78,6 +78,24 @@ async def get_video_metadata(file_path: str) -> Dict[str, Any]:
     """
     log = logger.bind(file_path=file_path)
     
+    def _parse_fps(value: Optional[str]) -> float:
+        if not value:
+            return 0.0
+        parts = value.split("/")
+        if len(parts) == 2:
+            try:
+                numerator = float(parts[0])
+                denominator = float(parts[1])
+                if denominator == 0:
+                    return 0.0
+                return numerator / denominator
+            except ValueError:
+                return 0.0
+        try:
+            return float(value)
+        except ValueError:
+            return 0.0
+
     try:
         # Run ffprobe to get video information
         cmd = [
@@ -89,11 +107,25 @@ async def get_video_metadata(file_path: str) -> Dict[str, Any]:
             file_path
         ]
         
-        process = await asyncio.create_subprocess_exec(
-            *cmd,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
-        )
+        try:
+            process = await asyncio.create_subprocess_exec(
+                *cmd,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+            )
+        except FileNotFoundError as exc:
+            file_size = Path(file_path).stat().st_size
+            log.warning("ffprobe_missing", error=str(exc))
+            return {
+                "duration": 0.0,
+                "width": 0,
+                "height": 0,
+                "size_bytes": file_size,
+                "mime_type": "unknown",
+                "codec": "unknown",
+                "fps": 0.0,
+                "bit_rate": 0,
+            }
         
         stdout, stderr = await process.communicate()
         
@@ -129,7 +161,7 @@ async def get_video_metadata(file_path: str) -> Dict[str, Any]:
             "size_bytes": file_size,
             "mime_type": format_info.get("format_name", "unknown"),
             "codec": video_stream.get("codec_name", "unknown"),
-            "fps": eval(video_stream.get("r_frame_rate", "0/1")) if video_stream.get("r_frame_rate") else 0,
+            "fps": _parse_fps(video_stream.get("r_frame_rate")),
             "bit_rate": int(format_info.get("bit_rate", 0)),
         }
         
@@ -191,25 +223,31 @@ async def save_uploaded_video(upload_file: UploadFile, destination_path: Path) -
     total_size = 0
     
     try:
-        async with destination_path.open("wb") as f:
+        with destination_path.open("wb") as f:
             while chunk := await upload_file.read(1024 * 1024):  # 1MB chunks
                 total_size += len(chunk)
                 if total_size > MAX_VIDEO_SIZE:
-                    # Clean up partial file
-                    await f.close()
                     if destination_path.exists():
                         destination_path.unlink()
+                    logger.error(
+                        "video_upload_too_large",
+                        max_size_mb=MAX_VIDEO_SIZE // (1024 * 1024),
+                        size_bytes=total_size,
+                        path=str(destination_path),
+                    )
                     raise HTTPException(
                         status_code=413,
                         detail=f"Video file too large. Maximum size: {MAX_VIDEO_SIZE // (1024*1024)}MB"
                     )
-                await f.write(chunk)
-                
-    except Exception as e:
+                f.write(chunk)
+    except HTTPException:
+        raise
+    except Exception as exc:
         # Clean up partial file on error
         if destination_path.exists():
             destination_path.unlink()
-        raise HTTPException(status_code=500, detail=f"Failed to save video file: {str(e)}")
+        logger.error("video_save_failed", error=str(exc), path=str(destination_path))
+        raise HTTPException(status_code=500, detail=f"Failed to save video file: {str(exc)}")
 
 
 def generate_video_filename(original_filename: str, video_id: Optional[int] = None) -> str:

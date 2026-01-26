@@ -1157,16 +1157,17 @@ video_id: int (required) - ID of the video
 #### Parameters (Body)
 ```json
 {
-  "rotation_type": "string (required) - Rotation type (DAILY, WEEKLY, MONTHLY, CUSTOM)"
+  "rotation_type": "string (required) - Rotation type (none, sequential, cyclic)"
 }
 ```
 
 #### Response (Success)
 ```json
 {
-  "message": "string - Success message",
-  "video_id": "int - Video ID",
-  "rotation_type": "string - New rotation type"
+  "status": "updated",
+  "rotation_type": "string - New rotation type",
+  "rotation_state": "int - Current rotation state (reset to 0)",
+  "message": "string - Success message"
 }
 ```
 
@@ -1176,9 +1177,91 @@ curl -X PATCH "http://localhost:8000/api/ar-content/1/videos/2/rotation" \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer YOUR_ACCESS_TOKEN" \
   -d '{
-    "rotation_type": "DAILY"
+    "rotation_type": "cyclic"
   }'
 ```
+
+### Update Playback Mode
+- **Method**: `PATCH`
+- **URL**: `/api/videos/ar-content/{content_id}/playback-mode`
+- **Description**: Switch playback mode between manual and automatic rotation (sequential/cyclic)
+- **Auth Required**: Yes
+
+#### Path Parameters
+```
+content_id: int (required) - ID of the AR content
+```
+
+#### Parameters (Body)
+
+For manual mode:
+```json
+{
+  "mode": "manual",
+  "active_video_id": "int (required) - ID of the video to set as active"
+}
+```
+
+For automatic modes (sequential/cyclic):
+```json
+{
+  "mode": "sequential" | "cyclic",
+  "active_video_ids": "array of ints (required) - IDs of videos to include in rotation"
+}
+```
+
+#### Response (Success)
+```json
+{
+  "status": "updated",
+  "mode": "string - Playback mode (manual, sequential, cyclic)",
+  "active_video_id": "int | null - Active video ID (for manual mode)",
+  "active_video_ids": "array of ints - Active video IDs (for automatic modes)"
+}
+```
+
+#### Examples
+
+Manual mode:
+```curl
+curl -X PATCH "http://localhost:8000/api/videos/ar-content/1/playback-mode" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer YOUR_ACCESS_TOKEN" \
+  -d '{
+    "mode": "manual",
+    "active_video_id": 2
+  }'
+```
+
+Sequential mode:
+```curl
+curl -X PATCH "http://localhost:8000/api/videos/ar-content/1/playback-mode" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer YOUR_ACCESS_TOKEN" \
+  -d '{
+    "mode": "sequential",
+    "active_video_ids": [1, 2, 3]
+  }'
+```
+
+Cyclic mode:
+```curl
+curl -X PATCH "http://localhost:8000/api/videos/ar-content/1/playback-mode" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer YOUR_ACCESS_TOKEN" \
+  -d '{
+    "mode": "cyclic",
+    "active_video_ids": [1, 2, 3]
+  }'
+```
+
+#### Playback Modes Description
+
+- **manual**: One fixed video. User selects the active video manually. No automatic rotation.
+- **sequential**: Videos switch sequentially (1→2→3→...→last). Stops at the last video. Rotation state increments after each video ends.
+- **cyclic**: Videos switch cyclically (1→2→3→...→1→2→...). Wraps around after the last video. Rotation state increments and wraps around.
+
+**Note**: In AR viewer, videos automatically switch to the next one after the current video ends (based on `rotation_state`). The rotation state is updated each time the viewer requests the active video.
 
 ### List Video Schedules
 - **Method**: `GET`
@@ -2318,7 +2401,7 @@ curl -X GET "http://localhost:8000/api/public/ar-content/unique-id"
 ### Get Viewer Active Video
 - **Method**: `GET`
 - **URL**: `/api/viewer/{ar_content_id}/active-video`
-- **Description**: Get the active video for AR content viewer
+- **Description**: Get the active video for AR content viewer with metadata. Implements video selection logic with priority: scheduled videos → active video → rotation-based selection → fallback. For sequential/cyclic rotation modes, automatically updates rotation state after each request.
 - **Auth Required**: No
 
 #### Path Parameters
@@ -2329,12 +2412,23 @@ ar_content_id: int (required) - ID of the AR content
 #### Response (Success)
 ```json
 {
-  "video_id": "int - Active video ID",
-  "filename": "string - Video filename",
-  "url": "string - Video URL",
+  "id": "int - Video ID",
+  "title": "string - Video title",
+  "video_url": "string - Video URL",
+  "preview_url": "string - Preview URL",
+  "thumbnail_url": "string - Thumbnail URL",
   "duration": "int - Video duration in seconds",
-  "size": "int - File size in bytes",
-  "video_status": "string - Processing status"
+  "width": "int - Video width in pixels",
+  "height": "int - Video height in pixels",
+  "mime_type": "string - Video MIME type",
+  "selection_source": "string - Selection source (schedule, active_default, rotation, fallback)",
+  "schedule_id": "int | null - Schedule ID if selected via schedule",
+  "expires_in_days": "int | null - Days until subscription expires",
+  "is_active": "bool - Whether video is marked as active",
+  "rotation_type": "string - Rotation type (none, sequential, cyclic)",
+  "subscription_end": "datetime | null - Subscription end date",
+  "selected_at": "datetime - Timestamp when video was selected",
+  "video_created_at": "datetime | null - Video creation timestamp"
 }
 ```
 
@@ -2343,10 +2437,12 @@ ar_content_id: int (required) - ID of the AR content
 curl -X GET "http://localhost:8000/api/viewer/1/active-video"
 ```
 
+**Note**: For sequential/cyclic rotation modes, the rotation state is automatically incremented after each request, ensuring the next video is selected on subsequent calls.
+
 ### Get Viewer Active Video by Unique ID
 - **Method**: `GET`
-- **URL**: `/api/viewer/ar/{unique_id}/active-video`
-- **Description**: Get the active video for AR content viewer by unique ID
+- **URL**: `/api/ar/{unique_id}/active-video`
+- **Description**: Get the active video for AR content viewer by unique ID. Same functionality as above, but uses unique_id instead of numeric ID.
 - **Auth Required**: No
 
 #### Path Parameters
@@ -2357,18 +2453,29 @@ unique_id: string (required) - Unique identifier for AR content
 #### Response (Success)
 ```json
 {
-  "video_id": "int - Active video ID",
-  "filename": "string - Video filename",
-  "url": "string - Video URL",
+  "id": "int - Video ID",
+  "title": "string - Video title",
+  "video_url": "string - Video URL",
+  "preview_url": "string - Preview URL",
+  "thumbnail_url": "string - Thumbnail URL",
   "duration": "int - Video duration in seconds",
-  "size": "int - File size in bytes",
-  "video_status": "string - Processing status"
+  "width": "int - Video width in pixels",
+  "height": "int - Video height in pixels",
+  "mime_type": "string - Video MIME type",
+  "selection_source": "string - Selection source (schedule, active_default, rotation, fallback)",
+  "schedule_id": "int | null - Schedule ID if selected via schedule",
+  "expires_in_days": "int | null - Days until subscription expires",
+  "is_active": "bool - Whether video is marked as active",
+  "rotation_type": "string - Rotation type (none, sequential, cyclic)",
+  "subscription_end": "datetime | null - Subscription end date",
+  "selected_at": "datetime - Timestamp when video was selected",
+  "video_created_at": "datetime | null - Video creation timestamp"
 }
 ```
 
 #### Examples
 ```curl
-curl -X GET "http://localhost:8000/api/viewer/ar/unique-id/active-video"
+curl -X GET "http://localhost:8000/api/ar/unique-id/active-video"
 ```
 
 ---

@@ -11,24 +11,134 @@ import re
 
 from app.core.config import settings
 from app.core.storage import get_storage_provider_instance
+from app.utils.slug_utils import generate_slug
 
 
-def build_ar_content_storage_path(company_id: int, project_id: int, unique_id: str) -> Path:
-    """Build the storage path for AR content following the new hierarchy.
+def sanitize_filename(name: str, max_length: int = 100) -> str:
+    """Convert name to filesystem-safe slug.
     
     Args:
-        company_id: The company ID
-        project_id: The project ID  
-        unique_id: The unique UUID for the AR content
+        name: Original name to sanitize
+        max_length: Maximum length of the resulting slug
+        
+    Returns:
+        Sanitized filename-safe string
+    """
+    if not name:
+        return "unnamed"
+    
+    # Replace spaces with underscores
+    name = name.replace(' ', '_')
+    
+    # Remove or replace problematic characters for Windows/Linux filesystems
+    # Windows: < > : " / \ | ? *
+    # Linux: / (and null byte, but we handle that separately)
+    name = re.sub(r'[<>:"/\\|?*\x00]', '', name)
+    
+    # Remove multiple underscores and dots
+    name = re.sub(r'[_.]+', '_', name)
+    
+    # Remove leading/trailing dots and underscores
+    name = name.strip('._')
+    
+    # Limit length
+    if len(name) > max_length:
+        name = name[:max_length]
+    
+    # If empty after sanitization, use default
+    if not name:
+        return "unnamed"
+    
+    return name
+
+
+def build_ar_content_storage_path(
+    company_id: int, 
+    project_id: int, 
+    order_number: str,
+    company_name: Optional[str] = None,
+    project_name: Optional[str] = None
+) -> Path:
+    """Build the storage path for AR content.
+    
+    Structure: {STORAGE_BASE_PATH}/VertexAR/{project_slug}/{order_number}
+    
+    Uses transliterated slug for project name to avoid Cyrillic issues in file paths.
+    
+    Args:
+        company_id: The company ID (not used in path)
+        project_id: The project ID
+        order_number: The order number for the AR content
+        company_name: Optional company name (not used in path)
+        project_name: Optional project name (will be transliterated and sanitized)
         
     Returns:
         Path object for the AR content storage directory
     """
-    return (
-        Path(settings.STORAGE_BASE_PATH) /
-        "companies" / str(company_id) /
-        "projects" / str(project_id) /
-        "ar-content" / str(unique_id)
+    # Base path
+    base_path = Path(settings.STORAGE_BASE_PATH) / "VertexAR"
+    
+    # Build project folder: use transliterated slug instead of raw name
+    if project_name:
+        # Use generate_slug which includes transliteration for Cyrillic
+        project_folder = generate_slug(project_name)
+        # Fallback to sanitize_filename if slug is empty
+        if not project_folder:
+            project_folder = sanitize_filename(project_name)
+    else:
+        project_folder = f"Project_{project_id}"
+    
+    # Build order folder: {order_number}
+    order_folder = sanitize_filename(order_number, max_length=50)
+    
+    return base_path / project_folder / order_folder
+
+
+async def get_ar_content_storage_path(ar_content, db = None) -> Path:
+    """Get storage path for AR content.
+    
+    Builds path using company and project names.
+    
+    Args:
+        ar_content: ARContent model instance
+        db: Optional database session to load relations if needed
+        
+    Returns:
+        Path object for the AR content storage directory
+    """
+    # Build new path using company and project names
+    company_name = None
+    project_name = None
+    
+    # Try to get names from loaded relations
+    if hasattr(ar_content, 'company') and ar_content.company:
+        company_name = ar_content.company.name
+    if hasattr(ar_content, 'project') and ar_content.project:
+        project_name = ar_content.project.name
+    
+    # If relations not loaded and db provided, load them
+    if db and (not company_name or not project_name):
+        from sqlalchemy.orm import selectinload
+        from sqlalchemy import select
+        from app.models.ar_content import ARContent
+        stmt = select(ARContent).options(
+            selectinload(ARContent.company),
+            selectinload(ARContent.project)
+        ).where(ARContent.id == ar_content.id)
+        result = await db.execute(stmt)
+        ar_content_loaded = result.scalar_one()
+        if not company_name and ar_content_loaded.company:
+            company_name = ar_content_loaded.company.name
+        if not project_name and ar_content_loaded.project:
+            project_name = ar_content_loaded.project.name
+    
+    # Build new path
+    return build_ar_content_storage_path(
+        company_id=ar_content.company_id,
+        project_id=ar_content.project_id,
+        order_number=ar_content.order_number,
+        company_name=company_name,
+        project_name=project_name
     )
 
 
@@ -44,12 +154,22 @@ def build_public_url(storage_path: Path) -> str:
     storage_provider = get_storage_provider_instance()
     
     # Convert absolute path to relative path
-    base_path = Path(settings.LOCAL_STORAGE_PATH)
+    base_path = Path(settings.STORAGE_BASE_PATH)
+    
     try:
         relative_path = storage_path.relative_to(base_path)
-        return storage_provider.get_public_url(str(relative_path))
+        relative_path_str = str(relative_path).replace('\\', '/')
+        return storage_provider.get_public_url(relative_path_str)
     except ValueError:
-        # If path is not under base_path, fall back to simple URL building
+        # If path is not under base_path, extract relative path from VertexAR
+        path_str = str(storage_path).replace('\\', '/')
+        if 'VertexAR' in path_str:
+            vertexar_index = path_str.find('VertexAR')
+            relative_path_str = path_str[vertexar_index:]
+            relative_path_str = relative_path_str.replace('\\', '/')
+            return storage_provider.get_public_url(relative_path_str)
+        
+        # Fallback: use just the filename
         return f"/storage/{storage_path.name}"
 
 

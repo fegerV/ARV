@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Request, Depends
+from fastapi import APIRouter, Request, Depends, HTTPException
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
@@ -55,6 +55,10 @@ async def companies_list(
     page_size = int(request.query_params.get('page_size', 20))
     search = request.query_params.get('search', '')
     status_filter = request.query_params.get('status', '')
+    
+    # Validate page_size - only allow 20, 30, 40, 50
+    if page_size not in [20, 30, 40, 50]:
+        page_size = 20
     
     try:
         # Get companies with filters
@@ -256,9 +260,9 @@ async def company_delete(
     
     try:
         # Delete company via API
-        from app.api.routes.companies import delete_company_general
+        from app.api.routes.companies import delete_company
         
-        await delete_company_general(
+        await delete_company(
             company_id=int(company_id),
             db=db,
             current_user=current_user
@@ -267,10 +271,39 @@ async def company_delete(
         # Return success response
         return JSONResponse(content={"status": "deleted"}, status_code=200)
         
+    except HTTPException as e:
+        logger.error("company_delete_error", company_id=company_id, error=str(e.detail), status_code=e.status_code)
+        # Return error response with proper status code
+        error_message = e.detail or "Failed to delete company"
+        return JSONResponse(
+            content={"error": error_message, "detail": error_message}, 
+            status_code=e.status_code
+        )
     except Exception as e:
         logger.error("company_delete_error", company_id=company_id, error=str(e), exc_info=True)
-        # Return error response
-        return JSONResponse(content={"error": f"Failed to delete company: {str(e)}"}, status_code=400)
+        error_message = str(e)
+        status_code = 500
+        
+        # Extract more detailed error message if available
+        if hasattr(e, 'detail'):
+            error_message = e.detail
+            if hasattr(e, 'status_code'):
+                status_code = e.status_code
+        elif hasattr(e, 'args') and len(e.args) > 0:
+            error_message = str(e.args[0])
+        
+        # Check for specific error types
+        if "not found" in error_message.lower() or "404" in str(e):
+            status_code = 404
+        elif "unauthorized" in error_message.lower() or "401" in str(e):
+            status_code = 401
+        elif "cannot delete" in error_message.lower() or "400" in str(e):
+            status_code = 400
+        
+        return JSONResponse(
+            content={"error": f"Failed to delete company: {error_message}"}, 
+            status_code=status_code
+        )
 
 @router.post("/companies/{company_id}", response_class=HTMLResponse)
 async def company_update_post(

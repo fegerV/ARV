@@ -43,9 +43,29 @@
     <!-- CSRF Token and htmx configuration -->
     <meta name="csrf-token" content="{{ csrf_token }}">
     <script>
-      document.body.addEventListener('htmx:configRequest', (event) => {
-        event.detail.headers['X-CSRF-Token'] = document.querySelector('meta[name="csrf-token"]').content;
-      })
+      // Wait for DOM to be ready before adding event listener
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', function() {
+          if (document.body) {
+            document.body.addEventListener('htmx:configRequest', (event) => {
+              const csrfToken = document.querySelector('meta[name="csrf-token"]');
+              if (csrfToken) {
+                event.detail.headers['X-CSRF-Token'] = csrfToken.content;
+              }
+            });
+          }
+        });
+      } else {
+        // DOM is already loaded
+        if (document.body) {
+          document.body.addEventListener('htmx:configRequest', (event) => {
+            const csrfToken = document.querySelector('meta[name="csrf-token"]');
+            if (csrfToken) {
+              event.detail.headers['X-CSRF-Token'] = csrfToken.content;
+            }
+          });
+        }
+      }
     </script>
     
     <style>
@@ -470,13 +490,25 @@
                 </div>
             `;
             
-            document.getElementById('toast-container').appendChild(toast);
+            // Try to find toast-container, if not exists, create it or append to body
+            let container = document.getElementById('toast-container');
+            if (!container) {
+                container = document.createElement('div');
+                container.id = 'toast-container';
+                container.className = 'fixed bottom-4 right-4 z-50 space-y-2';
+                document.body.appendChild(container);
+            }
+            
+            container.appendChild(toast);
             
             // Auto remove after 5 seconds
             setTimeout(() => {
                 removeToast(toastId);
             }, 5000);
         }
+        
+        // Make showToast available globally
+        window.showToast = showToast;
         
         function removeToast(toastId) {
             const toast = document.getElementById(toastId);

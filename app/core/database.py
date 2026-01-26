@@ -133,7 +133,8 @@ async def seed_defaults() -> None:
         res_storage = await session.execute(select(StorageConnection).where(StorageConnection.name == "Local Storage"))
         default_storage = res_storage.scalar_one_or_none()
         if not default_storage:
-            storage_path = Path("/tmp/storage/content")
+            # Use STORAGE_BASE_PATH from settings (without /content/)
+            storage_path = Path(settings.STORAGE_BASE_PATH)
             storage_path.mkdir(parents=True, exist_ok=True)
             
             default_storage = StorageConnection(
@@ -148,13 +149,23 @@ async def seed_defaults() -> None:
             
             logger.info("local_storage_structure_created", base_path=str(storage_path))
 
-        # Default company
-        res_company = await session.execute(select(Company).where(Company.name == "Vertex AR"))
+        # Default company - check by name and slug to prevent duplicates
+        from sqlalchemy import func
+        DEFAULT_COMPANY_NAMES = ["Vertex AR", "VertexAR", "vertex-ar", "vertexar"]
+        
+        # Check if default company exists (by name or slug)
+        res_company = await session.execute(
+            select(Company).where(
+                (func.lower(Company.name).in_([name.lower() for name in DEFAULT_COMPANY_NAMES])) |
+                (Company.slug == "vertex-ar")
+            )
+        )
         default_company = res_company.scalar_one_or_none()
+        
         if not default_company:
             default_company = Company(
                 name="Vertex AR",
-                slug="vertex-ar",  # Добавляем slug
+                slug="vertex-ar",
                 contact_email=settings.ADMIN_EMAIL,
                 status=CompanyStatus.ACTIVE
             )
@@ -164,9 +175,11 @@ async def seed_defaults() -> None:
             logger.info("default_company_created", company_id=default_company.id)
         else:
             # Update the existing company if needed
+            default_company.name = "Vertex AR"  # Ensure correct name
             default_company.slug = "vertex-ar"
             default_company.contact_email = settings.ADMIN_EMAIL
             default_company.status = CompanyStatus.ACTIVE
+            logger.info("default_company_updated", company_id=default_company.id)
 
         await session.commit()
         logger.info("defaults_seeded")

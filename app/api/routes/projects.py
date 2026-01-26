@@ -130,6 +130,10 @@ async def list_projects(
    current_user: User = Depends(get_current_active_user)
 ):
    """List projects with pagination and filtering"""
+   # Validate page_size - only allow 20, 30, 40, 50
+   if page_size not in [20, 30, 40, 50]:
+       page_size = 20
+   
    logger = structlog.get_logger()
    
    # Build base query
@@ -391,7 +395,7 @@ async def delete_project_general(
        )
    
    # Delete project
-   db.delete(project)
+   await db.delete(project)
    await db.commit()
    
    logger.info("project_deleted", project_id=project_id, name=project.name)
@@ -550,7 +554,7 @@ async def delete_project(
         )
     
     # Delete project
-    db.delete(project)
+    await db.delete(project)
     await db.commit()
     
     logger.info("project_deleted", project_id=project_id, name=project.name)

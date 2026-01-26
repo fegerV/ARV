@@ -7,6 +7,7 @@ import structlog
 from app.models.user import User
 from app.models.ar_content import ARContent
 from app.models.company import Company
+from app.models.project import Project
 from app.api.routes.projects import list_projects, get_project
 from app.html.deps import get_html_db
 from app.api.routes.auth import get_current_user_optional
@@ -59,6 +60,10 @@ async def projects_list(
     page_size = int(request.query_params.get("page_size", 20))
     company_filter = request.query_params.get("company", "")
     status_filter = request.query_params.get("status", "")
+    
+    # Validate page_size - only allow 20, 30, 40, 50
+    if page_size not in [20, 30, 40, 50]:
+        page_size = 20
     
     # Convert filters to appropriate types
     company_id_filter = int(company_filter) if company_filter and company_filter.isdigit() else None
@@ -145,12 +150,27 @@ async def project_create(
         return RedirectResponse(url="/admin/login", status_code=303)
     
     try:
-        from app.api.routes.companies import list_companies
-        companies_result = await list_companies(page=1, page_size=100, db=db, current_user=current_user)
+        # Query companies directly from database to avoid dependency issues
+        companies_query = select(Company).order_by(Company.created_at.desc())
+        companies_result = await db.execute(companies_query)
+        companies_db = companies_result.scalars().all()
+        
         companies = []
-        for item in companies_result.items:
-            company_dict = _pydantic_to_dict(item)
-            companies.append(company_dict)
+        for company in companies_db:
+            # Count projects for each company
+            projects_count_query = select(func.count()).select_from(Project).where(Project.company_id == company.id)
+            projects_count_result = await db.execute(projects_count_query)
+            projects_count = projects_count_result.scalar()
+            
+            companies.append({
+                "id": company.id,
+                "name": company.name,
+                "contact_email": company.contact_email,
+                "status": company.status,
+                "projects_count": projects_count,
+                "created_at": company.created_at.isoformat() if company.created_at and hasattr(company.created_at, "isoformat") else company.created_at,
+                "updated_at": company.updated_at.isoformat() if company.updated_at and hasattr(company.updated_at, "isoformat") else company.updated_at
+            })
     except Exception as e:
         logger.error("companies_fetch_error", error=str(e), exc_info=True)
         try:
@@ -163,12 +183,24 @@ async def project_create(
                     "name": company.name,
                     "contact_email": company.contact_email,
                     "status": company.status,
-                    "created_at": company.created_at,
-                    "updated_at": company.updated_at
+                    "created_at": company.created_at.isoformat() if company.created_at and hasattr(company.created_at, "isoformat") else company.created_at,
+                    "updated_at": company.updated_at.isoformat() if company.updated_at and hasattr(company.updated_at, "isoformat") else company.updated_at
                 })
         except Exception as db_error:
             logger.error("companies_db_error", error=str(db_error), exc_info=True)
-            companies = PROJECT_CREATE_MOCK_DATA["companies"]
+            companies = PROJECT_CREATE_MOCK_DATA.get("companies", [])
+    
+    # Ensure companies is a list
+    if not isinstance(companies, list):
+        companies = []
+    
+    # Convert any datetime objects in companies to strings
+    for company in companies:
+        if isinstance(company, dict):
+            if "created_at" in company and hasattr(company["created_at"], "isoformat"):
+                company["created_at"] = company["created_at"].isoformat()
+            if "updated_at" in company and hasattr(company.get("updated_at"), "isoformat"):
+                company["updated_at"] = company["updated_at"].isoformat()
     
     context = {
         "request": request,
@@ -203,7 +235,14 @@ async def project_detail(
     # Get companies for edit form
     try:
         from app.api.routes.companies import list_companies
-        companies_result = await list_companies(page=1, page_size=100, db=db, current_user=current_user)
+        companies_result = await list_companies(
+            page=1,
+            page_size=100,
+            search=None,
+            status=None,
+            db=db,
+            current_user=current_user
+        )
         companies = [_pydantic_to_dict(item) for item in companies_result.items]
     except Exception as e:
         logger.error("companies_fetch_error", error=str(e))
@@ -217,8 +256,8 @@ async def project_detail(
                     "name": company.name,
                     "contact_email": company.contact_email,
                     "status": company.status,
-                    "created_at": company.created_at,
-                    "updated_at": company.updated_at
+                    "created_at": company.created_at.isoformat() if company.created_at and hasattr(company.created_at, "isoformat") else company.created_at,
+                    "updated_at": company.updated_at.isoformat() if company.updated_at and hasattr(company.updated_at, "isoformat") else company.updated_at
                 })
         except Exception as db_error:
             logger.error("companies_db_error", error=str(db_error))
@@ -257,7 +296,14 @@ async def project_edit(
     # Get companies for edit form
     try:
         from app.api.routes.companies import list_companies
-        companies_result = await list_companies(page=1, page_size=100, db=db, current_user=current_user)
+        companies_result = await list_companies(
+            page=1,
+            page_size=100,
+            search=None,
+            status=None,
+            db=db,
+            current_user=current_user
+        )
         companies = [_pydantic_to_dict(item) for item in companies_result.items]
     except Exception as e:
         logger.error("companies_fetch_error", error=str(e))
@@ -271,8 +317,8 @@ async def project_edit(
                     "name": company.name,
                     "contact_email": company.contact_email,
                     "status": company.status,
-                    "created_at": company.created_at,
-                    "updated_at": company.updated_at
+                    "created_at": company.created_at.isoformat() if company.created_at and hasattr(company.created_at, "isoformat") else company.created_at,
+                    "updated_at": company.updated_at.isoformat() if company.updated_at and hasattr(company.updated_at, "isoformat") else company.updated_at
                 })
         except Exception as db_error:
             logger.error("companies_db_error", error=str(db_error))
@@ -306,14 +352,25 @@ async def project_create_post(
     name = form_data.get("name", "").strip()
     company_id = form_data.get("company_id")
     status = form_data.get("status", "active")
-    description = form_data.get("description", "").strip()
     
     if not name or not company_id:
         # If validation fails, return to form with error
         try:
-            from app.api.routes.companies import list_companies
-            companies_result = await list_companies(page=1, page_size=100, db=db, current_user=current_user)
-            companies = [_pydantic_to_dict(item) for item in companies_result.items]
+            # Query companies directly from database
+            companies_query = select(Company).order_by(Company.created_at.desc())
+            companies_result = await db.execute(companies_query)
+            companies_db = companies_result.scalars().all()
+            
+            companies = []
+            for company in companies_db:
+                companies.append({
+                    "id": company.id,
+                    "name": company.name,
+                    "contact_email": company.contact_email,
+                    "status": company.status,
+                    "created_at": company.created_at.isoformat() if company.created_at and hasattr(company.created_at, "isoformat") else company.created_at,
+                    "updated_at": company.updated_at.isoformat() if company.updated_at and hasattr(company.updated_at, "isoformat") else company.updated_at
+                })
         except Exception:
             companies = PROJECT_CREATE_MOCK_DATA["companies"]
         
@@ -326,22 +383,35 @@ async def project_create_post(
         return templates.TemplateResponse("projects/form.html", context)
     
     try:
-        # Create project via API
-        from app.api.routes.projects import create_project_general
-        from app.schemas.project_api import ProjectCreate
+        # Create project directly in database to avoid dependency issues
+        from app.enums import ProjectStatus
         
-        project_create_data = ProjectCreate(
-            name=name,
+        # Convert status string to ProjectStatus enum if needed
+        project_status = ProjectStatus.ACTIVE
+        if status:
+            try:
+                project_status = ProjectStatus(status)
+            except (ValueError, KeyError):
+                project_status = ProjectStatus.ACTIVE
+        
+        # Validate company exists
+        company = await db.get(Company, int(company_id))
+        if not company:
+            raise ValueError("Company not found")
+        
+        # Create project
+        # ProjectStatus is str, Enum, so .value is always available
+        project = Project(
             company_id=int(company_id),
-            status=status,
-            description=description
+            name=name,
+            status=project_status.value
         )
         
-        created_project = await create_project_general(
-            project_data=project_create_data,
-            db=db,
-            current_user=current_user
-        )
+        db.add(project)
+        await db.commit()
+        await db.refresh(project)
+        
+        logger.info("project_created", project_id=project.id, company_id=int(company_id), name=name)
         
         # Redirect to projects list after successful creation
         return RedirectResponse(url="/projects", status_code=303)
@@ -350,9 +420,21 @@ async def project_create_post(
         logger.error("project_create_error", error=str(e), exc_info=True)
         # If creation fails, return to form with error
         try:
-            from app.api.routes.companies import list_companies
-            companies_result = await list_companies(page=1, page_size=100, db=db, current_user=current_user)
-            companies = [_pydantic_to_dict(item) for item in companies_result.items]
+            # Query companies directly from database
+            companies_query = select(Company).order_by(Company.created_at.desc())
+            companies_result = await db.execute(companies_query)
+            companies_db = companies_result.scalars().all()
+            
+            companies = []
+            for company in companies_db:
+                companies.append({
+                    "id": company.id,
+                    "name": company.name,
+                    "contact_email": company.contact_email,
+                    "status": company.status,
+                    "created_at": company.created_at.isoformat() if company.created_at and hasattr(company.created_at, "isoformat") else company.created_at,
+                    "updated_at": company.updated_at.isoformat() if company.updated_at and hasattr(company.updated_at, "isoformat") else company.updated_at
+                })
         except Exception:
             companies = PROJECT_CREATE_MOCK_DATA["companies"]
         
@@ -385,14 +467,25 @@ async def project_update_post(
     name = form_data.get("name", "").strip()
     company_id = form_data.get("company_id")
     status = form_data.get("status", "active")
-    description = form_data.get("description", "").strip()
     
     if not name or not company_id:
         # If validation fails, return to form with error
         try:
-            from app.api.routes.companies import list_companies
-            companies_result = await list_companies(page=1, page_size=100, db=db, current_user=current_user)
-            companies = [_pydantic_to_dict(item) for item in companies_result.items]
+            # Query companies directly from database
+            companies_query = select(Company).order_by(Company.created_at.desc())
+            companies_result = await db.execute(companies_query)
+            companies_db = companies_result.scalars().all()
+            
+            companies = []
+            for company in companies_db:
+                companies.append({
+                    "id": company.id,
+                    "name": company.name,
+                    "contact_email": company.contact_email,
+                    "status": company.status,
+                    "created_at": company.created_at.isoformat() if company.created_at and hasattr(company.created_at, "isoformat") else company.created_at,
+                    "updated_at": company.updated_at.isoformat() if company.updated_at and hasattr(company.updated_at, "isoformat") else company.updated_at
+                })
         except Exception:
             companies = PROJECT_CREATE_MOCK_DATA["companies"]
         
@@ -410,11 +503,18 @@ async def project_update_post(
         from app.api.routes.projects import update_project_general
         from app.schemas.project_api import ProjectUpdate
         
+        # Convert status string to ProjectStatus enum if needed
+        from app.enums import ProjectStatus
+        project_status = None
+        if status:
+            try:
+                project_status = ProjectStatus(status)
+            except (ValueError, KeyError):
+                project_status = None
+        
         project_update_data = ProjectUpdate(
-            name=name,
-            company_id=int(company_id),
-            status=status,
-            description=description
+            name=name if name else None,
+            status=project_status
         )
         
         updated_project = await update_project_general(
@@ -432,7 +532,14 @@ async def project_update_post(
         # If update fails, return to form with error
         try:
             from app.api.routes.companies import list_companies
-            companies_result = await list_companies(page=1, page_size=100, db=db, current_user=current_user)
+            companies_result = await list_companies(
+                page=1,
+                page_size=100,
+                search=None,
+                status=None,
+                db=db,
+                current_user=current_user
+            )
             companies = [_pydantic_to_dict(item) for item in companies_result.items]
         except Exception:
             companies = PROJECT_CREATE_MOCK_DATA["companies"]
@@ -463,6 +570,7 @@ async def project_delete(
     try:
         # Delete project via API
         from app.api.routes.projects import delete_project_general
+        from fastapi import HTTPException
         
         await delete_project_general(
             project_id=int(project_id),
@@ -470,10 +578,41 @@ async def project_delete(
             current_user=current_user
         )
         
+        logger.info("project_deleted", project_id=project_id)
         # Return success response for JavaScript
         return JSONResponse(content={"status": "deleted"}, status_code=200)
         
+    except HTTPException as e:
+        logger.error("project_delete_error", project_id=project_id, error=str(e.detail), status_code=e.status_code)
+        # Return error response with proper status code and detail
+        error_message = e.detail or "Failed to delete project"
+        return JSONResponse(
+            content={"error": error_message, "detail": error_message}, 
+            status_code=e.status_code
+        )
     except Exception as e:
         logger.error("project_delete_error", project_id=project_id, error=str(e), exc_info=True)
+        error_message = str(e)
+        status_code = 500
+        
+        # Extract more detailed error message if available
+        if hasattr(e, 'detail'):
+            error_message = e.detail
+            if hasattr(e, 'status_code'):
+                status_code = e.status_code
+        elif hasattr(e, 'args') and len(e.args) > 0:
+            error_message = str(e.args[0])
+        
+        # Check for specific error types
+        if "not found" in error_message.lower() or "404" in str(e):
+            status_code = 404
+        elif "unauthorized" in error_message.lower() or "401" in str(e):
+            status_code = 401
+        elif "cannot delete" in error_message.lower() or "400" in str(e):
+            status_code = 400
+        
         # Return error response for JavaScript
-        return JSONResponse(content={"error": f"Failed to delete project: {str(e)}"}, status_code=400)
+        return JSONResponse(
+            content={"error": f"Failed to delete project: {error_message}"}, 
+            status_code=status_code
+        )

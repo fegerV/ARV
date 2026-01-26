@@ -18,12 +18,16 @@ class MindARMarkerService:
     _EDGE_DENSITY_TARGET = 0.2
     _CONTRAST_NORM = 50.0
     _SHARPNESS_NORM = 500.0
+    _MIN_CONTRAST = 35.0
+    _MIN_SHARPNESS = 60.0
+    _MIN_RECOGNITION_PROBABILITY = 0.6
 
     async def generate_marker(
         self,
         ar_content_id: int,
         image_path: str,
-        output_dir: str = "storage/markers",
+        storage_path: Path,
+        output_dir: str = None,  # Deprecated, kept for compatibility
     ) -> dict:
         """
         Generate Mind AR target file
@@ -46,33 +50,68 @@ class MindARMarkerService:
             result = await mindar_generator.generate_and_upload_marker(
                 ar_content_id=str(ar_content_id),
                 image_path=Path(image_path),
-                max_features=settings.MINDAR_MAX_FEATURES
+                max_features=settings.MINDAR_MAX_FEATURES,
+                storage_path=storage_path
             )
             generation_time = time.time() - start_time
             
             if not result["success"]:
-                log.error("mindar_generation_failed", error=result.get("error", "Unknown error"))
+                error_msg = result.get("error", "Unknown error")
+                log.error("mindar_generation_failed", 
+                         error=error_msg,
+                         ar_content_id=ar_content_id)
                 return {
                     "status": "failed",
-                    "error": result.get("error", "Unknown error"),
+                    "error": error_msg,
+                    "error_type": "generation_failed"
                 }
+
+            # Check marker validity
+            is_valid = result.get("is_valid", False)
+            validation_warnings = result.get("validation_warnings", [])
+            features_count = result.get("features", 0)
+            
+            if not is_valid:
+                warning_msg = "Marker generated but validation failed"
+                if validation_warnings:
+                    warning_msg += f": {', '.join(validation_warnings[:2])}"
+                
+                log.warning("marker_validation_failed",
+                           ar_content_id=ar_content_id,
+                           features_count=features_count,
+                           warnings=validation_warnings,
+                           message=warning_msg)
+                
+                # Still return success but with warning status
+                status = "ready_with_warnings" if features_count > 0 else "ready_invalid"
+            else:
+                status = "ready"
 
             image_quality = self._analyze_image_quality(image_path)
             metadata = self._build_marker_metadata(result, generation_time, image_quality)
             marker_storage_path = result.get("storage_path") or result.get("marker_path")
+            
+            # Add validation info to metadata
+            metadata["is_valid"] = is_valid
+            metadata["validation_warnings"] = validation_warnings
 
             log.info(
                 "mind_ar_generation_success",
                 marker_url=result.get("marker_url"),
                 file_size=result.get("file_size", 0),
                 generation_time=generation_time,
+                features_count=features_count,
+                is_valid=is_valid,
+                status=status
             )
 
             return {
                 "marker_path": marker_storage_path,
                 "marker_url": result.get("marker_url"),
                 "metadata": metadata,
-                "status": "ready",
+                "status": status,
+                "is_valid": is_valid,
+                "validation_warnings": validation_warnings
             }
 
         except Exception as e:
@@ -126,6 +165,76 @@ class MindARMarkerService:
     def analyze_image_quality(self, image_path: str) -> dict:
         """Public wrapper for image quality analysis."""
         return self._analyze_image_quality(image_path)
+
+    def build_image_recommendations(self, image_quality: dict) -> list[str]:
+        """Build recommendations based on image quality metrics."""
+        if not image_quality:
+            return ["Не удалось проанализировать изображение — попробуйте другое фото"]
+
+        recommendations: list[str] = []
+        brightness = image_quality.get("brightness")
+        contrast = image_quality.get("contrast")
+        sharpness = image_quality.get("sharpness")
+        edge_density = image_quality.get("edge_density")
+        recognition_probability = image_quality.get("recognition_probability")
+
+        if contrast is not None and contrast < self._MIN_CONTRAST:
+            recommendations.append("Увеличьте контраст — детали должны быть более выраженными")
+        if sharpness is not None and sharpness < self._MIN_SHARPNESS:
+            recommendations.append("Сделайте фото резче — избегайте смаза")
+        if brightness is not None and (brightness < 40 or brightness > 210):
+            recommendations.append("Нормализуйте яркость — избегайте сильных пересветов и теней")
+        if edge_density is not None and edge_density < 0.01:
+            recommendations.append("Добавьте мелкие детали и текстуры по всей площади изображения")
+        if recognition_probability is not None and recognition_probability < self._MIN_RECOGNITION_PROBABILITY:
+            recommendations.append("Используйте изображение с более выраженными деталями и контрастом")
+
+        if not recommendations:
+            recommendations.append("Изображение выглядит подходящим для устойчивого трекинга")
+
+        return recommendations
+
+    def should_auto_enhance(self, image_quality: dict) -> bool:
+        """Decide whether automatic enhancement should be applied."""
+        if not image_quality:
+            return False
+
+        contrast = image_quality.get("contrast", 0.0)
+        sharpness = image_quality.get("sharpness", 0.0)
+        recognition_probability = image_quality.get("recognition_probability", 0.0)
+        return (
+            contrast < self._MIN_CONTRAST
+            or sharpness < self._MIN_SHARPNESS
+            or recognition_probability < self._MIN_RECOGNITION_PROBABILITY
+        )
+
+    def enhance_image_for_marker(self, image_path: str, output_path: str) -> Optional[str]:
+        """
+        Enhance image for better marker tracking (contrast + sharpness).
+
+        Returns:
+            Path to enhanced image or None if enhancement failed.
+        """
+        image = cv2.imread(str(image_path))
+        if image is None:
+            logger.warning("image_enhancement_failed", reason="read_failed", image_path=str(image_path))
+            return None
+
+        lab = cv2.cvtColor(image, cv2.COLOR_BGR2LAB)
+        l_channel, a_channel, b_channel = cv2.split(lab)
+        clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
+        l_enhanced = clahe.apply(l_channel)
+        lab_enhanced = cv2.merge((l_enhanced, a_channel, b_channel))
+        contrast_enhanced = cv2.cvtColor(lab_enhanced, cv2.COLOR_LAB2BGR)
+
+        gaussian = cv2.GaussianBlur(contrast_enhanced, (0, 0), 1.0)
+        sharp_enhanced = cv2.addWeighted(contrast_enhanced, 1.6, gaussian, -0.6, 0)
+
+        output_path_obj = Path(output_path)
+        output_path_obj.parent.mkdir(parents=True, exist_ok=True)
+        cv2.imwrite(str(output_path_obj), sharp_enhanced)
+        logger.info("image_enhancement_applied", source=str(image_path), output=str(output_path_obj))
+        return str(output_path_obj)
 
     def _analyze_image_quality(self, image_path: str) -> dict:
         """Compute basic image quality metrics for recognition estimation."""
@@ -182,36 +291,7 @@ class MindARMarkerService:
 
         return round(min(max(weighted_score, 0.0), 1.0), 4)
 
-    def save_marker(self, project_id: int, marker_data: bytes) -> str:
-        """Save generated marker file and return URL."""
-        import tempfile
-        import os
-        
-        # Create temporary file
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".mind") as temp_file:
-            temp_file.write(marker_data)
-            temp_path = temp_file.name
-        
-        try:
-            # Save to storage using the provider
-            storage_provider = get_storage_provider_instance()
-            marker_storage_path = f"markers/marker_{project_id}.mind"
-            
-            # Use the async save_file method
-            import asyncio
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-            try:
-                url = loop.run_until_complete(
-                    storage_provider.save_file(temp_path, marker_storage_path)
-                )
-                return url
-            finally:
-                loop.close()
-        finally:
-            # Clean up temporary file
-            if os.path.exists(temp_path):
-                os.remove(temp_path)
+    # Removed save_marker - use generate_marker with storage_path instead
 
     async def validate_marker(self, marker_path: str) -> bool:
         """Validate marker file"""
