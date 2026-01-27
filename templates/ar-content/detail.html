@@ -8,6 +8,7 @@
 <script type="application/json" id="ar-content-data">{{ ar_content_js | tojson }}</script>
 <script type="application/json" id="ar-content-videos">{{ videos_js | default([]) | tojson }}</script>
 <script type="application/json" id="ar-content-active-video">{{ active_video_js | default(None) | tojson }}</script>
+<script type="application/json" id="ar-content-rotation-schedule">{{ rotation_schedule_js | default(None) | tojson }}</script>
 <script type="application/json" id="ar-content-marker-metrics">{{ marker_metrics | default({}) | tojson }}</script>
 
 <script>
@@ -17,6 +18,7 @@ function arContentDetail() {
     let arContent = {};
     let videos = [];
     let activeVideoInfo = null;
+    let rotationSchedule = null;
     let markerMetrics = {};
     
     try {
@@ -47,6 +49,15 @@ function arContentDetail() {
     }
     
     try {
+        const rotationScheduleEl = document.getElementById('ar-content-rotation-schedule');
+        if (rotationScheduleEl && rotationScheduleEl.textContent && rotationScheduleEl.textContent !== 'null') {
+            rotationSchedule = JSON.parse(rotationScheduleEl.textContent);
+        }
+    } catch (e) {
+        console.error('Failed to parse ar-content-rotation-schedule:', e);
+    }
+    
+    try {
         const markerMetricsEl = document.getElementById('ar-content-marker-metrics');
         if (markerMetricsEl && markerMetricsEl.textContent) {
             markerMetrics = JSON.parse(markerMetricsEl.textContent);
@@ -59,18 +70,21 @@ function arContentDetail() {
         arContent: arContent || {},
         videos: Array.isArray(videos) ? videos : [],
         activeVideoInfo: activeVideoInfo,
+        rotationSchedule: rotationSchedule,
         markerMetrics: markerMetrics || {},
         showPortraitLightbox: false,
         showQRDialog: false,
         showUploadDialog: false,
         showPhotoUploadDialog: false,
         showDeleteDialog: false,
+        showRotationScheduleDialog: false,
         downloadingQR: false,
         uploadingVideo: false,
         uploadingPhoto: false,
         deleting: false,
         regeneratingMedia: false,
         saving: false,
+        savingRotationSchedule: false,
         playbackMode: 'manual',
         playbackModeInitialized: false,
         playbackModeSaving: false,
@@ -79,6 +93,14 @@ function arContentDetail() {
         replacePhotoFile: null,
         replaceVideoFile: null,
         regenerateOnSave: true,
+        rotationScheduleForm: {
+            rotation_type: 'fixed',
+            default_video_id: null,
+            video_sequence_text: '',
+            no_repeat_days: 1,
+            notify_before_expiry_days: 7,
+            is_active: true,
+        },
 
         init() {
             // Ensure all data is loaded before initializing
@@ -770,43 +792,163 @@ function arContentDetail() {
                     }
                 }, 300);
             }, 3000);
+        },
+        
+        getRotationTypeLabel(type) {
+            const labels = {
+                'fixed': 'Фиксированное',
+                'date_specific': 'По датам',
+                'daily_cycle': 'Ежедневный цикл',
+                'weekly_cycle': 'Еженедельный цикл',
+                'random_daily': 'Случайное ежедневно'
+            };
+            return labels[type] || type;
+        },
+        
+        getVideoTitle(videoId) {
+            const video = this.videos.find(v => v.id === videoId);
+            return video ? (video.title || `Видео ${videoId}`) : `Видео ${videoId}`;
+        },
+        
+        formatDateTime(dateStr) {
+            if (!dateStr) return '—';
+            try {
+                const date = new Date(dateStr);
+                return date.toLocaleString('ru-RU');
+            } catch (e) {
+                return dateStr;
+            }
+        },
+        
+        initRotationScheduleForm() {
+            if (this.rotationSchedule) {
+                this.rotationScheduleForm = {
+                    rotation_type: this.rotationSchedule.rotation_type || 'fixed',
+                    default_video_id: this.rotationSchedule.default_video_id || null,
+                    video_sequence_text: (this.rotationSchedule.video_sequence || []).join(', '),
+                    no_repeat_days: this.rotationSchedule.no_repeat_days || 1,
+                    notify_before_expiry_days: this.rotationSchedule.notify_before_expiry_days || 7,
+                    is_active: this.rotationSchedule.is_active !== false,
+                };
+            } else {
+                this.rotationScheduleForm = {
+                    rotation_type: 'fixed',
+                    default_video_id: null,
+                    video_sequence_text: '',
+                    no_repeat_days: 1,
+                    notify_before_expiry_days: 7,
+                    is_active: true,
+                };
+            }
+        },
+        
+        async saveRotationSchedule() {
+            this.savingRotationSchedule = true;
+            try {
+                const payload = {
+                    rotation_type: this.rotationScheduleForm.rotation_type,
+                    default_video_id: this.rotationScheduleForm.default_video_id || null,
+                    no_repeat_days: parseInt(this.rotationScheduleForm.no_repeat_days) || 1,
+                    notify_before_expiry_days: parseInt(this.rotationScheduleForm.notify_before_expiry_days) || 7,
+                    is_active: this.rotationScheduleForm.is_active,
+                };
+                
+                // Parse video sequence if needed
+                if (this.rotationScheduleForm.video_sequence_text) {
+                    payload.video_sequence = this.rotationScheduleForm.video_sequence_text
+                        .split(',')
+                        .map(id => parseInt(id.trim()))
+                        .filter(id => !isNaN(id));
+                }
+                
+                const url = this.rotationSchedule 
+                    ? `/api/rotation/${this.rotationSchedule.id}`
+                    : `/api/ar-content/${this.arContent.id}/rotation`;
+                
+                const method = this.rotationSchedule ? 'PUT' : 'POST';
+                
+                const response = await fetch(url, {
+                    method: method,
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(payload),
+                });
+                
+                if (!response.ok) {
+                    const errorData = await response.json().catch(() => ({}));
+                    throw new Error(errorData.detail || errorData.message || 'Не удалось сохранить расписание');
+                }
+                
+                this.showToast('Расписание сохранено', 'success');
+                this.showRotationScheduleDialog = false;
+                
+                // Reload page to get updated schedule
+                setTimeout(() => {
+                    window.location.reload();
+                }, 1000);
+            } catch (error) {
+                this.showToast('Не удалось сохранить расписание: ' + error.message, 'error');
+                console.error('Rotation schedule save error:', error);
+            } finally {
+                this.savingRotationSchedule = false;
+            }
+        },
+        
+        async deleteRotationSchedule() {
+            if (!this.rotationSchedule || !confirm('Удалить расписание ротации?')) {
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/api/rotation/${this.rotationSchedule.id}`, {
+                    method: 'DELETE',
+                });
+                
+                if (!response.ok) {
+                    throw new Error('Не удалось удалить расписание');
+                }
+                
+                this.showToast('Расписание удалено', 'success');
+                
+                // Reload page to get updated schedule
+                setTimeout(() => {
+                    window.location.reload();
+                }, 1000);
+            } catch (error) {
+                this.showToast('Не удалось удалить расписание', 'error');
+                console.error('Rotation schedule delete error:', error);
+            }
         }
     };
 }
 </script>
 
 <div x-data="arContentDetail()" x-init="init()" class="page-container">
-    <!-- Header Card -->
+    <!-- ============================================ -->
+    <!-- БЛОК 1: ЗАГОЛОВОК И ОСНОВНЫЕ ДЕЙСТВИЯ -->
+    <!-- ============================================ -->
     <div class="card p-0 overflow-hidden mb-6">
-        <div class="px-4 py-5 sm:px-6 border-b border-gray-200 dark:border-gray-700">
+        <div class="px-4 py-5 sm:px-6 border-b border-gray-200 dark:border-gray-700 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-gray-800 dark:to-gray-700">
             <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                    <h3 class="text-lg leading-6 font-medium text-gray-900 dark:text-white">
-                        Заказ {{ ar_content.order_number }}
-                    </h3>
-                    <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                <div class="flex-1">
+                    <div class="flex items-center gap-3 mb-2">
+                        <h1 class="text-2xl font-bold text-gray-900 dark:text-white">
+                            Заказ {{ ar_content.order_number }}
+                        </h1>
+                        <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium"
+                              :class="arContent.status === 'ready' ? 'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-100' : 
+                                      arContent.status === 'processing' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/40 dark:text-yellow-100' : 
+                                      'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200'"
+                              x-text="arContent.status || '—'"></span>
+                    </div>
+                    <p class="text-sm text-gray-600 dark:text-gray-400">
                         Детали AR контента и управление
                     </p>
                 </div>
                 <div class="flex flex-wrap gap-2">
                     <button @click="showQRDialog = true" class="btn btn-secondary">
                         <span class="material-icons mr-2">qr_code</span>QR-код
-                    </button>
-                    <button @click="handleSave()" 
-                            :disabled="saving"
-                            class="btn btn-primary">
-                        <span class="material-icons mr-2" x-show="!saving">save</span>
-                        <span class="material-icons mr-2 animate-spin" x-show="saving">refresh</span>
-                        <span x-show="!saving">Сохранить</span>
-                        <span x-show="saving">Сохранение...</span>
-                    </button>
-                    <button @click="regenerateMedia()" 
-                            :disabled="regeneratingMedia"
-                            class="btn btn-secondary">
-                        <span class="material-icons mr-2" x-show="!regeneratingMedia">auto_fix_high</span>
-                        <span class="material-icons mr-2 animate-spin" x-show="regeneratingMedia">refresh</span>
-                        <span x-show="!regeneratingMedia">Обновить медиа</span>
-                        <span x-show="regeneratingMedia">Обновление...</span>
                     </button>
                     <a href="/ar-content" class="btn btn-secondary">
                         <span class="material-icons mr-2">arrow_back</span>Назад
@@ -817,233 +959,286 @@ function arContentDetail() {
                 </div>
             </div>
         </div>
-    </div>
-
-    <!-- Company & Project Info -->
-    <div class="card p-4 mb-6">
-        <div class="flex flex-wrap gap-2">
-            <span class="inline-flex items-center px-3 py-1 rounded-full text-sm bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
-                <span class="material-icons text-xs mr-1">business</span>
-                <span x-text="arContent.company_name || '—'"></span>
-            </span>
-            <span class="inline-flex items-center px-3 py-1 rounded-full text-sm bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
-                <span class="material-icons text-xs mr-1">folder</span>
-                <span x-text="arContent.project_name || '—'"></span>
-            </span>
-            <span class="inline-flex items-center px-3 py-1 rounded-full text-sm bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200">
-                <span class="material-icons text-xs mr-1">schedule</span>
-                {{ ar_content.created_at | datetime_format if ar_content.created_at else '—' }}
-            </span>
-            <span class="inline-flex items-center px-3 py-1 rounded-full text-sm bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200">
-                <span class="material-icons text-xs mr-1">timer</span>
-                <span x-text="(arContent.duration_years || 1) + ' год'"></span>
-            </span>
+        
+        <!-- Мета-информация -->
+        <div class="px-4 py-4 bg-white dark:bg-gray-800">
+            <div class="flex flex-wrap gap-3">
+                <div class="flex items-center gap-2 text-sm">
+                    <span class="material-icons text-blue-600 dark:text-blue-400 text-base">business</span>
+                    <span class="text-gray-600 dark:text-gray-400">Компания:</span>
+                    <span class="font-medium text-gray-900 dark:text-white" x-text="arContent.company_name || '—'"></span>
+                </div>
+                <div class="flex items-center gap-2 text-sm">
+                    <span class="material-icons text-green-600 dark:text-green-400 text-base">folder</span>
+                    <span class="text-gray-600 dark:text-gray-400">Проект:</span>
+                    <span class="font-medium text-gray-900 dark:text-white" x-text="arContent.project_name || '—'"></span>
+                </div>
+                <div class="flex items-center gap-2 text-sm">
+                    <span class="material-icons text-gray-600 dark:text-gray-400 text-base">schedule</span>
+                    <span class="text-gray-600 dark:text-gray-400">Создан:</span>
+                    <span class="font-medium text-gray-900 dark:text-white">{{ ar_content.created_at | datetime_format if ar_content.created_at else '—' }}</span>
+                </div>
+                <div class="flex items-center gap-2 text-sm">
+                    <span class="material-icons text-purple-600 dark:text-purple-400 text-base">timer</span>
+                    <span class="text-gray-600 dark:text-gray-400">Срок:</span>
+                    <span class="font-medium text-gray-900 dark:text-white" x-text="((arContent.duration_years || 1) + ' год')"></span>
+                </div>
+            </div>
         </div>
     </div>
     
-    <!-- Portrait + Customer Info -->
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-        <div>
-            <div class="card p-4">
-                <div>
-                    <div class="flex items-center justify-between mb-4">
-                        <h3 class="text-lg font-medium text-gray-900 dark:text-white">Портрет</h3>
-                        <button @click="showPhotoUploadDialog = true" class="btn btn-secondary">
-                            <span class="material-icons mr-2">upload</span>Загрузить фото
-                        </button>
-                    </div>
-                    <div class="bg-gray-100 dark:bg-gray-700 rounded-lg overflow-hidden">
-                        <template x-if="portraitUrl">
-                            <img :src="portraitUrl"
-                                 alt="Portrait"
-                                 loading="lazy"
-                                 @click="showPortraitLightbox = true"
-                                 class="w-full max-w-md mx-auto max-h-96 object-contain cursor-pointer hover:opacity-90 transition-opacity">
-                        </template>
-                        <template x-if="!portraitUrl">
-                            <div class="w-full h-64 flex items-center justify-center text-gray-500 dark:text-gray-400">
-                                <div class="text-center">
-                                    <span class="material-icons text-4xl mb-2">image</span>
-                                    <p>Портрет не загружен</p>
-                                </div>
-                            </div>
-                        </template>
-                    </div>
-                    <p class="mt-2 text-sm text-gray-500 dark:text-gray-400 text-center" x-show="portraitUrl">
-                        Кликните для просмотра в полный размер
-                    </p>
+    <!-- ============================================ -->
+    <!-- БЛОК 2: ОСНОВНАЯ ИНФОРМАЦИЯ -->
+    <!-- ============================================ -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+        <!-- Информация о заказчике -->
+        <div class="lg:col-span-1">
+            <div class="card p-5">
+                <div class="flex items-center gap-2 mb-4 pb-3 border-b border-gray-200 dark:border-gray-700">
+                    <span class="material-icons text-blue-600 dark:text-blue-400">person</span>
+                    <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Заказчик</h3>
                 </div>
+                <dl class="space-y-4">
+                    <div>
+                        <dt class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1">Имя</dt>
+                        <dd class="text-base font-medium text-gray-900 dark:text-white" x-text="arContent.customer_name || '—'"></dd>
+                    </div>
+                    <div>
+                        <dt class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1">Телефон</dt>
+                        <dd class="text-base text-gray-900 dark:text-white" x-text="arContent.customer_phone || '—'"></dd>
+                    </div>
+                    <div>
+                        <dt class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1">Email</dt>
+                        <dd class="text-base text-gray-900 dark:text-white break-all" x-text="arContent.customer_email || '—'"></dd>
+                    </div>
+                </dl>
             </div>
         </div>
         
-        <div>
-            <div class="card p-4">
-                <div>
-                    <h3 class="text-lg font-medium text-gray-900 dark:text-white mb-4 flex items-center">
-                        <span class="material-icons mr-2">person</span>Заказчик
-                    </h3>
-                    <dl class="space-y-3">
-                        <div>
-                            <dt class="text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">Имя</dt>
-                            <dd class="text-gray-900 dark:text-white" x-text="arContent.customer_name || '—'"></dd>
-                        </div>
-                        <div>
-                            <dt class="text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">Телефон</dt>
-                            <dd class="text-gray-900 dark:text-white" x-text="arContent.customer_phone || '—'"></dd>
-                        </div>
-                        <div>
-                            <dt class="text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">Email</dt>
-                            <dd class="text-gray-900 dark:text-white" x-text="arContent.customer_email || '—'"></dd>
-                        </div>
-                    </dl>
-                    
-                    <hr class="my-4 border-gray-200 dark:border-gray-700">
-                    
-                    <div>
-                        <h4 class="text-md font-medium text-gray-900 dark:text-white mb-3 flex items-center">
-                            <span class="material-icons mr-2 text-base">storage</span>Расположение файлов
-                        </h4>
-                        <p class="text-sm text-gray-600 dark:text-gray-400 break-all" x-text="arContent.storage_path || 'Путь не определен'"></p>
+        <!-- Портрет -->
+        <div class="lg:col-span-2">
+            <div class="card p-5">
+                <div class="flex items-center justify-between mb-4 pb-3 border-b border-gray-200 dark:border-gray-700">
+                    <div class="flex items-center gap-2">
+                        <span class="material-icons text-purple-600 dark:text-purple-400">image</span>
+                        <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Портрет</h3>
                     </div>
-
-                    {% if debug_info %}
-                    <hr class="my-4 border-gray-200 dark:border-gray-700">
-                    <details class="bg-gray-50 dark:bg-gray-700/60 p-3 rounded-lg">
-                        <summary class="text-md font-medium text-gray-900 dark:text-white mb-2 flex items-center cursor-pointer">
-                            <span class="material-icons mr-2 text-base">bug_report</span>Debug: пути и статусы
-                        </summary>
-                        <div class="text-xs text-gray-700 dark:text-gray-300 space-y-1 mt-2">
-                            <div><span class="font-medium">Storage:</span> {{ debug_info.storage_path or '—' }}</div>
-                            <div><span class="font-medium">Photo:</span> {{ debug_info.photo_path or '—' }}</div>
-                            <div><span class="font-medium">Video:</span> {{ debug_info.video_path or '—' }}</div>
-                            <div><span class="font-medium">QR:</span> {{ debug_info.qr_code_path or '—' }}</div>
-                            <div><span class="font-medium">Thumbnail:</span> {{ debug_info.thumbnail_url or '—' }}</div>
-                            <div><span class="font-medium">Marker:</span> {{ debug_info.marker_path or '—' }}</div>
-                            <div><span class="font-medium">Marker URL:</span> {{ debug_info.marker_url or '—' }}</div>
-                            <div><span class="font-medium">Marker status:</span> {{ debug_info.marker_status or '—' }}</div>
-                        </div>
-                    </details>
-                    {% endif %}
-                    
+                    <button @click="showPhotoUploadDialog = true" class="btn btn-secondary text-sm px-3 py-1.5">
+                        <span class="material-icons text-sm mr-1">upload</span>Загрузить
+                    </button>
                 </div>
+                <div class="bg-gray-50 dark:bg-gray-700/50 rounded-lg overflow-hidden border-2 border-dashed border-gray-200 dark:border-gray-600">
+                    <template x-if="portraitUrl">
+                        <img :src="portraitUrl"
+                             alt="Portrait"
+                             loading="lazy"
+                             @click="showPortraitLightbox = true"
+                             class="w-full max-h-96 object-contain cursor-pointer hover:opacity-90 transition-opacity mx-auto block">
+                    </template>
+                    <template x-if="!portraitUrl">
+                        <div class="w-full h-64 flex items-center justify-center text-gray-400 dark:text-gray-500">
+                            <div class="text-center">
+                                <span class="material-icons text-5xl mb-3 block">image_not_supported</span>
+                                <p class="text-sm">Портрет не загружен</p>
+                            </div>
+                        </div>
+                    </template>
+                </div>
+                <p class="mt-3 text-xs text-gray-500 dark:text-gray-400 text-center" x-show="portraitUrl">
+                    <span class="material-icons text-xs align-middle mr-1">zoom_in</span>Кликните для просмотра в полный размер
+                </p>
             </div>
         </div>
     </div>
-        
-    <!-- Video Management -->
+    
+    <!-- Техническая информация (скрываемая) -->
+    {% if debug_info %}
     <div class="card p-4 mb-6">
-        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
-            <h3 class="text-lg font-medium text-gray-900 dark:text-white flex items-center">
-                <span class="material-icons mr-2">videocam</span>Видео
-            </h3>
-        </div>
-        <div class="flex flex-col md:flex-row md:items-center gap-3 mb-4">
-            <div class="flex-1">
-                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Режим воспроизведения</label>
-                <select x-model="playbackMode" class="form-input w-full">
-                    <option value="manual">Ручной (фиксированное видео)</option>
-                    <option value="sequential">Авто: последовательный</option>
-                    <option value="cyclic">Авто: циклический</option>
-                </select>
-                <div class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                    <template x-if="playbackMode === 'manual'">
-                        <span>Одно фиксированное видео. Выберите активное видео кнопкой "Сделать активным".</span>
-                    </template>
-                    <template x-if="playbackMode === 'sequential'">
-                        <span>Видео переключаются последовательно (1→2→3→...→последнее). Отметьте галочками видео для ротации.</span>
-                    </template>
-                    <template x-if="playbackMode === 'cyclic'">
-                        <span>Видео переключаются циклически (1→2→3→...→1→2→...). Отметьте галочками видео для ротации.</span>
-                    </template>
-                </div>
+        <details class="cursor-pointer">
+            <summary class="text-sm font-medium text-gray-700 dark:text-gray-300 flex items-center gap-2">
+                <span class="material-icons text-base">bug_report</span>
+                Техническая информация (Debug)
+            </summary>
+            <div class="mt-4 grid grid-cols-2 md:grid-cols-4 gap-4 text-xs">
+                <div><span class="font-medium text-gray-600 dark:text-gray-400">Storage:</span><br><span class="text-gray-900 dark:text-white break-all">{{ debug_info.storage_path or '—' }}</span></div>
+                <div><span class="font-medium text-gray-600 dark:text-gray-400">Photo:</span><br><span class="text-gray-900 dark:text-white break-all">{{ debug_info.photo_path or '—' }}</span></div>
+                <div><span class="font-medium text-gray-600 dark:text-gray-400">Video:</span><br><span class="text-gray-900 dark:text-white break-all">{{ debug_info.video_path or '—' }}</span></div>
+                <div><span class="font-medium text-gray-600 dark:text-gray-400">Marker:</span><br><span class="text-gray-900 dark:text-white break-all">{{ debug_info.marker_path or '—' }}</span></div>
             </div>
-            <div class="flex items-end">
+        </details>
+    </div>
+    {% endif %}
+        
+    <!-- ============================================ -->
+    <!-- БЛОК 3: УПРАВЛЕНИЕ ВИДЕО -->
+    <!-- ============================================ -->
+    <div class="card p-5 mb-6">
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6 pb-4 border-b border-gray-200 dark:border-gray-700">
+            <div class="flex-1">
+                <div class="flex items-center gap-2 mb-2">
+                    <span class="material-icons text-red-600 dark:text-red-400">videocam</span>
+                    <h3 class="text-xl font-semibold text-gray-900 dark:text-white">Управление видео</h3>
+                </div>
+                <p class="text-sm text-gray-600 dark:text-gray-400">
+                    Срок действия видео устанавливается автоматически при загрузке на основе срока заказа ({{ ar_content.get('duration_years', 5) }} лет).
+                </p>
+            </div>
+            <button @click="showUploadDialog = true" class="btn btn-primary">
+                <span class="material-icons mr-2">add</span>Загрузить видео
+            </button>
+        </div>
+        <!-- Настройка режима воспроизведения -->
+        <div class="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4 mb-6">
+            <div class="flex flex-col md:flex-row md:items-end gap-4">
+                <div class="flex-1">
+                    <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                        <span class="material-icons text-sm align-middle mr-1">settings</span>Режим воспроизведения
+                    </label>
+                    <select x-model="playbackMode" class="form-input w-full">
+                        <option value="manual">Ручной (фиксированное видео)</option>
+                        <option value="sequential">Авто: последовательный</option>
+                        <option value="cyclic">Авто: циклический</option>
+                    </select>
+                    <div class="mt-2 text-xs text-gray-600 dark:text-gray-400 bg-white dark:bg-gray-800 p-2 rounded">
+                        <template x-if="playbackMode === 'manual'">
+                            <span>📌 Одно фиксированное видео. Выберите активное видео кнопкой "Сделать активным".</span>
+                        </template>
+                        <template x-if="playbackMode === 'sequential'">
+                            <span>➡️ Видео переключаются последовательно (1→2→3→...→последнее). Отметьте галочками видео для ротации.</span>
+                        </template>
+                        <template x-if="playbackMode === 'cyclic'">
+                            <span>🔄 Видео переключаются циклически (1→2→3→...→1→2→...). Отметьте галочками видео для ротации.</span>
+                        </template>
+                    </div>
+                </div>
                 <button @click="applyPlaybackMode()"
                         :disabled="playbackModeSaving"
-                        class="btn btn-primary">
+                        class="btn btn-primary whitespace-nowrap">
                     <span class="material-icons mr-2" x-show="!playbackModeSaving">save</span>
                     <span class="material-icons mr-2 animate-spin" x-show="playbackModeSaving">refresh</span>
-                    <span x-show="!playbackModeSaving">Применить режим</span>
+                    <span x-show="!playbackModeSaving">Применить</span>
                     <span x-show="playbackModeSaving">Сохранение...</span>
                 </button>
             </div>
         </div>
 
-        <template x-if="videos.length === 0">
-            <div class="bg-gray-50 dark:bg-gray-700/60 p-4 rounded-lg text-sm text-gray-600 dark:text-gray-300">
-                Видео не загружены
-            </div>
-        </template>
-
-        <template x-if="videos.length > 0">
-            <div class="space-y-4">
-                <div class="bg-gray-50 dark:bg-gray-700/60 p-4 rounded-lg">
-                    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-                        <div>
-                            <div class="text-sm text-gray-500 dark:text-gray-300">Активное видео</div>
-                            <div class="text-gray-900 dark:text-white font-medium" x-text="activeVideoTitle || '—'"></div>
-                            <div class="text-xs text-gray-500 dark:text-gray-400" x-text="activeVideoSourceLabel"></div>
-                        </div>
-                        <div class="text-xs text-gray-500 dark:text-gray-400" x-show="activeVideoSchedule">
-                            Расписание: <span x-text="formatSchedule(activeVideoSchedule)"></span>
+        <!-- Активное видео -->
+        <template x-if="videos && videos.length > 0">
+            <div class="mb-6">
+                <div class="bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 border-2 border-green-200 dark:border-green-800 rounded-lg p-5">
+                    <div class="flex items-center gap-2 mb-4">
+                        <span class="material-icons text-green-600 dark:text-green-400">play_circle</span>
+                        <h4 class="text-lg font-semibold text-gray-900 dark:text-white">Активное видео</h4>
+                        <span class="ml-auto inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-100" x-text="activeVideoSourceLabel"></span>
+                    </div>
+                    <div class="mb-3">
+                        <div class="text-base font-medium text-gray-900 dark:text-white mb-1" x-text="activeVideoTitle || '—'"></div>
+                        <div class="text-xs text-gray-600 dark:text-gray-400" x-show="activeVideoSchedule">
+                            📅 Расписание: <span x-text="formatSchedule(activeVideoSchedule)"></span>
                         </div>
                     </div>
-                    <div class="mt-3 bg-black/5 dark:bg-black/30 rounded-lg overflow-hidden">
+                    <div class="bg-white dark:bg-gray-800 rounded-lg overflow-hidden shadow-sm border border-gray-200 dark:border-gray-700">
                         <template x-if="activeVideo && isImagePreview(activeVideo.preview_url)">
-                            <img :src="activeVideo.preview_url" alt="Active video preview" class="w-full max-w-2xl mx-auto max-h-96 object-contain">
+                            <img :src="activeVideo.preview_url" alt="Active video preview" class="w-full max-h-96 object-contain mx-auto block">
                         </template>
                         <template x-if="activeVideo && !isImagePreview(activeVideo.preview_url)">
-                            <video :src="activeVideo.video_url" controls class="w-full max-w-2xl mx-auto max-h-96 object-contain"></video>
+                            <video :src="activeVideo.video_url" controls class="w-full max-h-96 object-contain mx-auto block"></video>
                         </template>
                         <template x-if="!activeVideo">
-                            <div class="w-full h-48 flex items-center justify-center text-gray-500 dark:text-gray-400 text-sm">
-                                Нет активного видео
+                            <div class="w-full h-48 flex items-center justify-center text-gray-400 dark:text-gray-500">
+                                <div class="text-center">
+                                    <span class="material-icons text-4xl mb-2 block">videocam_off</span>
+                                    <p class="text-sm">Нет активного видео</p>
+                                </div>
                             </div>
                         </template>
                     </div>
                 </div>
+            </div>
+        </template>
 
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <!-- Список всех видео -->
+        <template x-if="!videos || videos.length === 0">
+            <div class="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-6 text-center">
+                <span class="material-icons text-4xl text-yellow-600 dark:text-yellow-400 mb-3 block">videocam_off</span>
+                <p class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Видео не загружены</p>
+                <button @click="showUploadDialog = true" class="btn btn-primary text-sm px-3 py-1.5">
+                    <span class="material-icons mr-2 text-sm">add</span>Загрузить первое видео
+                </button>
+            </div>
+        </template>
+
+        <template x-if="videos && videos.length > 0">
+            <div>
+                <h4 class="text-base font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+                    <span class="material-icons text-base">list</span>
+                    Все видео (<span x-text="videos ? videos.length : 0"></span>)
+                </h4>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                     <template x-for="video in videos" :key="video.id">
-                        <div class="border rounded-lg overflow-hidden transition-colors"
-                             :class="video.is_active ? 'border-green-500 dark:border-green-400 border-2' : 'border-gray-200 dark:border-gray-700'">
-                            <div class="bg-black/5 dark:bg-black/30">
+                        <div class="border-2 rounded-lg overflow-hidden transition-all hover:shadow-lg"
+                             :class="video.is_active ? 'border-green-500 dark:border-green-400 bg-green-50/50 dark:bg-green-900/10' : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800'">
+                            <!-- Превью видео -->
+                            <div class="bg-gray-900 aspect-video flex items-center justify-center overflow-hidden">
                                 <template x-if="isImagePreview(video.preview_url)">
-                                    <img :src="video.preview_url" alt="Video preview" class="w-full max-h-48 object-contain mx-auto">
+                                    <img :src="video.preview_url" alt="Video preview" class="w-full h-full object-contain">
                                 </template>
                                 <template x-if="!isImagePreview(video.preview_url)">
-                                    <video :src="video.video_url" controls class="w-full max-h-48 object-contain mx-auto"></video>
+                                    <video :src="video.video_url" controls class="w-full h-full object-contain"></video>
                                 </template>
                             </div>
-                            <div class="p-3 space-y-2">
-                                <div class="flex items-center justify-between">
-                                    <div class="text-sm font-medium text-gray-900 dark:text-white" x-text="video.title || 'Видео'"></div>
-                                    <span class="text-xs px-2 py-0.5 rounded-full" :class="videoStatusClass(video.status)" x-text="video.status"></span>
+                            
+                            <!-- Информация о видео -->
+                            <div class="p-4 space-y-3">
+                                <div class="flex items-start justify-between gap-2">
+                                    <div class="flex-1 min-w-0">
+                                        <div class="text-sm font-semibold text-gray-900 dark:text-white truncate" x-text="video.title || 'Видео'"></div>
+                                        <div class="flex items-center gap-2 mt-1">
+                                            <span class="text-xs px-2 py-0.5 rounded-full font-medium" :class="videoStatusClass(video.status)" x-text="video.status"></span>
+                                            <span x-show="video.is_active" class="text-xs px-2 py-0.5 rounded-full bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-100 font-medium">
+                                                Активно
+                                            </span>
+                                        </div>
+                                    </div>
                                 </div>
-                                <div class="text-xs text-gray-500 dark:text-gray-400" x-show="playbackMode !== 'manual'">
-                                    <label class="inline-flex items-center gap-2">
+                                
+                                <!-- Метаданные -->
+                                <div class="space-y-1.5 text-xs text-gray-600 dark:text-gray-400">
+                                    <div class="flex items-center justify-between">
+                                        <span>Срок действия:</span>
+                                        <span class="font-medium" :class="video.days_remaining === null ? 'text-yellow-600 dark:text-yellow-400' : ''"
+                                              x-text="video.days_remaining !== null ? video.days_remaining + ' дн.' : 'Без срока'"></span>
+                                    </div>
+                                    <div class="flex items-center justify-between">
+                                        <span>Расписаний:</span>
+                                        <span class="font-medium" x-text="video.schedules_count"></span>
+                                    </div>
+                                </div>
+                                
+                                <!-- Чекбокс для ротации -->
+                                <div x-show="playbackMode !== 'manual'" class="pt-2 border-t border-gray-200 dark:border-gray-700">
+                                    <label class="inline-flex items-center gap-2 cursor-pointer">
                                         <input type="checkbox"
                                                :checked="video.is_active"
                                                @change="toggleVideoActive(video, $event)"
                                                class="form-checkbox">
-                                        В ротации
+                                        <span class="text-xs text-gray-700 dark:text-gray-300">Включить в ротацию</span>
                                     </label>
                                 </div>
-                                <div class="text-xs text-gray-500 dark:text-gray-400">
-                                    <span x-text="video.days_remaining !== null ? `Осталось дней: ${video.days_remaining}` : 'Без срока'"></span>
-                                </div>
-                                <div class="text-xs text-gray-500 dark:text-gray-400">
-                                    Расписаний: <span x-text="video.schedules_count"></span>
-                                </div>
-                                <div class="flex items-center gap-2">
+                                
+                                <!-- Действия -->
+                                <div class="flex flex-col gap-2 pt-2 border-t border-gray-200 dark:border-gray-700">
                                     <button @click="setActiveVideo(video.id)"
                                             :disabled="video.is_active || playbackMode !== 'manual'"
-                                            class="btn btn-secondary text-xs px-3 py-1">
+                                            class="btn btn-primary btn-sm w-full text-xs"
+                                            :class="video.is_active ? 'opacity-50 cursor-not-allowed' : ''">
+                                        <span class="material-icons text-sm mr-1">play_arrow</span>
                                         <span x-show="!video.is_active">Сделать активным</span>
-                                        <span x-show="video.is_active">Активное</span>
+                                        <span x-show="video.is_active">Уже активно</span>
                                     </button>
-                                    <button @click="openVideo(video.video_url)" class="btn btn-secondary text-xs px-3 py-1">
-                                        Смотреть
+                                    <button @click="openVideo(video.video_url)" class="btn btn-secondary w-full text-xs px-3 py-1.5">
+                                        <span class="material-icons text-sm mr-1">open_in_new</span>Открыть
                                     </button>
                                 </div>
                             </div>
@@ -1054,94 +1249,262 @@ function arContentDetail() {
         </template>
     </div>
     
-    <!-- Media Replace Section -->
-    <div class="card p-4 mb-6">
-        <div class="flex flex-col gap-4">
-            <h3 class="text-lg font-medium text-gray-900 dark:text-white flex items-center">
-                <span class="material-icons mr-2">edit</span>Замена фото и видео
-            </h3>
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                        Новое фото
-                    </label>
-                    <input type="file"
-                           accept="image/*"
-                           @change="handleReplacePhotoChange"
-                           x-ref="replacePhotoInput"
-                           class="form-input w-full">
-                    <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                        Заменит текущее фото и пересоздаст маркер
-                    </p>
+    <!-- ============================================ -->
+    <!-- БЛОК 4: РАСПИСАНИЕ РОТАЦИИ ВИДЕО -->
+    <!-- ============================================ -->
+    <div class="card p-5 mb-6" x-show="videos && videos.length > 0">
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6 pb-4 border-b border-gray-200 dark:border-gray-700">
+            <div class="flex-1">
+                <div class="flex items-center gap-2 mb-2">
+                    <span class="material-icons text-orange-600 dark:text-orange-400">schedule</span>
+                    <h3 class="text-xl font-semibold text-gray-900 dark:text-white">Расписание ротации видео</h3>
                 </div>
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                        Новое видео
-                    </label>
-                    <input type="file"
-                           accept="video/*"
-                           @change="handleReplaceVideoChange"
-                           x-ref="replaceVideoInput"
-                           class="form-input w-full">
-                    <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                        Заменит активное видео
-                    </p>
+                <p class="text-sm text-gray-600 dark:text-gray-400">
+                    Настройте автоматическую ротацию видео. По умолчанию используется одно активное видео на весь срок действия.
+                </p>
+            </div>
+            <button @click="showRotationScheduleDialog = true" class="btn btn-primary">
+                <span class="material-icons mr-2">add</span>
+                <span x-show="!rotationSchedule">Создать</span>
+                <span x-show="rotationSchedule">Изменить</span>
+            </button>
+        </div>
+        
+        <template x-if="!rotationSchedule">
+            <div class="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 p-4 rounded-lg">
+                <div class="flex items-start gap-3">
+                    <span class="material-icons text-blue-600 dark:text-blue-400 mt-0.5">info</span>
+                    <div class="flex-1">
+                        <h4 class="text-sm font-medium text-blue-900 dark:text-blue-100 mb-2">
+                            Расписание не настроено
+                        </h4>
+                        <p class="text-sm text-blue-800 dark:text-blue-200 mb-3">
+                            По умолчанию используется <strong>фиксированное видео</strong>. Система автоматически выберет активное видео, которое будет проигрываться весь срок действия ({{ ar_content.get('duration_years', 5) }} лет).
+                        </p>
+                        <div class="text-xs text-blue-700 dark:text-blue-300 space-y-1">
+                            <p><strong>Как это работает:</strong></p>
+                            <ul class="list-disc list-inside space-y-1 ml-2">
+                                <li>Выберите активное видео кнопкой "Сделать активным" в списке видео</li>
+                                <li>Срок действия видео устанавливается автоматически при загрузке (на основе duration_years заказа)</li>
+                                <li>Видео будет проигрываться до истечения срока действия</li>
+                                <li>Для настройки ротации между несколькими видео нажмите "Создать расписание"</li>
+                            </ul>
+                        </div>
+                    </div>
                 </div>
             </div>
-            <label class="inline-flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
-                <input type="checkbox" class="form-checkbox" x-model="regenerateOnSave">
-                Перегенерировать маркер при сохранении (если фото не меняли)
-            </label>
-            <div class="flex flex-wrap gap-2">
-                <button @click="handleSave()"
-                        :disabled="saving || uploadingPhoto || uploadingVideo"
-                        class="btn btn-primary">
-                    <span class="material-icons mr-2" x-show="!saving">save</span>
-                    <span class="material-icons mr-2 animate-spin" x-show="saving">refresh</span>
-                    <span x-show="!saving">Сохранить изменения</span>
-                    <span x-show="saving">Сохранение...</span>
-                </button>
-                <button @click="regenerateMedia()"
-                        :disabled="regeneratingMedia"
-                        class="btn btn-secondary">
-                    <span class="material-icons mr-2" x-show="!regeneratingMedia">auto_fix_high</span>
-                    <span class="material-icons mr-2 animate-spin" x-show="regeneratingMedia">refresh</span>
-                    <span x-show="!regeneratingMedia">Перегенерировать маркер</span>
-                    <span x-show="regeneratingMedia">Обновление...</span>
-                </button>
+        </template>
+        
+        <template x-if="rotationSchedule">
+            <div class="space-y-4">
+                <div class="bg-gray-50 dark:bg-gray-700/60 p-4 rounded-lg">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <div class="text-sm font-medium text-gray-500 dark:text-gray-300 mb-1">Тип ротации</div>
+                            <div class="text-gray-900 dark:text-white" x-text="getRotationTypeLabel(rotationSchedule.rotation_type)"></div>
+                        </div>
+                        <div>
+                            <div class="text-sm font-medium text-gray-500 dark:text-gray-300 mb-1">Статус</div>
+                            <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium"
+                                  :class="rotationSchedule.is_active ? 'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-100' : 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200'">
+                                <span x-text="rotationSchedule.is_active ? 'Активно' : 'Неактивно'"></span>
+                            </span>
+                        </div>
+                        <div x-show="rotationSchedule && rotationSchedule.default_video_id">
+                            <div class="text-sm font-medium text-gray-500 dark:text-gray-300 mb-1">Видео по умолчанию</div>
+                            <div class="text-gray-900 dark:text-white" x-text="getVideoTitle(rotationSchedule.default_video_id)"></div>
+                        </div>
+                        <div x-show="rotationSchedule && rotationSchedule.next_change_at">
+                            <div class="text-sm font-medium text-gray-500 dark:text-gray-300 mb-1">Следующее изменение</div>
+                            <div class="text-gray-900 dark:text-white" x-text="formatDateTime(rotationSchedule.next_change_at)"></div>
+                        </div>
+                        <div x-show="rotationSchedule && rotationSchedule.last_changed_at">
+                            <div class="text-sm font-medium text-gray-500 dark:text-gray-300 mb-1">Последнее изменение</div>
+                            <div class="text-gray-900 dark:text-white" x-text="formatDateTime(rotationSchedule.last_changed_at)"></div>
+                        </div>
+                        <div x-show="rotationSchedule && rotationSchedule.notify_before_expiry_days">
+                            <div class="text-sm font-medium text-gray-500 dark:text-gray-300 mb-1">Уведомление за (дней)</div>
+                            <div class="text-gray-900 dark:text-white" x-text="rotationSchedule.notify_before_expiry_days"></div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="flex gap-2">
+                    <button @click="showRotationScheduleDialog = true" class="btn btn-secondary">
+                        <span class="material-icons mr-2">edit</span>Изменить
+                    </button>
+                    <button @click="deleteRotationSchedule()" class="btn btn-danger">
+                        <span class="material-icons mr-2">delete</span>Удалить расписание
+                    </button>
+                </div>
+            </div>
+        </template>
+    </div>
+    
+    <!-- Rotation Schedule Dialog -->
+    <div x-show="showRotationScheduleDialog" 
+         @click.self="showRotationScheduleDialog = false"
+         @keydown.escape.window="showRotationScheduleDialog = false"
+         class="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4"
+         x-cloak>
+        <div class="relative bg-white dark:bg-gray-800 rounded-lg p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <button @click="showRotationScheduleDialog = false"
+                    class="absolute top-4 right-4 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200">
+                <span class="material-icons">close</span>
+            </button>
+            <h3 class="text-lg font-medium text-gray-900 dark:text-white mb-2">Настройка расписания ротации</h3>
+            <p class="text-sm text-gray-500 dark:text-gray-400 mb-4">
+                Настройте, как видео будут автоматически переключаться. Для простого случая (одно видео на 5 лет) выберите "Фиксированное".
+            </p>
+            
+            <form @submit.prevent="saveRotationSchedule()" x-init="initRotationScheduleForm()">
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                            Тип ротации <span class="text-red-500">*</span>
+                        </label>
+                        <select x-model="rotationScheduleForm.rotation_type" class="form-input w-full" required>
+                            <option value="fixed">Фиксированное (одно видео) — рекомендуется для стандартных заказов</option>
+                            <option value="date_specific">По датам (специфические даты) — для праздников и особых событий</option>
+                            <option value="daily_cycle">Ежедневный цикл — видео меняется каждый день по кругу</option>
+                            <option value="weekly_cycle">Еженедельный цикл — видео меняется по дням недели</option>
+                            <option value="random_daily">Случайное ежедневно — случайное видео каждый день</option>
+                        </select>
+                        <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                            <strong>Фиксированное</strong> — одно видео проигрывается весь срок действия ({{ ar_content.get('duration_years', 5) }} лет). Это стандартный режим для большинства заказов.
+                        </p>
+                    </div>
+                    
+                    <div x-show="rotationScheduleForm.rotation_type === 'fixed' || rotationScheduleForm.rotation_type === 'date_specific'">
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                            Видео по умолчанию <span class="text-red-500" x-show="rotationScheduleForm.rotation_type === 'fixed'">*</span>
+                        </label>
+                        <select x-model="rotationScheduleForm.default_video_id" class="form-input w-full" :required="rotationScheduleForm.rotation_type === 'fixed'">
+                            <option value="">Не выбрано</option>
+                            <template x-for="video in videos" :key="video.id">
+                                <option :value="video.id" x-text="(video.title || 'Видео ' + video.id) + (video.days_remaining !== null ? ' (осталось ' + video.days_remaining + ' дн.)' : '')"></option>
+                            </template>
+                        </select>
+                        <p class="mt-1 text-xs text-gray-500 dark:text-gray-400" x-show="rotationScheduleForm.rotation_type === 'fixed'">
+                            Выберите видео, которое будет проигрываться весь срок действия заказа ({{ ar_content.get('duration_years', 5) }} лет). Срок действия видео устанавливается автоматически при загрузке.
+                        </p>
+                        <p class="mt-1 text-xs text-gray-500 dark:text-gray-400" x-show="rotationScheduleForm.rotation_type === 'date_specific'">
+                            Видео, которое будет использоваться по умолчанию, если нет совпадений по датам.
+                        </p>
+                    </div>
+                    
+                    <div x-show="rotationScheduleForm.rotation_type === 'daily_cycle' || rotationScheduleForm.rotation_type === 'weekly_cycle'">
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                            Последовательность видео (ID через запятую)
+                        </label>
+                        <input type="text" 
+                               x-model="rotationScheduleForm.video_sequence_text"
+                               placeholder="1, 2, 3"
+                               class="form-input w-full">
+                        <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                            Введите ID видео через запятую в нужном порядке
+                        </p>
+                    </div>
+                    
+                    <div x-show="rotationScheduleForm.rotation_type === 'random_daily'">
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                            Не повторять видео (дней)
+                        </label>
+                        <input type="number" 
+                               x-model="rotationScheduleForm.no_repeat_days"
+                               min="1"
+                               class="form-input w-full">
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                            Уведомление за (дней до истечения)
+                        </label>
+                        <input type="number" 
+                               x-model="rotationScheduleForm.notify_before_expiry_days"
+                               min="0"
+                               class="form-input w-full">
+                    </div>
+                    
+                    <div>
+                        <label class="inline-flex items-center gap-2">
+                            <input type="checkbox" 
+                                   x-model="rotationScheduleForm.is_active"
+                                   class="form-checkbox">
+                            <span class="text-sm text-gray-700 dark:text-gray-300">Активно</span>
+                        </label>
+                    </div>
+                </div>
+                
+                <div class="flex gap-2 mt-6">
+                    <button type="submit" :disabled="savingRotationSchedule" class="btn btn-primary flex-1">
+                        <span class="material-icons mr-2" x-show="!savingRotationSchedule">save</span>
+                        <span class="material-icons mr-2 animate-spin" x-show="savingRotationSchedule">refresh</span>
+                        <span x-show="!savingRotationSchedule">Сохранить</span>
+                        <span x-show="savingRotationSchedule">Сохранение...</span>
+                    </button>
+                    <button type="button" @click="showRotationScheduleDialog = false" class="btn btn-secondary">
+                        Отмена
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+    
+    <!-- ============================================ -->
+    <!-- БЛОК 5: СТАТИСТИКА И АНАЛИТИКА -->
+    <!-- ============================================ -->
+    <div class="card p-5 mb-6">
+        <div class="flex items-center gap-2 mb-6 pb-4 border-b border-gray-200 dark:border-gray-700">
+            <span class="material-icons text-indigo-600 dark:text-indigo-400">analytics</span>
+            <h3 class="text-xl font-semibold text-gray-900 dark:text-white">Статистика</h3>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div class="bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-800/20 border border-blue-200 dark:border-blue-800 p-5 rounded-lg">
+                <div class="flex items-center justify-between mb-2">
+                    <span class="material-icons text-blue-600 dark:text-blue-400">visibility</span>
+                    <span class="text-xs font-medium text-blue-600 dark:text-blue-400 uppercase">Всего</span>
+                </div>
+                <div class="text-3xl font-bold text-gray-900 dark:text-white mb-1">{{ ar_content.views_count or 0 }}</div>
+                <div class="text-sm text-gray-600 dark:text-gray-400">просмотров</div>
+            </div>
+            <div class="bg-gradient-to-br from-green-50 to-green-100 dark:from-green-900/20 dark:to-green-800/20 border border-green-200 dark:border-green-800 p-5 rounded-lg">
+                <div class="flex items-center justify-between mb-2">
+                    <span class="material-icons text-green-600 dark:text-green-400">trending_up</span>
+                    <span class="text-xs font-medium text-green-600 dark:text-green-400 uppercase">30 дней</span>
+                </div>
+                <div class="text-3xl font-bold text-gray-900 dark:text-white mb-1">{{ ar_content.views_30_days or 0 }}</div>
+                <div class="text-sm text-gray-600 dark:text-gray-400">просмотров</div>
+            </div>
+            <div class="bg-gradient-to-br from-purple-50 to-purple-100 dark:from-purple-900/20 dark:to-purple-800/20 border border-purple-200 dark:border-purple-800 p-5 rounded-lg">
+                <div class="flex items-center justify-between mb-2">
+                    <span class="material-icons text-purple-600 dark:text-purple-400">play_circle</span>
+                    <span class="text-xs font-medium text-purple-600 dark:text-purple-400 uppercase">Активное</span>
+                </div>
+                <div class="text-base font-semibold text-gray-900 dark:text-white mb-1 truncate">{{ ar_content.active_video_title or '—' }}</div>
+                <div class="text-sm text-gray-600 dark:text-gray-400">видео</div>
             </div>
         </div>
     </div>
 
-    <!-- Statistics Section -->
-    <div class="card p-4">
-        <div>
-            <h3 class="text-lg font-medium text-gray-900 dark:text-white mb-4 flex items-center">
-                <span class="material-icons mr-2">analytics</span>Статистика
-            </h3>
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div class="bg-gray-50 dark:bg-gray-700/60 p-4 rounded-lg">
-                    <div class="text-sm font-medium text-gray-500 dark:text-gray-300">Всего просмотров</div>
-                    <div class="text-2xl font-bold text-gray-900 dark:text-white">{{ ar_content.views_count or 0 }}</div>
-                </div>
-                <div class="bg-gray-50 dark:bg-gray-700/60 p-4 rounded-lg">
-                    <div class="text-sm font-medium text-gray-500 dark:text-gray-300">Просмотров (30 дней)</div>
-                    <div class="text-2xl font-bold text-gray-900 dark:text-white">{{ ar_content.views_30_days or 0 }}</div>
-                </div>
-                <div class="bg-gray-50 dark:bg-gray-700/60 p-4 rounded-lg">
-                    <div class="text-sm font-medium text-gray-500 dark:text-gray-300">Активное видео</div>
-                    <div class="text-sm text-gray-900 dark:text-white">{{ ar_content.active_video_title or '—' }}</div>
-                </div>
+    <!-- ============================================ -->
+    <!-- БЛОК 6: МАРКЕР И КАЧЕСТВО ИЗОБРАЖЕНИЯ -->
+    <!-- ============================================ -->
+    <div class="card p-5 mb-6">
+        <div class="flex items-center justify-between mb-6 pb-4 border-b border-gray-200 dark:border-gray-700">
+            <div class="flex items-center gap-2">
+                <span class="material-icons text-teal-600 dark:text-teal-400">qr_code_2</span>
+                <h3 class="text-xl font-semibold text-gray-900 dark:text-white">Маркер и качество изображения</h3>
             </div>
+            <button @click="regenerateMedia()" 
+                    :disabled="regeneratingMedia"
+                    class="btn btn-secondary text-sm px-3 py-1.5">
+                <span class="material-icons text-sm mr-1" x-show="!regeneratingMedia">auto_fix_high</span>
+                <span class="material-icons text-sm mr-1 animate-spin" x-show="regeneratingMedia">refresh</span>
+                <span x-show="!regeneratingMedia">Обновить</span>
+                <span x-show="regeneratingMedia">Обновление...</span>
+            </button>
         </div>
-    </div>
-
-    <!-- Marker & Image Quality -->
-    <div class="card p-4">
-        <div>
-            <h3 class="text-lg font-medium text-gray-900 dark:text-white mb-4 flex items-center">
-                <span class="material-icons mr-2">qr_code_2</span>Маркер и качество изображения
-            </h3>
             <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div class="bg-gray-50 dark:bg-gray-700/60 p-4 rounded-lg">
                     <div class="text-sm font-medium text-gray-500 dark:text-gray-300 mb-1">Статус маркера</div>
@@ -1221,12 +1584,14 @@ function arContentDetail() {
         </div>
     </div>
 
-    <!-- Links & QR Code Section -->
-    <div class="card p-4">
-        <div>
-            <h3 class="text-lg font-medium text-gray-900 dark:text-white mb-4 flex items-center">
-                <span class="material-icons mr-2">link</span>Ссылки и QR-код
-            </h3>
+    <!-- ============================================ -->
+    <!-- БЛОК 7: ССЫЛКИ И QR-КОД -->
+    <!-- ============================================ -->
+    <div class="card p-5 mb-6">
+        <div class="flex items-center gap-2 mb-6 pb-4 border-b border-gray-200 dark:border-gray-700">
+            <span class="material-icons text-cyan-600 dark:text-cyan-400">link</span>
+            <h3 class="text-xl font-semibold text-gray-900 dark:text-white">Ссылки и QR-код</h3>
+        </div>
             <div class="flex flex-col sm:flex-row gap-3 items-stretch mb-4">
                 <input type="text" 
                        :value="fullArUrl" 
@@ -1260,6 +1625,68 @@ function arContentDetail() {
                          class="mx-auto mb-2">
                     <p class="text-sm text-gray-600 dark:text-gray-400" x-text="fullArUrl"></p>
                 </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- ============================================ -->
+    <!-- БЛОК 8: ЗАМЕНА МЕДИА-КОНТЕНТА -->
+    <!-- ============================================ -->
+    <div class="card p-5 mb-6">
+        <div class="flex items-center gap-2 mb-6 pb-4 border-b border-gray-200 dark:border-gray-700">
+            <span class="material-icons text-amber-600 dark:text-amber-400">edit</span>
+            <h3 class="text-xl font-semibold text-gray-900 dark:text-white">Замена фото и видео</h3>
+        </div>
+        <div class="space-y-4">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        Новое фото
+                    </label>
+                    <input type="file"
+                           accept="image/*"
+                           @change="handleReplacePhotoChange"
+                           x-ref="replacePhotoInput"
+                           class="form-input w-full">
+                    <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                        Заменит текущее фото и пересоздаст маркер
+                    </p>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        Новое видео
+                    </label>
+                    <input type="file"
+                           accept="video/*"
+                           @change="handleReplaceVideoChange"
+                           x-ref="replaceVideoInput"
+                           class="form-input w-full">
+                    <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                        Заменит активное видео
+                    </p>
+                </div>
+            </div>
+            <label class="inline-flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+                <input type="checkbox" class="form-checkbox" x-model="regenerateOnSave">
+                Перегенерировать маркер при сохранении (если фото не меняли)
+            </label>
+            <div class="flex flex-wrap gap-2">
+                <button @click="handleSave()"
+                        :disabled="saving || uploadingPhoto || uploadingVideo"
+                        class="btn btn-primary">
+                    <span class="material-icons mr-2" x-show="!saving">save</span>
+                    <span class="material-icons mr-2 animate-spin" x-show="saving">refresh</span>
+                    <span x-show="!saving">Сохранить изменения</span>
+                    <span x-show="saving">Сохранение...</span>
+                </button>
+                <button @click="regenerateMedia()"
+                        :disabled="regeneratingMedia"
+                        class="btn btn-secondary">
+                    <span class="material-icons mr-2" x-show="!regeneratingMedia">auto_fix_high</span>
+                    <span class="material-icons mr-2 animate-spin" x-show="regeneratingMedia">refresh</span>
+                    <span x-show="!regeneratingMedia">Перегенерировать маркер</span>
+                    <span x-show="regeneratingMedia">Обновление...</span>
+                </button>
             </div>
         </div>
     </div>

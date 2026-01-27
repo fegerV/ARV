@@ -133,6 +133,11 @@ async def upload_videos(
         # Validate file
         validate_video_file(upload_file)
         
+        # Calculate subscription_end based on AR content duration_years
+        subscription_end = None
+        if ar_content.duration_years:
+            subscription_end = datetime.utcnow() + timedelta(days=365 * ar_content.duration_years)
+        
         # Create video record first to get ID
         video = Video(
             ar_content_id=content_uuid,
@@ -140,6 +145,7 @@ async def upload_videos(
             status=VideoStatus.PROCESSING,
             rotation_type='none',
             is_active=False,
+            subscription_end=subscription_end,
         )
         
         db.add(video)

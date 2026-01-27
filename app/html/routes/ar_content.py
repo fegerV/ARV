@@ -5,7 +5,6 @@ from sqlalchemy import select
 from fastapi.templating import Jinja2Templates
 from app.models.user import User
 from app.api.routes.ar_content import (
-    list_all_ar_content, 
     get_ar_content_by_id, 
     get_ar_viewer,
     get_ar_content_by_id_legacy,
@@ -19,6 +18,7 @@ from app.api.routes.companies import list_companies
 from app.api.routes.projects import list_projects
 from app.models.video import Video
 from app.models.video_schedule import VideoSchedule as VideoScheduleModel
+from app.models.video_rotation_schedule import VideoRotationSchedule
 from app.services.video_scheduler import compute_video_status, compute_days_remaining, get_active_video
 from app.services.marker_service import marker_service
 from app.models.ar_content import ARContent
@@ -75,39 +75,60 @@ async def _load_video_details(ar_content_id: int, db: AsyncSession) -> tuple[lis
     video_items = []
     for video in videos:
         schedules_summary = schedule_map.get(video.id, [])
-        video_items.append({
-            "id": video.id,
-            "title": video.filename,
-            "video_url": video.video_url,
-            "preview_url": video.preview_url or video.video_url,
-            "is_active": video.is_active,
-            "rotation_type": video.rotation_type,
-            "subscription_end": _serialize_datetime(video.subscription_end),
-            "status": compute_video_status(video, now),
-            "days_remaining": compute_days_remaining(video, now),
-            "schedules_count": len(schedules_summary),
-            "schedules_summary": schedules_summary,
-        })
+        try:
+            video_items.append({
+                "id": video.id,
+                "title": getattr(video, 'filename', ''),
+                "video_url": getattr(video, 'video_url', ''),
+                "preview_url": getattr(video, 'preview_url', None) or getattr(video, 'video_url', ''),
+                "is_active": getattr(video, 'is_active', False),
+                "rotation_type": getattr(video, 'rotation_type', None),
+                "subscription_end": _serialize_datetime(getattr(video, 'subscription_end', None)),
+                "status": compute_video_status(video, now),
+                "days_remaining": compute_days_remaining(video, now),
+                "schedules_count": len(schedules_summary),
+                "schedules_summary": schedules_summary,
+            })
+        except Exception as exc:
+            logger.warning("video_item_serialize_failed", video_id=video.id, error=str(exc), exc_info=True)
+            # Add minimal video info even if serialization fails
+            video_items.append({
+                "id": video.id,
+                "title": getattr(video, 'filename', 'Unknown'),
+                "video_url": getattr(video, 'video_url', ''),
+                "preview_url": getattr(video, 'preview_url', None) or getattr(video, 'video_url', ''),
+                "is_active": getattr(video, 'is_active', False),
+                "rotation_type": getattr(video, 'rotation_type', None),
+                "subscription_end": None,
+                "status": "unknown",
+                "days_remaining": None,
+                "schedules_count": len(schedules_summary),
+                "schedules_summary": schedules_summary,
+            })
 
     active_video_info = None
-    active_data = await get_active_video(ar_content_id, db)
-    if active_data and active_data.get("video"):
-        active_video = active_data["video"]
-        active_schedule = None
-        if active_data.get("schedule_id"):
-            active_schedule = next(
-                (item for item in schedule_map.get(active_video.id, []) if item.get("id") == active_data.get("schedule_id")),
-                None
-            )
-        active_video_info = {
-            "id": active_video.id,
-            "title": active_video.filename,
-            "video_url": active_video.video_url,
-            "preview_url": active_video.preview_url or active_video.video_url,
-            "source": active_data.get("source"),
-            "expires_in": active_data.get("expires_in"),
-            "schedule": active_schedule,
-        }
+    try:
+        active_data = await get_active_video(ar_content_id, db)
+        if active_data and active_data.get("video"):
+            active_video = active_data["video"]
+            active_schedule = None
+            if active_data.get("schedule_id"):
+                active_schedule = next(
+                    (item for item in schedule_map.get(active_video.id, []) if item.get("id") == active_data.get("schedule_id")),
+                    None
+                )
+            active_video_info = {
+                "id": getattr(active_video, 'id', None),
+                "title": getattr(active_video, 'filename', ''),
+                "video_url": getattr(active_video, 'video_url', ''),
+                "preview_url": getattr(active_video, 'preview_url', None) or getattr(active_video, 'video_url', ''),
+                "source": active_data.get("source"),
+                "expires_in": active_data.get("expires_in"),
+                "schedule": active_schedule,
+            }
+    except Exception as exc:
+        logger.warning("active_video_load_failed", error=str(exc), ar_content_id=ar_content_id, exc_info=True)
+        active_video_info = None
 
     return video_items, active_video_info
 
@@ -134,98 +155,133 @@ async def ar_content_list(
         page_size = 20
     
     try:
-        result = await list_all_ar_content(page=page, page_size=page_size, db=db)
+        # Optimized: Load models directly instead of using API function to avoid duplicate queries
+        from sqlalchemy.orm import selectinload
+        from sqlalchemy import func
+        
+        # Calculate offset from page and page_size
+        skip = (page - 1) * page_size
+        
+        # Count total items (single query)
+        count_stmt = select(func.count(ARContent.id))
+        count_result = await db.execute(count_stmt)
+        total = count_result.scalar_one()
+        
+        # Calculate total pages
+        total_pages = (total + page_size - 1) // page_size
+        
+        # Get items with pagination, sorted by created_at DESC (newest first)
+        # Use selectinload to eagerly load company and project to avoid N+1
+        stmt = select(ARContent).options(
+            selectinload(ARContent.company), 
+            selectinload(ARContent.project)
+        ).order_by(ARContent.created_at.desc()).offset(skip).limit(page_size)
+        result = await db.execute(stmt)
+        ar_content_models_list = list(result.scalars().all())
+        
         ar_content_list = []
         
-        # Recalculate URLs for each item based on current path structure
-        # Load all AR content models in one query to avoid N+1 problem
-        ar_content_ids = [item.id for item in result.items]
-        ar_content_models = {}
-        if ar_content_ids:
-            from sqlalchemy.orm import selectinload
-            stmt = select(ARContent).options(
-                selectinload(ARContent.company),
-                selectinload(ARContent.project)
-            ).where(ARContent.id.in_(ar_content_ids))
-            models_result = await db.execute(stmt)
-            for model in models_result.scalars().all():
-                ar_content_models[model.id] = model
-        
-        for item in result.items:
-            item_dict = dict(item)
+        # Process models directly (already loaded with relationships via selectinload)
+        for ar_content_model in ar_content_models_list:
+            # Convert model to dict for template
+            # Use existing URLs from model first (they are already correct)
+            item_dict = {
+                'id': ar_content_model.id,
+                'order_number': ar_content_model.order_number,
+                'project_id': ar_content_model.project_id,
+                'company_id': ar_content_model.company_id,
+                'customer_name': ar_content_model.customer_name,
+                'customer_phone': ar_content_model.customer_phone,
+                'customer_email': ar_content_model.customer_email,
+                'duration_years': ar_content_model.duration_years,
+                'views_count': ar_content_model.views_count or 0,
+                'status': ar_content_model.status,
+                'active_video_id': ar_content_model.active_video_id,
+                'created_at': ar_content_model.created_at,
+                'updated_at': ar_content_model.updated_at,
+                'company_name': ar_content_model.company.name if ar_content_model.company else None,
+                'project_name': ar_content_model.project.name if ar_content_model.project else None,
+                'public_link': f"/view/{ar_content_model.unique_id}",
+                # Use URLs from model first (they are already correct)
+                'photo_url': ar_content_model.photo_url or '',
+                'video_url': ar_content_model.video_url or '',
+                'qr_code_url': ar_content_model.qr_code_url or '',
+                'thumbnail_url': ar_content_model.thumbnail_url or '',
+            }
             
-            # Recalculate URLs from paths if they exist
-            from app.utils.ar_content import get_ar_content_storage_path
+            # Only recalculate URLs from paths if model URLs are missing
+            # This avoids 404 errors for files that don't exist
             
-            # Get the AR content model from preloaded dict
-            ar_content_model = ar_content_models.get(item_dict.get('id'))
+            # Recalculate photo_url from photo_path only if missing
+            if not item_dict['photo_url'] and ar_content_model.photo_path:
+                try:
+                    photo_path = Path(ar_content_model.photo_path)
+                    if photo_path.is_absolute():
+                        item_dict['photo_url'] = build_public_url(photo_path)
+                    else:
+                        photo_path_abs = Path(settings.STORAGE_BASE_PATH) / photo_path
+                        item_dict['photo_url'] = build_public_url(photo_path_abs)
+                except Exception as e:
+                    logger.warning("photo_url_recalc_failed", error=str(e), ar_content_id=ar_content_model.id)
             
-            if ar_content_model:
-                # Recalculate URLs from paths - use build_public_url without file existence checks
-                # This is much faster than checking Path.exists() for each file
-                
-                # Recalculate photo_url from photo_path
-                if ar_content_model.photo_path and not item_dict.get('photo_url'):
-                    try:
+            # Recalculate video_url from video_path only if missing
+            if not item_dict['video_url'] and ar_content_model.video_path:
+                try:
+                    video_path = Path(ar_content_model.video_path)
+                    if video_path.is_absolute():
+                        item_dict['video_url'] = build_public_url(video_path)
+                    else:
+                        video_path_abs = Path(settings.STORAGE_BASE_PATH) / video_path
+                        item_dict['video_url'] = build_public_url(video_path_abs)
+                except Exception as e:
+                    logger.warning("video_url_recalc_failed", error=str(e), ar_content_id=ar_content_model.id)
+            
+            # Recalculate qr_code_url from qr_code_path only if missing
+            if not item_dict['qr_code_url'] and ar_content_model.qr_code_path:
+                try:
+                    qr_path = Path(ar_content_model.qr_code_path)
+                    if qr_path.is_absolute():
+                        item_dict['qr_code_url'] = build_public_url(qr_path)
+                    else:
+                        qr_path_abs = Path(settings.STORAGE_BASE_PATH) / qr_path
+                        item_dict['qr_code_url'] = build_public_url(qr_path_abs)
+                except Exception as e:
+                    logger.warning("qr_code_url_recalc_failed", error=str(e), ar_content_id=ar_content_model.id)
+            
+            # Recalculate thumbnail_url only if missing
+            # Use photo_url as fallback if thumbnail doesn't exist
+            if not item_dict['thumbnail_url']:
+                try:
+                    if ar_content_model.photo_path:
                         photo_path = Path(ar_content_model.photo_path)
                         if photo_path.is_absolute():
-                            item_dict['photo_url'] = build_public_url(photo_path)
+                            thumbnail_path = photo_path.parent / "thumbnail.webp"
                         else:
-                            # Relative path - build absolute
                             photo_path_abs = Path(settings.STORAGE_BASE_PATH) / photo_path
-                            item_dict['photo_url'] = build_public_url(photo_path_abs)
-                    except Exception as e:
-                        logger.warning("photo_url_recalc_failed", error=str(e), ar_content_id=item_dict.get('id'))
-                
-                # Recalculate video_url from video_path
-                if ar_content_model.video_path and not item_dict.get('video_url'):
-                    try:
-                        video_path = Path(ar_content_model.video_path)
-                        if video_path.is_absolute():
-                            item_dict['video_url'] = build_public_url(video_path)
-                        else:
-                            video_path_abs = Path(settings.STORAGE_BASE_PATH) / video_path
-                            item_dict['video_url'] = build_public_url(video_path_abs)
-                    except Exception as e:
-                        logger.warning("video_url_recalc_failed", error=str(e), ar_content_id=item_dict.get('id'))
-                
-                # Recalculate qr_code_url from qr_code_path
-                if ar_content_model.qr_code_path and not item_dict.get('qr_code_url'):
-                    try:
-                        qr_path = Path(ar_content_model.qr_code_path)
-                        if qr_path.is_absolute():
-                            item_dict['qr_code_url'] = build_public_url(qr_path)
-                        else:
-                            qr_path_abs = Path(settings.STORAGE_BASE_PATH) / qr_path
-                            item_dict['qr_code_url'] = build_public_url(qr_path_abs)
-                    except Exception as e:
-                        logger.warning("qr_code_url_recalc_failed", error=str(e), ar_content_id=item_dict.get('id'))
-                
-                # Recalculate thumbnail_url - use photo directory or new structure
-                if not item_dict.get('thumbnail_url'):
-                    try:
-                        if ar_content_model.photo_path:
-                            photo_path = Path(ar_content_model.photo_path)
-                            if photo_path.is_absolute():
-                                thumbnail_path = photo_path.parent / "thumbnail.webp"
-                            else:
-                                photo_path_abs = Path(settings.STORAGE_BASE_PATH) / photo_path
-                                thumbnail_path = photo_path_abs.parent / "thumbnail.webp"
-                            item_dict['thumbnail_url'] = build_public_url(thumbnail_path)
-                        elif item_dict.get('photo_url'):
-                            # Fallback to photo_url if no photo_path
-                            item_dict['thumbnail_url'] = item_dict['photo_url']
-                    except Exception as e:
-                        logger.warning("thumbnail_url_recalc_failed", error=str(e), ar_content_id=item_dict.get('id'))
-                        # Final fallback
-                        if not item_dict.get('thumbnail_url') and item_dict.get('photo_url'):
-                            item_dict['thumbnail_url'] = item_dict['photo_url']
+                            thumbnail_path = photo_path_abs.parent / "thumbnail.webp"
+                        item_dict['thumbnail_url'] = build_public_url(thumbnail_path)
+                    elif item_dict.get('photo_url'):
+                        # Fallback to photo_url if no photo_path
+                        item_dict['thumbnail_url'] = item_dict['photo_url']
+                except Exception as e:
+                    logger.warning("thumbnail_url_recalc_failed", error=str(e), ar_content_id=ar_content_model.id)
+                    # Final fallback to photo_url
+                    if item_dict.get('photo_url'):
+                        item_dict['thumbnail_url'] = item_dict['photo_url']
+            
+            # Final fallback: use photo_url for thumbnail if still missing
+            if not item_dict['thumbnail_url'] and item_dict.get('photo_url'):
+                item_dict['thumbnail_url'] = item_dict['photo_url']
             
             ar_content_list.append(item_dict)
         
         # Extract unique companies and statuses for filters
         unique_companies = list(set(item.get('company_name', '') for item in ar_content_list if item.get('company_name')))
         unique_statuses = list(set(item.get('status', '') for item in ar_content_list if item.get('status')))
+        
+        # Set total_count and total_pages from calculated values
+        total_count = total
+        # total_pages already calculated above
     except Exception as exc:
         if not settings.DEBUG:
             logger.exception("ar_content_list_failed", error=str(exc))
@@ -236,9 +292,6 @@ async def ar_content_list(
         unique_statuses = ["ready", "processing", "pending", "failed"]
         total_count = len(ar_content_list)
         total_pages = 1
-    else:
-        total_count = result.total
-        total_pages = result.total_pages
     
     context = {
         "request": request,
@@ -698,9 +751,48 @@ async def ar_content_detail(
         if ar_content.get("active_video") and not ar_content.get("active_video_title"):
             ar_content["active_video_title"] = ar_content["active_video"].get("title")
 
-        videos, active_video_info = await _load_video_details(int(ar_content_id), db)
-        if active_video_info and not ar_content.get("active_video_title"):
-            ar_content["active_video_title"] = active_video_info.get("title")
+        try:
+            videos, active_video_info = await _load_video_details(int(ar_content_id), db)
+            if active_video_info and not ar_content.get("active_video_title"):
+                ar_content["active_video_title"] = active_video_info.get("title")
+        except Exception as exc:
+            logger.warning("video_details_load_failed", error=str(exc), ar_content_id=ar_content_id, exc_info=True)
+            videos, active_video_info = [], None
+
+        # Load rotation schedule information
+        rotation_schedule = None
+        rotation_schedule_js = None
+        try:
+            stmt = select(VideoRotationSchedule).where(
+                VideoRotationSchedule.ar_content_id == int(ar_content_id)
+            ).order_by(VideoRotationSchedule.created_at.desc())
+            result = await db.execute(stmt)
+            rotation_schedule = result.scalar_one_or_none()
+            
+            if rotation_schedule:
+                try:
+                    rotation_schedule_js = {
+                        "id": rotation_schedule.id,
+                        "rotation_type": getattr(rotation_schedule, 'rotation_type', 'fixed'),
+                        "default_video_id": getattr(rotation_schedule, 'default_video_id', None),
+                        "date_rules": getattr(rotation_schedule, 'date_rules', None) or [],
+                        "video_sequence": getattr(rotation_schedule, 'video_sequence', None) or [],
+                        "current_index": getattr(rotation_schedule, 'current_index', 0),
+                        "random_seed": getattr(rotation_schedule, 'random_seed', None),
+                        "no_repeat_days": getattr(rotation_schedule, 'no_repeat_days', 1),
+                        "is_active": getattr(rotation_schedule, 'is_active', True),
+                        "next_change_at": _serialize_datetime(getattr(rotation_schedule, 'next_change_at', None)),
+                        "last_changed_at": _serialize_datetime(getattr(rotation_schedule, 'last_changed_at', None)),
+                        "notify_before_expiry_days": getattr(rotation_schedule, 'notify_before_expiry_days', 7),
+                    }
+                except Exception as exc:
+                    logger.warning("rotation_schedule_serialize_failed", error=str(exc), ar_content_id=ar_content_id, exc_info=True)
+                    rotation_schedule_js = None
+        except Exception as exc:
+            # Table might not exist or have wrong structure - this is OK, just log and continue
+            logger.warning("rotation_schedule_load_failed", error=str(exc), ar_content_id=ar_content_id, exc_info=True)
+            rotation_schedule = None
+            rotation_schedule_js = None
 
         marker_metadata = ar_content.get("marker_metadata") or {}
         if ar_content.get("photo_path") and not marker_metadata.get("image_quality"):
@@ -844,6 +936,16 @@ async def ar_content_detail(
             }
         
         # Create a simplified version for JavaScript serialization
+        # Helper function to safely serialize datetime
+        def safe_serialize_datetime(value):
+            if value is None:
+                return None
+            if isinstance(value, str):
+                return value  # Already a string
+            if hasattr(value, "isoformat"):
+                return value.isoformat()
+            return str(value) if value else None
+        
         ar_content_js = {
             "id": ar_content.get("id"),
             "company_id": ar_content.get("company_id"),
@@ -869,12 +971,8 @@ async def ar_content_detail(
             "views_30_days": ar_content.get("views_30_days"),
             "active_video_title": ar_content.get("active_video_title"),
             "storage_path": ar_content.get("storage_path"),
-            "created_at": ar_content.get("created_at").isoformat()
-            if ar_content.get("created_at") and hasattr(ar_content.get("created_at"), "isoformat")
-            else ar_content.get("created_at"),
-            "updated_at": ar_content.get("updated_at").isoformat()
-            if ar_content.get("updated_at") and hasattr(ar_content.get("updated_at"), "isoformat")
-            else ar_content.get("updated_at"),
+            "created_at": safe_serialize_datetime(ar_content.get("created_at")),
+            "updated_at": safe_serialize_datetime(ar_content.get("updated_at")),
         }
         
     except Exception as exc:
@@ -896,6 +994,7 @@ async def ar_content_detail(
                 "marker_status": ar_content.get("marker_status"),
             }
         videos, active_video_info = [], None
+        rotation_schedule_js = None  # Ensure it's set even in fallback
         marker_metadata = ar_content.get("marker_metadata") or {}
         marker_metrics = {
             "file_size_kb": marker_metadata.get("file_size_kb"),
@@ -944,6 +1043,7 @@ async def ar_content_detail(
         "ar_content_js": ar_content_js,
         "videos_js": videos,
         "active_video_js": active_video_info,
+        "rotation_schedule_js": rotation_schedule_js,
         "marker_metrics": marker_metrics,
         "debug_info": debug_info,
         "current_user": current_user
