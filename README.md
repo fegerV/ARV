@@ -224,15 +224,28 @@ docker compose exec app bash
 
 Дополнительная документация находится в папке `/docs`:
 
+### Основная документация
 - **[API Reference](docs/API.md)** - Полная документация API
 - **[API Examples](docs/API_EXAMPLES.md)** - Примеры использования API
-- **[Troubleshooting](docs/TROUBLESHOOTING.md)** - Решение распространенных проблем
-- **[Manual Testing Guide](docs/MANUAL_TESTING_GUIDE.md)** - Руководство по ручному тестированию
 - **[Deployment Guide](docs/DEPLOYMENT.md)** - Руководство по развертыванию
+- **[Architecture](docs/ARCHITECTURE.md)** - Архитектура системы
+- **[Data Models](docs/DATA_MODELS.md)** - Модели данных и схема БД
+- **[Storage System](docs/STORAGE.md)** - Система хранения файлов
+
+### Техническая документация
 - **[Authentication System](docs/AUTH_SYSTEM.md)** - Документация по системе аутентификации
 - **[Migrations](docs/MIGRATIONS.md)** - Документация по миграциям базы данных
 - **[MindAR Generator](docs/MINDAR_GENERATOR.md)** - Документация по генератору AR-маркеров
 - **[Tech Stack](docs/TECH_STACK.md)** - Подробное описание технологического стека
+
+### Руководства
+- **[Manual Testing Guide](docs/MANUAL_TESTING_GUIDE.md)** - Руководство по ручному тестированию
+- **[Troubleshooting](docs/TROUBLESHOOTING.md)** - Решение распространенных проблем
+
+### Продвинутая документация
+- **[Security](docs/SECURITY.md)** - Политика безопасности для продакшена
+- **[Performance](docs/PERFORMANCE.md)** - Оптимизация производительности
+- **[Services](docs/SERVICES.md)** - Описание сервисов системы
 
 Также доступна интерактивная документация API по адресу: http://localhost:8000/docs
 
