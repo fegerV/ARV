@@ -69,29 +69,63 @@ async def projects_list(
     company_id_filter = int(company_filter) if company_filter and company_filter.isdigit() else None
     
     try:
-        # Get projects with filters
-        result = await list_projects(
-            page=page,
-            page_size=page_size,
-            company_id=company_id_filter,
-            db=db,
-            current_user=current_user
-        )
+        # Optimized: Load projects directly with company relationship to avoid N+1
+        from sqlalchemy.orm import selectinload
+        
+        # Calculate offset from page and page_size
+        skip = (page - 1) * page_size
+        
+        # Build base query with eager loading
+        query = select(Project).options(selectinload(Project.company))
+        count_query = select(func.count()).select_from(Project)
+        
+        # Apply company filter if specified
+        if company_id_filter:
+            query = query.where(Project.company_id == company_id_filter)
+            count_query = count_query.where(Project.company_id == company_id_filter)
+        
+        # Get total count (single query)
+        total_result = await db.execute(count_query)
+        total = total_result.scalar()
+        
+        # Calculate total pages
+        total_pages = (total + page_size - 1) // page_size
+        
+        # Apply pagination and ordering
+        query = query.order_by(Project.created_at.desc()).offset(skip).limit(page_size)
+        
+        # Execute query (company is already loaded via selectinload)
+        result = await db.execute(query)
+        projects_models = list(result.scalars().all())
+        
+        # Optimize AR content count: load all counts in one query
+        project_ids = [p.id for p in projects_models]
+        ar_content_counts = {}
+        if project_ids:
+            # Single query to get all AR content counts grouped by project_id
+            ar_content_count_query = (
+                select(ARContent.project_id, func.count(ARContent.id).label('count'))
+                .where(ARContent.project_id.in_(project_ids))
+                .group_by(ARContent.project_id)
+            )
+            ar_content_count_result = await db.execute(ar_content_count_query)
+            for row in ar_content_count_result.all():
+                ar_content_counts[row.project_id] = row.count
         
         projects = []
         
-        for item in result.items:
-            # Convert Pydantic model to dict using helper
-            project_dict = _pydantic_to_dict(item)
-            project_dict = _convert_enum_to_string(project_dict)
-            
-            # Get company name
-            try:
-                company = await db.get(Company, project_dict["company_id"])
-                project_dict["company_name"] = company.name if company else "Unknown"
-            except Exception as err:
-                logger.error("get_company_error", project_id=project_dict["id"], error=str(err))
-                project_dict["company_name"] = "Unknown"
+        for project_model in projects_models:
+            # Convert model to dict
+            project_dict = {
+                'id': str(project_model.id),
+                'name': project_model.name,
+                'status': project_model.status.value if hasattr(project_model.status, 'value') else str(project_model.status),
+                'company_id': project_model.company_id,
+                'company_name': project_model.company.name if project_model.company else "Unknown",
+                'created_at': project_model.created_at.isoformat() if project_model.created_at else None,
+                'updated_at': project_model.updated_at.isoformat() if project_model.updated_at else None,
+                'ar_content_count': ar_content_counts.get(project_model.id, 0),
+            }
             
             # Apply status filter if specified
             if status_filter and str(project_dict.get("status")) != status_filter:
@@ -99,8 +133,7 @@ async def projects_list(
             
             projects.append(project_dict)
         
-        total_count = result.total
-        total_pages = result.total_pages
+        total_count = total
         
     except Exception as e:
         logger = structlog.get_logger()

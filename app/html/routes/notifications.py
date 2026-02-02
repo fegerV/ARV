@@ -7,7 +7,8 @@ import structlog
 from app.html.deps import get_html_db
 from app.api.routes.auth import get_current_user_optional
 from app.models.notification import Notification
-from app.html.filters import datetime_format
+from app.html.filters import datetime_format, tojson_filter
+from app.core.config import settings
 
 router = APIRouter()
 logger = structlog.get_logger()
@@ -15,6 +16,8 @@ logger = structlog.get_logger()
 templates = Jinja2Templates(directory="templates")
 # Add datetime filter to templates
 templates.env.filters["datetime_format"] = datetime_format
+# Add custom tojson filter (overrides default if exists)
+templates.env.filters["tojson"] = tojson_filter
 
 
 def _convert_data_for_template(data_dict):
@@ -42,8 +45,19 @@ async def notifications_page(
         return RedirectResponse(url="/admin/login", status_code=303)
     
     # Get query parameters
-    page = int(request.query_params.get('page', 1))
-    page_size = int(request.query_params.get('page_size', 20))
+    try:
+        page = int(request.query_params.get('page', 1))
+        if page < 1:
+            page = 1
+    except (ValueError, TypeError):
+        page = 1
+    
+    try:
+        page_size = int(request.query_params.get('page_size', 20))
+        if page_size < 1 or page_size > 100:
+            page_size = 20
+    except (ValueError, TypeError):
+        page_size = 20
     
     try:
         # Get total count
@@ -53,7 +67,7 @@ async def notifications_page(
         
         # Calculate pagination
         offset = (page - 1) * page_size
-        total_pages = (total_count + page_size - 1) // page_size
+        total_pages = (total_count + page_size - 1) // page_size if total_count > 0 else 1
         
         # Get notifications (latest first)
         stmt = select(Notification).order_by(Notification.created_at.desc()).offset(offset).limit(page_size)
@@ -63,20 +77,26 @@ async def notifications_page(
         # Transform database notifications to template format
         notifications = []
         for n in notifications_db:
-            meta = dict(n.notification_metadata or {})
-            
-            notification = {
-                "id": n.id,
-                "title": n.subject or meta.get("title") or n.notification_type.replace("_", " ").title(),
-                "message": n.message or "",
-                "created_at": n.created_at.isoformat() if n.created_at else None,
-                "is_read": bool(meta.get("is_read", False)),
-                "company_name": meta.get("company_name"),
-                "project_name": meta.get("project_name"),
-                "ar_content_name": meta.get("ar_content_name"),
-                "notification_type": n.notification_type,
-            }
-            notifications.append(notification)
+            try:
+                meta = dict(n.notification_metadata or {})
+                
+                notification = {
+                    "id": n.id,
+                    "title": n.subject or meta.get("title") or (n.notification_type.replace("_", " ").title() if n.notification_type else "Notification"),
+                    "message": n.message or "",
+                    "created_at": n.created_at,  # Pass datetime object - filter will handle it
+                    "is_read": bool(meta.get("is_read", False)),
+                    "company_name": meta.get("company_name"),
+                    "project_name": meta.get("project_name"),
+                    "ar_content_name": meta.get("ar_content_name"),
+                    "notification_type": n.notification_type or "unknown",
+                }
+                notifications.append(notification)
+            except Exception as e:
+                logger.warning("error_processing_notification",
+                             notification_id=getattr(n, 'id', None),
+                             error=str(e))
+                continue
         
     except Exception as e:
         logger.error("notifications_list_error", error=str(e), exc_info=True)
@@ -85,16 +105,34 @@ async def notifications_page(
         total_pages = 1
         page = 1
     
-    context = {
-        "request": request,
-        "notifications": notifications,
-        "total_count": total_count,
-        "total_pages": total_pages,
-        "page": page,
-        "page_size": page_size,
-        "current_user": current_user
-    }
-    return templates.TemplateResponse("notifications.html", context)
+    try:
+        context = {
+            "request": request,
+            "notifications": notifications,
+            "total_count": total_count,
+            "total_pages": total_pages,
+            "page": page,
+            "page_size": page_size,
+            "current_user": current_user
+        }
+        return templates.TemplateResponse("notifications.html", context)
+    except Exception as e:
+        logger.error("notifications_template_error", 
+                    error=str(e), 
+                    error_type=type(e).__name__,
+                    exc_info=True)
+        # Return error page
+        error_context = {
+            "request": request,
+            "notifications": [],
+            "total_count": 0,
+            "total_pages": 1,
+            "page": 1,
+            "page_size": 20,
+            "current_user": current_user,
+            "error_message": str(e) if settings.DEBUG else "An error occurred while loading notifications."
+        }
+        return templates.TemplateResponse("notifications.html", error_context, status_code=500)
 
 
 @router.get("/notifications/{notification_id}", response_class=HTMLResponse)

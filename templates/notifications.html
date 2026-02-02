@@ -69,7 +69,11 @@
                                 </div>
                             </td>
                             <td class="px-6 py-4 text-sm text-gray-600 dark:text-gray-400">
-                                {{ notification.created_at }}
+                                {% if notification.created_at %}
+                                    {{ notification.created_at|datetime_format }}
+                                {% else %}
+                                    —
+                                {% endif %}
                             </td>
                             <td class="px-6 py-4 text-right">
                                 <div class="flex items-center justify-end gap-2">
@@ -185,7 +189,7 @@
 function notificationsManager() {
     return {
         notifications: {{ notifications|tojson }},
-        totalCount: {{ total_count }},
+        totalCount: {{ total_count|default(0) }},
         showDeleteModal: false,
         isDeleting: false,
         deleteNotification: { id: null, title: '' },

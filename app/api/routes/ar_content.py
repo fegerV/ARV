@@ -5,7 +5,7 @@ from app.middleware.rate_limiter import rate_limit
 from uuid import uuid4, UUID
 from pathlib import Path
 from typing import Optional
-from fastapi import APIRouter, UploadFile, File, Form, Depends, HTTPException, Query, BackgroundTasks
+from fastapi import APIRouter, UploadFile, File, Form, Depends, HTTPException, Query, BackgroundTasks, Request
 import shutil
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
@@ -440,6 +440,39 @@ async def _create_ar_content(
                 marker_status=marker_result.get("status"),
                 status="ready"
             )
+            
+            # Create notification for successful AR content creation
+            try:
+                from app.services.notification_service import create_notification
+                
+                # Load company and project names for notification
+                stmt = select(ARContent).options(
+                    selectinload(ARContent.company),
+                    selectinload(ARContent.project)
+                ).where(ARContent.id == ar_content.id)
+                result = await db.execute(stmt)
+                ar_content_loaded = result.scalar_one()
+                
+                company_name = ar_content_loaded.company.name if ar_content_loaded.company else None
+                project_name = ar_content_loaded.project.name if ar_content_loaded.project else None
+                
+                await create_notification(
+                    db=db,
+                    notification_type="ar_content_created",
+                    subject=f"New AR Content Created: {ar_content.order_number}",
+                    message=f"AR content '{ar_content.order_number}' has been successfully created and is ready for use.",
+                    company_id=company_id,
+                    project_id=project_id,
+                    ar_content_id=ar_content.id,
+                    metadata={
+                        "is_read": False,
+                        "company_name": company_name,
+                        "project_name": project_name,
+                        "ar_content_name": ar_content.order_number
+                    }
+                )
+            except Exception as e:
+                logger.warning("failed_to_create_notification", error=str(e))
     except Exception as e:
         logger.error("marker_generation_exception", error=str(e))
         # We won't fail the whole request if marker generation fails
@@ -1035,13 +1068,20 @@ async def get_ar_content_by_id(
     
     if not ar_content:
         raise HTTPException(status_code=404, detail="AR content not found")
-    
-    # Add unique link to response
+
+    # Ensure unique_id exists (legacy records may lack it)
+    uid = (ar_content.unique_id or "").strip()
+    if not uid:
+        uid = str(uuid4())
+        ar_content.unique_id = uid
+        await db.commit()
+
+    # Add unique_id, unique_link and full public URL to response
     content_data = ARContentWithLinks.model_validate(ar_content)
-    # Set unique_link after validation since it's not in the database model
-    content_data.unique_link = build_unique_link(ar_content.unique_id)
-    # Set public_url as alias for unique_link
-    content_data.public_url = content_data.unique_link
+    content_data.unique_id = uid
+    content_data.unique_link = build_unique_link(uid)
+    base = (settings.PUBLIC_URL or "").rstrip("/")
+    content_data.public_url = f"{base}{content_data.unique_link}" if base else content_data.unique_link
     # Set company and project IDs
     content_data.company_id = ar_content.company_id
     content_data.project_id = ar_content.project_id
@@ -1124,8 +1164,17 @@ async def get_ar_content_by_id_legacy(
 
 # AR viewer endpoint
 @router.get("/view/{unique_id}", response_class=HTMLResponse, tags=["AR Content"])
-async def get_ar_viewer(unique_id: str, db: AsyncSession = Depends(get_db)):
-    """Get AR viewer page for a specific AR content"""
+async def get_ar_viewer(
+    request: Request,
+    unique_id: str,
+    diagnose: Optional[str] = Query(None, description="Включить диагностику AR (отправка таймингов): ?diagnose=1"),
+    db: AsyncSession = Depends(get_db),
+):
+    """Get AR viewer page for a specific AR content. Use ?diagnose=1 to enable diagnostic timing."""
+    # On mobile, load MindAR only from our server (no CDN) to avoid timeouts/blocks
+    ua = (request.headers.get("user-agent") or "")
+    is_mobile_request = bool(re.search(r"(?i)Mobile|Android|iP(hone|od)", ua))
+    logger.info("ar_viewer_request", unique_id=unique_id, user_agent=ua[:100], is_mobile=is_mobile_request)
     try:
         # Validate UUID format
         parsed_uuid = UUID(unique_id)
@@ -1139,10 +1188,10 @@ async def get_ar_viewer(unique_id: str, db: AsyncSession = Depends(get_db)):
             raise HTTPException(status_code=404, detail="AR content not found")
         
         # Check if content has expired based on duration_years
-        from datetime import datetime, timedelta
+        from datetime import datetime, timedelta, timezone
         creation_date = ar_content.created_at.replace(tzinfo=None) if ar_content.created_at.tzinfo else ar_content.created_at
         expiry_date = creation_date + timedelta(days=ar_content.duration_years * 365)
-        current_date = datetime.utcnow()
+        current_date = datetime.now(timezone.utc).replace(tzinfo=None)
         
         if current_date > expiry_date:
             raise HTTPException(status_code=403, detail="AR content subscription has expired")
@@ -1191,18 +1240,10 @@ async def get_ar_viewer(unique_id: str, db: AsyncSession = Depends(get_db)):
         if not photo_url:
             raise HTTPException(status_code=400, detail="Photo URL not available")
         
-        # Get active video URL
+        # Get video URL (simplified - use ar_content.video_url first, fastest path)
         video_url = ar_content.video_url
-        try:
-            from app.services.video_scheduler import get_active_video
-            active_video_data = await get_active_video(ar_content.id, db)
-            if active_video_data and active_video_data.get("video"):
-                video_url = active_video_data["video"].video_url
-        except Exception as e:
-            logger.warning("active_video_fetch_failed", error=str(e), ar_content_id=ar_content.id)
-            # Fallback to ar_content.video_url
         
-        # If still no video_url, try to recalculate from video_path
+        # If no video_url, try to recalculate from video_path
         if not video_url and ar_content.video_path:
             try:
                 video_path = Path(ar_content.video_path)
@@ -1214,6 +1255,16 @@ async def get_ar_viewer(unique_id: str, db: AsyncSession = Depends(get_db)):
             except Exception as e:
                 logger.warning("video_url_recalc_failed", error=str(e), video_path=ar_content.video_path)
         
+        # Only try scheduler if still no video (scheduler can be slow)
+        if not video_url:
+            try:
+                from app.services.video_scheduler import get_active_video
+                active_video_data = await get_active_video(ar_content.id, db)
+                if active_video_data and active_video_data.get("video"):
+                    video_url = active_video_data["video"].video_url
+            except Exception as e:
+                logger.warning("active_video_fetch_failed", error=str(e), ar_content_id=ar_content.id)
+        
         if not video_url:
             raise HTTPException(status_code=400, detail="Video not available for AR content")
         
@@ -1223,78 +1274,591 @@ async def get_ar_viewer(unique_id: str, db: AsyncSession = Depends(get_db)):
                    photo_url=photo_url,
                    video_url=video_url)
         
-        # Escape only text content, not URLs (URLs are safe in HTML attributes)
-        import html
+        # Increment views_count (simple increment, don't block)
+        try:
+            ar_content.views_count = (ar_content.views_count or 0) + 1
+            await db.commit()
+            await db.refresh(ar_content)
+            logger.info("views_count_incremented", 
+                       ar_content_id=ar_content.id, 
+                       views_count=ar_content.views_count)
+        except Exception as e:
+            logger.warning("failed_to_increment_views", error=str(e))
+            # Don't fail the request if view count increment fails
         
-        # Return the AR viewer page HTML
-        html_content = f"""
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <meta charset="UTF-8">
-            <meta name="viewport" content="width=device-width, initial-scale=1" />
-            <title>AR Viewer - {html.escape(ar_content.order_number)}</title>
-            <script src="https://cdn.jsdelivr.net/gh/hiukim/mind-ar-js@1.2.5/dist/mindar-image.prod.js"></script>
-            <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
-            <script src="https://cdn.jsdelivr.net/gh/hiukim/mind-ar-js@1.2.5/dist/mindar-image-aframe.prod.js"></script>
-            <style>
-                body, html {{
-                    margin: 0;
-                    padding: 0;
-                    overflow: hidden;
-                    width: 100%;
-                    height: 100%;
-                    background-color: #000;
+        # Return simple HTML (template will be used via html route)
+        # This endpoint is called from html route which has proper request object
+        import html as html_escape
+        
+        # Use relative paths for viewer - browser will use same origin as the page
+        # This works correctly with port forwarding (443 -> 8000)
+        marker_url_for_viewer = marker_url if (marker_url or "").startswith("/") else "/" + (marker_url or "")
+        video_url_for_viewer = video_url if (video_url or "").startswith("/") else "/" + (video_url or "")
+        
+        diagnose_mode_str = "true" if diagnose else "false"
+        # Скрипты загружаются динамически в JavaScript, чтобы не блокировать страницу
+        html_content = f"""<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>AR Viewer - {html_escape.escape(ar_content.order_number)}</title>
+    <style>
+        * {{ margin: 0; padding: 0; box-sizing: border-box; }}
+        body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; overflow: hidden; background: #000; }}
+        #ar-container {{ position: fixed; top: 0; left: 0; width: 100%; height: 100%; }}
+        #loading {{ position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); color: white; font-size: 18px; text-align: center; z-index: 1000; }}
+        #instructions {{ position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: rgba(0, 0, 0, 0.7); color: white; padding: 15px 25px; border-radius: 10px; font-size: 14px; text-align: center; max-width: 90%; z-index: 1000; }}
+        .hidden {{ display: none; }}
+    </style>
+</head>
+<body>
+    <div id="loading">
+        <div>AR просмотр</div>
+        <div style="font-size: 14px; margin-top: 10px; opacity: 0.9;">Нажмите кнопку ниже — браузер запросит доступ к камере и покажет «Разрешить»</div>
+        <button id="start-camera-btn" type="button" style="margin-top: 20px; padding: 14px 28px; min-height: 48px; font-size: 18px; background: #1a73e8; color: white; border: none; border-radius: 8px; cursor: pointer; display: inline-block; touch-action: manipulation; -webkit-tap-highlight-color: transparent;">Запустить камеру</button>
+        <div id="start-camera-hint" style="font-size: 12px; margin-top: 14px; opacity: 0.7;">Ссылка должна открываться по HTTPS. Если кнопка «Разрешить» не видна — проверьте иконку камеры в адресной строке или настройки сайта.</div>
+    </div>
+    <div id="instructions" class="hidden">Наведите камеру на портрет</div>
+    <div id="ar-container"></div>
+    <video id="camera-preview" class="hidden" autoplay playsinline muted style="position:fixed;top:0;left:0;width:100%;height:100%;object-fit:cover;z-index:500;"></video>
+    <div id="camera-preview-overlay" class="hidden" style="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);color:white;text-align:center;z-index:501;pointer-events:none;"><div>Загрузка AR...</div><div style="font-size:14px;margin-top:10px;opacity:0.9;">Подождите</div></div>
+    <div id="debug-log" style="position:fixed;bottom:0;left:0;right:0;max-height:40vh;overflow-y:auto;background:rgba(0,0,0,0.9);color:#0f0;font-size:11px;font-family:monospace;padding:8px;z-index:9999;display:block;"></div>
+    <script>
+        // Debug logger - shows on screen
+        var debugEl = document.getElementById('debug-log');
+        var originalLog = console.log;
+        var originalError = console.error;
+        var originalWarn = console.warn;
+        function dbg(prefix, args) {{
+            var msg = prefix + ': ' + Array.prototype.slice.call(args).map(function(a) {{
+                if (a === null) return 'null';
+                if (a === undefined) return 'undefined';
+                if (typeof a === 'object') try {{ return JSON.stringify(a).substring(0,100); }} catch(e) {{ return String(a); }}
+                return String(a);
+            }}).join(' ');
+            if (debugEl) {{
+                var line = document.createElement('div');
+                line.textContent = new Date().toLocaleTimeString() + ' ' + msg;
+                if (prefix === 'ERR') line.style.color = '#f44';
+                if (prefix === 'WARN') line.style.color = '#fa0';
+                debugEl.appendChild(line);
+                debugEl.scrollTop = debugEl.scrollHeight;
+            }}
+        }}
+        console.log = function() {{ dbg('LOG', arguments); originalLog.apply(console, arguments); }};
+        console.error = function() {{ dbg('ERR', arguments); originalError.apply(console, arguments); }};
+        console.warn = function() {{ dbg('WARN', arguments); originalWarn.apply(console, arguments); }};
+        window.onerror = function(msg, url, line) {{ dbg('ERR', ['Global:', msg, 'at line', line]); }};
+        console.log('Debug panel initialized');
+        
+        const PORTRAIT_UID = "{unique_id}";
+        const API_BASE = window.location.origin;
+        const MARKER_URL = "{html_escape.escape(marker_url_for_viewer)}";
+        const VIDEO_URL = "{html_escape.escape(video_url_for_viewer)}";
+        const DIAGNOSE_MODE_STR = "{diagnose_mode_str}";
+        const DIAGNOSE_MODE = (typeof DIAGNOSE_MODE_STR !== 'undefined' && DIAGNOSE_MODE_STR === 'true');
+        var lastArStage = 'start_begin';
+        
+        function loadScript(src) {{
+            return new Promise(function(resolve, reject) {{
+                var s = document.createElement('script');
+                s.src = src;
+                s.onload = resolve;
+                s.onerror = function() {{ reject(new Error('Failed to load: ' + src)); }};
+                document.head.appendChild(s);
+            }});
+        }}
+        function loadAllScripts() {{
+            // Use CDN for MindAR v1.1.5 - this version has IIFE bundle that sets window.MINDAR
+            // Note: v1.2.5 uses ES modules and doesn't work with script tags
+            // MindAR requires WebGL backend (CPU backend NOT supported)
+            console.log('Loading Three.js from CDN...');
+            return loadScript('https://cdn.jsdelivr.net/npm/three@0.147.0/build/three.min.js')
+                .then(function() {{
+                    console.log('THREE loaded:', !!window.THREE);
+                    window.three = window.THREE;
+                    console.log('Loading MindAR v1.1.5 from CDN...');
+                    return loadScript('https://cdn.jsdelivr.net/npm/mind-ar@1.1.5/dist/mindar-image-three.prod.js');
+                }})
+                .then(function() {{
+                    console.log('MindAR loaded. MINDAR:', !!window.MINDAR, 'IMAGE:', !!(window.MINDAR && window.MINDAR.IMAGE));
+                    if (window.MINDAR && window.MINDAR.IMAGE) {{
+                        console.log('MindARThree:', typeof window.MINDAR.IMAGE.MindARThree);
+                        console.log('MINDAR.IMAGE keys:', Object.keys(window.MINDAR.IMAGE).join(','));
+                    }}
+                }});
+        }}
+        
+        async function initAR() {{
+            var loadingEl = document.getElementById('loading');
+            var isMobile = /Mobile|Android|iP(hone|od)/.test(navigator.userAgent);
+            // AR works on both mobile and desktop - desktop is often more stable
+            console.log('Device type:', isMobile ? 'mobile' : 'desktop');
+            
+            // Early WebGL check - TensorFlow.js requires specific WebGL features
+            loadingEl.innerHTML = '<div>Проверка WebGL...</div>';
+            var webglInfo = {{ ok: false, version: null, renderer: '', extensions: [] }};
+            try {{
+                var testCanvas = document.createElement('canvas');
+                var gl = testCanvas.getContext('webgl2') || testCanvas.getContext('webgl') || testCanvas.getContext('experimental-webgl');
+                if (gl) {{
+                    webglInfo.ok = true;
+                    webglInfo.version = gl.getParameter(gl.VERSION);
+                    var dbg = gl.getExtension('WEBGL_debug_renderer_info');
+                    if (dbg) webglInfo.renderer = gl.getParameter(dbg.UNMASKED_RENDERER_WEBGL);
+                    // TensorFlow.js requires these extensions
+                    var requiredExt = ['OES_texture_float', 'WEBGL_lose_context'];
+                    requiredExt.forEach(function(ext) {{
+                        if (gl.getExtension(ext)) webglInfo.extensions.push(ext);
+                    }});
+                    // Clean up
+                    var loseCtx = gl.getExtension('WEBGL_lose_context');
+                    if (loseCtx) loseCtx.loseContext();
                 }}
-                #ar-container {{
-                    width: 100%;
-                    height: 100%;
+            }} catch (e) {{ console.warn('WebGL check error:', e); }}
+            console.log('WebGL info:', webglInfo);
+            if (!webglInfo.ok) {{
+                var hint = isMobile 
+                    ? 'Этот браузер не поддерживает WebGL. Попробуйте Chrome или Safari.'
+                    : 'WebGL отключен. Включите аппаратное ускорение в настройках браузера.';
+                throw new Error('<b>WebGL недоступен</b><br><br>' + hint);
+            }}
+            
+            loadingEl.innerHTML = '<div>Загрузка библиотек AR...</div><div style="font-size: 14px; margin-top: 10px; opacity: 0.7;">Подождите</div>';
+            try {{
+                await loadAllScripts();
+            }} catch (loadErr) {{
+                console.error('Scripts load error:', loadErr);
+                throw new Error('Не удалось загрузить библиотеки AR. Проверьте интернет.');
+            }}
+            try {{
+                if (!window.MINDAR || !window.MINDAR.IMAGE) {{
+                    throw new Error('Библиотека AR не загрузилась. Проверьте интернет и обновите страницу.');
                 }}
-            </style>
-        </head>
-        <body>
-            <div id="ar-container">
-                <a-scene
-                    mindar-image="imageTargetSrc: {marker_url}; uiLoading: #uiLoading; uiError: #uiError;"
-                    color-space="sRGB"
-                    renderer="colorManagement: true, physicallyCorrectLights"
-                    vr-mode-ui="enabled: false"
-                    device-orientation-permission-ui="enabled: false"
-                >
-                    <a-assets>
-                        <img id="targetImage" src="{photo_url}" />
-                        <a-asset-item id="videoModel" src="{video_url}"></a-asset-item>
-                    </a-assets>
-
-                    <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
-                    <a-entity mindar-image-target="targetIndex: 0">
-                        <a-image
-                            src="#targetImage"
-                            position="0 0 0"
-                            scale="0.5 0.5 1"
-                        ></a-image>
-                        <a-video
-                            src="#videoModel"
-                            width="0.5"
-                            height="0.5"
-                            position="0 0.1 0.01"
-                            rotation="0 0 0"
-                            autoplay="true"
-                            loop="true"
-                        ></a-video>
-                    </a-entity>
-                    
-                    <div id="uiLoading" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: white; font-size: 18px; text-align: center;">
-                        <div>Initializing AR experience...</div>
-                    </div>
-                    <div id="uiError" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: white; font-size: 18px; text-align: center; display: none;">
-                        <div>Error loading AR. Please try again.</div>
-                    </div>
-                </a-scene>
-            </div>
-        </body>
-        </html>
-        """
+                const MindARThree = window.MINDAR.IMAGE.MindARThree;
+                if (typeof MindARThree !== 'function') {{
+                    throw new Error('MindARThree недоступен. Обновите страницу.');
+                }}
+                loadingEl.innerHTML = '<div>Загрузка маркера...</div><div style="font-size: 14px; margin-top: 10px; opacity: 0.7;">Подождите</div>';
+                var markerFullUrl = MARKER_URL.startsWith('http') ? MARKER_URL : (API_BASE + (MARKER_URL.startsWith('/') ? '' : '/') + MARKER_URL);
+                console.log('Marker URL:', markerFullUrl);
+                console.log('API_BASE:', API_BASE, 'MARKER_URL:', MARKER_URL);
+                try {{
+                    console.log('Fetching marker...');
+                    var markerResp = await fetch(markerFullUrl, {{ mode: 'cors', cache: 'default' }});
+                    console.log('Marker response:', markerResp.status, markerResp.ok);
+                    if (!markerResp.ok) throw new Error('Маркер не загружен: ' + markerResp.status);
+                }} catch (preloadErr) {{
+                    console.error('Marker preload error:', preloadErr);
+                    throw new Error('Не удалось загрузить маркер. Проверьте интернет и обновите страницу.');
+                }}
+                loadingEl.innerHTML = '<div>Подготовка нейросети...</div><div style="font-size: 14px; margin-top: 10px; opacity: 0.7;">На телефоне может занять 1–2 мин</div>';
+                loadingEl.style.display = 'block';
+                loadingEl.classList.remove('hidden');
+                var tf = window.MINDAR && window.MINDAR.IMAGE && window.MINDAR.IMAGE.tf;
+                if (tf) {{
+                    try {{
+                        // MindAR requires WebGL backend - CPU backend is NOT supported
+                        // because MindAR uses WebGL-specific APIs (texData, gpgpu, compileAndRun)
+                        if (typeof tf.ready === 'function') {{
+                            await tf.ready();
+                        }}
+                        // Check if WebGL backend is available
+                        var backend = tf.getBackend && tf.getBackend();
+                        console.log('TensorFlow.js backend:', backend);
+                        if (!backend || (backend !== 'webgl' && backend !== 'webgl2')) {{
+                            throw new Error('WebGL не поддерживается. MindAR требует WebGL для работы.');
+                        }}
+                        // Disable WEBGL_PACK for better compatibility
+                        if (tf.env && typeof tf.env === 'function') {{
+                            var env = tf.env();
+                            if (env && env.set && typeof env.set === 'function') {{
+                                env.set('WEBGL_PACK', false);
+                            }}
+                        }}
+                        // Warmup TensorFlow.js
+                        if (tf.ones && typeof tf.ones === 'function') {{
+                            var w = tf.ones([1, 1]);
+                            if (w && w.dispose) w.dispose();
+                        }}
+                        if (tf.nextFrame && typeof tf.nextFrame === 'function') await tf.nextFrame();
+                        await new Promise(function(r) {{ setTimeout(r, 300); }});
+                    }} catch (tfErr) {{
+                        console.error('TensorFlow.js init error:', tfErr);
+                        // TensorFlow.js WebGL failed even though basic WebGL works
+                        // This usually means missing extensions or GPU driver issues
+                        var tfHint = '';
+                        if (webglInfo.ok) {{
+                            tfHint = '<br><br><b>Диагностика:</b><br>' +
+                                '• WebGL версия: ' + (webglInfo.version || 'неизвестно') + '<br>' +
+                                '• GPU: ' + (webglInfo.renderer || 'неизвестно') + '<br>' +
+                                '• Расширения: ' + (webglInfo.extensions.length ? webglInfo.extensions.join(', ') : 'не найдены') + '<br><br>' +
+                                'TensorFlow.js требует специфичные WebGL расширения, которые не поддерживаются вашей видеокартой или драйверами.';
+                        }}
+                        var webglHint = isMobile 
+                            ? '<br><br>Попробуйте Chrome или Safari на этом устройстве.'
+                            : '<br><br><b>Рекомендации:</b><br>• Обновите драйверы видеокарты<br>• Попробуйте Firefox или Edge<br>• Включите аппаратное ускорение в настройках браузера';
+                        throw new Error('<b>TensorFlow.js не смог использовать WebGL</b>' + tfHint + webglHint);
+                    }}
+                }}
+                var arContainer = document.getElementById("ar-container");
+                loadingEl.style.display = 'none';
+                loadingEl.classList.add('hidden');
+                if (arContainer.offsetWidth === 0 || arContainer.offsetHeight === 0) {{
+                    loadingEl.style.display = 'block';
+                    loadingEl.classList.remove('hidden');
+                    loadingEl.innerHTML = '<div>Ошибка: контейнер AR не имеет размера.</div><button type="button" onclick="location.reload()" style="margin-top:12px;padding:8px 16px;">Обновить</button>';
+                    throw new Error('Контейнер AR не имеет размера. Обновите страницу.');
+                }}
+                console.log('Creating MindARThree with marker:', markerFullUrl);
+                console.log('arContainer:', arContainer, 'tagName:', arContainer ? arContainer.tagName : 'null');
+                console.log('arContainer size:', arContainer ? arContainer.offsetWidth + 'x' + arContainer.offsetHeight : 'null');
+                console.log('arContainer style:', arContainer ? arContainer.style : 'null');
+                
+                if (!arContainer) {{
+                    throw new Error('AR container element not found');
+                }}
+                
+                var mindarThree;
+                try {{
+                    mindarThree = new MindARThree({{
+                        container: arContainer,
+                        imageTargetSrc: markerFullUrl,
+                        maxTrack: 1,
+                        uiLoading: "no",
+                        uiScanning: "no",
+                        uiError: "no"
+                    }});
+                    console.log('MindARThree created successfully');
+                }} catch (createErr) {{
+                    console.error('MindARThree constructor error:', createErr);
+                    console.error('Error message:', createErr && createErr.message);
+                    console.error('Error stack:', createErr && createErr.stack);
+                    throw createErr;
+                }}
+                
+                // Always wrap internal methods to track progress (not just in DIAGNOSE_MODE)
+                ['_startVideo', '_startAR'].forEach(function(name) {{
+                    if (mindarThree[name] && typeof mindarThree[name] === 'function') {{
+                        var orig = mindarThree[name].bind(mindarThree);
+                        mindarThree[name] = function() {{
+                            var t0 = Date.now();
+                            console.log('MindAR stage:', name, 'started');
+                            lastArStage = name + '_started';
+                            return orig().then(function() {{ 
+                                console.log('MindAR stage:', name, 'completed in', Date.now() - t0, 'ms');
+                                lastArStage = name + '_done'; 
+                                if (DIAGNOSE_MODE) sendDiagnostic(name, Date.now() - t0); 
+                            }}, function(e) {{ 
+                                console.error('MindAR stage:', name, 'failed after', Date.now() - t0, 'ms', e);
+                                lastArStage = name + '_error';
+                                if (DIAGNOSE_MODE) sendDiagnostic(name + '_error', Date.now() - t0, e); 
+                                throw e; 
+                            }});
+                        }};
+                    }}
+                }});
+                
+                const {{renderer, scene, camera}} = mindarThree;
+                
+                const video = document.createElement('video');
+                video.src = VIDEO_URL;
+                video.loop = true;
+                video.muted = true;
+                video.playsInline = true;
+                video.preload = "auto";
+                
+                const texture = new THREE.VideoTexture(video);
+                texture.minFilter = THREE.LinearFilter;
+                texture.magFilter = THREE.LinearFilter;
+                
+                const geometry = new THREE.PlaneGeometry(1, 0.5625);
+                const material = new THREE.MeshBasicMaterial({{ map: texture, transparent: true, side: THREE.DoubleSide }});
+                const plane = new THREE.Mesh(geometry, material);
+                
+                const anchor = mindarThree.addAnchor(0);
+                anchor.group.add(plane);
+                
+                anchor.onTargetFound = () => {{
+                    video.play().catch(e => console.error('Video play error:', e));
+                    document.getElementById('instructions').classList.add('hidden');
+                }};
+                
+                anchor.onTargetLost = () => {{
+                    video.pause();
+                }};
+                
+                await new Promise(function(r) {{ requestAnimationFrame(r); }});
+                
+                // Pre-check camera access before starting MindAR
+                // MindAR v1.1.5 calls reject() without error message on camera failures
+                loadingEl.style.display = 'block';
+                loadingEl.classList.remove('hidden');
+                loadingEl.innerHTML = '<div>Запрос доступа к камере...</div><div style="font-size: 14px; margin-top: 10px; opacity: 0.7;">Нажмите «Разрешить» в диалоге браузера</div>';
+                
+                console.log('Pre-checking camera access...');
+                try {{
+                    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {{
+                        throw new Error('Браузер не поддерживает доступ к камере. Используйте Chrome, Safari или Firefox.');
+                    }}
+                    var testStream = await navigator.mediaDevices.getUserMedia({{ 
+                        video: {{ facingMode: 'environment' }}, 
+                        audio: false 
+                    }});
+                    console.log('Camera access granted');
+                    // Stop test stream - MindAR will request its own
+                    testStream.getTracks().forEach(function(t) {{ t.stop(); }});
+                }} catch (camErr) {{
+                    var camName = (camErr && camErr.name) || '';
+                    var camMsg = (camErr && camErr.message) || String(camErr);
+                    console.error('Camera pre-check error:', camName, camMsg);
+                    if (camName === 'NotAllowedError' || camMsg.indexOf('denied') >= 0 || camMsg.indexOf('Permission') >= 0) {{
+                        throw new Error('Доступ к камере запрещён. Разрешите камеру в настройках браузера и обновите страницу.');
+                    }}
+                    if (camName === 'NotFoundError' || camMsg.indexOf('not found') >= 0) {{
+                        throw new Error('Камера не найдена. Убедитесь, что устройство имеет камеру.');
+                    }}
+                    if (camName === 'NotReadableError' || camMsg.indexOf('in use') >= 0) {{
+                        throw new Error('Камера занята другим приложением. Закройте другие приложения и обновите страницу.');
+                    }}
+                    throw new Error('Не удалось получить доступ к камере: ' + camMsg);
+                }}
+                
+                loadingEl.innerHTML = '<div>Запуск AR-трекинга...</div><div style="font-size: 14px; margin-top: 10px; opacity: 0.7;">Подождите до 2 мин</div>';
+                var loadStartTime = Date.now();
+                var longLoadHint = setTimeout(function() {{
+                    if (loadingEl && loadingEl.style.display !== 'none') {{
+                        var elapsed = Math.round((Date.now() - loadStartTime) / 1000);
+                        loadingEl.innerHTML = '<div>Инициализация нейросети...</div>' +
+                            '<div style="font-size: 14px; margin-top: 10px; opacity: 0.8;">Прошло ' + elapsed + ' сек. На мобильных может занять 2-5 минут.</div>' +
+                            '<div style="font-size: 12px; margin-top: 8px; opacity: 0.6;">Не закрывайте страницу. Если долго — попробуйте на компьютере.</div>';
+                    }}
+                }}, 25000);
+                // Update loading message every 30 seconds
+                var loadingInterval = setInterval(function() {{
+                    if (loadingEl && loadingEl.style.display !== 'none') {{
+                        var elapsed = Math.round((Date.now() - loadStartTime) / 1000);
+                        loadingEl.innerHTML = '<div>Инициализация нейросети...</div>' +
+                            '<div style="font-size: 14px; margin-top: 10px; opacity: 0.8;">Прошло ' + elapsed + ' сек. Пожалуйста, подождите.</div>' +
+                            '<div style="font-size: 12px; margin-top: 8px; opacity: 0.6;">GPU: ' + (webglInfo.renderer || 'неизвестно') + '</div>';
+                    }}
+                }}, 30000);
+                var startTimeout = isMobile ? 180000 : 60000;  // 3 min mobile, 1 min desktop
+                if (DIAGNOSE_MODE) sendDiagnostic('start_begin', 0);
+                var startT0 = Date.now();
+                
+                console.log('Calling mindarThree.start()...');
+                var startPromise = mindarThree.start().then(function() {{
+                    console.log('mindarThree.start() completed successfully');
+                }}).catch(function(err) {{
+                    console.error('mindarThree.start() error:', err, JSON.stringify(err));
+                    throw err;
+                }});
+                var timeoutPromise = new Promise(function(_, reject) {{
+                    setTimeout(function() {{
+                        if (DIAGNOSE_MODE) sendDiagnostic('start_timeout', startTimeout, {{ message: 'Timeout ' + (startTimeout/1000) + 's', stage: lastArStage }});
+                        console.error('AR timeout at stage:', lastArStage);
+                        var stageText, stageHint;
+                        if (lastArStage === 'start_begin' || lastArStage === '_startVideo_started') {{
+                            stageText = 'запуск камеры';
+                            stageHint = 'Камера не отвечает. Закройте другие приложения и обновите страницу.';
+                        }} else if (lastArStage === '_startVideo_done' || lastArStage === '_startAR_started') {{
+                            stageText = 'инициализация нейросети';
+                            stageHint = 'GPU ' + (webglInfo.renderer || 'этого устройства') + ' не справляется с компиляцией WebGL шейдеров за ' + (startTimeout/1000) + ' сек. Это известное ограничение MindAR.';
+                        }} else {{
+                            stageText = lastArStage || 'неизвестно';
+                            stageHint = 'Попробуйте другой браузер.';
+                        }}
+                        var msg = '<b>Таймаут на этапе: ' + stageText + '</b><br><br>' + stageHint;
+                        if (isMobile) msg += '<br><br><b>Рекомендация:</b> откройте эту ссылку на компьютере в Chrome — там AR работает стабильно.';
+                        reject(new Error(msg));
+                    }}, startTimeout);
+                }});
+                try {{
+                    await Promise.race([startPromise, timeoutPromise]);
+                    clearTimeout(longLoadHint);
+                    clearInterval(loadingInterval);
+                    if (DIAGNOSE_MODE) sendDiagnostic('start_complete', Date.now() - startT0);
+                }} catch (startErr) {{
+                    clearTimeout(longLoadHint);
+                    clearInterval(loadingInterval);
+                    if (DIAGNOSE_MODE) sendDiagnostic('start_error', Date.now() - startT0, startErr);
+                    console.error('mindarThree.start error:', startErr);
+                    var name = (startErr && startErr.name) || '';
+                    var msg = (startErr && startErr.message) || '';
+                    // MindAR v1.1.5 sometimes rejects with empty object {{}} - provide meaningful message
+                    if (!msg && startErr && typeof startErr === 'object' && Object.keys(startErr).length === 0) {{
+                        msg = 'MindAR не смог запустить камеру. Возможные причины: камера занята, браузер не поддерживает AR, или устройство несовместимо.';
+                    }}
+                    if (!msg) msg = String(startErr);
+                    if (name === 'NotAllowedError' || (msg && (msg.indexOf('Permission') >= 0 || msg.indexOf('denied') >= 0))) {{
+                        throw new Error('Доступ к камере запрещён. Разрешите камеру для этого сайта в настройках браузера и обновите страницу.');
+                    }}
+                    if (name === 'NotFoundError' || (msg && msg.indexOf('not found') >= 0)) {{
+                        throw new Error('Камера не найдена. Подключите камеру или откройте на устройстве с камерой.');
+                    }}
+                    if (msg && msg.indexOf('Таймаут') >= 0) {{
+                        throw new Error(msg);
+                    }}
+                    if (msg && (msg.indexOf('WebGL') >= 0 || msg.indexOf('webgl') >= 0)) {{
+                        throw new Error('WebGL не поддерживается в этом окружении. Попробуйте другой браузер (Chrome с GPU) или устройство с поддержкой WebGL.');
+                    }}
+                    throw new Error('Не удалось запустить AR. ' + (msg || 'Неизвестная ошибка. Попробуйте другой браузер.'));
+                }}
+                loadingEl.classList.add('hidden');
+                loadingEl.style.display = 'none';
+                stopCameraPreview();
+                var instructionsEl = document.getElementById('instructions');
+                instructionsEl.classList.remove('hidden');
+                instructionsEl.style.display = 'block';
+                
+                try {{
+                    renderer.setAnimationLoop(function() {{
+                        renderer.render(scene, camera);
+                    }});
+                }} catch (loopErr) {{
+                    console.error('setAnimationLoop error:', loopErr);
+                    throw new Error('Ошибка отрисовки AR. ' + (loopErr.message || String(loopErr)));
+                }}
+                trackARSession(PORTRAIT_UID);
+            }} catch (error) {{
+                console.error('AR initialization error:', error);
+                if (DIAGNOSE_MODE) sendDiagnostic('init_error', 0, error);
+                showError(error);
+            }}
+        }}
+        
+        function stopCameraPreview() {{
+            if (window._arPreviewStream) {{
+                window._arPreviewStream.getTracks().forEach(function(t) {{ t.stop(); }});
+                window._arPreviewStream = null;
+            }}
+            var prev = document.getElementById('camera-preview');
+            if (prev) {{ prev.srcObject = null; prev.classList.add('hidden'); }}
+            var over = document.getElementById('camera-preview-overlay');
+            if (over) over.classList.add('hidden');
+        }}
+        
+        function showError(error) {{
+            stopCameraPreview();
+            if (typeof DIAGNOSE_MODE !== 'undefined' && DIAGNOSE_MODE && typeof sendDiagnostic === 'function') {{
+                sendDiagnostic('show_error', 0, error);
+            }}
+            var msg = error && (error.message || String(error));
+            var loading = document.getElementById('loading');
+            loading.style.display = 'block';
+            loading.style.position = 'fixed';
+            loading.style.top = '50%';
+            loading.style.left = '50%';
+            loading.style.transform = 'translate(-50%, -50%)';
+            loading.classList.remove('hidden');
+            var hint = 'Обновите страницу или нажмите «Повторить».';
+            if (msg && (msg.indexOf('timeout') >= 0 || msg.indexOf('Таймаут') >= 0 || msg.indexOf('load timeout') >= 0))
+                hint = 'Загрузка прервалась по времени. Проверьте интернет (туннель может быть медленным), подождите и нажмите «Повторить».';
+            else if (msg && (msg.indexOf('маркер') >= 0 || msg.indexOf('marker') >= 0 || msg.indexOf('fetch') >= 0))
+                hint = 'Маркер не загрузился. Проверьте интернет и доступность ссылки, затем нажмите «Повторить».';
+            loading.innerHTML = '<div style="color: #ff4444; font-weight: bold;">Ошибка загрузки AR</div>' +
+                '<div style="font-size: 14px; margin-top: 12px; text-align: left; line-height: 1.6;">' + (msg || 'Неизвестная ошибка') + '</div>' +
+                '<p style="font-size: 12px; margin-top: 12px; opacity: 0.8;">' + hint + '</p>' +
+                '<button type="button" onclick="location.reload()" style="margin-top: 16px; padding: 10px 20px; background: #333; color: #fff; border: none; border-radius: 8px; font-size: 16px;">Повторить</button>' +
+                '<style>code {{ background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 3px; }}</style>';
+        }}
+        
+        function trackARSession(portraitId) {{
+            const sessionId = generateUUID();
+            fetch(`${{API_BASE}}/api/analytics/mobile/sessions`, {{
+                method: 'POST',
+                headers: {{'Content-Type': 'application/json'}},
+                body: JSON.stringify({{
+                    session_id: sessionId,
+                    ar_content_unique_id: portraitId,
+                    user_agent: navigator.userAgent,
+                    device_type: /Mobile|Android|iP(hone|od)/.test(navigator.userAgent) ? 'mobile' : 'desktop'
+                }})
+            }}).catch(e => console.error('Session tracking error:', e));
+        }}
+        
+        function generateUUID() {{
+            return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {{
+                const r = Math.random() * 16 | 0;
+                const v = c === 'x' ? r : (r & 0x3 | 0x8);
+                return v.toString(16);
+            }});
+        }}
+        
+        function sendDiagnostic(event, durationMs, err) {{
+            if (!DIAGNOSE_MODE) return;
+            var body = {{ event: event, duration_ms: durationMs, user_agent: navigator.userAgent, ar_content_unique_id: PORTRAIT_UID }};
+            if (err) body.error = (err && err.message) || String(err);
+            fetch(API_BASE + '/api/analytics/ar-diagnostic', {{
+                method: 'POST',
+                headers: {{ 'Content-Type': 'application/json' }},
+                body: JSON.stringify(body)
+            }}).catch(function(e) {{ console.error('Diagnostic send error:', e); }});
+        }}
+        
+        window.onerror = function(msg, url, line, col, err) {{
+            var text = (err && err.message) || msg || 'Неизвестная ошибка';
+            showError({{ message: text + (line ? ' (строка ' + line + ')' : '') }});
+        }};
+        window.addEventListener('unhandledrejection', function(e) {{
+            var err = e.reason;
+            var msg = (err && (err.message || String(err))) || 'Необработанная ошибка';
+            console.error('Unhandled rejection:', err);
+            if (typeof sendDiagnostic !== 'undefined' && DIAGNOSE_MODE) sendDiagnostic('unhandled_rejection', 0, err);
+            showError({{ message: msg }});
+            e.preventDefault();
+        }});
+        (function() {{
+            console.log('AR viewer script loaded');
+            var btn = document.getElementById('start-camera-btn');
+            var loadingEl = document.getElementById('loading');
+            console.log('Button found:', !!btn, 'Loading found:', !!loadingEl);
+            function onStartClick(e) {{
+                console.log('Button clicked!', e ? e.type : 'no event');
+                if (e && e.type === 'touchend') e.preventDefault();
+                if (!btn) return;
+                if (btn.disabled && btn.textContent.indexOf('Запрос') >= 0) return;
+                if (!loadingEl) {{ console.error('loading element not found'); showError({{ message: 'Ошибка загрузки страницы. Обновите страницу.' }}); return; }}
+                try {{
+                    btn.disabled = true;
+                    btn.textContent = 'Запрос камеры...';
+                    loadingEl.innerHTML = '<div>Запрос доступа к камере...</div><div style="font-size: 14px; margin-top: 10px; opacity: 0.7;">Нажмите «Разрешить» в окне браузера</div>';
+                }} catch (err) {{
+                    console.error('onStartClick init:', err);
+                    showError({{ message: (err && err.message) || String(err) }});
+                    btn.disabled = false;
+                    btn.textContent = 'Запустить камеру';
+                    return;
+                }}
+                // Don't request camera here - let MindAR handle it
+                // This avoids conflicts with multiple camera streams
+                console.log('Starting AR directly (MindAR will request camera)...');
+                loadingEl.innerHTML = '<div>Загрузка AR...</div><div style="font-size: 14px; margin-top: 10px; opacity: 0.7;">MindAR запросит камеру</div>';
+                loadingEl.style.display = 'block';
+                btn.textContent = 'Загрузка...';
+                initAR();
+            }}
+            if (btn) {{
+                console.log('Adding event listeners to button');
+                btn.addEventListener('click', onStartClick);
+                btn.addEventListener('touchend', function(e) {{ console.log('touchend!'); onStartClick(e); }}, {{ passive: false }});
+                btn.style.cursor = 'pointer';
+                btn.style.touchAction = 'manipulation';
+                btn.style.border = '3px solid green';  // Visual indicator that JS is working
+            }} else {{
+                console.error('Button not found!');
+            }}
+            // AR works on both mobile and desktop - no restrictions needed
+            window.addEventListener('load', function() {{
+                console.log('Page loaded, AR ready on', /Mobile|Android|iP(hone|od)/.test(navigator.userAgent) ? 'mobile' : 'desktop');
+            }});
+        }})();
+    </script>
+</body>
+</html>"""
+        
         return HTMLResponse(content=html_content)
     
     except HTTPException:

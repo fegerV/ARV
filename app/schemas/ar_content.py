@@ -131,6 +131,7 @@ class ARContentWithLinks(BaseModel):
     """Schema for AR content with additional links"""
     id: int
     order_number: str
+    unique_id: Optional[str] = None  # UUID for /view/{unique_id}
     unique_link: Optional[str] = None
     public_url: Optional[str] = None  # Public URL for AR viewer
     company_id: int  # Company ID

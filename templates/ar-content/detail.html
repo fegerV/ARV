@@ -12,8 +12,8 @@
 <script type="application/json" id="ar-content-marker-metrics">{{ marker_metrics | default({}) | tojson }}</script>
 
 <script>
-// Define function before Alpine.js tries to use it
-function arContentDetail() {
+// Define component for Alpine.js (must be global for x-data)
+window.arContentDetail = function arContentDetail() {
     // Safely parse JSON data with fallbacks
     let arContent = {};
     let videos = [];
@@ -66,6 +66,14 @@ function arContentDetail() {
         console.error('Failed to parse ar-content-marker-metrics:', e);
     }
 
+    function fullArUrlFromContent(c) {
+        const url = (c && (c.public_url || c.unique_link)) || '';
+        return url.startsWith('/') ? (typeof window !== 'undefined' ? window.location.origin : '') + url : url;
+    }
+    function portraitUrlFromContent(c) {
+        return (c && (c.thumbnail_url || c.photo_url)) || '';
+    }
+
     return {
         arContent: arContent || {},
         videos: Array.isArray(videos) ? videos : [],
@@ -93,6 +101,8 @@ function arContentDetail() {
         replacePhotoFile: null,
         replaceVideoFile: null,
         regenerateOnSave: true,
+        fullArUrl: '',
+        portraitUrl: '',
         rotationScheduleForm: {
             rotation_type: 'fixed',
             default_video_id: null,
@@ -103,15 +113,18 @@ function arContentDetail() {
         },
 
         init() {
-            // Ensure all data is loaded before initializing
+            this.fullArUrl = fullArUrlFromContent(this.arContent);
+            this.portraitUrl = portraitUrlFromContent(this.arContent);
             if (Object.keys(this.arContent).length === 0) {
                 console.warn('arContent is empty, trying to reload...');
-                // Try to reload data after a short delay
+                const self = this;
                 setTimeout(() => {
                     const arContentEl = document.getElementById('ar-content-data');
                     if (arContentEl && arContentEl.textContent) {
                         try {
-                            this.arContent = JSON.parse(arContentEl.textContent);
+                            self.arContent = JSON.parse(arContentEl.textContent);
+                            self.fullArUrl = fullArUrlFromContent(self.arContent);
+                            self.portraitUrl = portraitUrlFromContent(self.arContent);
                         } catch (e) {
                             console.error('Failed to reload arContent:', e);
                         }
@@ -122,13 +135,12 @@ function arContentDetail() {
             this.loadVideos();
         },
 
-        get fullArUrl() {
-            const url = this.arContent.public_url || this.arContent.unique_link || '';
-            return url.startsWith('/') ? window.location.origin + url : url;
+        get fullArUrlComputed() {
+            return fullArUrlFromContent(this.arContent);
         },
 
-        get portraitUrl() {
-            return this.arContent.thumbnail_url || this.arContent.photo_url || '';
+        get portraitUrlComputed() {
+            return portraitUrlFromContent(this.arContent);
         },
 
         get activeVideo() {
@@ -1596,6 +1608,7 @@ function arContentDetail() {
                 <input type="text" 
                        :value="fullArUrl" 
                        readonly
+                       placeholder="Ссылка для AR-просмотра (обновите страницу, если пусто)"
                        class="form-input flex-1">
                 <button @click="copyLink" class="btn btn-secondary">
                     <span class="material-icons mr-2">content_copy</span>Копировать

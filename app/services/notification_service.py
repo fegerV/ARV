@@ -4,10 +4,69 @@ from email.mime.multipart import MIMEMultipart
 import asyncio
 import httpx
 import structlog
+from typing import Optional, Dict, Any
+from datetime import datetime
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
+from app.models.notification import Notification
 
 logger = structlog.get_logger()
+
+
+async def create_notification(
+    db: AsyncSession,
+    notification_type: str,
+    subject: str,
+    message: str,
+    company_id: Optional[int] = None,
+    project_id: Optional[int] = None,
+    ar_content_id: Optional[int] = None,
+    metadata: Optional[Dict[str, Any]] = None,
+) -> Notification:
+    """Create a notification in the database.
+    
+    Args:
+        db: Database session
+        notification_type: Type of notification (e.g., 'ar_content_created', 'project_expired')
+        subject: Notification subject/title
+        message: Notification message
+        company_id: Optional company ID
+        project_id: Optional project ID
+        ar_content_id: Optional AR content ID
+        metadata: Optional metadata dictionary
+        
+    Returns:
+        Created Notification object
+    """
+    try:
+        notification = Notification(
+            notification_type=notification_type,
+            subject=subject,
+            message=message,
+            company_id=company_id,
+            project_id=project_id,
+            ar_content_id=ar_content_id,
+            notification_metadata=metadata or {},
+            created_at=datetime.utcnow()
+        )
+        
+        db.add(notification)
+        await db.flush()
+        await db.commit()
+        await db.refresh(notification)
+        
+        logger.info("notification_created",
+                   notification_id=notification.id,
+                   notification_type=notification_type)
+        
+        return notification
+    except Exception as e:
+        logger.error("error_creating_notification",
+                    error=str(e),
+                    notification_type=notification_type)
+        await db.rollback()
+        raise
 
 
 def send_expiry_warning_email(project_name: str, company_email: str, expires_at_str: str, ar_items_count: int) -> bool:
@@ -84,6 +143,22 @@ async def send_expiry_warning_telegram(company_chat_id: str, project_name: str, 
 class NotificationService:
     def __init__(self):
         pass
+
+    async def create_notification(
+        self,
+        db: AsyncSession,
+        notification_type: str,
+        subject: str,
+        message: str,
+        company_id: Optional[int] = None,
+        project_id: Optional[int] = None,
+        ar_content_id: Optional[int] = None,
+        metadata: Optional[Dict[str, Any]] = None,
+    ) -> Notification:
+        return await create_notification(
+            db, notification_type, subject, message,
+            company_id, project_id, ar_content_id, metadata
+        )
 
     def send_expiry_warning_email(self, project_name: str, company_email: str, expires_at_str: str, ar_items_count: int) -> bool:
         return send_expiry_warning_email(project_name, company_email, expires_at_str, ar_items_count)

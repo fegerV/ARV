@@ -35,8 +35,10 @@ class Video(Base):
 
     # Playback/rotation
     is_active = Column(Boolean, default=False, nullable=False)
-    rotation_type = Column(String(20), default="none", nullable=False)
+    rotation_type = Column(String(20), default="none", nullable=False)  # Legacy: none, sequential, cyclic
     rotation_order = Column(Integer, default=0, nullable=False)
+    rotation_weight = Column(Integer, default=1, nullable=True)  # Weight for random selection
+    is_default = Column(Boolean, default=False, nullable=False)  # Mark as default video
     subscription_end = Column(DateTime, nullable=True)
     
     # Timestamps

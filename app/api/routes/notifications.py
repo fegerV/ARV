@@ -18,8 +18,22 @@ from app.schemas.notifications import (
     NotificationDeleteResponse
 )
 from app.models.user import User
+from app.services.notification_service import create_notification
+from pydantic import BaseModel
+from typing import Optional, Dict, Any
 
 router = APIRouter()
+
+
+class NotificationCreate(BaseModel):
+    """Schema for creating a notification."""
+    notification_type: str
+    subject: str
+    message: str
+    company_id: Optional[int] = None
+    project_id: Optional[int] = None
+    ar_content_id: Optional[int] = None
+    metadata: Optional[Dict[str, Any]] = None
 
 
 def _send_email_notification_sync(to_email: str, subject: str, html_body: str) -> None:
@@ -172,6 +186,40 @@ async def delete_notification(
     return NotificationDeleteResponse(
         success=True,
         message=f"Notification {notification_id} deleted"
+    )
+
+
+@router.post("", response_model=NotificationItem)
+async def create_notification_endpoint(
+    notification_data: NotificationCreate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """Create a new notification."""
+    notification = await create_notification(
+        db=db,
+        notification_type=notification_data.notification_type,
+        subject=notification_data.subject,
+        message=notification_data.message,
+        company_id=notification_data.company_id,
+        project_id=notification_data.project_id,
+        ar_content_id=notification_data.ar_content_id,
+        metadata=notification_data.metadata,
+    )
+    
+    meta = dict(notification.notification_metadata or {})
+    return NotificationItem(
+        id=notification.id,
+        title=notification.subject or notification.notification_type.replace("_", " ").title(),
+        message=notification.message or "",
+        type=notification.notification_type,
+        is_read=bool(meta.get("is_read", False)),
+        read_at=meta.get("read_at"),
+        created_at=notification.created_at,
+        metadata=meta,
+        company_name=meta.get("company_name"),
+        project_name=meta.get("project_name"),
+        ar_content_name=meta.get("ar_content_name"),
     )
 
 

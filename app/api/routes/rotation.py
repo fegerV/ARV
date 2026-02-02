@@ -11,16 +11,36 @@ router = APIRouter()
 
 @router.post("/ar-content/{content_id}/rotation")
 async def set_rotation(content_id: int, payload: dict, db: AsyncSession = Depends(get_db)):
+    # Check if schedule already exists
+    stmt = select(VideoRotationSchedule).where(VideoRotationSchedule.ar_content_id == content_id)
+    result = await db.execute(stmt)
+    existing = result.scalar_one_or_none()
+    
+    if existing:
+        # Update existing schedule
+        for k, v in payload.items():
+            if hasattr(existing, k) and k != 'id':
+                setattr(existing, k, v)
+        await db.commit()
+        await db.refresh(existing)
+        return {"id": existing.id}
+    
+    # Create new schedule
     sched = VideoRotationSchedule(
         ar_content_id=content_id,
-        rotation_type=payload.get("rotation_type", "daily"),
+        rotation_type=payload.get("rotation_type", "fixed"),
+        default_video_id=payload.get("default_video_id"),
+        date_rules=payload.get("date_rules", []),
+        video_sequence=payload.get("video_sequence", []),
+        current_index=payload.get("current_index", 0),
+        random_seed=payload.get("random_seed"),
+        no_repeat_days=payload.get("no_repeat_days", 1),
         time_of_day=payload.get("time_of_day"),
         day_of_week=payload.get("day_of_week"),
         day_of_month=payload.get("day_of_month"),
         cron_expression=payload.get("cron_expression"),
-        video_sequence=payload.get("video_sequence"),
-        current_index=payload.get("current_index", 0),
-        is_active=1,
+        is_active=payload.get("is_active", True),
+        notify_before_expiry_days=payload.get("notify_before_expiry_days", 7),
     )
     db.add(sched)
     await db.flush()
@@ -35,10 +55,11 @@ async def update_rotation(schedule_id: int, payload: dict, db: AsyncSession = De
     if not sched:
         raise HTTPException(status_code=404, detail="Rotation schedule not found")
     for k, v in payload.items():
-        if hasattr(sched, k):
+        if hasattr(sched, k) and k != 'id':
             setattr(sched, k, v)
     await db.commit()
-    return {"status": "updated"}
+    await db.refresh(sched)
+    return {"status": "updated", "id": sched.id}
 
 
 @router.delete("/rotation/{schedule_id}")
@@ -60,7 +81,7 @@ async def set_rotation_sequence(content_id: int, payload: dict, db: AsyncSession
     res = await db.execute(select(VideoRotationSchedule).where(VideoRotationSchedule.ar_content_id == content_id))
     sched = res.scalars().first()
     if not sched:
-        sched = VideoRotationSchedule(ar_content_id=content_id, rotation_type="daily", video_sequence=seq, current_index=0, is_active=1)
+        sched = VideoRotationSchedule(ar_content_id=content_id, rotation_type="daily_cycle", video_sequence=seq, current_index=0, is_active=True)
         db.add(sched)
     else:
         sched.video_sequence = seq

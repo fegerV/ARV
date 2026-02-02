@@ -1,6 +1,7 @@
 from datetime import datetime, timedelta
 from typing import Optional
 import uuid
+import structlog
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, distinct, text
@@ -176,6 +177,28 @@ async def mobile_session_start(payload: dict, db: AsyncSession = Depends(get_db)
     db.add(s)
     await db.commit()
     return {"status": "created", "session_id": str(session_uuid)}
+
+
+@router.post("/ar-diagnostic")
+async def ar_diagnostic_event(payload: dict):
+    """Приём диагностических событий AR (тайминги, этапы) при открытии viewer с ?diagnose=1.
+    Логирует события для анализа зависаний на мобильных (MindAR start, _startVideo, _startAR и т.д.).
+    """
+    logger = structlog.get_logger()
+    stage = payload.get("event") or payload.get("stage")
+    duration_ms = payload.get("duration_ms")
+    user_agent = payload.get("user_agent", "")
+    ar_content_unique_id = payload.get("ar_content_unique_id", "")
+    err = payload.get("error")
+    logger.info(
+        "ar_diagnostic",
+        stage=stage,
+        duration_ms=duration_ms,
+        user_agent=user_agent[:200] if user_agent else None,
+        ar_content_unique_id=ar_content_unique_id or None,
+        error=err,
+    )
+    return {"status": "ok"}
 
 
 @router.post("/mobile/analytics")

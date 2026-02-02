@@ -36,6 +36,9 @@ class ARContent(Base):
     duration_years = Column(Integer, default=1, nullable=False)
     views_count = Column(Integer, default=0, nullable=False)
     
+    # Video rotation state
+    rotation_state = Column(Integer, default=0, nullable=True)  # Current index in rotation sequence
+    
     # Status and metadata
     status = Column(String(50), default=ArContentStatus.PENDING, nullable=False)
     content_metadata = Column(JSON().with_variant(JSONB, "postgresql"), nullable=True)

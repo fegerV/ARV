@@ -127,6 +127,8 @@ async def seed_defaults() -> None:
             session.add(admin_user)
             await session.flush()
         else:
+            # Синхронизируем пароль админа из .env (удобно для dev)
+            admin_user.hashed_password = get_password_hash(settings.ADMIN_DEFAULT_PASSWORD)
             logger.info("default_admin_exists", user_id=admin_user.id)
 
         # Default local storage connection

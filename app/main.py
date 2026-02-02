@@ -1,3 +1,4 @@
+import asyncio
 from contextlib import asynccontextmanager
 from pathlib import Path
 from fastapi import FastAPI, Request, status
@@ -49,6 +50,22 @@ async def lifespan(app: FastAPI) -> AsyncGenerator:
     """
     
     # Startup
+    # Suppress ConnectionResetError (WinError 10054) in asyncio callbacks when client closes connection
+    def _asyncio_exception_handler(loop: asyncio.AbstractEventLoop, context: dict) -> None:
+        exc = context.get("exception")
+        if exc is not None:
+            if isinstance(exc, ConnectionResetError):
+                if getattr(exc, "winerror", None) == 10054:
+                    return  # suppress log
+            if isinstance(exc, OSError) and getattr(exc, "winerror", None) == 10054:
+                return
+        loop.default_exception_handler(context)
+
+    try:
+        asyncio.get_running_loop().set_exception_handler(_asyncio_exception_handler)
+    except RuntimeError:
+        pass
+
     logger.info(
         "application_startup",
         environment=settings.ENVIRONMENT,
@@ -62,6 +79,8 @@ async def lifespan(app: FastAPI) -> AsyncGenerator:
         storage_base_path=str(Path(settings.STORAGE_BASE_PATH).resolve()),
         local_storage_path=str(Path(settings.LOCAL_STORAGE_PATH).resolve()),
     )
+    db_kind = "sqlite" if "sqlite" in settings.DATABASE_URL else "postgres"
+    logger.info("database_config", database=db_kind)
 
     try:
         settings.validate_sensitive_defaults()
@@ -234,10 +253,14 @@ async def favicon():
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(
-        "app.main:app",
-        host="127.0.0.1",
-        port=8000,
-        reload=settings.DEBUG,
-        log_level=settings.LOG_LEVEL.lower(),
-    )
+    # 0.0.0.0 — доступ с других устройств (в т.ч. через ngrok для теста AR на телефоне)
+    run_kw: dict = {
+        "host": "0.0.0.0",
+        "port": 8000,
+        "reload": settings.DEBUG,
+        "log_level": settings.LOG_LEVEL.lower(),
+    }
+    if settings.ssl_enabled:
+        run_kw["ssl_keyfile"] = settings.SSL_KEYFILE
+        run_kw["ssl_certfile"] = settings.SSL_CERTFILE
+    uvicorn.run("app.main:app", **run_kw)

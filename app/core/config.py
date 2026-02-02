@@ -72,6 +72,18 @@ class Settings(BaseSettings):
 
     PUBLIC_URL: str = Field(default="http://localhost:8000")
 
+    # SSL / HTTPS (сертификаты в папке ssl/, порты проброшены)
+    SSL_KEYFILE: str = ""   # путь к privkey.pem (например ssl/privkey.pem)
+    SSL_CERTFILE: str = ""  # путь к fullchain.pem (например ssl/fullchain.pem)
+
+    @property
+    def ssl_enabled(self) -> bool:
+        """True, если заданы оба пути к сертификатам и файлы существуют."""
+        if not self.SSL_KEYFILE or not self.SSL_CERTFILE:
+            return False
+        from pathlib import Path
+        return Path(self.SSL_KEYFILE).exists() and Path(self.SSL_CERTFILE).exists()
+
     # Media
     MEDIA_ROOT: str = "/app/storage/content"
     TEMPLATES_DIR: str = "/app/templates"

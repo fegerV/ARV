@@ -1,4 +1,6 @@
-from fastapi import APIRouter, Request, Depends, UploadFile, File, Form, BackgroundTasks
+import uuid
+from typing import Optional
+from fastapi import APIRouter, Request, Depends, UploadFile, File, Form, BackgroundTasks, Query
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
@@ -738,6 +740,26 @@ async def ar_content_detail(
         
         ar_content = convert_datetimes(ar_content)
 
+        # Сразу задаём unique_id, unique_link и public_url (чтобы ссылка была даже при ошибках ниже)
+        from app.utils.ar_content import build_unique_link
+        uid = (ar_content.get("unique_id") or "").strip()
+        if not uid:
+            try:
+                ar_content_row = await db.get(ARContent, int(ar_content_id))
+                if ar_content_row:
+                    uid = (ar_content_row.unique_id or "").strip()
+                    if not uid:
+                        uid = str(uuid.uuid4())
+                        ar_content_row.unique_id = uid
+                        await db.commit()
+            except Exception as e:
+                logger.warning("unique_id_ensure_failed", error=str(e), ar_content_id=ar_content_id)
+        if uid:
+            ar_content["unique_id"] = uid
+            ar_content["unique_link"] = build_unique_link(uid)
+            base = (settings.PUBLIC_URL or "").rstrip("/")
+            ar_content["public_url"] = f"{base}{build_unique_link(uid)}" if base else build_unique_link(uid)
+
         try:
             views_30_days_result = await analytics_content(int(ar_content_id), db)
             views_30_days = int(views_30_days_result.get("views_30_days", 0))
@@ -951,6 +973,7 @@ async def ar_content_detail(
             "company_id": ar_content.get("company_id"),
             "project_id": ar_content.get("project_id"),
             "order_number": ar_content.get("order_number"),
+            "unique_id": ar_content.get("unique_id"),
             "customer_name": ar_content.get("customer_name"),
             "customer_phone": ar_content.get("customer_phone"),
             "customer_email": ar_content.get("customer_email"),
@@ -1229,9 +1252,11 @@ async def ar_content_update_post(
 
 @router.get("/view/{unique_id}", response_class=HTMLResponse)
 async def ar_content_viewer(
+    request: Request,
     unique_id: str,
-    db: AsyncSession = Depends(get_html_db)
+    diagnose: Optional[str] = Query(None, description="Включить диагностику AR: ?diagnose=1"),
+    db: AsyncSession = Depends(get_html_db),
 ):
-    """Public AR viewer page."""
+    """Public AR viewer page. Add ?diagnose=1 to send AR timing diagnostics to the server."""
     from app.api.routes.ar_content import get_ar_viewer
-    return await get_ar_viewer(unique_id, db)
+    return await get_ar_viewer(request=request, unique_id=unique_id, diagnose=diagnose, db=db)

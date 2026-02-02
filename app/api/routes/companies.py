@@ -82,21 +82,30 @@ async def list_companies(
     result = await db.execute(query)
     companies = result.scalars().all()
     
+    # Optimize projects count: load all counts in one query
+    company_ids = [c.id for c in companies]
+    projects_counts = {}
+    if company_ids:
+        # Single query to get all project counts grouped by company_id
+        projects_count_query = (
+            select(Project.company_id, func.count(Project.id).label('count'))
+            .where(Project.company_id.in_(company_ids))
+            .group_by(Project.company_id)
+        )
+        projects_count_result = await db.execute(projects_count_query)
+        for row in projects_count_result.all():
+            projects_counts[row.company_id] = row.count
+    
     # Build response items
     items = []
     for company in companies:
-        # Load projects count efficiently
-        projects_count_query = select(func.count()).select_from(Project).where(Project.company_id == company.id)
-        projects_count_result = await db.execute(projects_count_query)
-        projects_count = projects_count_result.scalar()
-        
         item = CompanyListItem(
             id=str(company.id),
             name=company.name,
             contact_email=company.contact_email,
             storage_provider="Local",  # Always "Local" as per requirements
             status=company.status,
-            projects_count=projects_count,
+            projects_count=projects_counts.get(company.id, 0),
             created_at=company.created_at,
             _links=_generate_company_links(company.id)
         )

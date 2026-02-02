@@ -2,7 +2,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
-from datetime import datetime
+from datetime import datetime, timezone
 
 from app.core.database import get_db
 from app.models.ar_content import ARContent
@@ -18,18 +18,23 @@ async def get_viewer_active_video(
 ):
     """Get the active video for AR content viewer with metadata.
     
-    This endpoint implements the video selection logic:
-    1. Prefer video with active schedule window
-    2. Honor rotation_type (none -> active video, sequential -> advance, cyclic -> wrap)
-    3. Skip videos with expired subscriptions
-    4. Return metadata about selection source and expiration
+    This endpoint implements the video selection logic with priority:
+    1. Date-specific rules (holidays, special dates) - highest priority
+    2. Video with active schedule window
+    3. VideoRotationSchedule rule (fixed, daily_cycle, weekly_cycle, random_daily)
+    4. ARContent.active_video_id (if not expired)
+    5. Legacy rotation (sequential/cyclic)
+    6. Any active video (fallback)
+    
+    Skips videos with expired subscriptions.
     """
     # Verify AR content exists and is active
     ar_content = await db.get(ARContent, ar_content_id)
     if not ar_content:
         raise HTTPException(status_code=404, detail="AR content not found")
     
-    if not ar_content.is_active:
+    # Check if AR content is active (status should be "active" or "ready")
+    if ar_content.status not in ["active", "ready"]:
         raise HTTPException(status_code=404, detail="AR content is not active")
     
     # Get the active video using the scheduler service
@@ -46,14 +51,15 @@ async def get_viewer_active_video(
     schedule_id = video_result.get("schedule_id")
     expires_in = video_result.get("expires_in")
     
-    # Update rotation state if video was selected via rotation (sequential/cyclic)
-    if source == "rotation" and video.rotation_type in ["sequential", "cyclic"]:
+    # Update rotation state if video was selected via legacy rotation (sequential/cyclic)
+    # New rotation types (daily_cycle, weekly_cycle, etc.) don't need state updates
+    if source == "rotation" and hasattr(video, 'rotation_type') and video.rotation_type in ["sequential", "cyclic"]:
         await update_rotation_state(ar_content, db)
     
     # Build response with video metadata and selection info
     response = {
         "id": video.id,
-        "title": video.title,
+        "title": video.filename,  # Use filename as title
         "video_url": video.video_url,
         "preview_url": video.preview_url,
         "thumbnail_url": video.thumbnail_url,
@@ -73,7 +79,7 @@ async def get_viewer_active_video(
         "subscription_end": video.subscription_end,
         
         # Timestamps
-        "selected_at": datetime.utcnow().isoformat(),
+        "selected_at": datetime.now(timezone.utc).isoformat(),
         "video_created_at": video.created_at.isoformat() if video.created_at else None,
     }
     
@@ -90,8 +96,8 @@ async def get_viewer_active_video_by_unique_id(
     res = await db.execute(stmt)
     ar_content = res.scalar_one_or_none()
 
-    if not ar_content or not ar_content.is_active:
-        raise HTTPException(status_code=404, detail="AR content not found")
+    if not ar_content or ar_content.status not in ["active", "ready"]:
+        raise HTTPException(status_code=404, detail="AR content not found or not active")
 
     video_result = await get_active_video(ar_content.id, db)
     if not video_result:
@@ -102,13 +108,14 @@ async def get_viewer_active_video_by_unique_id(
     schedule_id = video_result.get("schedule_id")
     expires_in = video_result.get("expires_in")
     
-    # Update rotation state if video was selected via rotation (sequential/cyclic)
-    if source == "rotation" and video.rotation_type in ["sequential", "cyclic"]:
+    # Update rotation state if video was selected via legacy rotation (sequential/cyclic)
+    # New rotation types (daily_cycle, weekly_cycle, date_rule, etc.) don't need state updates
+    if source == "rotation" and hasattr(video, 'rotation_type') and video.rotation_type in ["sequential", "cyclic"]:
         await update_rotation_state(ar_content, db)
 
     return {
         "id": video.id,
-        "title": video.title,
+        "title": video.filename,  # Use filename as title
         "video_url": video.video_url,
         "preview_url": video.preview_url,
         "thumbnail_url": video.thumbnail_url,
@@ -122,6 +129,6 @@ async def get_viewer_active_video_by_unique_id(
         "is_active": video.is_active,
         "rotation_type": video.rotation_type,
         "subscription_end": video.subscription_end,
-        "selected_at": datetime.utcnow().isoformat(),
+        "selected_at": datetime.now(timezone.utc).isoformat(),
         "video_created_at": video.created_at.isoformat() if video.created_at else None,
     }

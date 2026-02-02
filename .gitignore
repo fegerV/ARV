@@ -32,6 +32,9 @@ env/
 *~
 .DS_Store
 
+# Local deps (e.g. cloned mind-ar-js for build_mindar_cpu.py)
+deps/
+
 # Environment variables
 .env
 .env.*

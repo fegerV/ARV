@@ -199,7 +199,9 @@ class LocalStorageProvider(StorageProvider):
         # Normalize path: replace backslashes with forward slashes (Windows compatibility)
         # and remove leading slash
         storage_path = str(storage_path).replace('\\', '/').lstrip('/')
-        # Return relative URL (without domain) for use in HTML templates
+        # Не дублировать префикс: если путь уже начинается с storage/, убрать его
+        if storage_path.lower().startswith("storage/"):
+            storage_path = storage_path[8:].lstrip("/")
         # StaticFiles is mounted at /storage, so return /storage/... path
         return f"/storage/{storage_path}"
     
