@@ -1,19 +1,23 @@
-<div x-data="sidebar()" class="fixed top-0 right-0 left-0 h-16 bg-white dark:bg-gray-800 shadow-md flex items-center px-4 z-10" :style="expanded ? 'margin-left: 240px' : 'margin-left: 64px'">
+<header class="fixed top-0 right-0 left-0 lg:left-64 h-16 bg-white dark:bg-gray-800 shadow-md flex items-center px-4 z-30 transition-all duration-300">
     <div class="flex items-center space-x-4">
-        <button @click="toggle()" class="material-icons text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white">menu</button>
-        <h2 class="text-lg font-semibold dark:text-white">{% block page_title %}{% endblock %}</h2>
+        <!-- Mobile hamburger menu -->
+        <button @click="window.dispatchEvent(new Event('toggle-sidebar'))" 
+                class="lg:hidden material-icons text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white p-1">
+            menu
+        </button>
+        <h2 class="text-lg font-semibold dark:text-white truncate">{% block page_title %}{% endblock %}</h2>
     </div>
-    <div class="ml-auto flex items-center space-x-4">
+    <div class="ml-auto flex items-center space-x-2 sm:space-x-4">
         <div x-data>
-            <button @click="$store.darkMode.toggle()" class="text-gray-600 hover:text-gray-700 dark:text-gray-300 dark:hover:text-white">
+            <button @click="$store.darkMode.toggle()" class="text-gray-600 hover:text-gray-700 dark:text-gray-300 dark:hover:text-white p-1">
                 <span class="material-icons" x-text="$store.darkMode.darkMode ? 'light_mode' : 'dark_mode'"></span>
             </button>
         </div>
         {% if current_user %}
-        <span class="text-gray-600 dark:text-gray-300">{{ current_user.full_name or current_user.email }}</span>
-        <a href="/api/auth/logout" class="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded text-sm">Выйти</a>
+        <span class="hidden sm:inline text-gray-600 dark:text-gray-300 text-sm truncate max-w-[150px]">{{ current_user.full_name or current_user.email }}</span>
+        <a href="/api/auth/logout" class="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded text-sm whitespace-nowrap">Выйти</a>
         {% else %}
         <span class="text-gray-600 dark:text-gray-300">Guest</span>
         {% endif %}
     </div>
-</div>
+</header>

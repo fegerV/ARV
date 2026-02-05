@@ -80,6 +80,46 @@
             width: 64px;
         }
         
+        /* Mobile responsive styles */
+        @media (max-width: 1023px) {
+            .page-header {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 1rem;
+            }
+            
+            .page-actions {
+                width: 100%;
+                flex-wrap: wrap;
+            }
+            
+            /* Make tables scrollable on mobile */
+            .table-responsive {
+                overflow-x: auto;
+                -webkit-overflow-scrolling: touch;
+            }
+            
+            /* Card padding adjustments for mobile */
+            .card {
+                padding: 1rem;
+            }
+        }
+        
+        @media (max-width: 640px) {
+            .page-title {
+                font-size: 1.25rem;
+            }
+            
+            /* Stack buttons on very small screens */
+            .page-actions {
+                flex-direction: column;
+            }
+            
+            .page-actions > * {
+                width: 100%;
+            }
+        }
+        
         .material-icons {
             font-family: 'Material Icons';
             font-weight: normal;
@@ -367,7 +407,7 @@
     {% include "components/sidebar.html" %}
     
     <!-- Main content area -->
-    <div class="ml-64">
+    <div class="lg:ml-64 transition-all duration-300">
         <!-- Include header component -->
         {% include "components/header.html" %}
         
@@ -437,34 +477,18 @@
             }
         }
         
-        // Sidebar functionality
+        // Sidebar functionality (legacy - kept for compatibility)
         function sidebar() {
             return {
                 expanded: true,
                 
                 init() {
-                    // Initialize sidebar state
-                    this.expanded = localStorage.getItem('sidebarExpanded') !== 'false';
+                    this.expanded = true;
                 },
                 
                 toggle() {
-                    this.expanded = !this.expanded;
-                    localStorage.setItem('sidebarExpanded', this.expanded);
-                    
-                    const sidebar = document.getElementById('sidebar');
-                    const mainContent = document.querySelector('.ml-64');
-                    
-                    if (this.expanded) {
-                        sidebar.classList.remove('sidebar-collapsed');
-                        sidebar.classList.add('sidebar-expanded');
-                        mainContent.classList.remove('ml-16');
-                        mainContent.classList.add('ml-64');
-                    } else {
-                        sidebar.classList.remove('sidebar-expanded');
-                        sidebar.classList.add('sidebar-collapsed');
-                        mainContent.classList.remove('ml-64');
-                        mainContent.classList.add('ml-16');
-                    }
+                    // On mobile, dispatch event to toggle sidebar
+                    window.dispatchEvent(new Event('toggle-sidebar'));
                 },
                 
                 isActive(path) {
