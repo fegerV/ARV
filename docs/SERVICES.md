@@ -16,57 +16,25 @@ API Routes → Services → Models → Database
 
 ## Основные сервисы
 
-### 1. MindARGenerator
-
-**Файл**: `app/services/mindar_generator.py`
-
-**Назначение**: Генерация AR-маркеров из изображений
-
-**Основные методы:**
-
-- `generate_marker()` - Генерация .mind файла из изображения
-- `validate_marker_file()` - Валидация созданного маркера
-- `generate_and_upload_marker()` - Генерация и сохранение маркера
-
-**Использование:**
-```python
-from app.services.mindar_generator import mindar_generator
-
-result = await mindar_generator.generate_and_upload_marker(
-    ar_content_id="123",
-    image_path=Path("photo.jpg"),
-    max_features=1000,
-    storage_path=Path("storage/path")
-)
-```
-
-**Зависимости:**
-- Node.js (mind-ar, canvas)
-- Pillow для работы с изображениями
-
-**Особенности:**
-- Асинхронная генерация через subprocess
-- Валидация маркеров
-- Fallback режим при ошибках
-
-### 2. MindARMarkerService
+### 1. ARCoreMarkerService
 
 **Файл**: `app/services/marker_service.py`
 
-**Назначение**: Высокоуровневый сервис для работы с маркерами
+**Назначение**: Сервис для работы с маркерами AR-контента (ARCore). Маркер = фото (растровое изображение JPEG/PNG), формат .mind не используется.
 
 **Основные методы:**
 
-- `generate_marker()` - Генерация маркера с анализом качества
-- `analyze_image_quality()` - Анализ качества изображения
-- `build_image_recommendations()` - Рекомендации по улучшению
+- `generate_marker()` — возвращает URL и путь фото как маркера (без генерации .mind)
+- `analyze_image_quality()` — анализ качества изображения
+- `build_image_recommendations()` — рекомендации по улучшению фото для трекинга
+- `enhance_image_for_marker()` — улучшение контраста и резкости
+- `validate_marker()` — проверка файла маркера (размер в допустимых пределах)
 
 **Использование:**
 ```python
-from app.services.marker_service import MindARMarkerService
+from app.services.marker_service import marker_service
 
-service = MindARMarkerService()
-result = await service.generate_marker(
+result = await marker_service.generate_marker(
     ar_content_id=1,
     image_path="photo.jpg",
     storage_path=Path("storage/path")
@@ -74,11 +42,10 @@ result = await service.generate_marker(
 ```
 
 **Особенности:**
-- Интеграция с MindARGenerator
-- Анализ качества изображений
-- Рекомендации по улучшению
+- Маркер для ARCore — то же изображение, что загружено как фото контента
+- Анализ качества изображений и рекомендации для устойчивого трекинга
 
-### 3. ThumbnailService
+### 2. ThumbnailService
 
 **Файл**: `app/services/thumbnail_service.py`
 
@@ -105,7 +72,7 @@ thumbnail_path = await service.generate_thumbnail(
 - Pillow для изображений
 - OpenCV для видео
 
-### 4. EnhancedThumbnailService
+### 3. EnhancedThumbnailService
 
 **Файл**: `app/services/enhanced_thumbnail_service.py`
 
@@ -122,7 +89,7 @@ thumbnail_path = await service.generate_thumbnail(
 - Автоматическая оптимизация
 - Пакетная обработка
 
-### 5. VideoScheduler
+### 4. VideoScheduler
 
 **Файл**: `app/services/video_scheduler.py`
 
@@ -157,7 +124,7 @@ video = result["video"]
 source = result["source"]  # "schedule", "active_default", "rotation", "fallback"
 ```
 
-### 6. NotificationService
+### 5. NotificationService
 
 **Файл**: `app/services/notification_service.py`
 
@@ -186,7 +153,7 @@ await service.send_notification(
 - SMTP для email
 - Telegram Bot API
 
-### 7. SettingsService
+### 6. SettingsService
 
 **Файл**: `app/services/settings_service.py`
 
@@ -216,7 +183,7 @@ await service.set_setting("api_keys_enabled", "true", "boolean")
 - `integrations` - Настройки интеграций
 - `ar` - Настройки AR
 
-### 8. EnhancedCacheService
+### 7. EnhancedCacheService
 
 **Файл**: `app/services/enhanced_cache_service.py`
 
@@ -256,7 +223,7 @@ await cache.set("key", value, cache_type="metadata", ttl=3600)
 - `api_responses` - Ответы API (L2, 5 минут)
 - `user_sessions` - Сессии пользователей (L2, 30 минут)
 
-### 9. ReliabilityService
+### 8. ReliabilityService
 
 **Файл**: `app/services/reliability_service.py`
 
@@ -307,7 +274,7 @@ async def database_operation():
 - `OPEN` - Цепь разомкнута, запросы отклоняются
 - `HALF_OPEN` - Тестирование восстановления
 
-### 10. AlertService
+### 9. AlertService
 
 **Файл**: `app/services/alert_service.py`
 
@@ -361,7 +328,7 @@ service = BackupBotService()
 await service.create_backup()
 ```
 
-### 12. EnhancedValidationService
+### 11. EnhancedValidationService
 
 **Файл**: `app/services/enhanced_validation_service.py`
 
@@ -391,7 +358,7 @@ API Route (ar_content.py)
     ↓
 3. ThumbnailService → Генерация превью
     ↓
-4. MindARGenerator → Генерация маркера
+4. ARCoreMarkerService → Маркер = фото (ARCore)
     ↓
 5. NotificationService → Уведомление о создании
     ↓
@@ -415,9 +382,9 @@ Viewer Route
 ## Зависимости между сервисами
 
 ```
-MindARGenerator
+ARCoreMarkerService
     ↓ (использует)
-Storage Provider
+Storage / build_public_url (фото как маркер)
 
 VideoScheduler
     ↓ (использует)
@@ -485,7 +452,7 @@ class MarkerGenerationError(ServiceError):
 
 async def generate_marker(...):
     try:
-        result = await mindar_generator.generate(...)
+        result = await marker_service.generate_marker(...)
         return result
     except Exception as e:
         raise MarkerGenerationError(f"Failed to generate marker: {e}")

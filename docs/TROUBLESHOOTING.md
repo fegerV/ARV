@@ -397,9 +397,6 @@ Get-NetIPAddress -AddressFamily IPv4 | Where-Object { $_.InterfaceAlias -notmatc
    brew install pkg-config cairo pango
    ```
 
-3. **Увеличьте timeout:**
-   - В `mindar_generator.py` timeout = 300 секунд (5 минут)
-
 ## Проблемы с Docker
 
 ### Контейнер не запускается
@@ -655,35 +652,15 @@ python utilities/create_admin.py
 
 ## Проблемы с AR Viewer
 
-Подробная документация: [AR_VIEWER_TROUBLESHOOTING.md](./AR_VIEWER_TROUBLESHOOTING.md)
+Веб-AR (MindAR) отключён. Просмотр AR — только в приложении **«AR Viewer»** (Android, ARCore). Ссылка `/view/{unique_id}` ведёт на лендинг с кнопками «Открыть в приложении» и «Скачать в Google Play». Для открытия ссылки сразу в приложении без выбора браузера настройте App Links: на сервере задайте `ANDROID_APP_SHA256_FINGERPRINTS` и убедитесь, что `/.well-known/assetlinks.json` отдаётся по HTTPS; в приложении — intent-filter на `https://your-domain.com/view/{unique_id}` с `autoVerify=true`. Запасной вариант — custom scheme `arv://view/{unique_id}`.
 
-### Быстрая диагностика
+Подробнее: [AR_VIEWER_TROUBLESHOOTING.md](./AR_VIEWER_TROUBLESHOOTING.md)
 
-| Ошибка | Причина | Решение |
-|--------|---------|---------|
-| "Камера не найдена" | Нет камеры | Подключите веб-камеру |
-| "Доступ к камере запрещён" | Не дано разрешение | Разрешите камеру в браузере |
-| "WebGL недоступен" | Отключено аппаратное ускорение | Включите в настройках браузера |
-| Таймаут на `_startAR` | Медленный GPU | Откройте на компьютере |
-| "MINDAR: false" | Проблема CDN | Проверьте интернет |
+### API для приложения
 
-### Диагностический режим
-
-Добавьте `?diagnose=1` к URL:
-```
-https://ar.neuroimagen.ru/view/xxx-xxx?diagnose=1
-```
-
-### Рекомендуемые устройства
-
-- **Компьютер** с веб-камерой — самый надёжный вариант
-- **iPhone** — Safari работает хорошо
-- **Android** — Chrome, но на слабых GPU может быть медленно
-
-### Версии библиотек
-
-- Three.js: 0.147.0
-- MindAR: 1.1.5 (IIFE бандл с CDN)
+- Манифест: `GET /api/viewer/ar/{unique_id}/manifest` — возвращает `manifest_version`, `marker_image_url` (фото для трекинга), `video`, `expires_at`.
+- Проверка доступности: `GET /api/viewer/ar/{unique_id}/check` — без инкремента просмотров.
+- Устройства с ARCore: [список поддерживаемых](https://developers.google.com/ar/devices).
 
 ---
 

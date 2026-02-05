@@ -202,6 +202,35 @@ async def api_protected_route(request: Request, path: str):
         content={"detail": "Not Found"}
     )
 
+
+# Android App Links: Digital Asset Links for https://your-domain.com/view/{unique_id}
+@app.get("/.well-known/assetlinks.json")
+async def well_known_assetlinks():
+    """
+    Serve assetlinks.json for Android App Links verification.
+    Set ANDROID_APP_SHA256_FINGERPRINTS (comma-separated) in env to enable.
+    """
+    fingerprints = [
+        s.strip() for s in settings.ANDROID_APP_SHA256_FINGERPRINTS.split(",") if s.strip()
+    ]
+    statements = []
+    if fingerprints and settings.ANDROID_APP_PACKAGE:
+        statements = [
+            {
+                "relation": ["delegate_permission/common.handle_all_urls"],
+                "target": {
+                    "namespace": "android_app",
+                    "package_name": settings.ANDROID_APP_PACKAGE,
+                    "sha256_cert_fingerprints": fingerprints,
+                },
+            }
+        ]
+    return JSONResponse(
+        content=statements,
+        media_type="application/json",
+    )
+
+
 # Mount static files - StaticFiles will handle 404s automatically
 # NOTE: For production, consider serving static files through Nginx instead of Uvicorn
 # to avoid blocking I/O operations in a single worker environment

@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">AR Viewer</string>
+    <string name="unique_id_hint">Введите unique_id или откройте ссылку</string>
+    <string name="open">Открыть</string>
+    <string name="enter_unique_id">Введите unique_id</string>
+    <string name="loading_content">Загрузка контента: %1$s</string>
+    <string name="loading_content_short">Загрузка…</string>
+    <string name="retry">Повторить</string>
+    <string name="error_invalid_unique_id">Неверный идентификатор</string>
+    <string name="error_not_found">Контент не найден</string>
+    <string name="error_subscription_expired">Подписка истекла</string>
+    <string name="error_content_not_active">Контент недоступен</string>
+    <string name="error_marker_not_available">Изображение маркера недоступно</string>
+    <string name="error_marker_still_generating">Маркер ещё создаётся, попробуйте позже</string>
+    <string name="error_no_playable_video">Нет доступного видео</string>
+    <string name="error_network">Ошибка сети. Проверьте подключение.</string>
+    <string name="error_server">Ошибка сервера (%1$d)</string>
+    <string name="error_unknown">Неизвестная ошибка</string>
+    <string name="ar_scene_placeholder">AR-сцена (загрузка…)</string>
+    <string name="error_arcore_required">Требуется ARCore. Установите из Play Маркета.</string>
+    <string name="error_arcore_session">Не удалось запустить AR. Проверьте поддержку устройства.</string>
+    <string name="capture_photo">Снимок</string>
+    <string name="photo_saved">Фото сохранено</string>
+    <string name="photo_save_failed">Не удалось сохранить фото</string>
+    <string name="record_video">Запись видео</string>
+    <string name="record_video_coming_soon">Запись видео будет в следующей версии</string>
+</resources>

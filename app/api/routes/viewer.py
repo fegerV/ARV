@@ -1,14 +1,47 @@
+from pathlib import Path
 from typing import Optional
+from uuid import UUID
+
+import structlog
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 
+from app.core.config import settings
 from app.core.database import get_db
 from app.models.ar_content import ARContent
+from app.schemas.viewer import VIEWER_MANIFEST_VERSION, ViewerManifestResponse, ViewerManifestVideo
 from app.services.video_scheduler import get_active_video, update_rotation_state
+from app.utils.ar_content import build_public_url
 
+logger = structlog.get_logger()
 router = APIRouter()
+
+
+def _absolute_url(relative_path: str) -> str:
+    """Build absolute URL from relative path (e.g. /storage/...)."""
+    base = settings.PUBLIC_URL.rstrip("/")
+    path = (relative_path or "").strip()
+    if not path:
+        return base
+    if path.startswith("http://") or path.startswith("https://"):
+        return path
+    return f"{base}{path}" if path.startswith("/") else f"{base}/{path}"
+
+
+def _photo_url_from_ar_content(ar_content: ARContent) -> Optional[str]:
+    """Get photo URL (relative) from ARContent, recalculating from path if needed."""
+    url = ar_content.photo_url
+    if ar_content.photo_path:
+        try:
+            p = Path(ar_content.photo_path)
+            path_abs = p if p.is_absolute() else Path(settings.STORAGE_BASE_PATH) / ar_content.photo_path
+            url = build_public_url(path_abs)
+        except Exception:
+            pass
+    return url
 
 
 @router.get("/viewer/{ar_content_id}/active-video")
@@ -132,3 +165,140 @@ async def get_viewer_active_video_by_unique_id(
         "selected_at": datetime.now(timezone.utc).isoformat(),
         "video_created_at": video.created_at.isoformat() if video.created_at else None,
     }
+
+
+@router.get("/ar/{unique_id}/check")
+async def get_viewer_content_check(
+    unique_id: str,
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Check if AR content is available for viewing without incrementing view count.
+    Returns content_available and optional reason. Use before showing UI or fetching full manifest.
+    """
+    try:
+        UUID(unique_id)
+    except (ValueError, TypeError):
+        return {"content_available": False, "reason": "invalid_unique_id"}
+
+    stmt = select(ARContent).where(ARContent.unique_id == unique_id)
+    res = await db.execute(stmt)
+    ar_content = res.scalar_one_or_none()
+    if not ar_content:
+        return {"content_available": False, "reason": "not_found"}
+
+    creation = ar_content.created_at.replace(tzinfo=None) if ar_content.created_at.tzinfo else ar_content.created_at
+    expiry_date = creation + timedelta(days=ar_content.duration_years * 365)
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    if now > expiry_date:
+        return {"content_available": False, "reason": "subscription_expired"}
+
+    if ar_content.status not in ["active", "ready"]:
+        return {"content_available": False, "reason": "content_not_active"}
+
+    if not (ar_content.photo_url or ar_content.photo_path):
+        return {"content_available": False, "reason": "marker_image_not_available"}
+
+    if (ar_content.marker_status or "").strip().lower() != "ready":
+        return {"content_available": False, "reason": "marker_still_generating"}
+
+    video_result = await get_active_video(ar_content.id, db)
+    if not video_result:
+        return {"content_available": False, "reason": "no_playable_video"}
+
+    return {"content_available": True}
+
+
+@router.get("/ar/{unique_id}/manifest", response_model=ViewerManifestResponse)
+async def get_viewer_manifest(
+    unique_id: str,
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Get viewer manifest for Android ARCore app.
+    Returns marker image URL (photo), video, expiry; increments views_count.
+    """
+    try:
+        UUID(unique_id)
+    except (ValueError, TypeError):
+        raise HTTPException(status_code=400, detail="Invalid unique_id format")
+
+    stmt = select(ARContent).where(ARContent.unique_id == unique_id)
+    res = await db.execute(stmt)
+    ar_content = res.scalar_one_or_none()
+    if not ar_content:
+        raise HTTPException(status_code=404, detail="AR content not found")
+
+    creation = ar_content.created_at.replace(tzinfo=None) if ar_content.created_at.tzinfo else ar_content.created_at
+    expiry_date = creation + timedelta(days=ar_content.duration_years * 365)
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    if now > expiry_date:
+        raise HTTPException(status_code=403, detail="AR content subscription has expired")
+
+    if ar_content.status not in ["active", "ready"]:
+        raise HTTPException(status_code=400, detail="AR content is not active or ready")
+
+    photo_url_rel = _photo_url_from_ar_content(ar_content)
+    if not photo_url_rel:
+        raise HTTPException(status_code=400, detail="Photo (marker image) not available")
+
+    if (ar_content.marker_status or "").strip().lower() != "ready":
+        raise HTTPException(
+            status_code=400,
+            detail="Marker is still being generated, try again later",
+        )
+
+    video_result = await get_active_video(ar_content.id, db)
+    if not video_result:
+        raise HTTPException(status_code=400, detail="No playable videos available for this AR content")
+
+    video = video_result["video"]
+    source = video_result["source"]
+    schedule_id = video_result.get("schedule_id")
+    expires_in = video_result.get("expires_in")
+    if source == "rotation" and getattr(video, "rotation_type", None) in ["sequential", "cyclic"]:
+        await update_rotation_state(ar_content, db)
+
+    marker_image_url = _absolute_url(photo_url_rel)
+    photo_url_abs = _absolute_url(photo_url_rel)
+    video_url_abs = _absolute_url(video.video_url or "")
+    thumbnail_url_abs = _absolute_url(video.thumbnail_url) if video.thumbnail_url else None
+
+    try:
+        ar_content.views_count = (ar_content.views_count or 0) + 1
+        await db.commit()
+        await db.refresh(ar_content)
+        logger.info("viewer_manifest_views_incremented", ar_content_id=ar_content.id, views_count=ar_content.views_count)
+    except Exception as e:
+        logger.warning("failed_to_increment_views_manifest", error=str(e))
+        await db.rollback()
+
+    expires_at_str = expiry_date.isoformat() if hasattr(expiry_date, "isoformat") else str(expiry_date)
+    video_payload = ViewerManifestVideo(
+        id=video.id,
+        title=video.filename,
+        video_url=video_url_abs,
+        thumbnail_url=thumbnail_url_abs,
+        duration=video.duration,
+        width=video.width,
+        height=video.height,
+        mime_type=video.mime_type,
+        selection_source=source,
+        schedule_id=schedule_id,
+        expires_in_days=expires_in,
+        selected_at=datetime.now(timezone.utc).isoformat(),
+    )
+    response = ViewerManifestResponse(
+        manifest_version=VIEWER_MANIFEST_VERSION,
+        unique_id=unique_id,
+        order_number=ar_content.order_number or "",
+        marker_image_url=marker_image_url,
+        photo_url=photo_url_abs,
+        video=video_payload,
+        expires_at=expires_at_str,
+        status=ar_content.status or "ready",
+    )
+    return JSONResponse(
+        content=response.model_dump(mode="json"),
+        headers={"X-Manifest-Version": VIEWER_MANIFEST_VERSION},
+    )

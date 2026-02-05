@@ -103,8 +103,7 @@ app/
 Содержит бизнес-логику приложения.
 
 **Основные сервисы:**
-- `mindar_generator.py` - Генерация AR-маркеров
-- `marker_service.py` - Работа с маркерами
+- `marker_service.py` - Работа с маркерами (ARCore: фото = маркер)
 - `thumbnail_service.py` - Генерация превью
 - `video_scheduler.py` - Логика выбора видео
 - `notification_service.py` - Отправка уведомлений

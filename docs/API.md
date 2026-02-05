@@ -2398,6 +2398,102 @@ curl -X GET "http://localhost:8000/api/public/ar-content/unique-id"
 
 ## Viewer
 
+### Viewer API contract (Android)
+
+Эндпоинты Viewer используются приложением в каталоге **android/** (AR Viewer). При изменении бэкенда:
+
+- **Не ломайте контракт без смены версии:** поля ответа манифеста (`manifest_version`, `marker_image_url`, `video`, `expires_at`, `status` и вложенный объект `video`) должны оставаться обратно совместимыми или сопровождаться увеличением `manifest_version` и обновлением приложения.
+- **Проверяйте сборку Android после правок API:** в CI при пуше в `android/` запускается сборка; при изменении Viewer API убедитесь, что приложение по-прежнему собирается и совместимо с новым контрактом (при необходимости обновите клиент в `android/` и версию манифеста).
+
+Список эндпоинтов контракта: манифест (`GET /api/viewer/ar/{unique_id}/manifest`), проверка доступности (`GET /api/viewer/ar/{unique_id}/check`), активное видео (`GET /api/viewer/ar/{unique_id}/active-video`), App Links (`GET /.well-known/assetlinks.json`). Полное описание ответов и кодов ошибок — в подразделах ниже.
+
+**Версионирование манифеста:** поле `manifest_version` в теле ответа (и опционально заголовок `X-Manifest-Version`) задаёт версию контракта. При внесении несовместимых изменений (удаление или переименование полей, смена типов) необходимо увеличить версию и обновить клиент. Добавление новых опциональных полей допускается без смены версии.
+
+---
+
+### Viewer Manifest API (ARCore app)
+
+Single endpoint used by the Android AR Viewer app to load AR content by `unique_id`. Returns the tracking image URL (marker = photo, raster JPEG/PNG; the .mind format is not used), active video, and metadata. Each successful call increments the view counter.
+
+- **Method**: `GET`
+- **URL**: `/api/viewer/ar/{unique_id}/manifest`
+- **Description**: Get viewer manifest for Android ARCore app. Returns marker image URL (photo for tracking), active video, subscription expiry, status. Increments `views_count` for the AR content.
+- **Auth Required**: No
+
+#### Path Parameters
+```
+unique_id: string (required) - UUID of the AR content (e.g. from /view/{unique_id} or QR link)
+```
+
+#### Response (Success 200)
+```json
+{
+  "manifest_version": "1",
+  "unique_id": "550e8400-e29b-41d4-a716-446655440000",
+  "order_number": "AR-001",
+  "marker_image_url": "https://your-domain.com/storage/ar_content/.../main_image.jpg",
+  "photo_url": "https://your-domain.com/storage/ar_content/.../main_image.jpg",
+  "video": {
+    "id": 1,
+    "title": "video.mp4",
+    "video_url": "https://your-domain.com/storage/.../video.mp4",
+    "thumbnail_url": "https://your-domain.com/...",
+    "duration": 120,
+    "width": 1920,
+    "height": 1080,
+    "mime_type": "video/mp4",
+    "selection_source": "schedule",
+    "schedule_id": 1,
+    "expires_in_days": 365,
+    "selected_at": "2025-02-03T12:00:00.000000+00:00"
+  },
+  "expires_at": "2026-02-03T00:00:00",
+  "status": "ready"
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| manifest_version | string | API version of the manifest (e.g. "1"); bump when breaking changes are introduced. |
+| unique_id | string | Same as path parameter. |
+| order_number | string | Human-readable order/project identifier. |
+| marker_image_url | string | Absolute URL of the photo image (raster JPEG/PNG) used as AR tracking target (ARCore). The .mind format is not used. |
+| photo_url | string | Same as marker_image_url (legacy). |
+| video | object | Active video selected by scheduler (schedule / active_default / rotation / fallback). |
+| expires_at | string | ISO datetime when the AR content subscription expires. |
+| status | string | Content status, e.g. "ready", "active". |
+
+#### Error Responses
+| Code | Detail | Description |
+|------|--------|-------------|
+| 400 | Invalid unique_id format | `unique_id` is not a valid UUID. |
+| 400 | Photo (marker image) not available | No photo uploaded for this AR content. |
+| 400 | Marker is still being generated, try again later | `marker_status` is not `ready` (e.g. pending, processing). |
+| 400 | AR content is not active or ready | Content status is not suitable for viewing. |
+| 400 | No playable videos available for this AR content | No active video could be selected. |
+| 403 | AR content subscription has expired | Current date is after `expires_at`. |
+| 404 | AR content not found | No AR content with this `unique_id`. |
+| 500 | Internal server error | Server-side error. |
+
+#### Examples
+```curl
+curl -X GET "http://localhost:8000/api/viewer/ar/550e8400-e29b-41d4-a716-446655440000/manifest"
+```
+
+**Note**: For sequential/cyclic playback modes, the app can request the next video via `GET /api/viewer/ar/{unique_id}/active-video` without incrementing the view count again (manifest call already increments it once per session).
+
+### Check AR content availability (no view count)
+- **Method**: `GET`
+- **URL**: `/api/viewer/ar/{unique_id}/check`
+- **Description**: Check if AR content is available for viewing without incrementing the view counter. Use to show a message (e.g. "Content unavailable" or "Subscription expired") before fetching the full manifest.
+- **Auth Required**: No
+
+#### Response (200)
+- `content_available: true` — content is playable.
+- `content_available: false`, `reason: string` — one of: `invalid_unique_id`, `not_found`, `subscription_expired`, `content_not_active`, `marker_image_not_available`, `marker_still_generating`, `no_playable_video`.
+
+---
+
 ### Get Viewer Active Video
 - **Method**: `GET`
 - **URL**: `/api/viewer/{ar_content_id}/active-video`
@@ -2441,7 +2537,7 @@ curl -X GET "http://localhost:8000/api/viewer/1/active-video"
 
 ### Get Viewer Active Video by Unique ID
 - **Method**: `GET`
-- **URL**: `/api/ar/{unique_id}/active-video`
+- **URL**: `/api/viewer/ar/{unique_id}/active-video`
 - **Description**: Get the active video for AR content viewer by unique ID. Same functionality as above, but uses unique_id instead of numeric ID.
 - **Auth Required**: No
 
@@ -2475,7 +2571,7 @@ unique_id: string (required) - Unique identifier for AR content
 
 #### Examples
 ```curl
-curl -X GET "http://localhost:8000/api/ar/unique-id/active-video"
+curl -X GET "http://localhost:8000/api/viewer/ar/unique-id/active-video"
 ```
 
 ---

@@ -59,6 +59,10 @@ yarn-debug.log
 yarn-error.log
 .pnpm-debug.log
 
+# Android (machine-specific)
+android/local.properties
+android/.gradle/
+
 # Build artifacts
 frontend/dist/
 frontend/build/

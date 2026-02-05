@@ -428,14 +428,13 @@ async def update_ar_settings(
     request: Request,
     current_user=Depends(get_current_user_optional),
     db: AsyncSession = Depends(get_html_db),
-    mindar_max_features: int = Form(1000),
     marker_generation_enabled: str = Form("on"),
     thumbnail_quality: int = Form(80),
     video_processing_enabled: str = Form("on"),
     default_ar_viewer_theme: str = Form("default"),
     qr_code_expiration_days: int = Form(365)
 ):
-    """Update AR settings."""
+    """Update AR settings. mindar_max_features removed (ARCore uses photo as marker)."""
     if not current_user:
         # Redirect to login page if user is not authenticated
         return RedirectResponse(url="/admin/login", status_code=303)
@@ -446,6 +445,8 @@ async def update_ar_settings(
     settings_service = SettingsService(db)
     
     try:
+        all_settings = await settings_service.get_all_settings()
+        mindar_max_features = getattr(all_settings.ar, "mindar_max_features", 1000)
         ar_settings = ARSettings(
             mindar_max_features=mindar_max_features,
             marker_generation_enabled=(marker_generation_enabled == "on"),

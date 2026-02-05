@@ -127,6 +127,11 @@ class Settings(BaseSettings):
     SENTRY_DSN: str = ""
     PROMETHEUS_MULTIPROC_DIR: str = "/tmp/prometheus_multiproc"
     
+    # Android App Links (for /.well-known/assetlinks.json)
+    ANDROID_APP_PACKAGE: str = "ru.neuroimagen.arviewer"
+    # SHA-256 cert fingerprints (comma-separated), e.g. from Play Console App Signing
+    ANDROID_APP_SHA256_FINGERPRINTS: str = ""
+
     # Backup
     BACKUP_S3_ENDPOINT: str = ""
     BACKUP_S3_ACCESS_KEY: str = ""

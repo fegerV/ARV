@@ -622,16 +622,6 @@
                     <form method="post" action="/settings/ar" class="space-y-6">
                         <div class="grid grid-cols-1 gap-6 sm:grid-cols-2">
                             <div>
-                                <label for="mindar-max-features" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                                    MindAR Max Features
-                                    <span class="text-gray-400 text-xs ml-1">Maximum feature points for marker detection</span>
-                                </label>
-                                <input type="number" name="mindar-max-features" id="mindar-max-features" 
-                                       value="{{ settings.ar.mindar_max_features|default(1000) }}" 
-                                       min="100" max="5000" step="100" class="form-input">
-                            </div>
-                            
-                            <div>
                                 <label for="thumbnail-quality" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                                     Thumbnail Quality (%)
                                     <span class="text-gray-400 text-xs ml-1">JPEG quality for generated thumbnails</span>

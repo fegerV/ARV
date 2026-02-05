@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">AR Viewer</string>
+    <string name="unique_id_hint">Enter unique_id or open link</string>
+    <string name="open">Open</string>
+    <string name="enter_unique_id">Enter unique_id</string>
+    <string name="loading_content">Loading content: %1$s</string>
+    <string name="loading_content_short">Loading…</string>
+    <string name="retry">Retry</string>
+    <string name="error_invalid_unique_id">Invalid identifier</string>
+    <string name="error_not_found">Content not found</string>
+    <string name="error_subscription_expired">Subscription expired</string>
+    <string name="error_content_not_active">Content unavailable</string>
+    <string name="error_marker_not_available">Marker image unavailable</string>
+    <string name="error_marker_still_generating">Marker is still being generated, try again later</string>
+    <string name="error_no_playable_video">No playable video</string>
+    <string name="error_network">Network error. Check connection.</string>
+    <string name="error_server">Server error (%1$d)</string>
+    <string name="error_unknown">Unknown error</string>
+    <string name="ar_scene_placeholder">AR scene (loading…)</string>
+    <string name="error_arcore_required">ARCore required. Install from Play Store.</string>
+    <string name="error_arcore_session">Failed to start AR. Check device support.</string>
+    <string name="capture_photo">Photo</string>
+    <string name="photo_saved">Photo saved</string>
+    <string name="photo_save_failed">Failed to save photo</string>
+    <string name="record_video">Record video</string>
+    <string name="record_video_coming_soon">Video recording coming in next version</string>
+</resources>
