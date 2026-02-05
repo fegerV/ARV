@@ -25,4 +25,11 @@
     <string name="photo_save_failed">Не удалось сохранить фото</string>
     <string name="record_video">Запись видео</string>
     <string name="record_video_coming_soon">Запись видео будет в следующей версии</string>
+    
+    <!-- QR Scanner -->
+    <string name="scan_qr">Сканировать QR</string>
+    <string name="qr_scan_hint">Наведите камеру на QR-код</string>
+    <string name="close">Закрыть</string>
+    <string name="camera_permission_required">Для сканирования QR требуется доступ к камере</string>
+    <string name="camera_error">Не удалось запустить камеру</string>
 </resources>

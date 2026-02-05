@@ -45,5 +45,11 @@
             android:exported="false"
             android:screenOrientation="fullSensor"
             android:configChanges="orientation|screenSize" />
+        
+        <activity
+            android:name=".QrScannerActivity"
+            android:exported="false"
+            android:screenOrientation="portrait"
+            android:theme="@style/Theme.ArViewer.NoActionBar" />
     </application>
 </manifest>

@@ -6,4 +6,13 @@
         <item name="android:statusBarColor">@color/primary_dark</item>
         <item name="android:navigationBarColor">@color/primary_dark</item>
     </style>
+    
+    <!-- Тема для полноэкранного QR сканера -->
+    <style name="Theme.ArViewer.NoActionBar" parent="Theme.MaterialComponents.DayNight.NoActionBar">
+        <item name="colorPrimary">@color/primary</item>
+        <item name="colorPrimaryVariant">@color/primary_dark</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/black</item>
+        <item name="android:windowTranslucentStatus">true</item>
+    </style>
 </resources>

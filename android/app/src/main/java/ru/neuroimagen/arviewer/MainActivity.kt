@@ -5,6 +5,7 @@ import android.net.Uri
 import android.os.Bundle
 import android.view.View
 import android.widget.Toast
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import com.google.gson.Gson
@@ -22,15 +23,33 @@ class MainActivity : AppCompatActivity() {
     private val repository get() = ApiProvider.viewerRepository
     private val gson = Gson()
 
+    private val qrScannerLauncher = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == RESULT_OK) {
+            val uniqueId = result.data?.getStringExtra(QrScannerActivity.EXTRA_UNIQUE_ID)
+            if (!uniqueId.isNullOrBlank()) {
+                binding.editUniqueId.setText(uniqueId)
+                openViewer(uniqueId)
+            }
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
         binding.buttonOpen.setOnClickListener { onOpenClicked() }
+        binding.buttonScanQr.setOnClickListener { openQrScanner() }
         binding.buttonRetry.setOnClickListener { showMainPanel() }
 
         handleIntent(intent)
+    }
+
+    private fun openQrScanner() {
+        val intent = Intent(this, QrScannerActivity::class.java)
+        qrScannerLauncher.launch(intent)
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -49,12 +68,36 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun onOpenClicked() {
-        val uniqueId = binding.editUniqueId.text.toString().trim()
-        if (uniqueId.isEmpty()) {
+        val input = binding.editUniqueId.text.toString().trim()
+        if (input.isEmpty()) {
             Toast.makeText(this, getString(R.string.enter_unique_id), Toast.LENGTH_SHORT).show()
             return
         }
+        // Парсим ввод: может быть UUID, URL или deep link
+        val uniqueId = extractUniqueId(input)
+        if (uniqueId == null) {
+            Toast.makeText(this, getString(R.string.error_invalid_unique_id), Toast.LENGTH_SHORT).show()
+            return
+        }
         openViewer(uniqueId)
+    }
+
+    /**
+     * Извлекает unique_id из ввода пользователя.
+     * Поддерживает: UUID напрямую, https://...view/{id}, arv://view/{id}
+     */
+    private fun extractUniqueId(input: String): String? {
+        // Если это уже UUID — вернуть как есть
+        if (UUID_REGEX.matches(input)) {
+            return input
+        }
+        // Попробовать распарсить как URL
+        return try {
+            val uri = Uri.parse(input)
+            parseUniqueIdFromUri(uri)
+        } catch (e: Exception) {
+            null
+        }
     }
 
     private fun openViewer(uniqueId: String) {
@@ -102,6 +145,10 @@ class MainActivity : AppCompatActivity() {
     }
 
     companion object {
+        private val UUID_REGEX = Regex(
+            "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+        )
+
         /**
          * Parses unique_id from viewer deep link URI.
          * Supports https://ar.neuroimagen.ru/view/{unique_id} and arv://view/{unique_id}.
@@ -109,7 +156,7 @@ class MainActivity : AppCompatActivity() {
         fun parseUniqueIdFromUri(uri: Uri): String? {
             return when (uri.scheme) {
                 "arv" -> uri.pathSegments.firstOrNull() ?: uri.path?.trimStart('/')?.takeIf { it.isNotBlank() }
-                "https", "http" -> uri.pathSegments.getOrNull(1)
+                "https", "http" -> uri.pathSegments.getOrNull(1)?.takeIf { UUID_REGEX.matches(it) }
                 else -> null
             }
         }
