@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">AR Viewer</string>
+    <string name="splash_loading">Загрузка…</string>
     <string name="unique_id_hint">Введите unique_id или откройте ссылку</string>
     <string name="open">Открыть</string>
     <string name="enter_unique_id">Введите unique_id</string>

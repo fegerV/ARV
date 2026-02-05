@@ -12,69 +12,97 @@
 <script type="application/json" id="ar-content-marker-metrics">{{ marker_metrics | default({}) | tojson }}</script>
 
 <script>
-// Define component for Alpine.js (must be global for x-data)
-window.arContentDetail = function arContentDetail() {
-    // Safely parse JSON data with fallbacks
-    let arContent = {};
-    let videos = [];
-    let activeVideoInfo = null;
-    let rotationSchedule = null;
-    let markerMetrics = {};
-    
-    try {
-        const arContentEl = document.getElementById('ar-content-data');
-        if (arContentEl && arContentEl.textContent) {
-            arContent = JSON.parse(arContentEl.textContent);
+// Register Alpine.js component using alpine:init event (works with defer loading)
+document.addEventListener('alpine:init', () => {
+    Alpine.data('arContentDetail', () => {
+        // Helper functions
+        function fullArUrlFromContent(c) {
+            const url = (c && (c.public_url || c.unique_link)) || '';
+            return url.startsWith('/') ? window.location.origin + url : url;
         }
-    } catch (e) {
-        console.error('Failed to parse ar-content-data:', e);
-    }
-    
-    try {
-        const videosEl = document.getElementById('ar-content-videos');
-        if (videosEl && videosEl.textContent) {
-            videos = JSON.parse(videosEl.textContent);
+        function portraitUrlFromContent(c) {
+            return (c && (c.thumbnail_url || c.photo_url)) || '';
         }
-    } catch (e) {
-        console.error('Failed to parse ar-content-videos:', e);
-    }
-    
-    try {
-        const activeVideoEl = document.getElementById('ar-content-active-video');
-        if (activeVideoEl && activeVideoEl.textContent && activeVideoEl.textContent !== 'null') {
-            activeVideoInfo = JSON.parse(activeVideoEl.textContent);
-        }
-    } catch (e) {
-        console.error('Failed to parse ar-content-active-video:', e);
-    }
-    
-    try {
-        const rotationScheduleEl = document.getElementById('ar-content-rotation-schedule');
-        if (rotationScheduleEl && rotationScheduleEl.textContent && rotationScheduleEl.textContent !== 'null') {
-            rotationSchedule = JSON.parse(rotationScheduleEl.textContent);
-        }
-    } catch (e) {
-        console.error('Failed to parse ar-content-rotation-schedule:', e);
-    }
-    
-    try {
-        const markerMetricsEl = document.getElementById('ar-content-marker-metrics');
-        if (markerMetricsEl && markerMetricsEl.textContent) {
-            markerMetrics = JSON.parse(markerMetricsEl.textContent);
-        }
-    } catch (e) {
-        console.error('Failed to parse ar-content-marker-metrics:', e);
-    }
 
-    function fullArUrlFromContent(c) {
-        const url = (c && (c.public_url || c.unique_link)) || '';
-        return url.startsWith('/') ? (typeof window !== 'undefined' ? window.location.origin : '') + url : url;
-    }
-    function portraitUrlFromContent(c) {
-        return (c && (c.thumbnail_url || c.photo_url)) || '';
-    }
+        // Safely parse JSON data with fallbacks
+        let arContent = {};
+        let videos = [];
+        let activeVideoInfo = null;
+        let rotationSchedule = null;
+        let markerMetrics = {};
+        
+        try {
+            const arContentEl = document.getElementById('ar-content-data');
+            if (arContentEl && arContentEl.textContent) {
+                const text = arContentEl.textContent.trim();
+                if (text && text !== 'null' && text !== 'undefined') {
+                    arContent = JSON.parse(text);
+                }
+            }
+        } catch (e) {
+            console.error('Failed to parse ar-content-data:', e);
+        }
+        
+        try {
+            const videosEl = document.getElementById('ar-content-videos');
+            if (videosEl && videosEl.textContent) {
+                const text = videosEl.textContent.trim();
+                if (text && text !== 'null' && text !== 'undefined') {
+                    videos = JSON.parse(text);
+                }
+            }
+        } catch (e) {
+            console.error('Failed to parse ar-content-videos:', e);
+        }
+        
+        try {
+            const activeVideoEl = document.getElementById('ar-content-active-video');
+            if (activeVideoEl && activeVideoEl.textContent) {
+                const text = activeVideoEl.textContent.trim();
+                if (text && text !== 'null' && text !== 'undefined') {
+                    activeVideoInfo = JSON.parse(text);
+                }
+            }
+        } catch (e) {
+            console.error('Failed to parse ar-content-active-video:', e);
+        }
+        
+        try {
+            const rotationScheduleEl = document.getElementById('ar-content-rotation-schedule');
+            if (rotationScheduleEl && rotationScheduleEl.textContent) {
+                const text = rotationScheduleEl.textContent.trim();
+                if (text && text !== 'null' && text !== 'undefined') {
+                    rotationSchedule = JSON.parse(text);
+                }
+            }
+        } catch (e) {
+            console.error('Failed to parse ar-content-rotation-schedule:', e);
+        }
+        
+        try {
+            const markerMetricsEl = document.getElementById('ar-content-marker-metrics');
+            if (markerMetricsEl && markerMetricsEl.textContent) {
+                const text = markerMetricsEl.textContent.trim();
+                if (text && text !== 'null' && text !== 'undefined') {
+                    markerMetrics = JSON.parse(text);
+                }
+            }
+        } catch (e) {
+            console.error('Failed to parse ar-content-marker-metrics:', e);
+        }
 
-    return {
+        // Pre-compute URLs
+        const initialFullArUrl = fullArUrlFromContent(arContent);
+        const initialPortraitUrl = portraitUrlFromContent(arContent);
+        
+        console.log('arContentDetail initialized:', { 
+            arContent_id: arContent?.id, 
+            public_url: arContent?.public_url, 
+            unique_link: arContent?.unique_link,
+            fullArUrl: initialFullArUrl 
+        });
+
+        return {
         arContent: arContent || {},
         videos: Array.isArray(videos) ? videos : [],
         activeVideoInfo: activeVideoInfo,
@@ -101,8 +129,8 @@ window.arContentDetail = function arContentDetail() {
         replacePhotoFile: null,
         replaceVideoFile: null,
         regenerateOnSave: true,
-        fullArUrl: '',
-        portraitUrl: '',
+        fullArUrl: initialFullArUrl,
+        portraitUrl: initialPortraitUrl,
         rotationScheduleForm: {
             rotation_type: 'fixed',
             default_video_id: null,
@@ -113,8 +141,13 @@ window.arContentDetail = function arContentDetail() {
         },
 
         init() {
-            this.fullArUrl = fullArUrlFromContent(this.arContent);
-            this.portraitUrl = portraitUrlFromContent(this.arContent);
+            // URLs already computed during initialization
+            if (!this.fullArUrl) {
+                this.fullArUrl = fullArUrlFromContent(this.arContent);
+            }
+            if (!this.portraitUrl) {
+                this.portraitUrl = portraitUrlFromContent(this.arContent);
+            }
             if (Object.keys(this.arContent).length === 0) {
                 console.warn('arContent is empty, trying to reload...');
                 const self = this;
@@ -122,9 +155,12 @@ window.arContentDetail = function arContentDetail() {
                     const arContentEl = document.getElementById('ar-content-data');
                     if (arContentEl && arContentEl.textContent) {
                         try {
-                            self.arContent = JSON.parse(arContentEl.textContent);
-                            self.fullArUrl = fullArUrlFromContent(self.arContent);
-                            self.portraitUrl = portraitUrlFromContent(self.arContent);
+                            const text = arContentEl.textContent.trim();
+                            if (text && text !== 'null' && text !== 'undefined') {
+                                self.arContent = JSON.parse(text);
+                                self.fullArUrl = fullArUrlFromContent(self.arContent);
+                                self.portraitUrl = portraitUrlFromContent(self.arContent);
+                            }
                         } catch (e) {
                             console.error('Failed to reload arContent:', e);
                         }
@@ -933,10 +969,11 @@ window.arContentDetail = function arContentDetail() {
             }
         }
     };
-}
+    });
+});
 </script>
 
-<div x-data="arContentDetail()" x-init="init()" class="page-container">
+<div x-data="arContentDetail" x-init="init()" class="page-container">
     <!-- ============================================ -->
     <!-- БЛОК 1: ЗАГОЛОВОК И ОСНОВНЫЕ ДЕЙСТВИЯ -->
     <!-- ============================================ -->

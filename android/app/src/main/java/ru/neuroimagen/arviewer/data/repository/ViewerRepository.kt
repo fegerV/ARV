@@ -1,7 +1,9 @@
 package ru.neuroimagen.arviewer.data.repository
 
+import android.content.Context
 import retrofit2.HttpException
 import ru.neuroimagen.arviewer.data.api.ViewerApi
+import ru.neuroimagen.arviewer.data.cache.ManifestCache
 import ru.neuroimagen.arviewer.data.model.ContentUnavailableReason
 import ru.neuroimagen.arviewer.data.model.ViewerError
 import ru.neuroimagen.arviewer.data.model.ViewerManifest
@@ -10,12 +12,15 @@ import java.io.IOException
 
 /**
  * Repository for viewer API: check content, load manifest, fetch next active video.
- * Maps HTTP and check responses to domain errors.
+ * Uses manifest cache for offline: on network failure returns cached manifest when available.
  */
-class ViewerRepository(private val api: ViewerApi) {
+class ViewerRepository(
+    private val api: ViewerApi,
+    private val contextProvider: () -> Context
+) {
 
     /**
-     * Checks if content is available, then fetches manifest.
+     * Checks if content is available, then fetches manifest. On network error, falls back to cache.
      * @return Result with [ViewerManifest] on success, or [ViewerError] on failure.
      */
     suspend fun loadManifest(uniqueId: String): Result<ViewerManifest> {
@@ -24,8 +29,27 @@ class ViewerRepository(private val api: ViewerApi) {
             return Result.failure(ViewerError.Unavailable(ContentUnavailableReason.INVALID_UNIQUE_ID))
         }
 
+        val networkResult = fetchManifestFromNetwork(trimmed)
+        if (networkResult != null) {
+            networkResult.getOrNull()?.let { manifest ->
+                ManifestCache.put(contextProvider(), trimmed, manifest)
+            }
+            return networkResult
+        }
+
+        ManifestCache.get(contextProvider(), trimmed)?.let { cached ->
+            return Result.success(cached)
+        }
+
+        return Result.failure(ViewerError.Network(msg = "Network error"))
+    }
+
+    /**
+     * Tries to load manifest from API. Returns null on network/HTTP error (so caller can try cache).
+     */
+    private suspend fun fetchManifestFromNetwork(uniqueId: String): Result<ViewerManifest>? {
         return try {
-            val checkResponse = api.checkContent(trimmed)
+            val checkResponse = api.checkContent(uniqueId)
             if (!checkResponse.isSuccessful) {
                 return Result.failure(mapHttpToError(checkResponse.code(), checkResponse.message()))
             }
@@ -35,7 +59,7 @@ class ViewerRepository(private val api: ViewerApi) {
                 return Result.failure(ViewerError.Unavailable(reason))
             }
 
-            val manifestResponse = api.getManifest(trimmed)
+            val manifestResponse = api.getManifest(uniqueId)
             if (!manifestResponse.isSuccessful) {
                 return Result.failure(mapHttpToError(manifestResponse.code(), manifestResponse.message()))
             }
@@ -43,9 +67,9 @@ class ViewerRepository(private val api: ViewerApi) {
                 ?: return Result.failure(ViewerError.Server(manifestResponse.code(), msg = "Empty manifest"))
             Result.success(manifest)
         } catch (e: IOException) {
-            Result.failure(ViewerError.Network(msg = e.message))
+            null
         } catch (e: HttpException) {
-            Result.failure(mapHttpToError(e.code(), e.message()))
+            null
         }
     }
 

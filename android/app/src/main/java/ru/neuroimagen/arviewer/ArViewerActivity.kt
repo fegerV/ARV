@@ -16,6 +16,7 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import com.google.android.exoplayer2.ExoPlayer
 import com.google.android.exoplayer2.MediaItem
+import com.google.android.exoplayer2.source.ProgressiveMediaSource
 import com.google.ar.core.Session
 import com.google.gson.Gson
 import kotlinx.coroutines.Dispatchers
@@ -24,6 +25,8 @@ import kotlinx.coroutines.withContext
 import ru.neuroimagen.arviewer.ar.ArRenderer
 import ru.neuroimagen.arviewer.ar.ArSessionHelper
 import ru.neuroimagen.arviewer.data.api.ApiProvider
+import ru.neuroimagen.arviewer.data.cache.MarkerCache
+import ru.neuroimagen.arviewer.data.cache.VideoCache
 import ru.neuroimagen.arviewer.data.model.ViewerManifest
 
 /**
@@ -177,17 +180,27 @@ class ArViewerActivity : AppCompatActivity() {
         exoPlayer?.release()
         val player = ExoPlayer.Builder(this).build()
         exoPlayer = player
-        player.setMediaItem(MediaItem.fromUri(manifest.video.videoUrl))
+        val cacheFactory = VideoCache.getDataSourceFactory(this)
+        val mediaSource = ProgressiveMediaSource.Factory(cacheFactory)
+            .createMediaSource(MediaItem.fromUri(manifest.video.videoUrl))
+        player.setMediaSource(mediaSource)
         player.setVideoSurface(surface)
         player.prepare()
         player.playWhenReady = true
     }
 
+    /**
+     * Loads marker image: from cache first, then from network. Saves to cache on download.
+     */
     private suspend fun loadMarkerBitmap(url: String): Bitmap? = withContext(Dispatchers.IO) {
-        val response = ApiProvider.viewerApi.downloadImage(url)
-        if (!response.isSuccessful) return@withContext null
-        val body = response.body() ?: return@withContext null
-        body.byteStream().use { BitmapFactory.decodeStream(it) }
+        MarkerCache.get(this@ArViewerActivity, url)
+            ?: run {
+                val response = ApiProvider.viewerApi.downloadImage(url)
+                if (!response.isSuccessful) return@withContext null
+                val bytes = response.body()?.bytes() ?: return@withContext null
+                MarkerCache.put(this@ArViewerActivity, url, bytes)
+                BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+            }
     }
 
     private fun loadManifestAndStart(uniqueId: String) {

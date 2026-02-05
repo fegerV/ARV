@@ -10,6 +10,7 @@ import java.util.concurrent.TimeUnit
 /**
  * Provides ViewerApi and ViewerRepository.
  * Base URL must end with / so that paths "api/viewer/ar/..." resolve correctly.
+ * ViewerRepository uses ArViewerApp context for manifest cache (offline).
  */
 object ApiProvider {
 
@@ -35,5 +36,7 @@ object ApiProvider {
 
     val viewerApi: ViewerApi by lazy { retrofit.create(ViewerApi::class.java) }
 
-    val viewerRepository: ViewerRepository by lazy { ViewerRepository(viewerApi) }
+    val viewerRepository: ViewerRepository by lazy {
+        ViewerRepository(viewerApi) { ru.neuroimagen.arviewer.ArViewerApp.applicationContext() }
+    }
 }

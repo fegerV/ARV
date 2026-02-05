@@ -968,12 +968,20 @@ async def ar_content_detail(
                 return value.isoformat()
             return str(value) if value else None
         
+        # Ensure unique_link and public_url are always set
+        uid = ar_content.get("unique_id") or ""
+        unique_link = ar_content.get("unique_link") or (f"/view/{uid}" if uid else "")
+        public_url = ar_content.get("public_url")
+        if not public_url and uid:
+            base = (settings.PUBLIC_URL or "").rstrip("/")
+            public_url = f"{base}/view/{uid}" if base else f"/view/{uid}"
+        
         ar_content_js = {
             "id": ar_content.get("id"),
             "company_id": ar_content.get("company_id"),
             "project_id": ar_content.get("project_id"),
             "order_number": ar_content.get("order_number"),
-            "unique_id": ar_content.get("unique_id"),
+            "unique_id": uid,
             "customer_name": ar_content.get("customer_name"),
             "customer_phone": ar_content.get("customer_phone"),
             "customer_email": ar_content.get("customer_email"),
@@ -986,8 +994,8 @@ async def ar_content_detail(
             "marker_url": ar_content.get("marker_url"),
             "marker_status": ar_content.get("marker_status"),
             "marker_metadata": marker_metadata,
-            "public_url": ar_content.get("public_url"),
-            "unique_link": ar_content.get("unique_link"),
+            "public_url": public_url,
+            "unique_link": unique_link,
             "company_name": ar_content.get("company_name"),
             "project_name": ar_content.get("project_name"),
             "views_count": ar_content.get("views_count"),
@@ -1031,12 +1039,21 @@ async def ar_content_detail(
             "is_valid": marker_metadata.get("is_valid", None),
             "validation_warnings": marker_metadata.get("validation_warnings", []),
         }
+        # Ensure unique_link and public_url are always set (fallback)
+        uid = ar_content.get("unique_id") or ""
+        unique_link = ar_content.get("unique_link") or (f"/view/{uid}" if uid else "")
+        public_url = ar_content.get("public_url")
+        if not public_url and uid:
+            base = (settings.PUBLIC_URL or "").rstrip("/")
+            public_url = f"{base}/view/{uid}" if base else f"/view/{uid}"
+        
         # Create a simplified version for JavaScript serialization from mock data
         ar_content_js = {
             'id': ar_content.get('id'),
             "company_id": ar_content.get("company_id"),
             "project_id": ar_content.get("project_id"),
             'order_number': ar_content.get('order_number'),
+            'unique_id': uid,
             'customer_name': ar_content.get('customer_name'),
             'customer_phone': ar_content.get('customer_phone'),
             'customer_email': ar_content.get('customer_email'),
@@ -1049,8 +1066,8 @@ async def ar_content_detail(
             'marker_url': ar_content.get('marker_url'),
             'marker_status': ar_content.get('marker_status'),
             "marker_metadata": marker_metadata,
-            'public_url': ar_content.get('public_url'),
-            'unique_link': ar_content.get('unique_link'),
+            'public_url': public_url,
+            'unique_link': unique_link,
             'company_name': ar_content.get('company_name'),
             'project_name': ar_content.get('project_name'),
             'views_count': ar_content.get('views_count'),

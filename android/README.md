@@ -1,6 +1,8 @@
 # AR Viewer (Android)
 
-Мобильное приложение **AR Viewer** для просмотра AR-контента (ARCore + Kotlin). Получает манифест с бэкенда ARV, отображает видео на маркере (растровое фото).
+Мобильное приложение **AR Viewer** для просмотра AR-контента (ARCore + Kotlin). Получает манифест с бэкенда ARV, отображает видео на маркере (растровое фото). Поддерживает кэширование и офлайн-режим, Splash Screen при старте.
+
+**Полная документация:** [docs/ANDROID_APP.md](../docs/ANDROID_APP.md) (экраны, архитектура, версионирование, роадмап, сборка, CI).
 
 ## Связь с бэкендом
 
@@ -32,9 +34,11 @@
 
 ## Структура
 
-- **MainActivity** — ввод unique_id, проверка (check), загрузка манифеста, переход в AR; обработка deep link с немедленным переходом в AR.
-- **ArViewerActivity** — ARCore-сессия, Augmented Images, загрузка маркера по URL, фон камеры (OpenGL), ExoPlayer на кваде по маркеру, кнопки «Снимок» и «Запись видео» (фото через PixelCopy + MediaStore).
-- **data/** — модели (ViewerManifest, ContentCheckResponse, ViewerError), ViewerApi (Retrofit), ViewerRepository.
+- **SplashActivity** — экран загрузки при запуске по иконке (~1,5 с), затем переход в MainActivity.
+- **MainActivity** — ввод unique_id/URL, проверка (check), загрузка манифеста (с fallback на кэш при офлайн), переход в AR; обработка deep link с немедленным переходом в AR; кнопка «Сканировать QR».
+- **QrScannerActivity** — сканер QR (CameraX + ML Kit), возврат unique_id в MainActivity.
+- **ArViewerActivity** — ARCore-сессия, Augmented Images, загрузка маркера (с кэшем), фон камеры (OpenGL), ExoPlayer с кэшем видео на кваде по маркеру, кнопки «Снимок» и «Запись видео» (фото через PixelCopy + MediaStore).
+- **data/** — модели (ViewerManifest, ContentCheckResponse, ViewerError), ViewerApi (Retrofit), ViewerRepository; кэши ManifestCache, MarkerCache, VideoCache (ExoPlayer).
 - **ar/** — BackgroundRenderer, VideoQuadRenderer, ArSessionHelper, ShaderUtil, шейдеры в `assets/shaders/`.
 
 ## Сборка
@@ -60,3 +64,18 @@ cd android && .\gradlew.bat assembleDebug
 - При падении сессии ARCore рендерер перестаёт рисовать кадры; при необходимости обрабатывать `UnavailableException` и показывать пользователю сообщение.
 
 Подробнее: [docs/STRUCTURE.md](../docs/STRUCTURE.md).
+
+## Версионирование
+
+- **versionName** (например `1.0.0`) и **versionCode** задаются в `app/build.gradle.kts`.
+- Формат версии: **MAJOR.MINOR.PATCH**. MAJOR — несовместимые изменения; MINOR — новая функциональность; PATCH — исправления.
+- При каждом релизе увеличивать `versionCode`; при смене версии для пользователя — `versionName`.
+
+Полное описание: [docs/ANDROID_APP.md](../docs/ANDROID_APP.md#5-версионирование).
+
+## Роадмап
+
+- **Сделано:** главный экран, deep links, QR-сканер, AR Viewer, кэш маркера/манифеста/видео, офлайн, Splash Screen, CI.
+- **В планах:** запись видео AR, ротация видео по расписанию, настройки, шаринг, аналитика, Splash API 12+.
+
+Подробный роадмап: [docs/ANDROID_APP.md](../docs/ANDROID_APP.md#6-роадмап).
