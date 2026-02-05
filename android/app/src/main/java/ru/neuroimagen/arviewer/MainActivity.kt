@@ -76,7 +76,13 @@ class MainActivity : AppCompatActivity() {
         // Парсим ввод: может быть UUID, URL или deep link
         val uniqueId = extractUniqueId(input)
         if (uniqueId == null) {
-            Toast.makeText(this, getString(R.string.error_invalid_unique_id), Toast.LENGTH_SHORT).show()
+            // Показываем более понятную ошибку в зависимости от типа ввода
+            val errorMsg = if (looksLikeUrl(input)) {
+                getString(R.string.error_invalid_link_format)
+            } else {
+                getString(R.string.error_invalid_unique_id)
+            }
+            Toast.makeText(this, errorMsg, Toast.LENGTH_LONG).show()
             return
         }
         openViewer(uniqueId)
@@ -84,7 +90,7 @@ class MainActivity : AppCompatActivity() {
 
     /**
      * Извлекает unique_id из ввода пользователя.
-     * Поддерживает: UUID напрямую, https://...view/{id}, arv://view/{id}
+     * Поддерживает: UUID напрямую, https://ar.neuroimagen.ru[:port]/view/{id}, arv://view/{id}
      */
     private fun extractUniqueId(input: String): String? {
         // Если это уже UUID — вернуть как есть
@@ -98,6 +104,13 @@ class MainActivity : AppCompatActivity() {
         } catch (e: Exception) {
             null
         }
+    }
+
+    /**
+     * Проверяет, выглядит ли ввод как URL (для показа соответствующей ошибки).
+     */
+    private fun looksLikeUrl(input: String): Boolean {
+        return input.startsWith("http://") || input.startsWith("https://") || input.startsWith("arv://")
     }
 
     private fun openViewer(uniqueId: String) {
@@ -145,18 +158,45 @@ class MainActivity : AppCompatActivity() {
     }
 
     companion object {
+        private const val EXPECTED_HOST = "ar.neuroimagen.ru"
+        
         private val UUID_REGEX = Regex(
             "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
         )
 
         /**
          * Parses unique_id from viewer deep link URI.
-         * Supports https://ar.neuroimagen.ru/view/{unique_id} and arv://view/{unique_id}.
+         * Supports:
+         * - https://ar.neuroimagen.ru/view/{unique_id}
+         * - https://ar.neuroimagen.ru:8000/view/{unique_id}
+         * - arv://view/{unique_id}
          */
         fun parseUniqueIdFromUri(uri: Uri): String? {
             return when (uri.scheme) {
-                "arv" -> uri.pathSegments.firstOrNull() ?: uri.path?.trimStart('/')?.takeIf { it.isNotBlank() }
-                "https", "http" -> uri.pathSegments.getOrNull(1)?.takeIf { UUID_REGEX.matches(it) }
+                "arv" -> {
+                    // arv://view/{unique_id}
+                    if (uri.host == "view") {
+                        uri.pathSegments.firstOrNull()?.takeIf { UUID_REGEX.matches(it) }
+                            ?: uri.path?.trimStart('/')?.takeIf { UUID_REGEX.matches(it) }
+                    } else {
+                        // arv://{unique_id}
+                        uri.host?.takeIf { UUID_REGEX.matches(it) }
+                            ?: uri.pathSegments.firstOrNull()?.takeIf { UUID_REGEX.matches(it) }
+                    }
+                }
+                "https", "http" -> {
+                    // Проверяем хост (uri.host не включает порт)
+                    if (uri.host != EXPECTED_HOST) {
+                        return null
+                    }
+                    // Ожидаем /view/{unique_id}
+                    val segments = uri.pathSegments
+                    if (segments.size >= 2 && segments[0] == "view") {
+                        segments[1].takeIf { UUID_REGEX.matches(it) }
+                    } else {
+                        null
+                    }
+                }
                 else -> null
             }
         }

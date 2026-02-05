@@ -8,6 +8,8 @@
     <string name="loading_content_short">Загрузка…</string>
     <string name="retry">Повторить</string>
     <string name="error_invalid_unique_id">Неверный идентификатор</string>
+    <string name="error_invalid_link_format">Неверный формат ссылки.\nОжидается: ar.neuroimagen.ru/view/ID</string>
+    <string name="error_qr_not_recognized">QR-код не содержит AR-ссылку</string>
     <string name="error_not_found">Контент не найден</string>
     <string name="error_subscription_expired">Подписка истекла</string>
     <string name="error_content_not_active">Контент недоступен</string>

@@ -44,6 +44,8 @@ class QrScannerActivity : AppCompatActivity() {
     private lateinit var barcodeScanner: BarcodeScanner
     
     private var isProcessing = false
+    private var lastInvalidQrShownTime = 0L
+    private var lastInvalidQrContent: String? = null
 
     private val requestPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
@@ -155,6 +157,15 @@ class QrScannerActivity : AppCompatActivity() {
                         if (uniqueId != null) {
                             handleScannedCode(uniqueId)
                             return@addOnSuccessListener
+                        } else {
+                            // QR распознан, но не содержит AR-ссылку
+                            // Показываем ошибку не чаще раза в 3 секунды для одного и того же QR
+                            val now = System.currentTimeMillis()
+                            if (value != lastInvalidQrContent || now - lastInvalidQrShownTime > 3000) {
+                                lastInvalidQrContent = value
+                                lastInvalidQrShownTime = now
+                                showInvalidQrMessage(value)
+                            }
                         }
                     }
                 }
@@ -183,9 +194,14 @@ class QrScannerActivity : AppCompatActivity() {
         return try {
             val uri = Uri.parse(content)
             when {
-                // https://ar.neuroimagen.ru/view/{unique_id}
-                uri.scheme in listOf("https", "http") && uri.host == "ar.neuroimagen.ru" -> {
-                    uri.pathSegments.getOrNull(1)?.takeIf { UUID_REGEX.matches(it) }
+                // https://ar.neuroimagen.ru[:port]/view/{unique_id}
+                uri.scheme in listOf("https", "http") && uri.host == EXPECTED_HOST -> {
+                    val segments = uri.pathSegments
+                    if (segments.size >= 2 && segments[0] == "view") {
+                        segments[1].takeIf { UUID_REGEX.matches(it) }
+                    } else {
+                        null
+                    }
                 }
                 // arv://view/{unique_id}
                 uri.scheme == "arv" && uri.host == "view" -> {
@@ -197,6 +213,16 @@ class QrScannerActivity : AppCompatActivity() {
         } catch (e: Exception) {
             Log.w(TAG, "Не удалось распарсить QR: $content", e)
             null
+        }
+    }
+
+    /**
+     * Показывает сообщение об ошибке при сканировании невалидного QR.
+     */
+    private fun showInvalidQrMessage(scannedContent: String) {
+        runOnUiThread {
+            val message = getString(R.string.error_qr_not_recognized) + "\n$scannedContent"
+            Toast.makeText(this, message, Toast.LENGTH_LONG).show()
         }
     }
 
@@ -218,6 +244,7 @@ class QrScannerActivity : AppCompatActivity() {
 
     companion object {
         private const val TAG = "QrScannerActivity"
+        private const val EXPECTED_HOST = "ar.neuroimagen.ru"
         const val EXTRA_UNIQUE_ID = "extra_unique_id"
         
         private val UUID_REGEX = Regex(
