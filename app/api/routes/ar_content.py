@@ -37,8 +37,6 @@ from app.utils.ar_content import (
 )
 from app.services.marker_service import marker_service
 
-# Add import for the viewer route
-from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse
 import json
 
@@ -719,9 +717,8 @@ async def create_ar_content_legacy(
 ):
     """Create new AR content with legacy format (image/video files and JSON metadata string)."""
     logger = structlog.get_logger()
-    
+
     # Parse the content metadata JSON string
-    import json
     try:
         metadata = json.loads(content_metadata)
     except json.JSONDecodeError:
@@ -1256,8 +1253,8 @@ async def get_ar_marker(unique_id: str, db: AsyncSession = Depends(get_db)):
     """Get AR marker file by unique_id"""
     try:
         # Validate UUID format
-        parsed_uuid = UUID(unique_id)
-        
+        UUID(unique_id)
+
         # Find AR content by unique_id (using string directly since model expects string)
         stmt = select(ARContent).where(ARContent.unique_id == unique_id)
         result = await db.execute(stmt)
@@ -1283,8 +1280,8 @@ async def get_ar_image(unique_id: str, db: AsyncSession = Depends(get_db)):
     """Get AR target image by unique_id"""
     try:
         # Validate UUID format
-        parsed_uuid = UUID(unique_id)
-        
+        UUID(unique_id)
+
         # Find AR content by unique_id (using string directly since model expects string)
         stmt = select(ARContent).where(ARContent.unique_id == unique_id)
         result = await db.execute(stmt)
