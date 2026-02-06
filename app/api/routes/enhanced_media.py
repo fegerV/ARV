@@ -4,28 +4,22 @@ Enhanced Media API routes with advanced validation, caching, and reliability.
 from typing import Optional, List, Dict, Any
 from fastapi import APIRouter, HTTPException, Query, BackgroundTasks, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, and_, or_
+from sqlalchemy import select
 from pydantic import BaseModel, Field
-from enum import Enum
 import uuid
-import asyncio
-from pathlib import Path
 
 from app.core.database import get_db
 from app.models.ar_content import ARContent
 from app.models.video import Video
 from app.services.enhanced_thumbnail_service import (
-    enhanced_thumbnail_service, 
-    ThumbnailConfig, 
-    ThumbnailSize, 
+    enhanced_thumbnail_service,
+    ThumbnailConfig,
+    ThumbnailSize,
     ThumbnailFormat,
-    ValidationResult as ThumbnailValidationResult
 )
 from app.services.enhanced_validation_service import (
     enhanced_validation_service,
     ValidationLevel,
-    FileConstraints,
-    ValidationResult
 )
 from app.services.enhanced_cache_service import enhanced_cache_service
 from app.services.reliability_service import (
@@ -34,7 +28,6 @@ from app.services.reliability_service import (
     RetryConfig,
     reliable
 )
-from app.core.config import settings
 import structlog
 
 logger = structlog.get_logger()
@@ -371,7 +364,7 @@ async def clear_cache(
             deleted_count = await enhanced_cache_service.invalidate_pattern(pattern, cache_type or 'default')
             return {
                 "status": "success",
-                "message": f"Cache pattern cleared",
+                "message": "Cache pattern cleared",
                 "deleted_count": deleted_count,
                 "pattern": pattern
             }
