@@ -1,4 +1,4 @@
-from typing import List, Optional
+from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, or_
@@ -129,8 +129,6 @@ async def get_company(
     current_user: User = Depends(get_current_active_user)
 ):
     """Get detailed company information"""
-    logger = structlog.get_logger()
-    
     # Get company
     company = await db.get(Company, company_id)
     if not company:

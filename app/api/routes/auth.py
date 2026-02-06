@@ -105,12 +105,6 @@ async def get_current_user_optional(
     
     # If we have a token, try to validate it
     if token:
-        credentials_exception = HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Could not validate credentials",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-        
         payload = decode_token(token)
         if payload is not None:
             email: str = payload.get("sub")
@@ -119,7 +113,7 @@ async def get_current_user_optional(
                 user = result.scalar_one_or_none()
                 if user:
                     return user
-    
+
     # If no token or token is invalid, return None
     return None
 
@@ -278,8 +272,6 @@ async def login_form(
     db: AsyncSession = Depends(get_db)
 ):
     """Handle form-based login for HTML interface"""
-    import os
-    
     # Create templates instance to render login page with errors
     templates = Jinja2Templates(directory="templates")
     

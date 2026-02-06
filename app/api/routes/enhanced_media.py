@@ -2,8 +2,7 @@
 Enhanced Media API routes with advanced validation, caching, and reliability.
 """
 from typing import Optional, List, Dict, Any
-from fastapi import APIRouter, HTTPException, UploadFile, File, Query, BackgroundTasks, Depends
-from fastapi.responses import JSONResponse
+from fastapi import APIRouter, HTTPException, Query, BackgroundTasks, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_, or_
 from pydantic import BaseModel, Field

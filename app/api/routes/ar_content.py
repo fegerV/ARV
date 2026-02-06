@@ -577,8 +577,6 @@ async def create_ar_content(
     )
 
 
-from fastapi import Request
-
 async def parse_ar_content_data(request: Request):
     """
     Custom dependency to parse AR content data from request that can handle both formats:
@@ -1097,12 +1095,7 @@ async def get_ar_content_by_id_legacy(
     """Get AR content by ID without requiring company/project context"""
     # Get AR content
     ar_content = await get_ar_content_or_404(content_id, db)
-    
-    # Load related videos
-    stmt = select(Video).where(Video.ar_content_id == content_id)
-    result = await db.execute(stmt)
-    videos = result.scalars().all()
-    
+
     # Add unique link to response
     content_data = ARContentWithLinks.model_validate(ar_content)
     # Set unique_link after validation since it's not in the database model
