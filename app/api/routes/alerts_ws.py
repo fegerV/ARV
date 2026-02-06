@@ -3,8 +3,6 @@ import json
 import structlog
 from fastapi import APIRouter, WebSocket
 
-from app.core.config import settings
-
 router = APIRouter()
 logger = structlog.get_logger()
 

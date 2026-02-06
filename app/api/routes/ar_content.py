@@ -1,7 +1,6 @@
 """
 AR Content API routes with Company → Project → AR Content hierarchy.
 """
-from app.middleware.rate_limiter import rate_limit
 from uuid import uuid4, UUID
 from pathlib import Path
 from typing import Optional
@@ -24,9 +23,7 @@ from app.models.company import Company
 from app.models.video import Video
 from app.schemas.ar_content import (
     ARContent as ARContentSchema,
-    ARContentCreate,
     ARContentUpdate,
-    ARContentVideoUpdate,
     ARContentList,
     ARContentCreateResponse,
     ARContentWithLinks
@@ -262,13 +259,8 @@ async def _create_ar_content(
     if not validate_file_extension(video_file.filename, allowed_video_extensions):
         raise HTTPException(status_code=422, detail="Video must be MP4, WebM, or MOV")
     
-    # Validate file sizes
-    MAX_FILE_SIZE_PHOTO = 10 * 1024 * 1024  # 10MB
-    MAX_FILE_SIZE_VIDEO = 100 * 1024 * 1024  # 100MB
-    
-    # Note: In a real implementation, we'd need to check the actual file size
-    # For now, we'll assume the files are within limits
-    
+    # Note: file size validation (e.g. 10MB photo, 100MB video) can be added here if needed
+
     # Generate unique identifier
     unique_id = str(uuid4())
     
@@ -362,10 +354,10 @@ async def _create_ar_content(
     await db.commit()
     await db.refresh(ar_content)
     
-    # Generate thumbnail for the photo
+    # Generate thumbnail (use enhanced image path when auto-enhance was applied)
     try:
         thumbnail_result = await thumbnail_service.generate_image_thumbnail(
-            image_path=str(photo_path),
+            image_path=marker_image_path,
             company_id=company_id,
             storage_path=storage_path
         )

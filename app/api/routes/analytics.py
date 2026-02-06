@@ -28,7 +28,7 @@ async def analytics_overview(db: AsyncSession = Depends(get_db)):
         unique_sessions = await db.execute(
             select(func.count(text('DISTINCT session_id'))).select_from(ARViewSession).where(ARViewSession.created_at >= since)
         )
-    except:
+    except Exception:
         # Fallback for PostgreSQL
         unique_sessions = await db.execute(select(func.count(distinct(ARViewSession.session_id))).where(ARViewSession.created_at >= since))
     unique_sessions_count = unique_sessions.scalar() or 0
