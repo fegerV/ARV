@@ -133,6 +133,12 @@ class MainActivity : AppCompatActivity() {
                 onFailure = { throwable ->
                     val message = when (val error = throwable as? ViewerError) {
                         is ViewerError.Server -> getString(R.string.error_server, error.code)
+                        is ViewerError.Network -> {
+                            val base = getString(R.string.error_network)
+                            val detail = if (!error.msg.isNullOrBlank()) "\n(${error.msg})" else ""
+                            val hint = getString(R.string.error_network_hint)
+                            "$base$detail\n\n$hint"
+                        }
                         is ViewerError -> getString(ViewerErrorMessages.getMessageResId(error))
                         else -> getString(R.string.error_unknown)
                     }

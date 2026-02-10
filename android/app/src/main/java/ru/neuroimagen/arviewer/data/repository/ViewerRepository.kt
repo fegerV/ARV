@@ -30,24 +30,23 @@ class ViewerRepository(
         }
 
         val networkResult = fetchManifestFromNetwork(trimmed)
-        if (networkResult != null) {
-            networkResult.getOrNull()?.let { manifest ->
-                ManifestCache.put(contextProvider(), trimmed, manifest)
+        networkResult.getOrNull()?.let { manifest ->
+            ManifestCache.put(contextProvider(), trimmed, manifest)
+            return Result.success(manifest)
+        }
+        val networkFailure = networkResult.exceptionOrNull()
+        if (networkFailure is ViewerError.Network) {
+            ManifestCache.get(contextProvider(), trimmed)?.let { cached ->
+                return Result.success(cached)
             }
-            return networkResult
         }
-
-        ManifestCache.get(contextProvider(), trimmed)?.let { cached ->
-            return Result.success(cached)
-        }
-
-        return Result.failure(ViewerError.Network(msg = "Network error"))
+        return Result.failure(networkFailure as? ViewerError ?: ViewerError.Network(msg = "Unknown error"))
     }
 
     /**
-     * Tries to load manifest from API. Returns null on network/HTTP error (so caller can try cache).
+     * Fetches manifest from API. Returns Result with proper error (Server/Unavailable/Network).
      */
-    private suspend fun fetchManifestFromNetwork(uniqueId: String): Result<ViewerManifest>? {
+    private suspend fun fetchManifestFromNetwork(uniqueId: String): Result<ViewerManifest> {
         return try {
             val checkResponse = api.checkContent(uniqueId)
             if (!checkResponse.isSuccessful) {
@@ -66,10 +65,10 @@ class ViewerRepository(
             val manifest = manifestResponse.body()
                 ?: return Result.failure(ViewerError.Server(manifestResponse.code(), msg = "Empty manifest"))
             Result.success(manifest)
-        } catch (e: IOException) {
-            null
         } catch (e: HttpException) {
-            null
+            Result.failure(mapHttpToError(e.code(), e.message()))
+        } catch (e: IOException) {
+            Result.failure(ViewerError.Network(msg = e.message ?: e.javaClass.simpleName))
         }
     }
 

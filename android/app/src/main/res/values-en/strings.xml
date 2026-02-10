@@ -16,6 +16,7 @@
     <string name="error_marker_still_generating">Marker is still being generated, try again later</string>
     <string name="error_no_playable_video">No playable video</string>
     <string name="error_network">Network error. Check connection.</string>
+    <string name="error_network_hint">Open in phone browser: https://ar.neuroimagen.ru — if it does not load, the server is unreachable (different network or server down).</string>
     <string name="error_server">Server error (%1$d)</string>
     <string name="error_unknown">Unknown error</string>
     <string name="ar_scene_placeholder">AR scene (loading…)</string>

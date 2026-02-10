@@ -18,6 +18,7 @@
     <string name="error_marker_still_generating">Маркер ещё создаётся, попробуйте позже</string>
     <string name="error_no_playable_video">Нет доступного видео</string>
     <string name="error_network">Ошибка сети. Проверьте подключение.</string>
+    <string name="error_network_hint">Откройте в браузере телефона: https://ar.neuroimagen.ru — если не открывается, сервер недоступен (другой Wi‑Fi, нет интернета или сервер выключен).</string>
     <string name="error_server">Ошибка сервера (%1$d)</string>
     <string name="error_unknown">Неизвестная ошибка</string>
     <string name="ar_scene_placeholder">AR-сцена (загрузка…)</string>
