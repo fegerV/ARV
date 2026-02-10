@@ -23,6 +23,9 @@ class MainActivity : AppCompatActivity() {
     private val repository get() = ApiProvider.viewerRepository
     private val gson = Gson()
 
+    /** Last uniqueId we tried to open; used when user taps Retry. */
+    private var lastAttemptedUniqueId: String? = null
+
     private val qrScannerLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
     ) { result ->
@@ -42,7 +45,7 @@ class MainActivity : AppCompatActivity() {
 
         binding.buttonOpen.setOnClickListener { onOpenClicked() }
         binding.buttonScanQr.setOnClickListener { openQrScanner() }
-        binding.buttonRetry.setOnClickListener { showMainPanel() }
+        binding.buttonRetry.setOnClickListener { onRetryClicked() }
 
         handleIntent(intent)
     }
@@ -114,6 +117,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun openViewer(uniqueId: String) {
+        lastAttemptedUniqueId = uniqueId
         showLoadingPanel()
         lifecycleScope.launch {
             val result = withContext(Dispatchers.IO) { repository.loadManifest(uniqueId) }
@@ -135,6 +139,15 @@ class MainActivity : AppCompatActivity() {
                     showErrorPanel(message)
                 }
             )
+        }
+    }
+
+    private fun onRetryClicked() {
+        val id = lastAttemptedUniqueId
+        if (!id.isNullOrBlank()) {
+            openViewer(id)
+        } else {
+            showMainPanel()
         }
     }
 

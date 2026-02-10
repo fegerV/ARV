@@ -19,6 +19,7 @@
     <string name="error_server">Server error (%1$d)</string>
     <string name="error_unknown">Unknown error</string>
     <string name="ar_scene_placeholder">AR scene (loading…)</string>
+    <string name="error_camera_required">Camera access is required for AR. Grant it in app settings.</string>
     <string name="error_arcore_required">ARCore required. Install from Play Store.</string>
     <string name="error_arcore_session">Failed to start AR. Check device support.</string>
     <string name="capture_photo">Photo</string>

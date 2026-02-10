@@ -21,6 +21,7 @@
     <string name="error_server">Ошибка сервера (%1$d)</string>
     <string name="error_unknown">Неизвестная ошибка</string>
     <string name="ar_scene_placeholder">AR-сцена (загрузка…)</string>
+    <string name="error_camera_required">Для AR нужен доступ к камере. Разрешите в настройках приложения.</string>
     <string name="error_arcore_required">Требуется ARCore. Установите из Play Маркета.</string>
     <string name="error_arcore_session">Не удалось запустить AR. Проверьте поддержку устройства.</string>
     <string name="capture_photo">Снимок</string>

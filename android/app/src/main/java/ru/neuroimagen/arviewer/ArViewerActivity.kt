@@ -1,5 +1,7 @@
 package ru.neuroimagen.arviewer
 
+import android.Manifest
+import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.opengl.GLSurfaceView
@@ -12,7 +14,9 @@ import android.view.Surface
 import android.widget.Button
 import android.widget.Toast
 import java.io.OutputStream
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
 import com.google.android.exoplayer2.ExoPlayer
 import com.google.android.exoplayer2.MediaItem
@@ -39,6 +43,22 @@ class ArViewerActivity : AppCompatActivity() {
     private val gson = Gson()
     private var arSession: Session? = null
     private var exoPlayer: ExoPlayer? = null
+
+    private val cameraPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (granted) {
+            pendingManifest?.let { manifest -> pendingBitmap?.let { bitmap -> startArWithPermission(manifest, bitmap) } }
+        } else {
+            Toast.makeText(this, R.string.error_camera_required, Toast.LENGTH_LONG).show()
+            finish()
+        }
+        pendingManifest = null
+        pendingBitmap = null
+    }
+
+    private var pendingManifest: ViewerManifest? = null
+    private var pendingBitmap: Bitmap? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -99,40 +119,55 @@ class ArViewerActivity : AppCompatActivity() {
             }
             withContext(Dispatchers.Main) {
                 if (isDestroyed) return@withContext
-                if (!ArSessionHelper.checkAndInstallArCore(this@ArViewerActivity)) {
-                    Toast.makeText(this@ArViewerActivity, R.string.error_arcore_required, Toast.LENGTH_LONG).show()
-                    finish()
+                if (ContextCompat.checkSelfPermission(this@ArViewerActivity, Manifest.permission.CAMERA)
+                    != PackageManager.PERMISSION_GRANTED) {
+                    pendingManifest = manifest
+                    pendingBitmap = bitmap
+                    cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
                     return@withContext
                 }
-                if (isDestroyed) return@withContext
-                val session = ArSessionHelper.createSession(this@ArViewerActivity, bitmap, manifest)
-                if (session == null) {
-                    Toast.makeText(this@ArViewerActivity, R.string.error_arcore_session, Toast.LENGTH_LONG).show()
-                    finish()
-                    return@withContext
-                }
-                if (isDestroyed) return@withContext
-                arSession = session
-                val root = layoutInflater.inflate(R.layout.activity_ar_viewer_gl, null)
-                val glView = root.findViewById<GLSurfaceView>(R.id.ar_gl_surface).apply {
-                    setEGLContextClientVersion(2)
-                    setEGLConfigChooser(8, 8, 8, 8, 16, 0)
-                    setRenderer(ArRenderer(
-                        this@ArViewerActivity,
-                        session,
-                        manifest,
-                        onVideoSurfaceReady = { surface -> startVideoPlayer(surface, manifest) }
-                    ))
-                }
-                root.findViewById<Button>(R.id.button_capture_photo).setOnClickListener {
-                    capturePhoto(glView)
-                }
-                root.findViewById<Button>(R.id.button_record_video).setOnClickListener {
-                    Toast.makeText(this@ArViewerActivity, R.string.record_video_coming_soon, Toast.LENGTH_SHORT).show()
-                }
-                setContentView(root)
+                startArWithPermission(manifest, bitmap)
             }
         }
+    }
+
+    /**
+     * Starts AR scene. Call only when camera permission is granted.
+     */
+    private fun startArWithPermission(manifest: ViewerManifest, bitmap: Bitmap) {
+        if (isDestroyed) return
+        if (!ArSessionHelper.checkAndInstallArCore(this)) {
+            Toast.makeText(this, R.string.error_arcore_required, Toast.LENGTH_LONG).show()
+            finish()
+            return
+        }
+        if (isDestroyed) return
+        val session = ArSessionHelper.createSession(this, bitmap, manifest)
+        if (session == null) {
+            Toast.makeText(this, R.string.error_arcore_session, Toast.LENGTH_LONG).show()
+            finish()
+            return
+        }
+        if (isDestroyed) return
+        arSession = session
+        val root = layoutInflater.inflate(R.layout.activity_ar_viewer_gl, null)
+        val glView = root.findViewById<GLSurfaceView>(R.id.ar_gl_surface).apply {
+            setEGLContextClientVersion(2)
+            setEGLConfigChooser(8, 8, 8, 8, 16, 0)
+            setRenderer(ArRenderer(
+                this@ArViewerActivity,
+                session,
+                manifest,
+                onVideoSurfaceReady = { surface -> startVideoPlayer(surface, manifest) }
+            ))
+        }
+        root.findViewById<Button>(R.id.button_capture_photo).setOnClickListener {
+            capturePhoto(glView)
+        }
+        root.findViewById<Button>(R.id.button_record_video).setOnClickListener {
+            Toast.makeText(this@ArViewerActivity, R.string.record_video_coming_soon, Toast.LENGTH_SHORT).show()
+        }
+        setContentView(root)
     }
 
     private fun capturePhoto(glView: GLSurfaceView) {
