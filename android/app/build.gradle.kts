@@ -11,11 +11,11 @@ android {
         targetSdk = 34
         versionCode = 1
         versionName = "1.0.0"
-        buildConfigField("String", "API_BASE_URL", "\"https://ar.neuroimagen.ru:8000\"")
+        buildConfigField("String", "API_BASE_URL", "\"https://ar.neuroimagen.ru\"")
     }
     buildTypes {
         debug {
-            buildConfigField("String", "API_BASE_URL", "\"https://ar.neuroimagen.ru:8000\"")
+            buildConfigField("String", "API_BASE_URL", "\"https://ar.neuroimagen.ru\"")
         }
         release {
             isMinifyEnabled = false

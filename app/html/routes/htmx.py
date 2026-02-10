@@ -10,6 +10,7 @@ from fastapi.responses import HTMLResponse, JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 import qrcode
 
+from app.core.config import settings
 from app.core.redis import redis_client
 from app.html.deps import get_html_db, CurrentActiveUser
 from app.api.routes.ar_content import (
@@ -43,7 +44,8 @@ async def copy_ar_content_link(
     unique_link = content_data.get("unique_link") or content_data.get("public_url") or ""
     link = unique_link
     if unique_link.startswith("/"):
-        link = str(request.base_url) + unique_link.lstrip("/")
+        base = (settings.PUBLIC_URL or "").rstrip("/")
+        link = f"{base}{unique_link}" if base else unique_link
     return {"link": link}
 
 
@@ -65,6 +67,12 @@ async def get_ar_content_qr_code(
     else:
         content_data = dict(content)
 
+    # Единый формат ссылки из PUBLIC_URL (для QR и приложения)
+    public_url = content_data.get("unique_link") or content_data.get("public_url") or ""
+    if public_url.startswith("/"):
+        base = (settings.PUBLIC_URL or "").rstrip("/")
+        public_url = f"{base}{public_url}" if base else public_url
+
     cache_key = f"qr:{ar_content_id}"
     cached = None
     try:
@@ -74,9 +82,6 @@ async def get_ar_content_qr_code(
     if cached:
         img_b64 = cached
     else:
-        public_url = content_data.get("unique_link") or content_data.get("public_url") or ""
-        if public_url.startswith("/"):
-            public_url = str(request.base_url) + public_url.lstrip("/")
         qr = qrcode.make(public_url, image_factory=qrcode.image.pil.PilImage)
         buf = io.BytesIO()
         qr.save(buf, format="PNG")
