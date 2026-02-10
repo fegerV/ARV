@@ -25,6 +25,7 @@ import kotlinx.coroutines.withContext
 import ru.neuroimagen.arviewer.ar.ArRenderer
 import ru.neuroimagen.arviewer.ar.ArSessionHelper
 import ru.neuroimagen.arviewer.data.api.ApiProvider
+import ru.neuroimagen.arviewer.BuildConfig
 import ru.neuroimagen.arviewer.data.cache.MarkerCache
 import ru.neuroimagen.arviewer.data.cache.VideoCache
 import ru.neuroimagen.arviewer.data.model.ViewerManifest
@@ -86,26 +87,31 @@ class ArViewerActivity : AppCompatActivity() {
 
     private fun onManifestReady(manifest: ViewerManifest) {
         lifecycleScope.launch {
+            if (isDestroyed) return@launch
             val bitmap = withContext(Dispatchers.IO) {
                 loadMarkerBitmap(manifest.markerImageUrl)
             }
+            if (isDestroyed) return@launch
             if (bitmap == null) {
                 Toast.makeText(this@ArViewerActivity, R.string.error_marker_not_available, Toast.LENGTH_LONG).show()
                 finish()
                 return@launch
             }
             withContext(Dispatchers.Main) {
+                if (isDestroyed) return@withContext
                 if (!ArSessionHelper.checkAndInstallArCore(this@ArViewerActivity)) {
                     Toast.makeText(this@ArViewerActivity, R.string.error_arcore_required, Toast.LENGTH_LONG).show()
                     finish()
                     return@withContext
                 }
+                if (isDestroyed) return@withContext
                 val session = ArSessionHelper.createSession(this@ArViewerActivity, bitmap, manifest)
                 if (session == null) {
                     Toast.makeText(this@ArViewerActivity, R.string.error_arcore_session, Toast.LENGTH_LONG).show()
                     finish()
                     return@withContext
                 }
+                if (isDestroyed) return@withContext
                 arSession = session
                 val root = layoutInflater.inflate(R.layout.activity_ar_viewer_gl, null)
                 val glView = root.findViewById<GLSurfaceView>(R.id.ar_gl_surface).apply {
@@ -190,15 +196,26 @@ class ArViewerActivity : AppCompatActivity() {
     }
 
     /**
+     * Builds absolute URL for marker image (server may send relative path).
+     */
+    private fun absoluteMarkerUrl(url: String): String {
+        val trimmed = url.trim()
+        if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) return trimmed
+        val base = BuildConfig.API_BASE_URL.trimEnd('/')
+        return if (trimmed.startsWith("/")) "$base$trimmed" else "$base/$trimmed"
+    }
+
+    /**
      * Loads marker image: from cache first, then from network. Saves to cache on download.
      */
     private suspend fun loadMarkerBitmap(url: String): Bitmap? = withContext(Dispatchers.IO) {
-        MarkerCache.get(this@ArViewerActivity, url)
+        val absoluteUrl = absoluteMarkerUrl(url)
+        MarkerCache.get(this@ArViewerActivity, absoluteUrl)
             ?: run {
-                val response = ApiProvider.viewerApi.downloadImage(url)
+                val response = ApiProvider.viewerApi.downloadImage(absoluteUrl)
                 if (!response.isSuccessful) return@withContext null
                 val bytes = response.body()?.bytes() ?: return@withContext null
-                MarkerCache.put(this@ArViewerActivity, url, bytes)
+                MarkerCache.put(this@ArViewerActivity, absoluteUrl, bytes)
                 BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
             }
     }
@@ -209,7 +226,10 @@ class ArViewerActivity : AppCompatActivity() {
             val result = withContext(Dispatchers.IO) { repository.loadManifest(uniqueId) }
             result.fold(
                 onSuccess = { onManifestReady(it) },
-                onFailure = { finish() }
+                onFailure = {
+                    Toast.makeText(this@ArViewerActivity, R.string.error_unknown, Toast.LENGTH_LONG).show()
+                    finish()
+                }
             )
         }
     }

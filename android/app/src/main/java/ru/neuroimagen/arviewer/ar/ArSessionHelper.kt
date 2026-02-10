@@ -23,12 +23,18 @@ object ArSessionHelper {
     /**
      * Checks if ARCore is available and installs if needed.
      * @return true if ready to create session, false if user must install or device unsupported.
+     * Catches all throwables (e.g. FatalException if manifest meta-data was missing) to avoid crash.
      */
     fun checkAndInstallArCore(activity: Activity): Boolean {
-        return when (ArCoreApk.getInstance().requestInstall(activity, true)) {
-            ArCoreApk.InstallStatus.INSTALLED -> true
-            ArCoreApk.InstallStatus.INSTALL_REQUESTED -> false
-            else -> false
+        return try {
+            when (ArCoreApk.getInstance().requestInstall(activity, true)) {
+                ArCoreApk.InstallStatus.INSTALLED -> true
+                ArCoreApk.InstallStatus.INSTALL_REQUESTED -> false
+                else -> false
+            }
+        } catch (e: Throwable) {
+            Log.e(TAG, "ARCore check/install failed", e)
+            false
         }
     }
 

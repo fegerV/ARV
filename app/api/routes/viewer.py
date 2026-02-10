@@ -95,7 +95,7 @@ async def get_viewer_active_video(
         "title": video.filename,  # Use filename as title
         "video_url": video.video_url,
         "preview_url": video.preview_url,
-        "thumbnail_url": video.thumbnail_url,
+        "thumbnail_url": video.preview_url,
         "duration": video.duration,
         "width": video.width,
         "height": video.height,
@@ -151,7 +151,7 @@ async def get_viewer_active_video_by_unique_id(
         "title": video.filename,  # Use filename as title
         "video_url": video.video_url,
         "preview_url": video.preview_url,
-        "thumbnail_url": video.thumbnail_url,
+        "thumbnail_url": video.preview_url,
         "duration": video.duration,
         "width": video.width,
         "height": video.height,
@@ -262,7 +262,7 @@ async def get_viewer_manifest(
     marker_image_url = _absolute_url(photo_url_rel)
     photo_url_abs = _absolute_url(photo_url_rel)
     video_url_abs = _absolute_url(video.video_url or "")
-    thumbnail_url_abs = _absolute_url(video.thumbnail_url) if video.thumbnail_url else None
+    thumbnail_url_abs = _absolute_url(video.preview_url) if video.preview_url else None
 
     try:
         ar_content.views_count = (ar_content.views_count or 0) + 1

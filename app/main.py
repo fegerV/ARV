@@ -13,6 +13,7 @@ import structlog
 import os
 import sys
 from typing import AsyncGenerator
+from uuid import UUID
 
 from app.core.config import settings
 from app.core.database import seed_defaults
@@ -201,6 +202,17 @@ async def api_protected_route(request: Request, path: str):
         status_code=404,
         content={"detail": "Not Found"}
     )
+
+
+# Legacy QR / links: old path /ar/{unique_id} → /view/{unique_id}
+@app.get("/ar/{unique_id}")
+async def legacy_ar_viewer_redirect(unique_id: str):
+    """Redirect legacy /ar/{unique_id} (old QR codes) to current /view/{unique_id}."""
+    try:
+        UUID(unique_id)
+    except (ValueError, TypeError):
+        return JSONResponse(status_code=400, content={"detail": "Invalid unique_id format"})
+    return RedirectResponse(url=f"/view/{unique_id}", status_code=302)
 
 
 # Android App Links: Digital Asset Links for https://your-domain.com/view/{unique_id}
