@@ -1,0 +1,34 @@
+[Unit]
+Description=Vertex AR FastAPI Application
+After=network.target postgresql.service
+Wants=postgresql.service
+
+[Service]
+Type=exec
+User=arv
+Group=arv
+WorkingDirectory=/opt/arv/app
+EnvironmentFile=/opt/arv/app/.env
+
+ExecStart=/opt/arv/venv/bin/uvicorn app.main:app \
+    --host 127.0.0.1 \
+    --port 8000 \
+    --workers 2 \
+    --log-level info \
+    --access-log
+
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=arv
+
+# Security hardening
+NoNewPrivileges=true
+ProtectSystem=strict
+ReadWritePaths=/opt/arv/storage /tmp/prometheus_multiproc
+ProtectHome=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

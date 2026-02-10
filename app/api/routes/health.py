@@ -25,6 +25,12 @@ router = APIRouter(tags=["Health"])
 logger = structlog.get_logger()
 
 
+@router.get("")
+async def health_ping():
+    """Быстрый health-check: GET /api/health → 200 OK."""
+    return {"status": "ok"}
+
+
 @router.get("/status")
 async def health_status():
     """Расширенный health check endpoint"""

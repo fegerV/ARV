@@ -157,10 +157,9 @@ from app.api.routes import (
     rotation, oauth, public, settings as routes_settings, viewer, videos, health, alerts_ws
 )
 
+# Health must be registered before ar_content (which has greedy /{content_id} under /api)
+app.include_router(health.router, prefix="/api/health", tags=["Health"])
 app.include_router(auth.router, prefix="/api/auth", tags=["Authentication"])
-app.include_router(companies.router, prefix="/api", tags=["Companies"])
-app.include_router(projects.router, prefix="/api", tags=["Projects"])
-app.include_router(ar_content.router, prefix="/api", tags=["AR Content"])
 app.include_router(storage.router, prefix="/api/storage", tags=["Storage"])
 app.include_router(analytics.router, prefix="/api/analytics", tags=["Analytics"])
 app.include_router(notifications.router, prefix="/api/notifications", tags=["Notifications"])
@@ -170,8 +169,11 @@ app.include_router(public.router, prefix="/api/public", tags=["Public"])
 app.include_router(routes_settings.router, prefix="/api/settings", tags=["Settings"])
 app.include_router(viewer.router, prefix="/api/viewer", tags=["Viewer"])
 app.include_router(videos.router, prefix="/api/videos", tags=["Videos"])
-app.include_router(health.router, prefix="/api/health", tags=["Health"])
 app.include_router(alerts_ws.router, prefix="/api/ws", tags=["WebSocket"])
+app.include_router(companies.router, prefix="/api", tags=["Companies"])
+app.include_router(projects.router, prefix="/api", tags=["Projects"])
+# ar_content last: has greedy GET /{content_id} that matches any /api/... path
+app.include_router(ar_content.router, prefix="/api", tags=["AR Content"])
 
 
 # Global exception handlers
