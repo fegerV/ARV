@@ -36,6 +36,8 @@ class ArRenderer(
         backgroundRenderer = BackgroundRenderer()
         val textureId = backgroundRenderer.createOnGlThread(context)
         session.setCameraTextureName(textureId)
+        // Start camera: Activity.onResume() already ran before we set this content view, so resume here.
+        session.resume()
 
         videoQuadRenderer = VideoQuadRenderer()
         val (vidTexId, surfaceTexture) = videoQuadRenderer.createOnGlThread(context)
