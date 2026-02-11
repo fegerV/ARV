@@ -276,22 +276,17 @@ async def debug_storage_test():
     }
 
 
-# Favicon endpoint
+# Favicon endpoint (used when Nginx proxies /favicon.ico to backend)
 @app.get("/favicon.ico")
 async def favicon():
-    """Serve favicon."""
+    """Serve favicon from static or templates."""
     import os
-    # Check if favicon exists in static directory first
-    if os.path.exists("static/favicon.ico"):
-        return FileResponse("static/favicon.ico")
-    elif os.path.exists("static/favicon.png"):
-        return FileResponse("static/favicon.png")
-    else:
-        # Return a simple default favicon if none exists
-        from fastapi.responses import Response
-        # This is a minimal 16x16 ico file content (32 bytes)
-        default_favicon = b'\x00\x00\x01\x00\x01\x00\x10\x10\x00\x00\x01\x00\x04\x00\x86\x00\x00\x00(\x00\x00\x00\x10\x00\x00\x00 \x00\x00\x00\x01\x00\x04\x00'
-        return Response(content=default_favicon, media_type="image/x-icon")
+    for path in ("static/favicon.ico", "static/favicon.png", "templates/favicon.png"):
+        if os.path.exists(path):
+            return FileResponse(path, media_type="image/png" if path.endswith(".png") else "image/x-icon")
+    from fastapi.responses import Response
+    default_favicon = b'\x00\x00\x01\x00\x01\x00\x10\x10\x00\x00\x01\x00\x04\x00\x86\x00\x00\x00(\x00\x00\x00\x10\x00\x00\x00 \x00\x00\x00\x01\x00\x04\x00'
+    return Response(content=default_favicon, media_type="image/x-icon")
 
 
 if __name__ == "__main__":

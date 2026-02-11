@@ -12,28 +12,26 @@
 <script type="application/json" id="ar-content-marker-metrics">{{ marker_metrics | default({}) | tojson }}</script>
 
 <script>
-// Expose component as global function so Alpine always has full scope (avoids "X is not defined" when using defer)
-window.arContentDetail = function() {
-    // Helper functions
+// Use Alpine.store so the same scope is used for all bindings (fixes "X is not defined" with defer + plugins)
+document.addEventListener('alpine:init', function() {
     function fullArUrlFromContent(c) {
-        const url = (c && (c.public_url || c.unique_link)) || '';
-        return url.startsWith('/') ? window.location.origin + url : url;
+        var url = (c && (c.public_url || c.unique_link)) || '';
+        return url.indexOf('/') === 0 ? window.location.origin + url : url;
     }
     function portraitUrlFromContent(c) {
         return (c && (c.thumbnail_url || c.photo_url)) || '';
     }
 
-    // Safely parse JSON data with fallbacks
-    let arContent = {};
-    let videos = [];
-    let activeVideoInfo = null;
-    let rotationSchedule = null;
-    let markerMetrics = {};
+    var arContent = {};
+    var videos = [];
+    var activeVideoInfo = null;
+    var rotationSchedule = null;
+    var markerMetrics = {};
     
     try {
-        const arContentEl = document.getElementById('ar-content-data');
+        var arContentEl = document.getElementById('ar-content-data');
         if (arContentEl && arContentEl.textContent) {
-            const text = arContentEl.textContent.trim();
+            var text = arContentEl.textContent.trim();
             if (text && text !== 'null' && text !== 'undefined') {
                 arContent = JSON.parse(text);
             }
@@ -43,9 +41,9 @@ window.arContentDetail = function() {
     }
     
     try {
-        const videosEl = document.getElementById('ar-content-videos');
+        var videosEl = document.getElementById('ar-content-videos');
         if (videosEl && videosEl.textContent) {
-            const text = videosEl.textContent.trim();
+            var text = videosEl.textContent.trim();
             if (text && text !== 'null' && text !== 'undefined') {
                 videos = JSON.parse(text);
             }
@@ -55,9 +53,9 @@ window.arContentDetail = function() {
     }
     
     try {
-        const activeVideoEl = document.getElementById('ar-content-active-video');
+        var activeVideoEl = document.getElementById('ar-content-active-video');
         if (activeVideoEl && activeVideoEl.textContent) {
-            const text = activeVideoEl.textContent.trim();
+            var text = activeVideoEl.textContent.trim();
             if (text && text !== 'null' && text !== 'undefined') {
                 activeVideoInfo = JSON.parse(text);
             }
@@ -67,9 +65,9 @@ window.arContentDetail = function() {
     }
     
     try {
-        const rotationScheduleEl = document.getElementById('ar-content-rotation-schedule');
+        var rotationScheduleEl = document.getElementById('ar-content-rotation-schedule');
         if (rotationScheduleEl && rotationScheduleEl.textContent) {
-            const text = rotationScheduleEl.textContent.trim();
+            var text = rotationScheduleEl.textContent.trim();
             if (text && text !== 'null' && text !== 'undefined') {
                 rotationSchedule = JSON.parse(text);
             }
@@ -79,9 +77,9 @@ window.arContentDetail = function() {
     }
     
     try {
-        const markerMetricsEl = document.getElementById('ar-content-marker-metrics');
+        var markerMetricsEl = document.getElementById('ar-content-marker-metrics');
         if (markerMetricsEl && markerMetricsEl.textContent) {
-            const text = markerMetricsEl.textContent.trim();
+            var text = markerMetricsEl.textContent.trim();
             if (text && text !== 'null' && text !== 'undefined') {
                 markerMetrics = JSON.parse(text);
             }
@@ -90,18 +88,17 @@ window.arContentDetail = function() {
         console.error('Failed to parse ar-content-marker-metrics:', e);
     }
 
-    // Pre-compute URLs
-    const initialFullArUrl = fullArUrlFromContent(arContent);
-    const initialPortraitUrl = portraitUrlFromContent(arContent);
+    var initialFullArUrl = fullArUrlFromContent(arContent);
+    var initialPortraitUrl = portraitUrlFromContent(arContent);
     
     console.log('arContentDetail initialized:', { 
-        arContent_id: arContent?.id, 
-        public_url: arContent?.public_url, 
-        unique_link: arContent?.unique_link,
+        arContent_id: arContent && arContent.id, 
+        public_url: arContent && arContent.public_url, 
+        unique_link: arContent && arContent.unique_link,
         fullArUrl: initialFullArUrl 
     });
 
-    return {
+    Alpine.store('arContentDetail', {
         arContent: arContent || {},
         videos: Array.isArray(videos) ? videos : [],
         activeVideoInfo: activeVideoInfo,
@@ -967,11 +964,11 @@ window.arContentDetail = function() {
                 console.error('Rotation schedule delete error:', error);
             }
         }
-    };
-};
+    });
+});
 </script>
 
-<div x-data="arContentDetail()" x-init="init()" class="page-container">
+<div x-data="$store.arContentDetail" x-init="init()" class="page-container">
     <!-- ============================================ -->
     <!-- БЛОК 1: ЗАГОЛОВОК И ОСНОВНЫЕ ДЕЙСТВИЯ -->
     <!-- ============================================ -->
