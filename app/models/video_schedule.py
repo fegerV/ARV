@@ -16,9 +16,9 @@ class VideoSchedule(Base):
     id = Column(Integer, primary_key=True, index=True)
     video_id = Column(Integer, ForeignKey("videos.id", ondelete="CASCADE"), nullable=False)
     
-    # Schedule time window
-    start_time = Column(DateTime, nullable=False)
-    end_time = Column(DateTime, nullable=False)
+    # Schedule time window (TIMESTAMPTZ in PostgreSQL)
+    start_time = Column(DateTime(timezone=True), nullable=False)
+    end_time = Column(DateTime(timezone=True), nullable=False)
     
     # Status automatically computed based on current time
     status = Column(String(20), default="active")  # 'active', 'expired'
