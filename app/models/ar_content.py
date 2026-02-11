@@ -1,12 +1,35 @@
 from sqlalchemy import Column, Integer, String, ForeignKey, Index, CheckConstraint, DateTime
-from sqlalchemy import JSON
-from sqlalchemy.dialects.postgresql import JSONB, UUID
+from sqlalchemy import JSON, TypeDecorator
+from sqlalchemy.dialects.postgresql import JSONB, UUID as PG_UUID
 from sqlalchemy.orm import relationship
 from app.core.database import Base
 from app.enums import ArContentStatus
 import re
 import uuid
 from datetime import datetime
+
+
+class UUIDString(TypeDecorator):
+    """Stores UUID as string in Python; uses native UUID in PostgreSQL, String(36) in SQLite."""
+    impl = String(36)
+    cache_ok = True
+
+    def load_dialect_impl(self, dialect):
+        if dialect.name == "postgresql":
+            return dialect.type_descriptor(PG_UUID(as_uuid=True))
+        return dialect.type_descriptor(String(36))
+
+    def process_bind_param(self, value, dialect):
+        if value is None:
+            return value
+        if dialect.name == "postgresql":
+            return uuid.UUID(value) if isinstance(value, str) else value
+        return str(value) if isinstance(value, uuid.UUID) else value
+
+    def process_result_value(self, value, dialect):
+        if value is None:
+            return value
+        return str(value)
 
 
 class ARContent(Base):
@@ -23,8 +46,8 @@ class ARContent(Base):
     company_id = Column(Integer, ForeignKey("companies.id"), nullable=False)
     active_video_id = Column(Integer, ForeignKey("videos.id"), nullable=True)
     
-    # Unique identifier for public links - String for SQLite compatibility
-    unique_id = Column(String(36), default=lambda: str(uuid.uuid4()), nullable=False, unique=True)
+    # Unique identifier for public links (UUID in PostgreSQL, string in SQLite; always str in Python)
+    unique_id = Column(UUIDString, default=lambda: str(uuid.uuid4()), nullable=False, unique=True)
     
     # Order and customer information
     order_number = Column(String(50), nullable=False)
