@@ -1,3 +1,4 @@
+# Builds app-debug.apk on push to main/develop or via Run workflow. Artifact: Actions -> run -> Artifacts.
 name: Android (AR Viewer build)
 
 on:
