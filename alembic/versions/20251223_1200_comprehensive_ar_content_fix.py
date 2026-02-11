@@ -7,8 +7,6 @@ Create Date: 2025-12-23 12:00:00.000000
 """
 from typing import Sequence, Union
 from alembic import op
-import sqlalchemy as sa
-from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
 revision: str = '20251223_1200_comprehensive_ar_content_fix'
@@ -18,131 +16,67 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    """Ensure all required columns exist in ar_content table with proper defaults"""
-    
-    # Check and add thumbnail_url if it doesn't exist
-    try:
-        op.add_column('ar_content', sa.Column('thumbnail_url', sa.String(length=500), nullable=True))
-    except Exception:
-        # Column might already exist, which is fine
-        pass
-    
-    # Check and add marker fields if they don't exist
-    try:
-        op.add_column('ar_content', sa.Column('marker_path', sa.String(length=500), nullable=True))
-    except Exception:
-        pass
-    
-    try:
-        op.add_column('ar_content', sa.Column('marker_url', sa.String(length=500), nullable=True))
-    except Exception:
-        pass
-    
-    try:
-        op.add_column('ar_content', sa.Column('marker_status', sa.String(length=50), nullable=True))
-    except Exception:
-        pass
-    
-    try:
-        op.add_column('ar_content', sa.Column('marker_metadata', sa.JSON().with_variant(postgresql.JSONB(astext_type=sa.Text()), 'postgresql'), nullable=True))
-    except Exception:
-        pass
-    
-    # Check and add timestamp fields if they don't exist
-    try:
-        # Add created_at with proper default if it doesn't exist
-        op.add_column('ar_content', sa.Column('created_at', sa.DateTime(), nullable=False, server_default=sa.text('NOW()')))
-    except Exception:
-        # Column might already exist, try to update it if needed
-        pass
-    
-    try:
-        # Add updated_at with proper default if it doesn't exist
-        op.add_column('ar_content', sa.Column('updated_at', sa.DateTime(), nullable=False, server_default=sa.text('NOW()')))
-    except Exception:
-        # Column might already exist, try to update it if needed
-        pass
-    
-    # Ensure proper constraints and indexes exist
-    # Create unique constraint on unique_id if it doesn't exist
-    try:
-        op.create_unique_constraint('uq_ar_content_unique_id', 'ar_content', ['unique_id'])
-    except Exception:
-        pass
-    
-    # Create performance indexes if they don't exist
-    try:
-        op.create_index('ix_ar_content_company_project', 'ar_content', ['company_id', 'project_id'])
-    except Exception:
-        pass
-    
-    try:
-        op.create_index('ix_ar_content_created_at', 'ar_content', ['created_at'])
-    except Exception:
-        pass
-    
-    try:
-        op.create_index('ix_ar_content_status', 'ar_content', ['status'])
-    except Exception:
-        pass
-    
-    # Ensure foreign key constraints exist
-    try:
-        op.create_foreign_key('fk_ar_content_project', 'ar_content', 'projects', ['project_id'], ['id'])
-    except Exception:
-        pass
-    
-    try:
-        op.create_foreign_key('fk_ar_content_company', 'ar_content', 'companies', ['company_id'], ['id'])
-    except Exception:
-        pass
-    
-    try:
-        op.create_foreign_key('fk_ar_content_active_video', 'ar_content', 'videos', ['active_video_id'], ['id'])
-    except Exception:
-        pass
+    """Ensure all required columns exist in ar_content table. Uses PostgreSQL IF NOT EXISTS to be idempotent."""
+    # PostgreSQL: ADD COLUMN IF NOT EXISTS so one transaction is not aborted on duplicate
+    for col_sql in [
+        "ALTER TABLE ar_content ADD COLUMN IF NOT EXISTS thumbnail_url VARCHAR(500)",
+        "ALTER TABLE ar_content ADD COLUMN IF NOT EXISTS marker_path VARCHAR(500)",
+        "ALTER TABLE ar_content ADD COLUMN IF NOT EXISTS marker_url VARCHAR(500)",
+        "ALTER TABLE ar_content ADD COLUMN IF NOT EXISTS marker_status VARCHAR(50)",
+        "ALTER TABLE ar_content ADD COLUMN IF NOT EXISTS marker_metadata JSONB",
+        "ALTER TABLE ar_content ADD COLUMN IF NOT EXISTS created_at TIMESTAMP NOT NULL DEFAULT NOW()",
+        "ALTER TABLE ar_content ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP NOT NULL DEFAULT NOW()",
+    ]:
+        op.execute(col_sql)
+    # For NOT NULL columns added without default on existing rows, relax then add default in two steps if needed
+    # (above uses DEFAULT NOW() so new rows get value; existing rows may need backfill - run separately if needed)
+
+    # Indexes and constraints: use DO block to ignore duplicate
+    for sql in [
+        "CREATE UNIQUE INDEX IF NOT EXISTS uq_ar_content_unique_id ON ar_content (unique_id)",
+        "CREATE INDEX IF NOT EXISTS ix_ar_content_company_project ON ar_content (company_id, project_id)",
+        "CREATE INDEX IF NOT EXISTS ix_ar_content_created_at ON ar_content (created_at)",
+        "CREATE INDEX IF NOT EXISTS ix_ar_content_status ON ar_content (status)",
+    ]:
+        try:
+            op.execute(sql)
+        except Exception:
+            pass
+
+    # Foreign keys: only add if not exist (PostgreSQL has no IF NOT EXISTS for FK; use DO block)
+    for fk_sql in [
+        """DO $$ BEGIN
+           IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'fk_ar_content_project') THEN
+             ALTER TABLE ar_content ADD CONSTRAINT fk_ar_content_project FOREIGN KEY (project_id) REFERENCES projects(id);
+           END IF; END $$""",
+        """DO $$ BEGIN
+           IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'fk_ar_content_company') THEN
+             ALTER TABLE ar_content ADD CONSTRAINT fk_ar_content_company FOREIGN KEY (company_id) REFERENCES companies(id);
+           END IF; END $$""",
+        """DO $$ BEGIN
+           IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'fk_ar_content_active_video') THEN
+             ALTER TABLE ar_content ADD CONSTRAINT fk_ar_content_active_video FOREIGN KEY (active_video_id) REFERENCES videos(id);
+           END IF; END $$""",
+    ]:
+        try:
+            op.execute(fk_sql)
+        except Exception:
+            pass
 
 
 def downgrade() -> None:
     """Remove the columns that were added by this migration"""
     
-    # Remove indexes first
-    try:
-        op.drop_index('ix_ar_content_status', table_name='ar_content')
-    except Exception:
-        pass
-    
-    try:
-        op.drop_index('ix_ar_content_created_at', table_name='ar_content')
-    except Exception:
-        pass
-    
-    try:
-        op.drop_index('ix_ar_content_company_project', table_name='ar_content')
-    except Exception:
-        pass
-    
+    # Remove indexes (including unique index)
+    op.execute("DROP INDEX IF EXISTS ix_ar_content_status")
+    op.execute("DROP INDEX IF EXISTS ix_ar_content_created_at")
+    op.execute("DROP INDEX IF EXISTS ix_ar_content_company_project")
+    op.execute("DROP INDEX IF EXISTS uq_ar_content_unique_id")
+
     # Remove foreign key constraints
-    try:
-        op.drop_constraint('fk_ar_content_active_video', 'ar_content', type_='foreignkey')
-    except Exception:
-        pass
-    
-    try:
-        op.drop_constraint('fk_ar_content_company', 'ar_content', type_='foreignkey')
-    except Exception:
-        pass
-    
-    try:
-        op.drop_constraint('fk_ar_content_project', 'ar_content', type_='foreignkey')
-    except Exception:
-        pass
-    
-    # Remove unique constraint
-    try:
-        op.drop_constraint('uq_ar_content_unique_id', 'ar_content', type_='unique')
-    except Exception:
-        pass
+    op.execute("ALTER TABLE ar_content DROP CONSTRAINT IF EXISTS fk_ar_content_active_video")
+    op.execute("ALTER TABLE ar_content DROP CONSTRAINT IF EXISTS fk_ar_content_company")
+    op.execute("ALTER TABLE ar_content DROP CONSTRAINT IF EXISTS fk_ar_content_project")
     
     # Remove columns (only if they were added by this migration)
     # Note: We'll be conservative and not remove columns that might have been added by other migrations

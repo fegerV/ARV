@@ -26,7 +26,7 @@ APP_DIR="/opt/arv/app"
 VENV_DIR="/opt/arv/venv"
 STORAGE_DIR="/opt/arv/storage"
 ARV_USER="arv"
-GIT_REPO="https://github.com/nicktretyakov/ARV.git"
+GIT_REPO="https://github.com/fegerV/ARV.git"
 GIT_BRANCH="main"
 
 DB_NAME="vertex_ar"
