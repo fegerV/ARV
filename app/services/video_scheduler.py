@@ -54,6 +54,8 @@ async def get_active_video_schedule(video_id: int, db: AsyncSession, now: dateti
     stmt = select(VideoSchedule).where(
         and_(
             VideoSchedule.video_id == video_id,
+            VideoSchedule.start_time.isnot(None),
+            VideoSchedule.end_time.isnot(None),
             VideoSchedule.start_time <= now,
             VideoSchedule.end_time >= now,
             VideoSchedule.status == "active"
@@ -73,6 +75,8 @@ async def get_videos_with_active_schedules(ar_content_id: int, db: AsyncSession,
         and_(
             Video.ar_content_id == ar_content_id,
             Video.is_active == True,
+            VideoSchedule.start_time.isnot(None),
+            VideoSchedule.end_time.isnot(None),
             VideoSchedule.start_time <= now,
             VideoSchedule.end_time >= now,
             VideoSchedule.status == "active"

@@ -212,7 +212,18 @@ async def get_viewer_content_check(
         )
         return {"content_available": False, "reason": "marker_still_generating"}
 
-    video_result = await get_active_video(ar_content.id, db)
+    try:
+        video_result = await get_active_video(ar_content.id, db)
+    except Exception as exc:
+        logger.error(
+            "viewer_check_video_query_failed",
+            unique_id=unique_id,
+            ar_content_id=ar_content.id,
+            error=str(exc),
+            exc_info=True,
+        )
+        video_result = None
+
     if not video_result:
         logger.info("viewer_check_no_video", unique_id=unique_id, ar_content_id=ar_content.id)
         return {"content_available": False, "reason": "no_playable_video"}
