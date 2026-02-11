@@ -6,6 +6,7 @@ from app.api.routes.auth import get_current_user_optional
 from app.middleware.rate_limiter import limiter
 from app.html.filters import datetime_format
 from app.core.database import get_db
+from app.core.config import settings
 
 router = APIRouter()
 
@@ -28,6 +29,12 @@ async def admin_login_page(request: Request):
     return templates.TemplateResponse("admin/login.html", context)
 
 
+@router.get("/admin/login-form", response_class=RedirectResponse)
+async def login_form_get():
+    """Redirect GET /admin/login-form to login page."""
+    return RedirectResponse(url="/admin/login", status_code=302)
+
+
 @router.post("/admin/login-form", response_class=HTMLResponse)
 async def login_form(
     request: Request,
@@ -40,15 +47,21 @@ async def login_form(
     from datetime import datetime, timedelta
     from sqlalchemy import select
     from app.models.user import User
-    from app.core.config import get_settings
     import structlog
-    
+
     logger = structlog.get_logger()
-    
-    # Get user by email
-    result = await db.execute(select(User).where(User.email == username))
-    user = result.scalar_one_or_none()
-    
+
+    try:
+        # Get user by email
+        result = await db.execute(select(User).where(User.email == username))
+        user = result.scalar_one_or_none()
+    except Exception as e:
+        logger.exception("login_form_error", error=str(e))
+        return templates.TemplateResponse(
+            "admin/login.html",
+            {"request": request, "error": f"Ошибка входа: {e!s}"},
+        )
+
     # Check if account is locked
     if user and user.locked_until:
         if datetime.utcnow() < user.locked_until:
@@ -116,35 +129,40 @@ async def login_form(
         }
         return templates.TemplateResponse("admin/login.html", context)
     
-    # Reset login attempts on successful login
-    user.login_attempts = 0
-    user.locked_until = None
-    user.last_login_at = datetime.utcnow()
-    await db.commit()
-    
-    # Create JWT token with configured expiry
-    settings = get_settings()
-    access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
-    access_token = create_access_token(
-        data={"sub": user.email, "user_id": user.id},
-        expires_delta=access_token_expires
-    )
-    
-    logger.info("User login successful", user_id=user.id, email=user.email)
-    
-    # Create response and set cookie
-    response = RedirectResponse(url="/admin", status_code=303)
-    response.set_cookie(
-        key="access_token",
-        value=access_token,
-        max_age=3600,
-        expires=3600,
-        path="/",
-        secure=settings.is_production,  # Use secure cookies in production
-        httponly=True,
-        samesite="lax",
-    )
-    return response
+    try:
+        # Reset login attempts on successful login
+        user.login_attempts = 0
+        user.locked_until = None
+        user.last_login_at = datetime.utcnow()
+        await db.commit()
+
+        # Create JWT token with configured expiry
+        access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+        access_token = create_access_token(
+            data={"sub": user.email, "user_id": user.id},
+            expires_delta=access_token_expires
+        )
+
+        logger.info("User login successful", user_id=user.id, email=user.email)
+
+        # Create response and set cookie (expires: max_age in seconds; omit expires for compatibility)
+        response = RedirectResponse(url="/admin", status_code=303)
+        response.set_cookie(
+            key="access_token",
+            value=access_token,
+            max_age=3600,
+            path="/",
+            secure=settings.is_production,
+            httponly=True,
+            samesite="lax",
+        )
+        return response
+    except Exception as e:
+        logger.exception("login_form_success_error", error=str(e))
+        return templates.TemplateResponse(
+            "admin/login.html",
+            {"request": request, "error": f"Ошибка при входе: {e!s}"},
+        )
 
 
 @router.get("/", response_class=RedirectResponse)
