@@ -10,7 +10,7 @@ from alembic import op
 
 # revision identifiers, used by Alembic.
 revision: str = '20251223_1200_comprehensive_ar_content_fix'
-down_revision: Union[str, None] = 'e90dda773ba4'
+down_revision: Union[str, None] = 'widen_ver'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
