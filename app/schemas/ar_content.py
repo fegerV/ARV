@@ -67,11 +67,11 @@ class ArContentResponse(BaseModel):
     views_count: int
     status: str
     active_video_id: Optional[int] = None
-    public_link: str
-    qr_code_url: str
-    photo_url: str
+    public_link: Optional[str] = None  # Optional for legacy/incomplete records
+    qr_code_url: Optional[str] = None
+    photo_url: Optional[str] = None
     thumbnail_url: Optional[str] = None  # Thumbnail URL for photo preview
-    video_url: str
+    video_url: Optional[str] = None
     created_at: datetime
     updated_at: datetime
     

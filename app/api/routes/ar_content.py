@@ -674,33 +674,46 @@ async def create_ar_content_hierarchical(
     db: AsyncSession = Depends(get_db)
 ):
     """Create new AR content within a specific company and project with photo and video files."""
-    logger = structlog.get_logger()
-    
-    logger.info(
+    log = structlog.get_logger()
+    log.info(
         "ar_content_creation_request",
         company_id=company_id,
         project_id=project_id,
-        customer_name=data["customer_name"],
-        customer_phone=data["customer_phone"],
-        customer_email=data["customer_email"],
-        duration_years=data["duration_years"],
+        customer_name=data.get("customer_name"),
+        customer_phone=data.get("customer_phone"),
+        customer_email=data.get("customer_email"),
+        duration_years=data.get("duration_years"),
         auto_enhance=data.get("auto_enhance"),
-        photo_filename=data["photo_file"].filename if data["photo_file"] else None,
-        video_filename=data["video_file"].filename if data["video_file"] else None
+        photo_filename=data["photo_file"].filename if data.get("photo_file") else None,
+        video_filename=data["video_file"].filename if data.get("video_file") else None,
     )
-    
-    return await _create_ar_content(
-        company_id=company_id,
-        project_id=project_id,
-        customer_name=data["customer_name"],
-        customer_phone=data["customer_phone"],
-        customer_email=data["customer_email"],
-        duration_years=data["duration_years"],
-        photo_file=data["photo_file"],
-        video_file=data["video_file"],
-        auto_enhance=bool(data.get("auto_enhance")),
-        db=db
-    )
+    try:
+        return await _create_ar_content(
+            company_id=company_id,
+            project_id=project_id,
+            customer_name=data.get("customer_name"),
+            customer_phone=data.get("customer_phone"),
+            customer_email=data.get("customer_email"),
+            duration_years=data["duration_years"],
+            photo_file=data["photo_file"],
+            video_file=data["video_file"],
+            auto_enhance=bool(data.get("auto_enhance")),
+            db=db
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        log.error(
+            "ar_content_creation_failed",
+            company_id=company_id,
+            project_id=project_id,
+            error=str(e),
+            exc_info=True,
+        )
+        raise HTTPException(
+            status_code=500,
+            detail=f"Не удалось создать AR контент: {str(e)}",
+        )
 
 
 @router.post("/companies/{company_id}/projects/{project_id}/ar-content-legacy", response_model=ARContentCreateResponse, tags=["AR Content"])
@@ -886,6 +899,7 @@ async def update_ar_content_photo(
     try:
         thumbnail_result = await thumbnail_service.generate_image_thumbnail(
             image_path=str(photo_path),
+            storage_path=storage_path,
             company_id=company_id,
         )
         if thumbnail_result.get("status") == "ready":
