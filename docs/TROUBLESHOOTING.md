@@ -584,6 +584,32 @@ Get-NetIPAddress -AddressFamily IPv4 | Where-Object { $_.InterfaceAlias -notmatc
    ls -la storage/VertexAR/
    ```
 
+### 403 при доступе к /storage/ или /favicon.ico (Nginx)
+
+**Симптомы:** в браузере 403 Forbidden при запросах к `/storage/VertexAR/...` (превью, видео, QR), к `/favicon.ico` или к файлам в каталоге хранилища.
+
+**Причина:** Nginx отдаёт файлы с диска; процесс Nginx (обычно `www-data`) должен иметь право читать каталоги и файлы.
+
+**Решения:**
+
+1. **Права на каталог хранилища (при Nginx на сервере):**
+   ```bash
+   sudo chmod 755 /opt/arv/storage
+   sudo chmod -R a+rX /opt/arv/storage
+   ```
+   Либо добавьте пользователя Nginx в группу владельца каталога и дайте группе чтение:
+   ```bash
+   sudo chgrp -R www-data /opt/arv/storage
+   sudo chmod -R g+rX /opt/arv/storage
+   ```
+
+2. **Favicon:**
+   ```bash
+   sudo chmod 644 /opt/arv/app/templates/favicon.png
+   ```
+
+3. После изменений перезагрузите Nginx: `sudo nginx -t && sudo systemctl reload nginx`.
+
 ### Недостаточно места на диске
 
 **Симптомы:**
