@@ -179,33 +179,45 @@ async def get_viewer_content_check(
     try:
         UUID(unique_id)
     except (ValueError, TypeError):
+        logger.info("viewer_check_invalid_id", unique_id=unique_id)
         return {"content_available": False, "reason": "invalid_unique_id"}
 
     stmt = select(ARContent).where(ARContent.unique_id == unique_id)
     res = await db.execute(stmt)
     ar_content = res.scalar_one_or_none()
     if not ar_content:
+        logger.info("viewer_check_not_found", unique_id=unique_id)
         return {"content_available": False, "reason": "not_found"}
 
     creation = ar_content.created_at.replace(tzinfo=None) if ar_content.created_at.tzinfo else ar_content.created_at
     expiry_date = creation + timedelta(days=ar_content.duration_years * 365)
     now = datetime.now(timezone.utc).replace(tzinfo=None)
     if now > expiry_date:
+        logger.info("viewer_check_expired", unique_id=unique_id)
         return {"content_available": False, "reason": "subscription_expired"}
 
     if ar_content.status not in ["active", "ready"]:
+        logger.info("viewer_check_not_active", unique_id=unique_id, status=ar_content.status)
         return {"content_available": False, "reason": "content_not_active"}
 
     if not (ar_content.photo_url or ar_content.photo_path):
+        logger.info("viewer_check_no_photo", unique_id=unique_id)
         return {"content_available": False, "reason": "marker_image_not_available"}
 
     if (ar_content.marker_status or "").strip().lower() != "ready":
+        logger.info(
+            "viewer_check_marker_not_ready",
+            unique_id=unique_id,
+            marker_status=ar_content.marker_status,
+        )
         return {"content_available": False, "reason": "marker_still_generating"}
 
     video_result = await get_active_video(ar_content.id, db)
     if not video_result:
+        logger.info("viewer_check_no_video", unique_id=unique_id, ar_content_id=ar_content.id)
         return {"content_available": False, "reason": "no_playable_video"}
 
+    logger.info("viewer_check_ok", unique_id=unique_id, ar_content_id=ar_content.id)
     return {"content_available": True}
 
 
@@ -297,6 +309,13 @@ async def get_viewer_manifest(
         video=video_payload,
         expires_at=expires_at_str,
         status=ar_content.status or "ready",
+    )
+    logger.info(
+        "viewer_manifest_served",
+        unique_id=unique_id,
+        ar_content_id=ar_content.id,
+        marker_image_url=marker_image_url,
+        video_url=video_url_abs,
     )
     return JSONResponse(
         content=response.model_dump(mode="json"),

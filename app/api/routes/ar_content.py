@@ -1149,9 +1149,15 @@ async def get_ar_viewer(
         photo_ok = bool(ar_content.photo_url or ar_content.photo_path)
         if not photo_ok:
             raise HTTPException(status_code=400, detail="Photo (marker image) not available")
-        base_url = settings.PUBLIC_URL.rstrip("/")
-        app_link = f"{base_url}/view/{unique_id}"
+        base_url = (settings.PUBLIC_URL or "").rstrip("/")
+        app_link = f"{base_url}/view/{unique_id}" if base_url else f"/view/{unique_id}"
         deep_link = "arv://view/" + unique_id
+        logger.info(
+            "ar_viewer_landing_ok",
+            unique_id=unique_id,
+            ar_content_id=ar_content.id,
+            app_link=app_link,
+        )
         play_store_url = "https://play.google.com/store/apps/details?id=ru.neuroimagen.arviewer"
         import html as html_escape
         order_esc = html_escape.escape(ar_content.order_number or "AR")
