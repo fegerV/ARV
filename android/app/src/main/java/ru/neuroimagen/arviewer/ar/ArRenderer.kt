@@ -23,7 +23,8 @@ class ArRenderer(
     private val context: Context,
     private val session: Session,
     private val manifest: ViewerManifest,
-    private val onVideoSurfaceReady: (android.view.Surface) -> Unit
+    private val onVideoSurfaceReady: (android.view.Surface) -> Unit,
+    private val onMarkerTrackingChanged: (Boolean) -> Unit = {}
 ) : GLSurfaceView.Renderer {
 
     private lateinit var backgroundRenderer: BackgroundRenderer
@@ -37,6 +38,9 @@ class ArRenderer(
 
     private var surfaceWidth = 0
     private var surfaceHeight = 0
+
+    /** Previous tracking state — used to detect transitions. */
+    private var wasTracking = false
 
     // ── Zoom ─────────────────────────────────────────────────────────
     @Volatile
@@ -123,6 +127,15 @@ class ArRenderer(
         val st = videoSurfaceTexture
         val allImages = session.getAllTrackables(AugmentedImage::class.java)
         val hasTracking = allImages.any { it.trackingState == TrackingState.TRACKING }
+
+        // Notify activity when marker tracking starts or stops
+        if (hasTracking != wasTracking) {
+            wasTracking = hasTracking
+            (context as? android.app.Activity)?.runOnUiThread {
+                onMarkerTrackingChanged(hasTracking)
+            }
+        }
+
         if (hasTracking && st != null) {
             st.updateTexImage()
         }

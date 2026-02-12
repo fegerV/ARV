@@ -179,7 +179,8 @@ class ArViewerActivity : AppCompatActivity() {
             this,
             session,
             manifest,
-            onVideoSurfaceReady = { surface -> startVideoPlayer(surface, manifest) }
+            onVideoSurfaceReady = { surface -> prepareVideoPlayer(surface, manifest) },
+            onMarkerTrackingChanged = { isTracking -> onMarkerTrackingChanged(isTracking) }
         )
         arRenderer = renderer
 
@@ -350,7 +351,11 @@ class ArViewerActivity : AppCompatActivity() {
 
     // ── Video player ─────────────────────────────────────────────────
 
-    private fun startVideoPlayer(surface: Surface, manifest: ViewerManifest) {
+    /**
+     * Prepare ExoPlayer but do NOT start playback.
+     * Video will begin playing when the marker is first recognized.
+     */
+    private fun prepareVideoPlayer(surface: Surface, manifest: ViewerManifest) {
         exoPlayer?.release()
         val player = ExoPlayer.Builder(this).build()
         exoPlayer = player
@@ -386,7 +391,27 @@ class ArViewerActivity : AppCompatActivity() {
         player.setMediaSource(mediaSource)
         player.setVideoSurface(surface)
         player.prepare()
-        player.playWhenReady = true
+        player.playWhenReady = false // wait for marker recognition
+        Log.d(TAG, "Video player prepared (paused, waiting for marker)")
+    }
+
+    /**
+     * Called from ArRenderer when marker tracking starts or stops.
+     * Plays video when marker is visible, pauses when lost.
+     */
+    private fun onMarkerTrackingChanged(isTracking: Boolean) {
+        val player = exoPlayer ?: return
+        if (isTracking) {
+            if (!player.playWhenReady) {
+                player.playWhenReady = true
+                Log.d(TAG, "Marker tracked — video playing")
+            }
+        } else {
+            if (player.playWhenReady) {
+                player.playWhenReady = false
+                Log.d(TAG, "Marker lost — video paused")
+            }
+        }
     }
 
     // ── Utilities ────────────────────────────────────────────────────
