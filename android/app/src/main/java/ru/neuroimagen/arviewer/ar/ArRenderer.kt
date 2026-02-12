@@ -4,16 +4,20 @@ import android.content.Context
 import android.graphics.SurfaceTexture
 import android.opengl.GLES20
 import android.opengl.GLSurfaceView
+import android.util.Log
 import com.google.ar.core.AugmentedImage
 import com.google.ar.core.Frame
 import com.google.ar.core.Session
 import com.google.ar.core.TrackingState
 import ru.neuroimagen.arviewer.data.model.ViewerManifest
+import ru.neuroimagen.arviewer.recording.ArRecorder
+import java.io.File
 import javax.microedition.khronos.egl.EGLConfig
 import javax.microedition.khronos.opengles.GL10
 
 /**
- * OpenGL renderer for AR: camera background and video quad on Augmented Image.
+ * OpenGL renderer for AR: camera background, video quad on Augmented Image,
+ * and optional recording to MP4 via [ArRecorder].
  */
 class ArRenderer(
     private val context: Context,
@@ -31,12 +35,46 @@ class ArRenderer(
     private val viewMatrix = FloatArray(16)
     private val projectionMatrix = FloatArray(16)
 
+    private var surfaceWidth = 0
+    private var surfaceHeight = 0
+
+    // ── Recording ────────────────────────────────────────────────────
+    private val recorder = ArRecorder()
+
+    @Volatile
+    private var pendingRecordStart: File? = null
+
+    @Volatile
+    private var pendingRecordStop = false
+    private var onRecordingStopped: ((String?) -> Unit)? = null
+
+    /** Whether the recorder is currently capturing frames. */
+    val isRecording: Boolean get() = recorder.isRecording
+
+    /**
+     * Request to start recording on the next GL frame.
+     *
+     * @param outputFile temporary MP4 file path
+     * @param onStopped callback invoked on the UI thread when recording finishes;
+     *                  receives the output file path or null on failure
+     */
+    fun startRecording(outputFile: File, onStopped: (String?) -> Unit) {
+        onRecordingStopped = onStopped
+        pendingRecordStart = outputFile
+    }
+
+    /** Request to stop recording on the next GL frame. */
+    fun stopRecording() {
+        pendingRecordStop = true
+    }
+
+    // ── GLSurfaceView.Renderer ───────────────────────────────────────
+
     override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) {
         GLES20.glClearColor(0f, 0f, 0f, 1f)
         backgroundRenderer = BackgroundRenderer()
         val textureId = backgroundRenderer.createOnGlThread(context)
         session.setCameraTextureName(textureId)
-        // Start camera: Activity.onResume() already ran before we set this content view, so resume here.
         session.resume()
 
         videoQuadRenderer = VideoQuadRenderer()
@@ -52,11 +90,16 @@ class ArRenderer(
 
     override fun onSurfaceChanged(gl: GL10?, width: Int, height: Int) {
         GLES20.glViewport(0, 0, width, height)
+        surfaceWidth = width
+        surfaceHeight = height
+        @Suppress("DEPRECATION")
         val rotation = (context as? android.app.Activity)?.windowManager?.defaultDisplay?.rotation ?: 0
         session.setDisplayGeometry(rotation, width, height)
     }
 
     override fun onDrawFrame(gl: GL10?) {
+        handleRecordingCommands()
+
         if (sessionFailed) return
         val frame: Frame?
         try {
@@ -67,6 +110,36 @@ class ArRenderer(
         }
         if (frame == null) return
 
+        // Update video texture once (shared across screen & encoder renders)
+        val st = videoSurfaceTexture
+        val allImages = session.getAllTrackables(AugmentedImage::class.java)
+        val hasTracking = allImages.any { it.trackingState == TrackingState.TRACKING }
+        if (hasTracking && st != null) {
+            st.updateTexImage()
+        }
+
+        // 1. Render to screen
+        renderScene(frame, allImages)
+
+        // 2. If recording, also render to encoder surface
+        if (recorder.isRecording) {
+            if (recorder.beginFrame()) {
+                renderScene(frame, allImages)
+                recorder.endFrame(frame.timestamp)
+            }
+            // Restore screen viewport
+            GLES20.glViewport(0, 0, surfaceWidth, surfaceHeight)
+        }
+    }
+
+    // ── Private helpers ──────────────────────────────────────────────
+
+    /**
+     * Render the full AR scene: camera background + video quads on tracked images.
+     * Does NOT call [SurfaceTexture.updateTexImage] — that must happen once before
+     * the first render in [onDrawFrame].
+     */
+    private fun renderScene(frame: Frame, images: Collection<AugmentedImage>) {
         GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT or GLES20.GL_DEPTH_BUFFER_BIT)
         GLES20.glDisable(GLES20.GL_DEPTH_TEST)
         backgroundRenderer.draw(frame)
@@ -75,14 +148,8 @@ class ArRenderer(
         frame.camera.getViewMatrix(viewMatrix, 0)
         frame.camera.getProjectionMatrix(projectionMatrix, 0, 0.1f, 100f)
 
-        val st = videoSurfaceTexture
-        // Use getAllTrackables instead of getUpdatedTrackables so that
-        // updateTexImage() and draw() are called every frame while the
-        // marker is visible, not only when tracking state changes.
-        val allImages = session.getAllTrackables(AugmentedImage::class.java)
-        for (image in allImages) {
-            if (image.trackingState == TrackingState.TRACKING && st != null) {
-                st.updateTexImage()
+        for (image in images) {
+            if (image.trackingState == TrackingState.TRACKING) {
                 videoQuadRenderer.draw(
                     videoTextureId,
                     image.centerPose,
@@ -93,5 +160,35 @@ class ArRenderer(
                 )
             }
         }
+    }
+
+    /**
+     * Process pending start/stop commands from the UI thread.
+     * Must be called at the very beginning of [onDrawFrame] (GL thread).
+     */
+    private fun handleRecordingCommands() {
+        pendingRecordStart?.let { file ->
+            pendingRecordStart = null
+            try {
+                recorder.prepare(file, surfaceWidth, surfaceHeight)
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to start recording", e)
+                (context as? android.app.Activity)?.runOnUiThread {
+                    onRecordingStopped?.invoke(null)
+                }
+            }
+        }
+
+        if (pendingRecordStop) {
+            pendingRecordStop = false
+            val path = recorder.stop()
+            (context as? android.app.Activity)?.runOnUiThread {
+                onRecordingStopped?.invoke(path)
+            }
+        }
+    }
+
+    companion object {
+        private const val TAG = "ArRenderer"
     }
 }

@@ -1,6 +1,7 @@
 package ru.neuroimagen.arviewer
 
 import android.Manifest
+import android.content.ContentValues
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
@@ -9,16 +10,16 @@ import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.provider.MediaStore
+import android.util.Log
 import android.view.PixelCopy
 import android.view.Surface
 import android.widget.Button
 import android.widget.Toast
-import java.io.OutputStream
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
-import android.util.Log
 import com.google.android.exoplayer2.ExoPlayer
 import com.google.android.exoplayer2.MediaItem
 import com.google.android.exoplayer2.PlaybackException
@@ -32,13 +33,15 @@ import kotlinx.coroutines.withContext
 import ru.neuroimagen.arviewer.ar.ArRenderer
 import ru.neuroimagen.arviewer.ar.ArSessionHelper
 import ru.neuroimagen.arviewer.data.api.ApiProvider
-import ru.neuroimagen.arviewer.BuildConfig
 import ru.neuroimagen.arviewer.data.cache.MarkerCache
 import ru.neuroimagen.arviewer.data.cache.VideoCache
 import ru.neuroimagen.arviewer.data.model.ViewerManifest
+import java.io.File
+import java.io.FileInputStream
+import java.io.OutputStream
 
 /**
- * AR viewer scene: camera, ARCore Augmented Image, video overlay.
+ * AR viewer scene: camera, ARCore Augmented Image, video overlay, photo capture, and video recording.
  * Receives either [EXTRA_MANIFEST_JSON] (pre-loaded) or [EXTRA_UNIQUE_ID] (will load manifest).
  */
 class ArViewerActivity : AppCompatActivity() {
@@ -46,12 +49,18 @@ class ArViewerActivity : AppCompatActivity() {
     private val gson = Gson()
     private var arSession: Session? = null
     private var exoPlayer: ExoPlayer? = null
+    private var arRenderer: ArRenderer? = null
+    private var recordButton: Button? = null
 
     private val cameraPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { granted ->
         if (granted) {
-            pendingManifest?.let { manifest -> pendingBitmap?.let { bitmap -> startArWithPermission(manifest, bitmap) } }
+            pendingManifest?.let { manifest ->
+                pendingBitmap?.let { bitmap ->
+                    startArWithPermission(manifest, bitmap)
+                }
+            }
         } else {
             Toast.makeText(this, R.string.error_camera_required, Toast.LENGTH_LONG).show()
             finish()
@@ -92,10 +101,12 @@ class ArViewerActivity : AppCompatActivity() {
 
     override fun onPause() {
         super.onPause()
+        stopRecordingIfActive()
         arSession?.pause()
     }
 
     override fun onDestroy() {
+        stopRecordingIfActive()
         exoPlayer?.release()
         exoPlayer = null
         arSession?.close()
@@ -107,6 +118,8 @@ class ArViewerActivity : AppCompatActivity() {
         onBackPressedDispatcher.onBackPressed()
         return true
     }
+
+    // ── Manifest loading ─────────────────────────────────────────────
 
     private fun onManifestReady(manifest: ViewerManifest) {
         lifecycleScope.launch {
@@ -123,7 +136,8 @@ class ArViewerActivity : AppCompatActivity() {
             withContext(Dispatchers.Main) {
                 if (isDestroyed) return@withContext
                 if (ContextCompat.checkSelfPermission(this@ArViewerActivity, Manifest.permission.CAMERA)
-                    != PackageManager.PERMISSION_GRANTED) {
+                    != PackageManager.PERMISSION_GRANTED
+                ) {
                     pendingManifest = manifest
                     pendingBitmap = bitmap
                     cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
@@ -133,6 +147,8 @@ class ArViewerActivity : AppCompatActivity() {
             }
         }
     }
+
+    // ── AR scene setup ───────────────────────────────────────────────
 
     /**
      * Starts AR scene. Call only when camera permission is granted.
@@ -153,25 +169,31 @@ class ArViewerActivity : AppCompatActivity() {
         }
         if (isDestroyed) return
         arSession = session
+
+        val renderer = ArRenderer(
+            this,
+            session,
+            manifest,
+            onVideoSurfaceReady = { surface -> startVideoPlayer(surface, manifest) }
+        )
+        arRenderer = renderer
+
         val root = layoutInflater.inflate(R.layout.activity_ar_viewer_gl, null)
         val glView = root.findViewById<GLSurfaceView>(R.id.ar_gl_surface).apply {
             setEGLContextClientVersion(2)
             setEGLConfigChooser(8, 8, 8, 8, 16, 0)
-            setRenderer(ArRenderer(
-                this@ArViewerActivity,
-                session,
-                manifest,
-                onVideoSurfaceReady = { surface -> startVideoPlayer(surface, manifest) }
-            ))
+            setRenderer(renderer)
         }
         root.findViewById<Button>(R.id.button_capture_photo).setOnClickListener {
             capturePhoto(glView)
         }
-        root.findViewById<Button>(R.id.button_record_video).setOnClickListener {
-            Toast.makeText(this@ArViewerActivity, R.string.record_video_coming_soon, Toast.LENGTH_SHORT).show()
+        recordButton = root.findViewById<Button>(R.id.button_record_video).apply {
+            setOnClickListener { toggleRecording() }
         }
         setContentView(root)
     }
+
+    // ── Photo capture ────────────────────────────────────────────────
 
     private fun capturePhoto(glView: GLSurfaceView) {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.N) {
@@ -198,18 +220,18 @@ class ArViewerActivity : AppCompatActivity() {
     private fun saveBitmapToMediaStore(bitmap: Bitmap): Boolean {
         return try {
             val filename = "AR_${System.currentTimeMillis()}.jpg"
-            val contentValues = android.content.ContentValues().apply {
-                put(android.provider.MediaStore.MediaColumns.DISPLAY_NAME, filename)
-                put(android.provider.MediaStore.MediaColumns.MIME_TYPE, "image/jpeg")
+            val contentValues = ContentValues().apply {
+                put(MediaStore.MediaColumns.DISPLAY_NAME, filename)
+                put(MediaStore.MediaColumns.MIME_TYPE, "image/jpeg")
             }
             val uri = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                 contentResolver.insert(
-                    android.provider.MediaStore.Images.Media.getContentUri(android.provider.MediaStore.VOLUME_EXTERNAL_PRIMARY),
+                    MediaStore.Images.Media.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY),
                     contentValues
                 )
             } else {
                 @Suppress("DEPRECATION")
-                contentResolver.insert(android.provider.MediaStore.Images.Media.EXTERNAL_CONTENT_URI, contentValues)
+                contentResolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, contentValues)
             } ?: return false
             contentResolver.openOutputStream(uri)?.use { out: OutputStream ->
                 bitmap.compress(Bitmap.CompressFormat.JPEG, 90, out)
@@ -219,6 +241,95 @@ class ArViewerActivity : AppCompatActivity() {
             false
         }
     }
+
+    // ── Video recording ──────────────────────────────────────────────
+
+    private fun toggleRecording() {
+        val renderer = arRenderer ?: return
+        if (renderer.isRecording) {
+            stopRecordingIfActive()
+        } else {
+            startRecording(renderer)
+        }
+    }
+
+    private fun startRecording(renderer: ArRenderer) {
+        val tempFile = File(cacheDir, "ar_record_${System.currentTimeMillis()}.mp4")
+        recordButton?.text = getString(R.string.stop_recording)
+        renderer.startRecording(tempFile) { outputPath ->
+            recordButton?.text = getString(R.string.record_video)
+            if (outputPath != null) {
+                saveVideoToGallery(File(outputPath))
+            } else {
+                Toast.makeText(this, R.string.video_save_failed, Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    /**
+     * Stop recording if currently active (called on pause/destroy too).
+     */
+    private fun stopRecordingIfActive() {
+        val renderer = arRenderer ?: return
+        if (renderer.isRecording) {
+            renderer.stopRecording()
+        }
+    }
+
+    /**
+     * Copy the recorded MP4 from cache to the device gallery via MediaStore.
+     */
+    private fun saveVideoToGallery(sourceFile: File) {
+        lifecycleScope.launch {
+            val saved = withContext(Dispatchers.IO) {
+                try {
+                    val filename = "AR_${System.currentTimeMillis()}.mp4"
+                    val contentValues = ContentValues().apply {
+                        put(MediaStore.MediaColumns.DISPLAY_NAME, filename)
+                        put(MediaStore.MediaColumns.MIME_TYPE, "video/mp4")
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                            put(MediaStore.Video.Media.RELATIVE_PATH, "Movies/AR Viewer")
+                            put(MediaStore.Video.Media.IS_PENDING, 1)
+                        }
+                    }
+                    val uri = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                        contentResolver.insert(
+                            MediaStore.Video.Media.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY),
+                            contentValues
+                        )
+                    } else {
+                        @Suppress("DEPRECATION")
+                        contentResolver.insert(MediaStore.Video.Media.EXTERNAL_CONTENT_URI, contentValues)
+                    } ?: return@withContext false
+
+                    contentResolver.openOutputStream(uri)?.use { out ->
+                        FileInputStream(sourceFile).use { input ->
+                            input.copyTo(out, bufferSize = 8192)
+                        }
+                    }
+
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                        val update = ContentValues().apply {
+                            put(MediaStore.Video.Media.IS_PENDING, 0)
+                        }
+                        contentResolver.update(uri, update, null, null)
+                    }
+                    sourceFile.delete()
+                    true
+                } catch (e: Exception) {
+                    Log.e(TAG, "Failed to save video to gallery", e)
+                    false
+                }
+            }
+            if (saved) {
+                Toast.makeText(this@ArViewerActivity, R.string.video_saved, Toast.LENGTH_SHORT).show()
+            } else {
+                Toast.makeText(this@ArViewerActivity, R.string.video_save_failed, Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    // ── Video player ─────────────────────────────────────────────────
 
     private fun startVideoPlayer(surface: Surface, manifest: ViewerManifest) {
         exoPlayer?.release()
@@ -258,6 +369,8 @@ class ArViewerActivity : AppCompatActivity() {
         player.prepare()
         player.playWhenReady = true
     }
+
+    // ── Utilities ────────────────────────────────────────────────────
 
     /**
      * Builds absolute URL for marker image (server may send relative path).
