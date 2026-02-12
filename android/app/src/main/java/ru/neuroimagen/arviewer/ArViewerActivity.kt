@@ -32,6 +32,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import ru.neuroimagen.arviewer.ar.ArRenderer
 import ru.neuroimagen.arviewer.ar.ArSessionHelper
+import ru.neuroimagen.arviewer.ar.RecordableEGLConfigChooser
 import ru.neuroimagen.arviewer.data.api.ApiProvider
 import ru.neuroimagen.arviewer.data.cache.MarkerCache
 import ru.neuroimagen.arviewer.data.cache.VideoCache
@@ -181,7 +182,8 @@ class ArViewerActivity : AppCompatActivity() {
         val root = layoutInflater.inflate(R.layout.activity_ar_viewer_gl, null)
         val glView = root.findViewById<GLSurfaceView>(R.id.ar_gl_surface).apply {
             setEGLContextClientVersion(2)
-            setEGLConfigChooser(8, 8, 8, 8, 16, 0)
+            setEGLConfigChooser(RecordableEGLConfigChooser())
+            preserveEGLContextOnPause = true
             setRenderer(renderer)
         }
         root.findViewById<Button>(R.id.button_capture_photo).setOnClickListener {

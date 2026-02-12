@@ -52,13 +52,19 @@ class ArRecorder {
      * @param height recording height (should match GL surface height)
      */
     fun prepare(outputFile: File, width: Int, height: Int) {
+        // H.264 encoders require even dimensions
+        recordWidth = (width / 2) * 2
+        recordHeight = (height / 2) * 2
+        require(recordWidth > 0 && recordHeight > 0) {
+            "Invalid recording dimensions: ${width}x$height"
+        }
         outputPath = outputFile.absolutePath
-        recordWidth = width
-        recordHeight = height
         startTimestampNs = -1L
 
+        Log.d(TAG, "Preparing recorder: ${recordWidth}x$recordHeight -> $outputPath")
+
         val format = MediaFormat.createVideoFormat(
-            MediaFormat.MIMETYPE_VIDEO_AVC, width, height
+            MediaFormat.MIMETYPE_VIDEO_AVC, recordWidth, recordHeight
         ).apply {
             setInteger(
                 MediaFormat.KEY_COLOR_FORMAT,
@@ -157,28 +163,78 @@ class ArRecorder {
     private fun createEncoderEglSurface() {
         val display = EGL14.eglGetCurrentDisplay()
         val context = EGL14.eglGetCurrentContext()
+        Log.d(TAG, "EGL display=$display, context=$context")
 
-        // Query the EGL config ID used by the current context
-        val configIdArr = IntArray(1)
-        EGL14.eglQueryContext(display, context, EGL14.EGL_CONFIG_ID, configIdArr, 0)
-
-        val configAttribs = intArrayOf(EGL14.EGL_CONFIG_ID, configIdArr[0], EGL14.EGL_NONE)
-        val configs = arrayOfNulls<android.opengl.EGLConfig>(1)
-        val numConfigs = IntArray(1)
-        EGL14.eglChooseConfig(display, configAttribs, 0, configs, 0, 1, numConfigs, 0)
-
-        val config = configs[0]
-            ?: throw IllegalStateException("Failed to find matching EGL config for id ${configIdArr[0]}")
+        // Strategy 1: reuse the config from the current GL context
+        val config = getContextEglConfig(display, context)
+            // Strategy 2: find a recordable RGBA8888 config
+            ?: findRecordableConfig(display)
+            ?: throw IllegalStateException("No suitable EGL config for encoder surface")
 
         val surfaceAttribs = intArrayOf(EGL14.EGL_NONE)
         encoderEglSurface = EGL14.eglCreateWindowSurface(
             display, config, inputSurface!!, surfaceAttribs, 0
         )
         if (encoderEglSurface == EGL14.EGL_NO_SURFACE) {
+            val err = EGL14.eglGetError()
             throw IllegalStateException(
-                "Failed to create encoder EGL surface: 0x${Integer.toHexString(EGL14.eglGetError())}"
+                "eglCreateWindowSurface failed: 0x${Integer.toHexString(err)}"
             )
         }
+        Log.d(TAG, "Encoder EGL surface created successfully")
+    }
+
+    /**
+     * Try to retrieve the EGL config used by the current GL context.
+     */
+    private fun getContextEglConfig(
+        display: android.opengl.EGLDisplay,
+        context: android.opengl.EGLContext
+    ): android.opengl.EGLConfig? {
+        val configIdArr = IntArray(1)
+        if (!EGL14.eglQueryContext(display, context, EGL14.EGL_CONFIG_ID, configIdArr, 0)) {
+            Log.w(TAG, "eglQueryContext failed: 0x${Integer.toHexString(EGL14.eglGetError())}")
+            return null
+        }
+        Log.d(TAG, "Context config ID: ${configIdArr[0]}")
+
+        val attribs = intArrayOf(EGL14.EGL_CONFIG_ID, configIdArr[0], EGL14.EGL_NONE)
+        val configs = arrayOfNulls<android.opengl.EGLConfig>(1)
+        val numConfigs = IntArray(1)
+        if (!EGL14.eglChooseConfig(display, attribs, 0, configs, 0, 1, numConfigs, 0)
+            || numConfigs[0] == 0
+        ) {
+            Log.w(TAG, "eglChooseConfig for config ID ${configIdArr[0]} returned 0 matches")
+            return null
+        }
+        return configs[0]
+    }
+
+    /**
+     * Fallback: find an RGBA8888 + GLES2 config with EGL_RECORDABLE_ANDROID.
+     */
+    private fun findRecordableConfig(
+        display: android.opengl.EGLDisplay
+    ): android.opengl.EGLConfig? {
+        val attribs = intArrayOf(
+            EGL14.EGL_RED_SIZE, 8,
+            EGL14.EGL_GREEN_SIZE, 8,
+            EGL14.EGL_BLUE_SIZE, 8,
+            EGL14.EGL_ALPHA_SIZE, 8,
+            EGL14.EGL_RENDERABLE_TYPE, EGL14.EGL_OPENGL_ES2_BIT,
+            EGL_RECORDABLE_ANDROID, 1,
+            EGL14.EGL_NONE
+        )
+        val configs = arrayOfNulls<android.opengl.EGLConfig>(1)
+        val numConfigs = IntArray(1)
+        if (!EGL14.eglChooseConfig(display, attribs, 0, configs, 0, 1, numConfigs, 0)
+            || numConfigs[0] == 0
+        ) {
+            Log.w(TAG, "No recordable EGL config found either")
+            return null
+        }
+        Log.d(TAG, "Using fallback recordable EGL config")
+        return configs[0]
     }
 
     /**
@@ -262,9 +318,11 @@ class ArRecorder {
 
     companion object {
         private const val TAG = "ArRecorder"
-        private const val BIT_RATE = 6_000_000     // 6 Mbps — good quality for 1080p
+        private const val BIT_RATE = 6_000_000      // 6 Mbps — good quality for 1080p
         private const val FRAME_RATE = 30
-        private const val I_FRAME_INTERVAL = 2     // keyframe every 2 seconds
-        private const val TIMEOUT_US = 10_000L     // 10 ms drain timeout
+        private const val I_FRAME_INTERVAL = 2      // keyframe every 2 seconds
+        private const val TIMEOUT_US = 10_000L      // 10 ms drain timeout
+        /** EGL_RECORDABLE_ANDROID — not in android.opengl.EGL14 constants */
+        private const val EGL_RECORDABLE_ANDROID = 0x3142
     }
 }
