@@ -40,7 +40,9 @@ class ArRenderer(
         session.resume()
 
         videoQuadRenderer = VideoQuadRenderer()
-        val (vidTexId, surfaceTexture) = videoQuadRenderer.createOnGlThread(context)
+        val videoWidth = manifest.video.width ?: 0
+        val videoHeight = manifest.video.height ?: 0
+        val (vidTexId, surfaceTexture) = videoQuadRenderer.createOnGlThread(context, videoWidth, videoHeight)
         videoTextureId = vidTexId
         videoSurfaceTexture = surfaceTexture
         (context as? android.app.Activity)?.runOnUiThread {
@@ -74,8 +76,11 @@ class ArRenderer(
         frame.camera.getProjectionMatrix(projectionMatrix, 0, 0.1f, 100f)
 
         val st = videoSurfaceTexture
-        val updatedImages = frame.getUpdatedTrackables(AugmentedImage::class.java)
-        for (image in updatedImages) {
+        // Use getAllTrackables instead of getUpdatedTrackables so that
+        // updateTexImage() and draw() are called every frame while the
+        // marker is visible, not only when tracking state changes.
+        val allImages = session.getAllTrackables(AugmentedImage::class.java)
+        for (image in allImages) {
             if (image.trackingState == TrackingState.TRACKING && st != null) {
                 st.updateTexImage()
                 videoQuadRenderer.draw(

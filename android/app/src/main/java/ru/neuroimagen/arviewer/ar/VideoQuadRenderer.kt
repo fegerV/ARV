@@ -31,9 +31,12 @@ class VideoQuadRenderer {
 
     /**
      * Call on GL thread. Creates OES texture and SurfaceTexture for ExoPlayer.
+     * @param context Android context for loading shader assets
+     * @param videoWidth video width from manifest (0 = use default 1024)
+     * @param videoHeight video height from manifest (0 = use default 576)
      * @return pair of (textureId, SurfaceTexture)
      */
-    fun createOnGlThread(context: Context): Pair<Int, SurfaceTexture> {
+    fun createOnGlThread(context: Context, videoWidth: Int = 0, videoHeight: Int = 0): Pair<Int, SurfaceTexture> {
         val textures = IntArray(1)
         GLES20.glGenTextures(1, textures, 0)
         val textureId = textures[0]
@@ -43,8 +46,10 @@ class VideoQuadRenderer {
         GLES20.glTexParameteri(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, GLES20.GL_TEXTURE_MIN_FILTER, GLES20.GL_LINEAR)
         GLES20.glTexParameteri(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, GLES20.GL_TEXTURE_MAG_FILTER, GLES20.GL_LINEAR)
 
+        val bufferWidth = if (videoWidth > 0) videoWidth else DEFAULT_BUFFER_WIDTH
+        val bufferHeight = if (videoHeight > 0) videoHeight else DEFAULT_BUFFER_HEIGHT
         val surfaceTexture = SurfaceTexture(textureId)
-        surfaceTexture.setDefaultBufferSize(1024, 576)
+        surfaceTexture.setDefaultBufferSize(bufferWidth, bufferHeight)
 
         val vertexShader = ShaderUtil.loadGLShader(GLES20.GL_VERTEX_SHADER, context, "shaders/video_quad.vert")
         val fragmentShader = ShaderUtil.loadGLShader(GLES20.GL_FRAGMENT_SHADER, context, "shaders/video_quad.frag")
@@ -114,5 +119,7 @@ class VideoQuadRenderer {
 
     companion object {
         private const val TAG = "VideoQuadRenderer"
+        private const val DEFAULT_BUFFER_WIDTH = 1024
+        private const val DEFAULT_BUFFER_HEIGHT = 576
     }
 }

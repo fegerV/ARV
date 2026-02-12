@@ -18,8 +18,11 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
+import android.util.Log
 import com.google.android.exoplayer2.ExoPlayer
 import com.google.android.exoplayer2.MediaItem
+import com.google.android.exoplayer2.PlaybackException
+import com.google.android.exoplayer2.Player
 import com.google.android.exoplayer2.source.ProgressiveMediaSource
 import com.google.ar.core.Session
 import com.google.gson.Gson
@@ -221,6 +224,32 @@ class ArViewerActivity : AppCompatActivity() {
         exoPlayer?.release()
         val player = ExoPlayer.Builder(this).build()
         exoPlayer = player
+
+        player.repeatMode = Player.REPEAT_MODE_ALL
+        player.addListener(object : Player.Listener {
+            override fun onPlaybackStateChanged(playbackState: Int) {
+                val stateName = when (playbackState) {
+                    Player.STATE_IDLE -> "IDLE"
+                    Player.STATE_BUFFERING -> "BUFFERING"
+                    Player.STATE_READY -> "READY"
+                    Player.STATE_ENDED -> "ENDED"
+                    else -> "UNKNOWN($playbackState)"
+                }
+                Log.d(TAG, "ExoPlayer state: $stateName")
+            }
+
+            override fun onPlayerError(error: PlaybackException) {
+                Log.e(TAG, "ExoPlayer error: ${error.errorCodeName}", error)
+                runOnUiThread {
+                    Toast.makeText(
+                        this@ArViewerActivity,
+                        getString(R.string.error_video_playback, error.errorCodeName),
+                        Toast.LENGTH_LONG
+                    ).show()
+                }
+            }
+        })
+
         val cacheFactory = VideoCache.getDataSourceFactory(this)
         val mediaSource = ProgressiveMediaSource.Factory(cacheFactory)
             .createMediaSource(MediaItem.fromUri(manifest.video.videoUrl))
@@ -270,6 +299,7 @@ class ArViewerActivity : AppCompatActivity() {
     }
 
     companion object {
+        private const val TAG = "ArViewerActivity"
         const val EXTRA_MANIFEST_JSON = "manifest_json"
         const val EXTRA_UNIQUE_ID = "unique_id"
     }

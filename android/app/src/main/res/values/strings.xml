@@ -25,6 +25,7 @@
     <string name="error_camera_required">Для AR нужен доступ к камере. Разрешите в настройках приложения.</string>
     <string name="error_arcore_required">Требуется ARCore. Установите из Play Маркета.</string>
     <string name="error_arcore_session">Не удалось запустить AR. Проверьте поддержку устройства.</string>
+    <string name="error_video_playback">Ошибка воспроизведения видео: %1$s</string>
     <string name="capture_photo">Снимок</string>
     <string name="photo_saved">Фото сохранено</string>
     <string name="photo_save_failed">Не удалось сохранить фото</string>
