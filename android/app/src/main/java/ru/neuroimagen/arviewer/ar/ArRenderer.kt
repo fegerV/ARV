@@ -38,6 +38,15 @@ class ArRenderer(
     private var surfaceWidth = 0
     private var surfaceHeight = 0
 
+    // ── Zoom ─────────────────────────────────────────────────────────
+    @Volatile
+    private var zoomLevel = 1.0f
+
+    /** Set digital zoom level (1.0 = no zoom). Thread-safe, called from UI thread. */
+    fun setZoomLevel(zoom: Float) {
+        zoomLevel = zoom
+    }
+
     // ── Recording ────────────────────────────────────────────────────
     private val recorder = ArRecorder()
 
@@ -140,13 +149,22 @@ class ArRenderer(
      * the first render in [onDrawFrame].
      */
     private fun renderScene(frame: Frame, images: Collection<AugmentedImage>) {
+        val zoom = zoomLevel
+
         GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT or GLES20.GL_DEPTH_BUFFER_BIT)
         GLES20.glDisable(GLES20.GL_DEPTH_TEST)
-        backgroundRenderer.draw(frame)
+        backgroundRenderer.draw(frame, zoom)
         GLES20.glEnable(GLES20.GL_DEPTH_TEST)
 
         frame.camera.getViewMatrix(viewMatrix, 0)
         frame.camera.getProjectionMatrix(projectionMatrix, 0, 0.1f, 100f)
+
+        // Apply digital zoom to the projection matrix so AR content
+        // scales consistently with the zoomed camera background.
+        if (zoom != 1.0f) {
+            projectionMatrix[0] *= zoom   // horizontal FOV
+            projectionMatrix[5] *= zoom   // vertical FOV
+        }
 
         for (image in images) {
             if (image.trackingState == TrackingState.TRACKING) {

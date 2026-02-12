@@ -30,6 +30,9 @@ class BackgroundRenderer {
     private val texCoordsPerVertex = 2
     private val floatSize = 4
 
+    /** Base tex coords computed by ARCore (before zoom). */
+    private val baseTexCoords = FloatArray(8)
+
     init {
         val bbCoords = ByteBuffer.allocateDirect(QUAD_COORDS.size * floatSize)
         bbCoords.order(ByteOrder.nativeOrder())
@@ -75,9 +78,12 @@ class BackgroundRenderer {
     }
 
     /**
-     * Draw camera background. Call after Session.update() each frame.
+     * Draw camera background with optional digital zoom.
+     *
+     * @param frame current ARCore frame
+     * @param zoomLevel zoom factor (1.0 = no zoom, 2.0 = 2x zoom toward center)
      */
-    fun draw(frame: Frame) {
+    fun draw(frame: Frame, zoomLevel: Float = 1.0f) {
         if (frame.hasDisplayGeometryChanged()) {
             frame.transformCoordinates2d(
                 Coordinates2d.OPENGL_NORMALIZED_DEVICE_COORDINATES,
@@ -85,9 +91,24 @@ class BackgroundRenderer {
                 Coordinates2d.TEXTURE_NORMALIZED,
                 quadTexCoords
             )
+            // Save original tex coords before zoom
+            quadTexCoords.position(0)
+            quadTexCoords.get(baseTexCoords)
         }
         if (frame.timestamp == 0L) return
 
+        // Apply zoom: scale tex coords toward center (0.5, 0.5)
+        if (zoomLevel != 1.0f) {
+            val zoomed = FloatArray(baseTexCoords.size)
+            for (i in baseTexCoords.indices) {
+                zoomed[i] = 0.5f + (baseTexCoords[i] - 0.5f) / zoomLevel
+            }
+            quadTexCoords.position(0)
+            quadTexCoords.put(zoomed)
+        } else {
+            quadTexCoords.position(0)
+            quadTexCoords.put(baseTexCoords)
+        }
         quadTexCoords.position(0)
         GLES20.glDisable(GLES20.GL_DEPTH_TEST)
         GLES20.glDepthMask(false)

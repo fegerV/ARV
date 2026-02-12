@@ -12,7 +12,9 @@ import android.os.Handler
 import android.os.Looper
 import android.provider.MediaStore
 import android.util.Log
+import android.view.MotionEvent
 import android.view.PixelCopy
+import android.view.ScaleGestureDetector
 import android.view.Surface
 import android.widget.Button
 import android.widget.Toast
@@ -52,6 +54,8 @@ class ArViewerActivity : AppCompatActivity() {
     private var exoPlayer: ExoPlayer? = null
     private var arRenderer: ArRenderer? = null
     private var recordButton: Button? = null
+    private var currentZoom = 1.0f
+    private var scaleDetector: ScaleGestureDetector? = null
 
     private val cameraPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
@@ -179,12 +183,25 @@ class ArViewerActivity : AppCompatActivity() {
         )
         arRenderer = renderer
 
+        scaleDetector = ScaleGestureDetector(
+            this,
+            object : ScaleGestureDetector.SimpleOnScaleGestureListener() {
+                override fun onScale(detector: ScaleGestureDetector): Boolean {
+                    currentZoom *= detector.scaleFactor
+                    currentZoom = currentZoom.coerceIn(MIN_ZOOM, MAX_ZOOM)
+                    arRenderer?.setZoomLevel(currentZoom)
+                    return true
+                }
+            }
+        )
+
         val root = layoutInflater.inflate(R.layout.activity_ar_viewer_gl, null)
         val glView = root.findViewById<GLSurfaceView>(R.id.ar_gl_surface).apply {
             setEGLContextClientVersion(2)
             setEGLConfigChooser(RecordableEGLConfigChooser())
             preserveEGLContextOnPause = true
             setRenderer(renderer)
+            setOnTouchListener { _, event -> onGlSurfaceTouch(event) }
         }
         root.findViewById<Button>(R.id.button_capture_photo).setOnClickListener {
             capturePhoto(glView)
@@ -413,9 +430,20 @@ class ArViewerActivity : AppCompatActivity() {
         }
     }
 
+    /**
+     * Forward touch events to [ScaleGestureDetector] for pinch-to-zoom.
+     */
+    @Suppress("ClickableViewAccessibility")
+    private fun onGlSurfaceTouch(event: MotionEvent): Boolean {
+        scaleDetector?.onTouchEvent(event)
+        return true
+    }
+
     companion object {
         private const val TAG = "ArViewerActivity"
         const val EXTRA_MANIFEST_JSON = "manifest_json"
         const val EXTRA_UNIQUE_ID = "unique_id"
+        private const val MIN_ZOOM = 1.0f
+        private const val MAX_ZOOM = 5.0f
     }
 }
