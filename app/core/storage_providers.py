@@ -263,3 +263,36 @@ def reset_storage_provider() -> None:
     """Reset the global storage provider instance (for testing)."""
     global _storage_provider
     _storage_provider = None
+
+
+async def get_provider_for_company(company) -> StorageProvider:
+    """
+    Resolve the correct storage provider for a given company.
+
+    For companies with ``storage_provider == 'yandex_disk'`` and a valid token,
+    returns a :class:`YandexDiskStorageProvider`.  Otherwise falls back to
+    the default local provider.
+
+    Args:
+        company: A :class:`Company` SQLAlchemy model instance.
+
+    Returns:
+        An appropriate ``StorageProvider`` implementation.
+    """
+    if (
+        getattr(company, "storage_provider", "local") == "yandex_disk"
+        and getattr(company, "yandex_disk_token", None)
+    ):
+        from app.utils.token_encryption import token_encryption
+        from app.core.yandex_disk_provider import YandexDiskStorageProvider
+
+        creds = token_encryption.decrypt_credentials(company.yandex_disk_token)
+        oauth_token = creds.get("access_token", "")
+        if oauth_token:
+            return YandexDiskStorageProvider(oauth_token=oauth_token)
+        logger.warning(
+            "yd_token_missing_after_decrypt",
+            company_id=company.id,
+        )
+
+    return get_storage_provider()

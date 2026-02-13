@@ -1,14 +1,20 @@
 from pydantic import BaseModel, Field, EmailStr, validator
-from typing import Optional, List, Dict, Any
+from typing import Optional, List
 from datetime import datetime
-from app.enums import CompanyStatus
+
+from app.enums import CompanyStatus, StorageProviderType
 
 
 class CompanyCreate(BaseModel):
-    """Schema for creating a new company"""
+    """Schema for creating a new company."""
+
     name: str = Field(..., min_length=1, max_length=255, description="Company name")
     contact_email: Optional[EmailStr] = Field(None, description="Contact email address")
     status: Optional[CompanyStatus] = Field(default=CompanyStatus.ACTIVE, description="Company status")
+    storage_provider: StorageProviderType = Field(
+        default=StorageProviderType.LOCAL,
+        description="Storage backend: local or yandex_disk",
+    )
 
     @validator('contact_email', pre=True)
     def empty_string_to_none(cls, v):
@@ -28,10 +34,15 @@ class CompanyCreate(BaseModel):
 
 
 class CompanyUpdate(BaseModel):
-    """Schema for updating an existing company"""
+    """Schema for updating an existing company."""
+
     name: Optional[str] = Field(None, min_length=1, max_length=255, description="Company name")
     contact_email: Optional[EmailStr] = Field(None, description="Contact email address")
     status: Optional[CompanyStatus] = Field(None, description="Company status")
+    storage_provider: Optional[StorageProviderType] = Field(
+        None,
+        description="Storage backend: local or yandex_disk",
+    )
 
     @validator('contact_email', pre=True)
     def empty_string_to_none(cls, v):
@@ -59,11 +70,12 @@ class CompanyLinks(BaseModel):
 
 
 class CompanyListItem(BaseModel):
-    """Schema for company list item response"""
+    """Schema for company list item response."""
+
     id: str
     name: str
     contact_email: Optional[str]
-    storage_provider: str = Field(default="Local", description="Storage provider (always 'Local')")
+    storage_provider: str = Field(default="local", description="Storage provider type")
     status: CompanyStatus
     projects_count: int = Field(..., description="Number of projects for this company")
     created_at: datetime
@@ -74,11 +86,13 @@ class CompanyListItem(BaseModel):
 
 
 class CompanyDetail(BaseModel):
-    """Schema for detailed company response"""
+    """Schema for detailed company response."""
+
     id: str
     name: str
     contact_email: Optional[str]
-    storage_provider: str = Field(default="Local", description="Storage provider (always 'Local')")
+    storage_provider: str = Field(default="local", description="Storage provider type")
+    yandex_connected: bool = Field(default=False, description="Whether Yandex Disk is connected")
     status: CompanyStatus
     projects_count: int = Field(..., description="Number of projects for this company")
     ar_content_count: int = Field(..., description="Total AR content across all projects")

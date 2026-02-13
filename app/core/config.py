@@ -132,6 +132,10 @@ class Settings(BaseSettings):
     # SHA-256 cert fingerprints (comma-separated), e.g. from Play Console App Signing
     ANDROID_APP_SHA256_FINGERPRINTS: str = ""
 
+    # Yandex OAuth (for Yandex Disk storage)
+    YANDEX_OAUTH_CLIENT_ID: str = ""
+    YANDEX_OAUTH_CLIENT_SECRET: str = ""
+
     # Backup
     BACKUP_S3_ENDPOINT: str = ""
     BACKUP_S3_ACCESS_KEY: str = ""

@@ -107,6 +107,109 @@
                         Control whether this organization is actively used
                     </p>
                 </div>
+
+                <!-- Storage Provider -->
+                <div x-data="storageProviderSection()">
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        Хранилище файлов
+                    </label>
+                    <div class="flex gap-4 mb-3">
+                        <label class="flex items-center">
+                            <input type="radio"
+                                   name="storage_provider"
+                                   value="local"
+                                   x-model="provider"
+                                   {% if not company or (company.storage_provider|default('local')) == 'local' %}checked{% endif %}
+                                   class="w-4 h-4 text-indigo-600 dark:text-indigo-400">
+                            <span class="ml-2 text-sm text-gray-700 dark:text-gray-300">Локальное хранилище</span>
+                        </label>
+                        <label class="flex items-center">
+                            <input type="radio"
+                                   name="storage_provider"
+                                   value="yandex_disk"
+                                   x-model="provider"
+                                   {% if company and company.storage_provider == 'yandex_disk' %}checked{% endif %}
+                                   class="w-4 h-4 text-indigo-600 dark:text-indigo-400">
+                            <span class="ml-2 text-sm text-gray-700 dark:text-gray-300">Яндекс Диск</span>
+                        </label>
+                    </div>
+                    <p class="mt-1.5 text-xs text-gray-500 dark:text-gray-400 mb-3">
+                        Локальное хранилище — файлы сохраняются на сервере. Яндекс Диск — файлы загружаются в облако.
+                    </p>
+
+                    <!-- Yandex Disk OAuth section (shown when yandex_disk selected) -->
+                    <div x-show="provider === 'yandex_disk'" x-cloak
+                         class="mt-4 p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg border border-gray-200 dark:border-gray-600 space-y-4">
+
+                        <!-- Connection status -->
+                        {% if company and company.yandex_connected %}
+                        <div class="flex items-center gap-2 text-green-600 dark:text-green-400">
+                            <span class="material-icons text-base">check_circle</span>
+                            <span class="text-sm font-medium">Яндекс Диск подключён</span>
+                        </div>
+                        {% else %}
+                        <div class="flex items-center gap-2 text-yellow-600 dark:text-yellow-400"
+                             x-show="!connected" x-cloak>
+                            <span class="material-icons text-base">warning</span>
+                            <span class="text-sm font-medium">Яндекс Диск не подключён</span>
+                        </div>
+                        <div class="flex items-center gap-2 text-green-600 dark:text-green-400"
+                             x-show="connected" x-cloak>
+                            <span class="material-icons text-base">check_circle</span>
+                            <span class="text-sm font-medium">Яндекс Диск подключён</span>
+                        </div>
+                        {% endif %}
+
+                        {% if company and company.id %}
+                        <!-- Step 1: Get auth URL -->
+                        <button type="button"
+                                @click="openYandexAuth()"
+                                class="inline-flex items-center gap-2 px-4 py-2 bg-yellow-500 hover:bg-yellow-600 text-white rounded-lg text-sm font-medium transition-colors">
+                            <span class="material-icons text-base">link</span>
+                            Авторизовать Яндекс Диск
+                        </button>
+
+                        <!-- Step 2: Enter code -->
+                        <div x-show="showCodeInput" x-cloak class="space-y-2">
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                                Введите код подтверждения
+                            </label>
+                            <div class="flex gap-2">
+                                <input type="text"
+                                       x-model="authCode"
+                                       placeholder="Вставьте код из Яндекса"
+                                       class="form-input flex-1 border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm">
+                                <button type="button"
+                                        @click="exchangeCode()"
+                                        :disabled="!authCode || exchanging"
+                                        class="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 disabled:opacity-50 transition-colors">
+                                    <span x-show="!exchanging">Подключить</span>
+                                    <span x-show="exchanging" class="flex items-center gap-1">
+                                        <span class="inline-block w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+                                        ...
+                                    </span>
+                                </button>
+                            </div>
+                            <p x-show="exchangeError" x-text="exchangeError" class="text-sm text-red-600 dark:text-red-400"></p>
+                        </div>
+
+                        <!-- Disconnect button -->
+                        {% if company and company.yandex_connected %}
+                        <button type="button"
+                                @click="disconnectYandex()"
+                                class="inline-flex items-center gap-2 px-4 py-2 border border-red-300 dark:border-red-600 text-red-600 dark:text-red-400 rounded-lg text-sm font-medium hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors">
+                            <span class="material-icons text-base">link_off</span>
+                            Отключить Яндекс Диск
+                        </button>
+                        {% endif %}
+
+                        {% else %}
+                        <p class="text-sm text-gray-500 dark:text-gray-400">
+                            Сначала сохраните компанию, затем вы сможете подключить Яндекс Диск.
+                        </p>
+                        {% endif %}
+                    </div>
+                </div>
             </div>
 
             <!-- Form Actions -->
@@ -154,12 +257,80 @@ function companyForm() {
         isSubmitting: false,
 
         init() {
-            // Initialize form listeners
             const form = this.$el.querySelector('form');
             if (form) {
-                form.addEventListener('submit', (e) => {
+                form.addEventListener('submit', () => {
                     this.isSubmitting = true;
                 });
+            }
+        }
+    };
+}
+
+function storageProviderSection() {
+    return {
+        provider: '{{ (company.storage_provider if company and company.storage_provider) or "local" }}',
+        connected: {{ 'true' if company and company.yandex_connected else 'false' }},
+        showCodeInput: false,
+        authCode: '',
+        exchanging: false,
+        exchangeError: '',
+
+        async openYandexAuth() {
+            try {
+                const companyId = '{{ company.id if company and company.id else "" }}';
+                if (!companyId) return;
+                const resp = await fetch('/api/companies/' + companyId + '/yandex-auth-url');
+                const data = await resp.json();
+                if (data.auth_url) {
+                    window.open(data.auth_url, '_blank');
+                    this.showCodeInput = true;
+                }
+            } catch (e) {
+                console.error('Failed to get auth URL', e);
+            }
+        },
+
+        async exchangeCode() {
+            const companyId = '{{ company.id if company and company.id else "" }}';
+            if (!companyId || !this.authCode) return;
+            this.exchanging = true;
+            this.exchangeError = '';
+            try {
+                const resp = await fetch('/api/companies/' + companyId + '/yandex-auth-code', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({code: this.authCode})
+                });
+                const data = await resp.json();
+                if (resp.ok && data.status === 'connected') {
+                    this.connected = true;
+                    this.showCodeInput = false;
+                    this.authCode = '';
+                } else {
+                    this.exchangeError = data.detail || 'Ошибка авторизации';
+                }
+            } catch (e) {
+                this.exchangeError = 'Не удалось подключиться: ' + e.message;
+            }
+            this.exchanging = false;
+        },
+
+        async disconnectYandex() {
+            const companyId = '{{ company.id if company and company.id else "" }}';
+            if (!companyId) return;
+            if (!confirm('Отключить Яндекс Диск для этой компании?')) return;
+            try {
+                const resp = await fetch('/api/companies/' + companyId + '/yandex-token', {method: 'DELETE'});
+                if (resp.ok) {
+                    this.connected = false;
+                    this.provider = 'local';
+                    // Update the hidden radio
+                    const localRadio = document.querySelector('input[name="storage_provider"][value="local"]');
+                    if (localRadio) localRadio.checked = true;
+                }
+            } catch (e) {
+                console.error('Failed to disconnect', e);
             }
         }
     };

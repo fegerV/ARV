@@ -1,9 +1,9 @@
-from sqlalchemy import Column, Integer, String, DateTime, ForeignKey
+from sqlalchemy import Column, Integer, String, DateTime, Text
 from sqlalchemy.orm import relationship
-import uuid
 from datetime import datetime
+
 from app.core.database import Base
-from app.enums import CompanyStatus
+from app.enums import CompanyStatus, StorageProviderType
 
 
 class Company(Base):
@@ -16,9 +16,18 @@ class Company(Base):
     
     # Basic information
     name = Column(String(255), nullable=False)
-    slug = Column(String(255), nullable=False)  # Добавляем поле slug
+    slug = Column(String(255), nullable=False)
     contact_email = Column(String(255))
     status = Column(String(50), default=CompanyStatus.ACTIVE, nullable=False)
+    
+    # Storage provider
+    storage_provider = Column(
+        String(50),
+        default=StorageProviderType.LOCAL,
+        server_default="local",
+        nullable=False,
+    )
+    yandex_disk_token = Column(Text, nullable=True)
     
     # Timestamps
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)

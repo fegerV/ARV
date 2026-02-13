@@ -29,3 +29,9 @@ class VideoStatus(str, Enum):
     PROCESSING = "processing"
     READY = "ready"
     FAILED = "failed"
+
+
+class StorageProviderType(str, Enum):
+    """Storage provider type for companies."""
+    LOCAL = "local"
+    YANDEX_DISK = "yandex_disk"

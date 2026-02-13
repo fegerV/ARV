@@ -1,15 +1,21 @@
+import structlog
 from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
-from typing import Optional, List
+from typing import Optional
 from datetime import datetime
+
+import httpx
 
 from app.core.database import get_db
 from app.core.storage import get_storage_provider_instance
+from app.core.storage_providers import get_provider_for_company
 from app.models.storage import StorageConnection
 from app.models.company import Company
 from app.schemas.storage import StorageConnectionCreate, StorageConnectionUpdate, StorageUsageStats
 
+logger = structlog.get_logger()
 router = APIRouter()
 
 
@@ -167,3 +173,66 @@ async def list_storage_connections(
         safe_connections.append(safe_conn)
     
     return safe_connections
+
+
+# ------------------------------------------------------------------
+# Yandex Disk proxy — stream files for admin panel preview
+# ------------------------------------------------------------------
+
+@router.get("/yd-file")
+async def proxy_yandex_disk_file(
+    path: str = Query(..., description="Relative file path on Yandex Disk"),
+    company_id: int = Query(..., description="Company ID that owns the file"),
+    db: AsyncSession = Depends(get_db),
+):
+    """Proxy-stream a file from Yandex Disk for the admin panel.
+
+    The admin panel cannot reference ``yadisk://`` URLs directly — this
+    endpoint fetches a temporary download link, then streams the content
+    back to the browser with the appropriate ``Content-Type``.
+    """
+    company = await db.get(Company, company_id)
+    if not company:
+        raise HTTPException(status_code=404, detail="Company not found")
+
+    if company.storage_provider != "yandex_disk" or not company.yandex_disk_token:
+        raise HTTPException(
+            status_code=400,
+            detail="Company does not use Yandex Disk storage",
+        )
+
+    from app.core.yandex_disk_provider import YandexDiskStorageProvider
+
+    provider = await get_provider_for_company(company)
+    if not isinstance(provider, YandexDiskStorageProvider):
+        raise HTTPException(status_code=400, detail="Provider mismatch")
+
+    download_url = await provider.get_download_url(path)
+    if not download_url:
+        raise HTTPException(status_code=404, detail="File not found on Yandex Disk")
+
+    # Determine MIME type from extension
+    ext = path.rsplit(".", 1)[-1].lower() if "." in path else ""
+    mime_map = {
+        "png": "image/png",
+        "jpg": "image/jpeg",
+        "jpeg": "image/jpeg",
+        "mp4": "video/mp4",
+        "webm": "video/webm",
+        "mov": "video/quicktime",
+    }
+    content_type = mime_map.get(ext, "application/octet-stream")
+
+    async def _stream():
+        async with httpx.AsyncClient(timeout=120.0) as client:
+            async with client.stream("GET", download_url, follow_redirects=True) as resp:
+                resp.raise_for_status()
+                async for chunk in resp.aiter_bytes(chunk_size=65536):
+                    yield chunk
+
+    logger.info("yd_proxy_stream", company_id=company_id, path=path)
+    return StreamingResponse(
+        _stream(),
+        media_type=content_type,
+        headers={"Cache-Control": "private, max-age=1800"},
+    )

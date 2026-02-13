@@ -1,21 +1,24 @@
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, or_
+import httpx
 import structlog
 
+from app.core.config import get_settings
 from app.core.database import get_db
 from app.models.company import Company
 from app.models.project import Project
 from app.models.ar_content import ARContent
 from app.models.user import User
 from app.schemas.company_api import (
-    CompanyCreate, CompanyUpdate, CompanyListItem, CompanyDetail, 
+    CompanyCreate, CompanyUpdate, CompanyListItem, CompanyDetail,
     CompanyLinks, PaginatedCompaniesResponse
 )
 from app.api.routes.auth import get_current_active_user
-# Add import for slug utility
 from app.utils.slug_utils import generate_slug
+from app.utils.token_encryption import token_encryption
 
 router = APIRouter(tags=["companies"])
 
@@ -103,7 +106,7 @@ async def list_companies(
             id=str(company.id),
             name=company.name,
             contact_email=company.contact_email,
-            storage_provider="Local",  # Always "Local" as per requirements
+            storage_provider=company.storage_provider or "local",
             status=company.status,
             projects_count=projects_counts.get(company.id, 0),
             created_at=company.created_at,
@@ -153,7 +156,8 @@ async def get_company(
         id=str(company.id),
         name=company.name,
         contact_email=company.contact_email,
-        storage_provider="Local",  # Always "Local" as per requirements
+        storage_provider=company.storage_provider or "local",
+        yandex_connected=bool(company.yandex_disk_token),
         status=company.status,
         projects_count=projects_count,
         ar_content_count=ar_content_count,
@@ -215,20 +219,23 @@ async def create_company(
         name=company_name_normalized,
         slug=slug,
         contact_email=company_data.contact_email,
-        status=company_data.status
+        status=company_data.status,
+        storage_provider=company_data.storage_provider.value,
     )
     
     db.add(company)
     await db.commit()
     await db.refresh(company)
     
-    logger.info("company_created", company_id=company.id, name=company.name)
+    logger.info("company_created", company_id=company.id, name=company.name,
+                storage_provider=company.storage_provider)
     
     return CompanyDetail(
         id=str(company.id),
         name=company.name,
         contact_email=company.contact_email,
-        storage_provider="Local",
+        storage_provider=company.storage_provider or "local",
+        yandex_connected=bool(company.yandex_disk_token),
         status=company.status,
         projects_count=0,
         ar_content_count=0,
@@ -280,7 +287,8 @@ async def update_company(
         id=str(company.id),
         name=company.name,
         contact_email=company.contact_email,
-        storage_provider="Local",
+        storage_provider=company.storage_provider or "local",
+        yandex_connected=bool(company.yandex_disk_token),
         status=company.status,
         projects_count=projects_count,
         ar_content_count=ar_content_count,
@@ -321,3 +329,138 @@ async def delete_company(
     logger.info("company_deleted", company_id=company_id, name=company.name)
     
     return {"status": "deleted"}
+
+
+# ------------------------------------------------------------------
+# Yandex Disk OAuth flow
+# ------------------------------------------------------------------
+
+@router.get("/companies/{company_id}/yandex-auth-url")
+async def get_yandex_auth_url(
+    company_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """Generate Yandex OAuth authorization URL for a company.
+
+    The user opens this URL in a new tab, authorizes, and copies the
+    verification code back into the admin panel form.
+    """
+    company = await db.get(Company, company_id)
+    if not company:
+        raise HTTPException(status_code=404, detail="Company not found")
+
+    cfg = get_settings()
+    if not cfg.YANDEX_OAUTH_CLIENT_ID:
+        raise HTTPException(
+            status_code=500,
+            detail="YANDEX_OAUTH_CLIENT_ID is not configured on the server",
+        )
+
+    auth_url = (
+        "https://oauth.yandex.ru/authorize"
+        f"?response_type=code"
+        f"&client_id={cfg.YANDEX_OAUTH_CLIENT_ID}"
+        f"&redirect_uri=https://oauth.yandex.ru/verification_code"
+        f"&force_confirm=yes"
+    )
+    return {"auth_url": auth_url, "company_id": company_id}
+
+
+class YandexAuthCodePayload(BaseModel):
+    """Payload for exchanging Yandex OAuth code."""
+    code: str
+
+
+@router.post("/companies/{company_id}/yandex-auth-code")
+async def exchange_yandex_auth_code(
+    company_id: int,
+    payload: YandexAuthCodePayload,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """Exchange Yandex OAuth verification code for an access token.
+
+    Encrypts the token and saves it in the ``companies.yandex_disk_token``
+    column.  Yandex OAuth tokens are permanent — no refresh needed.
+    """
+    logger = structlog.get_logger()
+    company = await db.get(Company, company_id)
+    if not company:
+        raise HTTPException(status_code=404, detail="Company not found")
+
+    cfg = get_settings()
+    if not cfg.YANDEX_OAUTH_CLIENT_ID or not cfg.YANDEX_OAUTH_CLIENT_SECRET:
+        raise HTTPException(
+            status_code=500,
+            detail="Yandex OAuth credentials are not configured",
+        )
+
+    # Exchange the code for an access token
+    try:
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            resp = await client.post(
+                "https://oauth.yandex.ru/token",
+                data={
+                    "grant_type": "authorization_code",
+                    "code": payload.code,
+                    "client_id": cfg.YANDEX_OAUTH_CLIENT_ID,
+                    "client_secret": cfg.YANDEX_OAUTH_CLIENT_SECRET,
+                },
+                headers={"Content-Type": "application/x-www-form-urlencoded"},
+            )
+            if resp.status_code != 200:
+                detail = resp.json().get("error_description", resp.text)
+                logger.error("yandex_token_exchange_failed", status=resp.status_code, detail=detail)
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Yandex OAuth error: {detail}",
+                )
+            token_data = resp.json()
+    except httpx.HTTPError as exc:
+        logger.error("yandex_token_exchange_http_error", error=str(exc))
+        raise HTTPException(status_code=502, detail=f"Failed to reach Yandex OAuth: {exc}")
+
+    access_token = token_data.get("access_token")
+    if not access_token:
+        raise HTTPException(status_code=400, detail="No access_token in Yandex response")
+
+    # Encrypt and persist
+    encrypted = token_encryption.encrypt_credentials({"access_token": access_token})
+    company.yandex_disk_token = encrypted
+    company.storage_provider = "yandex_disk"
+    await db.commit()
+    await db.refresh(company)
+
+    logger.info("yandex_disk_connected", company_id=company_id)
+
+    return {
+        "status": "connected",
+        "company_id": company_id,
+        "storage_provider": company.storage_provider,
+    }
+
+
+@router.delete("/companies/{company_id}/yandex-token")
+async def delete_yandex_token(
+    company_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """Disconnect Yandex Disk from the company and delete the stored token."""
+    logger = structlog.get_logger()
+    company = await db.get(Company, company_id)
+    if not company:
+        raise HTTPException(status_code=404, detail="Company not found")
+
+    company.yandex_disk_token = None
+    company.storage_provider = "local"
+    await db.commit()
+    await db.refresh(company)
+
+    logger.info("yandex_disk_disconnected", company_id=company_id)
+    return {
+        "status": "disconnected",
+        "company_id": company_id,
+        "storage_provider": company.storage_provider,
+    }

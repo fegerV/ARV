@@ -1,17 +1,26 @@
 """
 AR Content utilities for storage paths and QR code generation.
+
+Supports both local and Yandex Disk storage providers via the
+``StorageProvider`` abstraction.
 """
+from __future__ import annotations
+
 from pathlib import Path
-from typing import Optional
+from typing import Optional, TYPE_CHECKING
 import qrcode
 from PIL import Image
 import io
 import aiofiles
 import re
+import tempfile
 
 from app.core.config import settings
 from app.core.storage import get_storage_provider_instance
 from app.utils.slug_utils import generate_slug
+
+if TYPE_CHECKING:
+    from app.core.storage_providers import StorageProvider
 
 
 def sanitize_filename(name: str, max_length: int = 100) -> str:
@@ -142,20 +151,24 @@ async def get_ar_content_storage_path(ar_content, db = None) -> Path:
     )
 
 
-def build_public_url(storage_path: Path) -> str:
+def build_public_url(
+    storage_path: Path,
+    provider: Optional["StorageProvider"] = None,
+) -> str:
     """Convert a storage path to a public URL using the storage provider.
-    
+
     Args:
-        storage_path: The absolute storage path
-        
+        storage_path: The absolute storage path (or relative for YD).
+        provider: Explicit provider.  Falls back to the default local one.
+
     Returns:
-        Public URL for accessing the file
+        Public URL for accessing the file.
     """
-    storage_provider = get_storage_provider_instance()
-    
+    storage_provider = provider or get_storage_provider_instance()
+
     # Convert absolute path to relative path
     base_path = Path(settings.STORAGE_BASE_PATH)
-    
+
     try:
         relative_path = storage_path.relative_to(base_path)
         relative_path_str = str(relative_path).replace('\\', '/')
@@ -168,7 +181,7 @@ def build_public_url(storage_path: Path) -> str:
             relative_path_str = path_str[vertexar_index:]
             relative_path_str = relative_path_str.replace('\\', '/')
             return storage_provider.get_public_url(relative_path_str)
-        
+
         # Fallback: use just the filename
         return f"/storage/{storage_path.name}"
 
@@ -185,17 +198,21 @@ def build_unique_link(unique_id: str) -> str:
     return f"/view/{unique_id}"
 
 
-async def generate_qr_code(unique_id: str, storage_path: Path) -> str:
+async def generate_qr_code(
+    unique_id: str,
+    storage_path: Path,
+    provider: Optional["StorageProvider"] = None,
+) -> str:
     """Generate QR code for AR content and save it to storage.
-    
+
     Args:
-        unique_id: The unique UUID for the AR content
-        storage_path: The storage directory path for the AR content
-        
+        unique_id: The unique UUID for the AR content.
+        storage_path: The storage directory path for the AR content.
+        provider: Explicit storage provider (uses local if ``None``).
+
     Returns:
-        Public URL of the generated QR code
+        Public URL of the generated QR code.
     """
-    # Create QR code with the full public URL (so the QR works outside of current domain context)
     unique_link = build_unique_link(unique_id)
     unique_url = f"{settings.PUBLIC_URL.rstrip('/')}{unique_link}"
     qr = qrcode.QRCode(
@@ -206,38 +223,65 @@ async def generate_qr_code(unique_id: str, storage_path: Path) -> str:
     )
     qr.add_data(unique_url)
     qr.make(fit=True)
-    
-    # Generate QR code image
+
     qr_img = qr.make_image(fill_color="black", back_color="white")
-    
-    # Save QR code to storage
-    qr_code_path = storage_path / "qr_code.png"
-    
-    # Convert PIL image to bytes and save asynchronously
+
+    # Render to bytes
     img_byte_arr = io.BytesIO()
     qr_img.save(img_byte_arr, format='PNG')
-    img_byte_arr.seek(0)
-    
+    qr_bytes = img_byte_arr.getvalue()
+
+    # Check if provider is Yandex Disk
+    from app.core.yandex_disk_provider import YandexDiskStorageProvider
+    if isinstance(provider, YandexDiskStorageProvider):
+        relative = str(storage_path).replace("\\", "/").lstrip("/")
+        dest = f"{relative}/qr_code.png"
+        return await provider.save_file_bytes(qr_bytes, dest)
+
+    # Local: write to disk directly
+    qr_code_path = storage_path / "qr_code.png"
+    qr_code_path.parent.mkdir(parents=True, exist_ok=True)
     async with aiofiles.open(qr_code_path, "wb") as f:
-        await f.write(img_byte_arr.getvalue())
-    
-    # Return public URL
-    return build_public_url(qr_code_path)
+        await f.write(qr_bytes)
+
+    return build_public_url(qr_code_path, provider=provider)
 
 
-async def save_uploaded_file(upload_file, destination_path: Path) -> None:
+async def save_uploaded_file(
+    upload_file,
+    destination_path: Path,
+    provider: Optional["StorageProvider"] = None,
+    relative_storage_path: Optional[str] = None,
+) -> Optional[str]:
     """Save an uploaded file to the destination path asynchronously.
-    
+
+    For local storage the file is written to *destination_path* directly.
+    For Yandex Disk the file is first read into memory and then uploaded
+    via ``provider.save_file_bytes``.
+
     Args:
-        upload_file: The uploaded file object
-        destination_path: The destination path to save the file
+        upload_file: The uploaded file object (FastAPI ``UploadFile``).
+        destination_path: The local destination path (used for local storage).
+        provider: Explicit storage provider.
+        relative_storage_path: Relative path on the remote provider
+            (e.g. ``company_slug/project_slug/001/marker.png``).
+
+    Returns:
+        ``yadisk://…`` reference for remote providers, ``None`` for local.
     """
-    # Ensure parent directory exists
+    from app.core.yandex_disk_provider import YandexDiskStorageProvider
+
+    if isinstance(provider, YandexDiskStorageProvider) and relative_storage_path:
+        # Read full file into bytes and upload
+        content = await upload_file.read()
+        return await provider.save_file_bytes(content, relative_storage_path)
+
+    # Local storage — original behaviour
     destination_path.parent.mkdir(parents=True, exist_ok=True)
-    
     async with aiofiles.open(destination_path, "wb") as f:
-        while chunk := await upload_file.read(1024 * 1024):  # 1MB chunks
+        while chunk := await upload_file.read(1024 * 1024):
             await f.write(chunk)
+    return None
 
 
 def validate_email_format(email: str) -> bool:
@@ -280,23 +324,40 @@ def validate_file_size(file_size: int, max_size: int) -> bool:
     return file_size <= max_size
 
 
-async def generate_thumbnail(image_path: Path, thumbnail_path: Path, size=(200, 200)) -> None:
+async def generate_thumbnail(
+    image_path: Path,
+    thumbnail_path: Path,
+    size: tuple = (200, 200),
+    provider: Optional["StorageProvider"] = None,
+    relative_storage_path: Optional[str] = None,
+) -> Optional[str]:
     """Generate a thumbnail for an image.
-    
+
     Args:
-        image_path: Path to the original image
-        thumbnail_path: Path where the thumbnail will be saved
-        size: Tuple of (width, height) for the thumbnail
+        image_path: Path to the original image (local temp file).
+        thumbnail_path: Path where the thumbnail will be saved (local).
+        size: Tuple of (width, height) for the thumbnail.
+        provider: Explicit storage provider.
+        relative_storage_path: Remote path for Yandex Disk, e.g.
+            ``slug/project/001/thumbnail.png``.
+
+    Returns:
+        ``yadisk://…`` reference for remote, ``None`` for local.
     """
-    # Open the original image
+    from app.core.yandex_disk_provider import YandexDiskStorageProvider
+
     with Image.open(image_path) as img:
-        # Create thumbnail maintaining aspect ratio
         img.thumbnail(size, Image.Resampling.LANCZOS)
-        
-        # Create a blank image with the exact size and paste the thumbnail centered
-        thumb = Image.new('RGB', size, (255, 255, 255))  # White background
+        thumb = Image.new('RGB', size, (255, 255, 255))
         offset = ((size[0] - img.size[0]) // 2, (size[1] - img.size[1]) // 2)
         thumb.paste(img, offset)
-        
-        # Save the thumbnail
+
+        if isinstance(provider, YandexDiskStorageProvider) and relative_storage_path:
+            buf = io.BytesIO()
+            thumb.save(buf, format="PNG", optimize=True, quality=85)
+            return await provider.save_file_bytes(buf.getvalue(), relative_storage_path)
+
+        # Local: save directly
+        thumbnail_path.parent.mkdir(parents=True, exist_ok=True)
         thumb.save(thumbnail_path, optimize=True, quality=85)
+        return None

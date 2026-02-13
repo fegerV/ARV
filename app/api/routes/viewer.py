@@ -7,17 +7,30 @@ from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from sqlalchemy.orm import selectinload
 from datetime import datetime, timezone, timedelta
 
 from app.core.config import settings
 from app.core.database import get_db
 from app.models.ar_content import ARContent
+from app.models.company import Company
 from app.schemas.viewer import VIEWER_MANIFEST_VERSION, ViewerManifestResponse, ViewerManifestVideo
 from app.services.video_scheduler import get_active_video, update_rotation_state
 from app.utils.ar_content import build_public_url
+from app.core.storage_providers import get_provider_for_company
 
 logger = structlog.get_logger()
 router = APIRouter()
+
+
+def _is_yadisk_ref(path_or_url: Optional[str]) -> bool:
+    """Check if a stored path is a ``yadisk://`` reference."""
+    return bool(path_or_url and str(path_or_url).startswith("yadisk://"))
+
+
+def _yadisk_relative(ref: str) -> str:
+    """Extract relative path from ``yadisk://slug/project/001/file``."""
+    return ref.replace("yadisk://", "", 1)
 
 
 def _absolute_url(relative_path: str) -> str:
@@ -32,8 +45,11 @@ def _absolute_url(relative_path: str) -> str:
 
 
 def _photo_url_from_ar_content(ar_content: ARContent) -> Optional[str]:
-    """Get photo URL (relative) from ARContent, recalculating from path if needed."""
+    """Get photo URL (relative or yadisk://) from ARContent."""
     url = ar_content.photo_url
+    # For yadisk:// references, just return as-is (will be resolved later)
+    if _is_yadisk_ref(url) or _is_yadisk_ref(ar_content.photo_path):
+        return url
     if ar_content.photo_path:
         try:
             p = Path(ar_content.photo_path)
@@ -42,6 +58,29 @@ def _photo_url_from_ar_content(ar_content: ARContent) -> Optional[str]:
         except Exception:
             pass
     return url
+
+
+async def _resolve_yd_url(url_or_path: Optional[str], company: Company) -> Optional[str]:
+    """Resolve a ``yadisk://`` reference to a temporary Yandex Disk download URL.
+
+    Returns the original value unchanged if it is not a YD reference or if
+    the company doesn't have a valid token.
+    """
+    if not url_or_path:
+        return url_or_path
+    if not _is_yadisk_ref(url_or_path):
+        return url_or_path
+    try:
+        provider = await get_provider_for_company(company)
+        from app.core.yandex_disk_provider import YandexDiskStorageProvider
+        if isinstance(provider, YandexDiskStorageProvider):
+            relative = _yadisk_relative(url_or_path)
+            download_url = await provider.get_download_url(relative)
+            if download_url:
+                return download_url
+    except Exception as exc:
+        logger.error("yd_resolve_url_failed", path=url_or_path, error=str(exc))
+    return url_or_path
 
 
 @router.get("/viewer/{ar_content_id}/active-video")
@@ -246,7 +285,11 @@ async def get_viewer_manifest(
     except (ValueError, TypeError):
         raise HTTPException(status_code=400, detail="Invalid unique_id format")
 
-    stmt = select(ARContent).where(ARContent.unique_id == unique_id)
+    stmt = (
+        select(ARContent)
+        .options(selectinload(ARContent.company))
+        .where(ARContent.unique_id == unique_id)
+    )
     res = await db.execute(stmt)
     ar_content = res.scalar_one_or_none()
     if not ar_content:
@@ -281,6 +324,15 @@ async def get_viewer_manifest(
     expires_in = video_result.get("expires_in")
     if source == "rotation" and getattr(video, "rotation_type", None) in ["sequential", "cyclic"]:
         await update_rotation_state(ar_content, db)
+
+    # Resolve Yandex Disk yadisk:// references to temporary download URLs
+    company = ar_content.company
+    if company and _is_yadisk_ref(photo_url_rel):
+        photo_url_rel = await _resolve_yd_url(photo_url_rel, company)
+    if company and _is_yadisk_ref(video.video_url):
+        video.video_url = await _resolve_yd_url(video.video_url, company)
+    if company and _is_yadisk_ref(video.preview_url):
+        video.preview_url = await _resolve_yd_url(video.preview_url, company)
 
     marker_image_url = _absolute_url(photo_url_rel)
     photo_url_abs = _absolute_url(photo_url_rel)

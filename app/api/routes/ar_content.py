@@ -33,9 +33,10 @@ from app.utils.ar_content import (
     build_public_url,
     build_unique_link,
     generate_qr_code,
-    save_uploaded_file
+    save_uploaded_file,
 )
 from app.services.marker_service import marker_service
+from app.core.storage_providers import get_provider_for_company
 
 from fastapi.responses import HTMLResponse
 import json
@@ -236,6 +237,11 @@ async def _create_ar_content(
     """Внутренняя функция для создания AR-контента"""
     # Validate company and project relationship
     company, project = await validate_company_project(company_id, project_id, db)
+
+    # Resolve storage provider for the company
+    provider = await get_provider_for_company(company)
+    from app.core.yandex_disk_provider import YandexDiskStorageProvider
+    is_yd = isinstance(provider, YandexDiskStorageProvider)
     
     # Validate duration years
     if duration_years not in [1, 3, 5]:
@@ -256,8 +262,6 @@ async def _create_ar_content(
     
     if not validate_file_extension(video_file.filename, allowed_video_extensions):
         raise HTTPException(status_code=422, detail="Video must be MP4, WebM, or MOV")
-    
-    # Note: file size validation (e.g. 10MB photo, 100MB video) can be added here if needed
 
     # Generate unique identifier
     unique_id = str(uuid4())
@@ -265,7 +269,7 @@ async def _create_ar_content(
     # Generate order number
     order_number = generate_order_number()
     
-    # Build storage path with company and project names
+    # Build local storage path (always needed for temp files / image analysis)
     storage_path = build_ar_content_storage_path(
         company_id=company_id,
         project_id=project_id,
@@ -274,32 +278,68 @@ async def _create_ar_content(
         project_name=project.name
     )
     storage_path.mkdir(parents=True, exist_ok=True)
+
+    # Relative path used for Yandex Disk uploads
+    from app.utils.slug_utils import generate_slug
+    project_slug = generate_slug(project.name) or f"Project_{project_id}"
+    from app.utils.ar_content import sanitize_filename
+    order_folder = sanitize_filename(order_number, max_length=50)
+    yd_relative_prefix = f"{project_slug}/{order_folder}"
     
     # Save photo
     photo_filename = f"photo{Path(photo_file.filename).suffix}"
     photo_path = storage_path / photo_filename
-    await save_uploaded_file(photo_file, photo_path)
+    if is_yd:
+        # Save locally first (needed for image analysis), then upload to YD
+        import tempfile as _tmpmod
+        _tmp_photo = Path(_tmpmod.mkdtemp()) / photo_filename
+        await save_uploaded_file(photo_file, _tmp_photo)
+        yd_photo_ref = await provider.save_file(str(_tmp_photo), f"{yd_relative_prefix}/{photo_filename}")
+        # Keep local copy for analysis
+        shutil.copy2(str(_tmp_photo), str(photo_path))
+    else:
+        await save_uploaded_file(photo_file, photo_path)
+        yd_photo_ref = None
     
     # Save video
     video_filename = f"video{Path(video_file.filename).suffix}"
     video_path = storage_path / video_filename
-    await save_uploaded_file(video_file, video_path)
-    video_url = build_public_url(video_path)
+    if is_yd:
+        yd_video_ref = await save_uploaded_file(
+            video_file,
+            video_path,
+            provider=provider,
+            relative_storage_path=f"{yd_relative_prefix}/{video_filename}",
+        )
+    else:
+        await save_uploaded_file(video_file, video_path)
+        yd_video_ref = None
+
+    # Resolve URLs depending on provider
+    if is_yd:
+        photo_url_val = yd_photo_ref or provider.get_public_url(f"{yd_relative_prefix}/{photo_filename}")
+        video_url = yd_video_ref or provider.get_public_url(f"{yd_relative_prefix}/{video_filename}")
+    else:
+        photo_url_val = build_public_url(photo_path, provider=provider)
+        video_url = build_public_url(video_path, provider=provider)
     
     # Generate QR code
-    qr_code_url = await generate_qr_code(unique_id, storage_path)
+    if is_yd:
+        qr_code_url = await generate_qr_code(unique_id, Path(yd_relative_prefix), provider=provider)
+    else:
+        qr_code_url = await generate_qr_code(unique_id, storage_path, provider=provider)
     logger.info(
         "ar_content_storage_paths",
         storage_path=str(storage_path),
         photo_path=str(photo_path),
         video_path=str(video_path),
-        qr_code_path=str(storage_path / "qr_code.png"),
-        photo_url=build_public_url(photo_path),
+        photo_url=photo_url_val,
         video_url=video_url,
         qr_code_url=qr_code_url,
+        storage_provider=company.storage_provider,
     )
 
-    # Analyze photo quality and build recommendations
+    # Analyze photo quality and build recommendations (always uses local file)
     image_quality = marker_service.analyze_image_quality(str(photo_path))
     recommendations = marker_service.build_image_recommendations(image_quality)
     photo_analysis: dict = {
@@ -325,9 +365,20 @@ async def _create_ar_content(
                         "enhanced_metrics": enhanced_metrics,
                     }
                 )
+                # Upload enhanced version to YD
+                if is_yd:
+                    await provider.save_file(
+                        enhanced_path,
+                        f"{yd_relative_prefix}/photo_enhanced.png",
+                    )
         else:
             photo_analysis["auto_enhance_skipped_reason"] = "quality_above_threshold"
-    
+
+    # Paths stored in DB: for YD — yadisk:// refs, for local — absolute paths
+    db_photo_path = yd_photo_ref if is_yd else str(photo_path)
+    db_video_path = yd_video_ref if is_yd else str(video_path)
+    db_qr_path = qr_code_url if is_yd else str(storage_path / "qr_code.png")
+
     # Create database record for AR content
     ar_content = ARContent(
         company_id=company_id,
@@ -338,11 +389,11 @@ async def _create_ar_content(
         customer_phone=customer_phone,
         customer_email=customer_email,
         duration_years=duration_years,
-        photo_path=str(photo_path),
-        photo_url=build_public_url(photo_path),
-        video_path=str(video_path),
+        photo_path=db_photo_path,
+        photo_url=photo_url_val,
+        video_path=db_video_path,
         video_url=video_url,
-        qr_code_path=str(storage_path / "qr_code.png"),
+        qr_code_path=db_qr_path,
         qr_code_url=qr_code_url,
         status="pending"
     )
@@ -361,31 +412,35 @@ async def _create_ar_content(
         )
         
         if thumbnail_result.get("status") == "ready":
-            # Update the AR content with thumbnail URL
-            ar_content.thumbnail_url = thumbnail_result.get("thumbnail_url")
-            # Commit the change to the database
+            thumb_url = thumbnail_result.get("thumbnail_url")
+            # For YD: upload generated thumbnail
+            if is_yd:
+                thumb_local = thumbnail_result.get("thumbnail_path")
+                if thumb_local and Path(thumb_local).exists():
+                    thumb_url = await provider.save_file(
+                        thumb_local,
+                        f"{yd_relative_prefix}/thumbnail.png",
+                    )
+            ar_content.thumbnail_url = thumb_url
             await db.commit()
-            await db.refresh(ar_content)  # Refresh to ensure the change is saved
+            await db.refresh(ar_content)
             logger.info(
                 "photo_thumbnail_generation_saved",
                 ar_content_id=ar_content.id,
-                thumbnail_url=thumbnail_result.get("thumbnail_url"),
-                thumbnail_path=thumbnail_result.get("thumbnail_path"),
+                thumbnail_url=thumb_url,
             )
         else:
             logger.warning("photo_thumbnail_generation_failed", error=thumbnail_result.get("error"))
-            # We won't fail the whole request if thumbnail generation fails
     except Exception as e:
         logger.error("photo_thumbnail_generation_exception", error=str(e))
-        # We won't fail the whole request if thumbnail generation fails
     
     # Create video record
     video_record = Video(
         ar_content_id=ar_content.id,
         filename=video_filename,
-        video_path=str(video_path),
+        video_path=db_video_path,
         video_url=video_url,
-        preview_url=video_url,  # Use the same URL as video_url for preview
+        preview_url=video_url,
         is_active=True,
         status="uploaded"
     )
@@ -401,8 +456,8 @@ async def _create_ar_content(
     
     # ARCore: marker = photo image (no .mind generation)
     try:
-        ar_content.marker_path = str(photo_path)
-        ar_content.marker_url = build_public_url(photo_path)
+        ar_content.marker_path = db_photo_path
+        ar_content.marker_url = photo_url_val
         ar_content.marker_status = "ready"
         ar_content.marker_metadata = {}
         ar_content.status = "ready"

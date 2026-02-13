@@ -131,18 +131,20 @@ async def company_detail(
 ):
     """Company detail page."""
     if not current_user:
-        # Redirect to login page if user is not authenticated
         return RedirectResponse(url="/admin/login", status_code=303)
     
     if not current_user.is_active:
-        # Redirect to login page if user is not active
         return RedirectResponse(url="/admin/login", status_code=303)
     try:
-        from app.schemas.company import Company as CompanySchema
-        company = await get_company(int(company_id), db)
-        company_data = CompanySchema.model_validate(company).dict()
+        company_detail_resp = await get_company(int(company_id), db, current_user=current_user)
+        company_data = _pydantic_to_dict(company_detail_resp)
+        company_data = _convert_data_for_template(company_data)
+        # Ensure storage fields are present
+        company_obj = await db.get(Company, int(company_id))
+        if company_obj:
+            company_data["storage_provider"] = company_obj.storage_provider or "local"
+            company_data["yandex_connected"] = bool(company_obj.yandex_disk_token)
     except Exception:
-        # fallback to mock data
         company_data = {**MOCK_COMPANIES[0], "id": company_id}
     
     context = {
@@ -161,19 +163,27 @@ async def company_edit(
 ):
     """Company edit page."""
     if not current_user:
-        # Redirect to login page if user is not authenticated
         return RedirectResponse(url="/admin/login", status_code=303)
     
     if not current_user.is_active:
-        # Redirect to login page if user is not active
         return RedirectResponse(url="/admin/login", status_code=303)
     
     try:
-        from app.schemas.company import Company as CompanySchema
-        company = await get_company(int(company_id), db)
-        company_data = CompanySchema.model_validate(company).dict()
+        # Load directly from DB to get storage_provider and yandex_disk_token
+        company_obj = await db.get(Company, int(company_id))
+        if not company_obj:
+            raise HTTPException(status_code=404, detail="Company not found")
+        company_data = {
+            "id": company_obj.id,
+            "name": company_obj.name,
+            "contact_email": company_obj.contact_email,
+            "status": company_obj.status,
+            "storage_provider": company_obj.storage_provider or "local",
+            "yandex_connected": bool(company_obj.yandex_disk_token),
+        }
+    except HTTPException:
+        raise
     except Exception:
-        # fallback to mock data
         company_data = {**MOCK_COMPANIES[0], "id": company_id}
     
     context = {
@@ -201,26 +211,27 @@ async def company_create_post(
     name = form_data.get("name", "").strip()
     contact_email = form_data.get("contact_email", "").strip() or None
     status = form_data.get("status", "active")
+    storage_provider = form_data.get("storage_provider", "local").strip()
     
     if not name:
-        # If validation fails, return to form with error
         context = {
             "request": request,
-            "company": {"name": name, "contact_email": contact_email, "status": status},
+            "company": {"name": name, "contact_email": contact_email, "status": status,
+                        "storage_provider": storage_provider},
             "current_user": current_user,
             "error": "Name is required field"
         }
         return templates.TemplateResponse("companies/form.html", context)
     
     try:
-        # Create company via API
         from app.api.routes.companies import create_company
         from app.schemas.company_api import CompanyCreate
         
         company_create_data = CompanyCreate(
             name=name,
             contact_email=contact_email,
-            status=status
+            status=status,
+            storage_provider=storage_provider,
         )
         
         created_company = await create_company(
@@ -229,15 +240,21 @@ async def company_create_post(
             current_user=current_user
         )
         
-        # Redirect to companies list after successful creation
+        # If Yandex Disk selected, redirect to edit page so user can authorize
+        if storage_provider == "yandex_disk":
+            return RedirectResponse(
+                url=f"/companies/{created_company.id}/edit",
+                status_code=303,
+            )
+        
         return RedirectResponse(url="/companies", status_code=303)
         
     except Exception as e:
         logger.error("company_create_error", error=str(e), exc_info=True)
-        # If creation fails, return to form with error
         context = {
             "request": request,
-            "company": {"name": name, "contact_email": contact_email, "status": status},
+            "company": {"name": name, "contact_email": contact_email, "status": status,
+                        "storage_provider": storage_provider},
             "current_user": current_user,
             "error": f"Failed to create company: {str(e)}"
         }
@@ -326,26 +343,27 @@ async def company_update_post(
     name = form_data.get("name", "").strip()
     contact_email = form_data.get("contact_email", "").strip() or None
     status = form_data.get("status", "active")
+    storage_provider = form_data.get("storage_provider", "local").strip()
     
     if not name:
-        # If validation fails, return to form with error
         context = {
             "request": request,
-            "company": {"id": company_id, "name": name, "contact_email": contact_email, "status": status},
+            "company": {"id": company_id, "name": name, "contact_email": contact_email,
+                        "status": status, "storage_provider": storage_provider},
             "current_user": current_user,
             "error": "Name is required field"
         }
         return templates.TemplateResponse("companies/form.html", context)
     
     try:
-        # Update company via API
         from app.api.routes.companies import update_company
         from app.schemas.company_api import CompanyUpdate
         
         company_update_data = CompanyUpdate(
             name=name,
             contact_email=contact_email,
-            status=status
+            status=status,
+            storage_provider=storage_provider,
         )
         
         updated_company = await update_company(
@@ -355,14 +373,13 @@ async def company_update_post(
             current_user=current_user
         )
         
-        # Redirect to companies list after successful update
         return RedirectResponse(url="/companies", status_code=303)
         
     except Exception as e:
-        # If update fails, return to form with error
         context = {
             "request": request,
-            "company": {"id": company_id, "name": name, "contact_email": contact_email, "status": status},
+            "company": {"id": company_id, "name": name, "contact_email": contact_email,
+                        "status": status, "storage_provider": storage_provider},
             "current_user": current_user,
             "error": f"Failed to update company: {str(e)}"
         }
