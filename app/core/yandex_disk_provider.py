@@ -217,6 +217,68 @@ class YandexDiskStorageProvider(StorageProvider):
             logger.error("yd_download_url_failed", disk_path=disk_path, error=str(exc))
             return None
 
+    async def get_folder_size(self, relative_path: str = "") -> Dict[str, Any]:
+        """Calculate total size and file count for a folder on Yandex Disk.
+
+        Recursively traverses the folder tree via the Disk REST API and
+        sums up file sizes.
+
+        Args:
+            relative_path: Path relative to base_prefix (empty = root folder).
+
+        Returns:
+            ``{"total_bytes": int, "file_count": int}``
+        """
+        disk_path = self._disk_path(relative_path) if relative_path else f"app:/{self._base_prefix}"
+
+        async def _sum_dir(dir_path: str, client: httpx.AsyncClient, depth: int = 0) -> tuple[int, int]:
+            """Return (total_bytes, file_count) for *dir_path*."""
+            if depth > 10:
+                return 0, 0
+            total = 0
+            count = 0
+            offset = 0
+            limit = 100
+            while True:
+                try:
+                    resp = await client.get(
+                        f"{_DISK_API}/resources",
+                        params={
+                            "path": dir_path,
+                            "limit": limit,
+                            "offset": offset,
+                            "fields": "_embedded.items.type,_embedded.items.size,_embedded.items.path,_embedded.total",
+                        },
+                        headers=self._headers,
+                    )
+                    if resp.status_code != 200:
+                        break
+                    embedded = resp.json().get("_embedded", {})
+                    items = embedded.get("items", [])
+                    for item in items:
+                        if item.get("type") == "file":
+                            total += item.get("size", 0)
+                            count += 1
+                        elif item.get("type") == "dir":
+                            sub_total, sub_count = await _sum_dir(item["path"], client, depth + 1)
+                            total += sub_total
+                            count += sub_count
+                    items_total = embedded.get("total", 0)
+                    offset += limit
+                    if offset >= items_total:
+                        break
+                except Exception:
+                    break
+            return total, count
+
+        try:
+            async with httpx.AsyncClient(timeout=60.0) as client:
+                total_bytes, file_count = await _sum_dir(disk_path, client)
+            return {"total_bytes": total_bytes, "file_count": file_count}
+        except Exception as exc:
+            logger.error("yd_folder_size_failed", path=disk_path, error=str(exc))
+            return {"total_bytes": 0, "file_count": 0, "error": str(exc)}
+
     async def get_usage_stats(self, path: str = "") -> Dict[str, Any]:
         """Return Yandex Disk quota information."""
         try:

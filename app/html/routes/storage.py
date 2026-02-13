@@ -175,51 +175,102 @@ async def get_storage_info(db: AsyncSession) -> dict:
                         traceback=traceback.format_exc())
             companies = []
         
-        # Simple company list without size calculation (too slow)
+        # Build company list with storage info
+        from sqlalchemy import func as sa_func
+        from app.core.storage_providers import get_provider_for_company
+        from app.core.yandex_disk_provider import YandexDiskStorageProvider
+
         company_storage = []
+        yd_quota: dict | None = None  # Filled once for any YD company
+
         for company in companies:
             try:
-                # Get project count without loading all relations
-                projects_count = 0
-                try:
-                    from sqlalchemy import func
-                    from app.models.project import Project
-                    count_stmt = select(func.count(Project.id)).where(Project.company_id == company.id)
-                    count_result = await db.execute(count_stmt)
-                    projects_count = count_result.scalar() or 0
-                except Exception:
-                    pass
-                
+                # Project count
+                count_stmt = select(sa_func.count(Project.id)).where(Project.company_id == company.id)
+                count_result = await db.execute(count_stmt)
+                projects_count = count_result.scalar() or 0
+
+                storage_type = getattr(company, "storage_provider", "local")
+                storage_used = "—"
+                storage_used_bytes = 0
+                files_count = 0
+
+                if storage_type == "yandex_disk":
+                    try:
+                        provider = await get_provider_for_company(company)
+                        if isinstance(provider, YandexDiskStorageProvider):
+                            # Get per-company folder size
+                            folder_info = await provider.get_folder_size()
+                            storage_used_bytes = folder_info.get("total_bytes", 0)
+                            files_count = folder_info.get("file_count", 0)
+                            storage_used = format_bytes(storage_used_bytes)
+
+                            # Get overall YD quota once
+                            if yd_quota is None:
+                                yd_quota = await provider.get_usage_stats()
+                    except Exception as exc:
+                        logger.warning(
+                            "yd_company_usage_failed",
+                            company_id=company.id,
+                            error=str(exc),
+                        )
+                else:
+                    # Local storage: calculate from filesystem
+                    try:
+                        company_dir = Path(settings.STORAGE_BASE_PATH) / (getattr(company, "slug", None) or "")
+                        if company_dir.exists() and company_dir.is_dir():
+                            storage_used_bytes, files_count = calculate_directory_size(company_dir)
+                            storage_used = format_bytes(storage_used_bytes)
+                    except Exception:
+                        pass
+
                 company_storage.append({
                     "id": company.id,
-                    "name": getattr(company, 'name', 'Unknown'),
-                    "storage_used": "—",  # Not calculated for performance
-                    "storage_used_bytes": 0,
-                    "files_count": 0,
-                    "projects_count": projects_count
+                    "name": getattr(company, "name", "Unknown"),
+                    "storage_type": storage_type,
+                    "storage_used": storage_used,
+                    "storage_used_bytes": storage_used_bytes,
+                    "files_count": files_count,
+                    "projects_count": projects_count,
                 })
             except Exception as e:
-                logger.warning("error_processing_company",
-                            company_id=getattr(company, 'id', None),
-                            error=str(e))
+                logger.warning(
+                    "error_processing_company",
+                    company_id=getattr(company, "id", None),
+                    error=str(e),
+                )
                 company_storage.append({
-                    "id": getattr(company, 'id', 0),
-                    "name": getattr(company, 'name', 'Unknown'),
+                    "id": getattr(company, "id", 0),
+                    "name": getattr(company, "name", "Unknown"),
+                    "storage_type": "local",
                     "storage_used": "—",
                     "storage_used_bytes": 0,
                     "files_count": 0,
-                    "projects_count": 0
+                    "projects_count": 0,
                 })
-        
-        return {
+
+        result = {
             "total_storage": format_bytes(total_disk) if total_disk > 0 else "Unknown",
             "used_storage": format_bytes(used_disk) if used_disk > 0 else "0 B",
             "available_storage": format_bytes(free_disk) if free_disk > 0 else "Unknown",
             "storage_usage_percent": round((used_disk / total_disk * 100), 2) if total_disk > 0 else 0,
             "ar_content_storage": format_bytes(storage_size),
             "ar_content_files": storage_files,
-            "companies": company_storage
+            "companies": company_storage,
         }
+
+        # Add Yandex Disk quota block if any company uses it
+        if yd_quota and yd_quota.get("exists"):
+            yd_total = yd_quota.get("total_bytes", 0)
+            yd_used = yd_quota.get("used_bytes", 0)
+            result["yd_quota"] = {
+                "total": format_bytes(yd_total),
+                "used": format_bytes(yd_used),
+                "free": format_bytes(yd_total - yd_used),
+                "percent": round(yd_used / yd_total * 100, 1) if yd_total > 0 else 0,
+            }
+
+        return result
     except Exception as e:
         logger.error("error_in_get_storage_info",
                     error=str(e),
