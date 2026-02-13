@@ -49,6 +49,10 @@
     <string name="video_saved">Видео сохранено в галерею</string>
     <string name="video_save_failed">Не удалось сохранить видео</string>
 
+    <!-- Main screen -->
+    <string name="open_from_file">Загрузить QR из галереи</string>
+    <string name="qr_not_found_in_image">QR-код не найден на изображении</string>
+
     <!-- QR Scanner -->
     <string name="scan_qr">Сканировать QR</string>
     <string name="qr_scan_hint">Наведите камеру на QR-код</string>

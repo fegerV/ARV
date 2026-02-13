@@ -462,26 +462,26 @@ class ArViewerActivity : AppCompatActivity() {
             .createMediaSource(MediaItem.fromUri(manifest.video.videoUrl))
         player.setMediaSource(mediaSource)
         player.setVideoSurface(surface)
+        player.volume = 0f
         player.prepare()
         player.playWhenReady = false
-        Log.d(TAG, "Video player prepared (paused, waiting for marker)")
+        Log.d(TAG, "Video player prepared (muted, paused, waiting for marker)")
     }
 
     /**
      * Called from ArRenderer when marker tracking starts or stops.
+     * Plays and unmutes video when marker is visible; immediately mutes and pauses when lost.
      */
     private fun onMarkerTrackingChanged(isTracking: Boolean) {
         val player = exoPlayer ?: return
         if (isTracking) {
-            if (!player.playWhenReady) {
-                player.playWhenReady = true
-                Log.d(TAG, "Marker tracked — video playing")
-            }
+            player.volume = 1f
+            player.playWhenReady = true
+            Log.d(TAG, "Marker tracked — video playing, unmuted")
         } else {
-            if (player.playWhenReady) {
-                player.playWhenReady = false
-                Log.d(TAG, "Marker lost — video paused")
-            }
+            player.volume = 0f
+            player.playWhenReady = false
+            Log.d(TAG, "Marker lost — video muted + paused")
         }
     }
 

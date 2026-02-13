@@ -5,13 +5,19 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Bundle
+import android.util.Log
 import android.view.View
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
+import com.google.android.gms.tasks.Tasks
 import com.google.gson.Gson
+import com.google.mlkit.vision.barcode.BarcodeScannerOptions
+import com.google.mlkit.vision.barcode.BarcodeScanning
+import com.google.mlkit.vision.barcode.common.Barcode
+import com.google.mlkit.vision.common.InputImage
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -21,7 +27,7 @@ import ru.neuroimagen.arviewer.databinding.ActivityMainBinding
 import ru.neuroimagen.arviewer.ui.ViewerErrorMessages
 
 /**
- * Main screen: QR scanning (primary action) and manual unique_id input.
+ * Main screen: QR scanning (primary action), QR from gallery, and manual unique_id input.
  * Requests all required permissions (camera, microphone) at startup.
  */
 class MainActivity : AppCompatActivity() {
@@ -42,7 +48,6 @@ class MainActivity : AppCompatActivity() {
         if (!cameraGranted) {
             Toast.makeText(this, R.string.error_camera_required, Toast.LENGTH_LONG).show()
         }
-        // Microphone denial is not critical — recording will work without audio
     }
 
     private val qrScannerLauncher = registerForActivityResult(
@@ -57,6 +62,17 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    /**
+     * Pick an image from gallery to decode a QR code from it.
+     */
+    private val pickImageLauncher = registerForActivityResult(
+        ActivityResultContracts.GetContent()
+    ) { uri ->
+        uri?.let { decodeQrFromImage(it) }
+    }
+
+    // ── Lifecycle ────────────────────────────────────────────────────
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivityMainBinding.inflate(layoutInflater)
@@ -64,6 +80,7 @@ class MainActivity : AppCompatActivity() {
 
         binding.buttonOpen.setOnClickListener { onOpenClicked() }
         binding.buttonScanQr.setOnClickListener { openQrScanner() }
+        binding.buttonOpenFromFile.setOnClickListener { pickImageLauncher.launch("image/*") }
         binding.buttonRetry.setOnClickListener { onRetryClicked() }
 
         requestRequiredPermissions()
@@ -72,10 +89,6 @@ class MainActivity : AppCompatActivity() {
 
     // ── Permissions ──────────────────────────────────────────────────
 
-    /**
-     * Request all permissions the app needs upfront so individual screens
-     * don't interrupt the user with dialogs mid-action.
-     */
     private fun requestRequiredPermissions() {
         val needed = mutableListOf<String>()
         if (!hasPermission(Manifest.permission.CAMERA)) {
@@ -97,6 +110,54 @@ class MainActivity : AppCompatActivity() {
     private fun openQrScanner() {
         val intent = Intent(this, QrScannerActivity::class.java)
         qrScannerLauncher.launch(intent)
+    }
+
+    // ── QR from gallery image ────────────────────────────────────────
+
+    /**
+     * Decode a QR code from a picked gallery image using ML Kit.
+     */
+    private fun decodeQrFromImage(imageUri: Uri) {
+        showLoadingPanel()
+        lifecycleScope.launch {
+            val uniqueId = withContext(Dispatchers.IO) {
+                scanBarcodeFromImage(imageUri)
+            }
+            if (uniqueId != null) {
+                binding.editUniqueId.setText(uniqueId)
+                openViewer(uniqueId)
+            } else {
+                showMainPanel()
+                Toast.makeText(
+                    this@MainActivity,
+                    R.string.qr_not_found_in_image,
+                    Toast.LENGTH_LONG
+                ).show()
+            }
+        }
+    }
+
+    /**
+     * Use ML Kit barcode scanner to find a QR code in the given image.
+     *
+     * @return extracted unique_id if a valid AR QR code is found, null otherwise
+     */
+    private fun scanBarcodeFromImage(imageUri: Uri): String? {
+        return try {
+            val image = InputImage.fromFilePath(this, imageUri)
+            val options = BarcodeScannerOptions.Builder()
+                .setBarcodeFormats(Barcode.FORMAT_QR_CODE)
+                .build()
+            val scanner = BarcodeScanning.getClient(options)
+            val barcodes = Tasks.await(scanner.process(image))
+            scanner.close()
+            barcodes.firstNotNullOfOrNull { barcode ->
+                barcode.rawValue?.let { extractUniqueId(it) }
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to decode QR from image", e)
+            null
+        }
     }
 
     // ── Intent handling ──────────────────────────────────────────────
@@ -220,6 +281,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     companion object {
+        private const val TAG = "MainActivity"
         private const val EXPECTED_HOST = "ar.neuroimagen.ru"
 
         private val UUID_REGEX = Regex(
@@ -228,10 +290,6 @@ class MainActivity : AppCompatActivity() {
 
         /**
          * Parses unique_id from viewer deep link URI.
-         * Supports:
-         * - https://ar.neuroimagen.ru/view/{unique_id}
-         * - https://ar.neuroimagen.ru:8000/view/{unique_id}
-         * - arv://view/{unique_id}
          */
         fun parseUniqueIdFromUri(uri: Uri): String? {
             return when (uri.scheme) {
