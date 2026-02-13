@@ -59,6 +59,9 @@ class ArRenderer(
 
     @Volatile
     private var pendingRecordStop = false
+
+    @Volatile
+    private var pendingAudioEnabled = false
     private var onRecordingStopped: ((String?) -> Unit)? = null
 
     /** Whether the recorder is currently capturing frames. */
@@ -67,12 +70,14 @@ class ArRenderer(
     /**
      * Request to start recording on the next GL frame.
      *
-     * @param outputFile temporary MP4 file path
-     * @param onStopped callback invoked on the UI thread when recording finishes;
-     *                  receives the output file path or null on failure
+     * @param outputFile  temporary MP4 file path
+     * @param enableAudio if true, records microphone audio alongside video
+     * @param onStopped   callback invoked on the UI thread when recording finishes;
+     *                    receives the output file path or null on failure
      */
-    fun startRecording(outputFile: File, onStopped: (String?) -> Unit) {
+    fun startRecording(outputFile: File, enableAudio: Boolean = false, onStopped: (String?) -> Unit) {
         onRecordingStopped = onStopped
+        pendingAudioEnabled = enableAudio
         pendingRecordStart = outputFile
     }
 
@@ -200,8 +205,9 @@ class ArRenderer(
     private fun handleRecordingCommands() {
         pendingRecordStart?.let { file ->
             pendingRecordStart = null
+            val audio = pendingAudioEnabled
             try {
-                recorder.prepare(file, surfaceWidth, surfaceHeight)
+                recorder.prepare(file, surfaceWidth, surfaceHeight, enableAudio = audio)
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to start recording", e)
                 (context as? android.app.Activity)?.runOnUiThread {

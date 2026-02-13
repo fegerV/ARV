@@ -21,19 +21,38 @@
     <string name="error_network_hint">Откройте в браузере телефона: https://ar.neuroimagen.ru — если не открывается, сервер недоступен (другой Wi‑Fi, нет интернета или сервер выключен).</string>
     <string name="error_server">Ошибка сервера (%1$d)</string>
     <string name="error_unknown">Неизвестная ошибка</string>
-    <string name="ar_scene_placeholder">AR-сцена (загрузка…)</string>
     <string name="error_camera_required">Для AR нужен доступ к камере. Разрешите в настройках приложения.</string>
     <string name="error_arcore_required">Требуется ARCore. Установите из Play Маркета.</string>
     <string name="error_arcore_session">Не удалось запустить AR. Проверьте поддержку устройства.</string>
     <string name="error_video_playback">Ошибка воспроизведения видео: %1$s</string>
+    <string name="error_microphone_required">Для записи со звуком нужен доступ к микрофону</string>
+
+    <!-- AR loading screen -->
+    <string name="ar_scene_placeholder">AR-сцена (загрузка…)</string>
+    <string name="ar_loading_title">Подготовка AR-сцены…</string>
+    <string-array name="ar_loading_tips">
+        <item>Обеспечьте хорошее освещение</item>
+        <item>Держите камеру ровно</item>
+        <item>Наведите на маркер с расстояния 20–40 см</item>
+        <item>Избегайте бликов на изображении</item>
+        <item>Маркер должен быть полностью виден</item>
+        <item>Не трясите телефон при наведении</item>
+    </string-array>
+
+    <!-- Photo / Video -->
     <string name="capture_photo">Снимок</string>
     <string name="photo_saved">Фото сохранено</string>
     <string name="photo_save_failed">Не удалось сохранить фото</string>
-    <string name="record_video">Запись видео</string>
-    <string name="stop_recording">Остановить</string>
+    <string name="record_video">Запись</string>
+    <string name="stop_recording">Стоп</string>
     <string name="video_saved">Видео сохранено в галерею</string>
     <string name="video_save_failed">Не удалось сохранить видео</string>
-    
+
+    <!-- Sharing -->
+    <string name="share">Поделиться</string>
+    <string name="share_ar_content">Поделиться AR</string>
+    <string name="share_no_content">Сначала сделайте снимок или запишите видео</string>
+
     <!-- QR Scanner -->
     <string name="scan_qr">Сканировать QR</string>
     <string name="qr_scan_hint">Наведите камеру на QR-код</string>
