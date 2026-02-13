@@ -1,87 +1,317 @@
 {% extends "base.html" %}
 
 {% block title %}Analytics - Vertex AR Admin{% endblock %}
-
 {% block page_title %}Analytics{% endblock %}
 
 {% block content %}
-<div class="page-container">
-    <!-- Overview Cards -->
-    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-6">
-        <div class="card">
-            <div class="flex items-center">
-                <div class="p-3 rounded-full bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400 mr-4">
-                    <span class="material-icons">visibility</span>
+<script src="https://cdn.jsdelivr.net/npm/apexcharts@3.49.0/dist/apexcharts.min.js"></script>
+
+{# --- JSON data blocks for JS ------------------------------------------ #}
+<script type="application/json" id="views-by-day">{{ analytics_data.views_by_day | tojson }}</script>
+<script type="application/json" id="device-stats">{{ analytics_data.device_stats | tojson }}</script>
+<script type="application/json" id="browser-stats">{{ analytics_data.browser_stats | tojson }}</script>
+
+<div class="page-container" x-data="analyticsPage()" x-init="initCharts()">
+
+    {# ── Period filter ─────────────────────────────────────────────────── #}
+    <div class="flex flex-wrap items-center gap-2 mb-6">
+        <span class="text-sm text-gray-500 dark:text-gray-400 mr-1">Period:</span>
+        {% set period = analytics_data.period|default(30) %}
+        {% for p, label in [(7,'7 days'),(30,'30 days'),(90,'90 days'),(0,'All time')] %}
+        <a href="/analytics?period={{ p }}"
+           class="px-3 py-1.5 rounded-lg text-sm font-medium transition-colors
+                  {% if period == p %}
+                  bg-indigo-600 text-white shadow-sm
+                  {% else %}
+                  bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600
+                  {% endif %}">
+            {{ label }}
+        </a>
+        {% endfor %}
+    </div>
+
+    {# ── Summary cards (6 items) ───────────────────────────────────────── #}
+    <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-6">
+        {% set cards = [
+            ('visibility',   'Total Views',       analytics_data.total_views|default(0),      'blue'),
+            ('people',       'Unique Sessions',   analytics_data.unique_sessions|default(0),  'green'),
+            ('view_in_ar',   'Active Content',    analytics_data.active_content|default(0),   'purple'),
+            ('timer',        'Avg Duration',      (analytics_data.avg_duration|default(0)|string) ~ ' s', 'orange'),
+            ('play_circle',  'Video Play Rate',   (analytics_data.video_play_rate|default(0)|string) ~ '%', 'teal'),
+            ('inventory',    'Total Content',     analytics_data.total_content|default(0),    'indigo'),
+        ] %}
+        {% for icon, title, value, color in cards %}
+        <div class="card !p-4">
+            <div class="flex items-center gap-3">
+                <div class="p-2 rounded-full bg-{{ color }}-100 text-{{ color }}-600 dark:bg-{{ color }}-900/30 dark:text-{{ color }}-400 shrink-0">
+                    <span class="material-icons text-lg">{{ icon }}</span>
                 </div>
-                <div>
-                    <p class="text-sm text-gray-500 dark:text-gray-400">Total Views (30 days)</p>
-                    <p class="text-2xl font-bold text-gray-900 dark:text-white">{{ analytics_data.total_views|default(0) }}</p>
+                <div class="min-w-0">
+                    <p class="text-xs text-gray-500 dark:text-gray-400 truncate">{{ title }}</p>
+                    <p class="text-lg font-bold text-gray-900 dark:text-white">{{ value }}</p>
                 </div>
             </div>
         </div>
-        
-        <div class="card">
-            <div class="flex items-center">
-                <div class="p-3 rounded-full bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400 mr-4">
-                    <span class="material-icons">people</span>
-                </div>
-                <div>
-                    <p class="text-sm text-gray-500 dark:text-gray-400">Unique Sessions (30 days)</p>
-                    <p class="text-2xl font-bold text-gray-900 dark:text-white">{{ analytics_data.unique_sessions|default(0) }}</p>
-                </div>
+        {% endfor %}
+    </div>
+
+    {# ── Views line chart ──────────────────────────────────────────────── #}
+    <div class="card mb-6">
+        <h3 class="text-base font-semibold text-gray-900 dark:text-white mb-4">
+            <span class="material-icons text-sm align-middle mr-1">show_chart</span>
+            Views over time
+        </h3>
+        <div id="chart-views" class="w-full" style="min-height:280px"></div>
+    </div>
+
+    {# ── Middle row: devices + browsers | top content ──────────────────── #}
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+
+        {# Left column — pie charts #}
+        <div class="space-y-6">
+            <div class="card">
+                <h3 class="text-base font-semibold text-gray-900 dark:text-white mb-4">
+                    <span class="material-icons text-sm align-middle mr-1">devices</span>
+                    Devices
+                </h3>
+                <div id="chart-devices" class="w-full" style="min-height:250px"></div>
+                {% if not analytics_data.device_stats %}
+                <p class="text-gray-400 dark:text-gray-500 text-center text-sm py-4">No data</p>
+                {% endif %}
+            </div>
+            <div class="card">
+                <h3 class="text-base font-semibold text-gray-900 dark:text-white mb-4">
+                    <span class="material-icons text-sm align-middle mr-1">public</span>
+                    Browsers
+                </h3>
+                <div id="chart-browsers" class="w-full" style="min-height:250px"></div>
+                {% if not analytics_data.browser_stats %}
+                <p class="text-gray-400 dark:text-gray-500 text-center text-sm py-4">No data</p>
+                {% endif %}
             </div>
         </div>
-        
+
+        {# Right column — top content table #}
         <div class="card">
-            <div class="flex items-center">
-                <div class="p-3 rounded-full bg-purple-100 text-purple-600 dark:bg-purple-900/30 dark:text-purple-400 mr-4">
-                    <span class="material-icons">view_in_ar</span>
-                </div>
-                <div>
-                    <p class="text-sm text-gray-500 dark:text-gray-400">Active Content</p>
-                    <p class="text-2xl font-bold text-gray-900 dark:text-white">{{ analytics_data.active_content|default(0) }}</p>
-                </div>
+            <h3 class="text-base font-semibold text-gray-900 dark:text-white mb-4">
+                <span class="material-icons text-sm align-middle mr-1">star</span>
+                Top Content
+            </h3>
+            {% if analytics_data.top_content %}
+            <div class="overflow-x-auto">
+                <table class="table text-sm">
+                    <thead>
+                        <tr>
+                            <th class="text-left">#</th>
+                            <th class="text-left">Order</th>
+                            <th class="text-left">Company</th>
+                            <th class="text-right">Views</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in analytics_data.top_content %}
+                        <tr>
+                            <td class="text-gray-400">{{ loop.index }}</td>
+                            <td class="font-medium text-gray-900 dark:text-white">{{ item.order_number }}</td>
+                            <td class="text-gray-500 dark:text-gray-400">{{ item.company_name }}</td>
+                            <td class="text-right font-semibold text-gray-900 dark:text-white">{{ item.views }}</td>
+                            <td>
+                                <a href="/ar-content/{{ item.id }}"
+                                   class="text-indigo-600 hover:text-indigo-800 dark:text-indigo-400 text-xs">
+                                    View
+                                </a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
             </div>
+            {% else %}
+            <p class="text-gray-400 dark:text-gray-500 text-center py-8">No view data yet</p>
+            {% endif %}
         </div>
     </div>
 
-    <!-- Additional Stats -->
-    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div class="card">
-            <div class="flex items-center">
-                <div class="p-3 rounded-full bg-orange-100 text-orange-600 dark:bg-orange-900/30 dark:text-orange-400 mr-4">
-                    <span class="material-icons">business</span>
-                </div>
-                <div>
-                    <p class="text-sm text-gray-500 dark:text-gray-400">Active Companies</p>
-                    <p class="text-2xl font-bold text-gray-900 dark:text-white">{{ analytics_data.active_companies|default(0) }}</p>
-                </div>
-            </div>
+    {# ── Company stats table ───────────────────────────────────────────── #}
+    <div class="card">
+        <h3 class="text-base font-semibold text-gray-900 dark:text-white mb-4">
+            <span class="material-icons text-sm align-middle mr-1">business</span>
+            Stats by Company
+        </h3>
+        {% if analytics_data.company_stats %}
+        <div class="overflow-x-auto">
+            <table class="table text-sm">
+                <thead>
+                    <tr>
+                        <th class="text-left">Company</th>
+                        <th class="text-right">Views</th>
+                        <th class="text-right">Sessions</th>
+                        <th class="text-right">Avg Duration</th>
+                        <th class="text-right">Video Rate</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for c in analytics_data.company_stats %}
+                    <tr>
+                        <td>
+                            <a href="/companies/{{ c.id }}"
+                               class="font-medium text-gray-900 dark:text-white hover:text-indigo-600 dark:hover:text-indigo-400">
+                                {{ c.name }}
+                            </a>
+                        </td>
+                        <td class="text-right text-gray-700 dark:text-gray-300">{{ c.views }}</td>
+                        <td class="text-right text-gray-700 dark:text-gray-300">{{ c.sessions }}</td>
+                        <td class="text-right text-gray-500 dark:text-gray-400">{{ c.avg_duration }} s</td>
+                        <td class="text-right">
+                            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium
+                                {% if c.video_rate >= 50 %}
+                                bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300
+                                {% elif c.video_rate >= 20 %}
+                                bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300
+                                {% else %}
+                                bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300
+                                {% endif %}">
+                                {{ c.video_rate }}%
+                            </span>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
         </div>
-        
-        <div class="card">
-            <div class="flex items-center">
-                <div class="p-3 rounded-full bg-indigo-100 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-400 mr-4">
-                    <span class="material-icons">folder</span>
-                </div>
-                <div>
-                    <p class="text-sm text-gray-500 dark:text-gray-400">Active Projects</p>
-                    <p class="text-2xl font-bold text-gray-900 dark:text-white">{{ analytics_data.active_projects|default(0) }}</p>
-                </div>
-            </div>
-        </div>
-        
-        <div class="card">
-            <div class="flex items-center">
-                <div class="p-3 rounded-full bg-teal-100 text-teal-600 dark:bg-teal-900/30 dark:text-teal-400 mr-4">
-                    <span class="material-icons">inventory</span>
-                </div>
-                <div>
-                    <p class="text-sm text-gray-500 dark:text-gray-400">Total Content</p>
-                    <p class="text-2xl font-bold text-gray-900 dark:text-white">{{ analytics_data.total_content|default(0) }}</p>
-                </div>
-            </div>
-        </div>
+        {% else %}
+        <p class="text-gray-400 dark:text-gray-500 text-center py-8">No company data yet</p>
+        {% endif %}
     </div>
 </div>
+
+{# ── ApexCharts initialization ──────────────────────────────────────── #}
+<script>
+function analyticsPage() {
+    return {
+        charts: [],
+
+        initCharts() {
+            const isDark = document.documentElement.classList.contains('dark');
+            const fg = isDark ? '#e5e7eb' : '#374151';
+            const grid = isDark ? '#374151' : '#e5e7eb';
+            const bg = 'transparent';
+
+            this.renderViewsChart(isDark, fg, grid, bg);
+            this.renderPieChart('chart-devices', 'device-stats', isDark, fg);
+            this.renderPieChart('chart-browsers', 'browser-stats', isDark, fg);
+        },
+
+        renderViewsChart(isDark, fg, grid, bg) {
+            const raw = JSON.parse(document.getElementById('views-by-day')?.textContent || '[]');
+            if (!raw.length) return;
+
+            const categories = raw.map(d => d.date);
+            const series = raw.map(d => d.views);
+
+            const opts = {
+                chart: {
+                    type: 'area',
+                    height: 280,
+                    background: bg,
+                    toolbar: { show: false },
+                    fontFamily: 'inherit',
+                    foreColor: fg,
+                },
+                series: [{ name: 'Views', data: series }],
+                xaxis: {
+                    categories,
+                    labels: {
+                        rotate: -45,
+                        rotateAlways: categories.length > 14,
+                        style: { fontSize: '10px', colors: fg },
+                        formatter(val) {
+                            if (!val) return '';
+                            const parts = val.split('-');
+                            return parts[2] + '.' + parts[1];
+                        },
+                    },
+                    axisBorder: { color: grid },
+                    axisTicks: { color: grid },
+                    tickAmount: Math.min(categories.length, 15),
+                },
+                yaxis: {
+                    labels: { style: { colors: fg } },
+                    min: 0,
+                },
+                grid: { borderColor: grid, strokeDashArray: 4 },
+                stroke: { curve: 'smooth', width: 2 },
+                fill: {
+                    type: 'gradient',
+                    gradient: {
+                        shadeIntensity: 1,
+                        opacityFrom: 0.45,
+                        opacityTo: 0.05,
+                    },
+                },
+                colors: ['#6366f1'],
+                dataLabels: { enabled: false },
+                tooltip: {
+                    theme: isDark ? 'dark' : 'light',
+                    x: { format: 'dd.MM.yyyy' },
+                },
+            };
+
+            const chart = new ApexCharts(document.getElementById('chart-views'), opts);
+            chart.render();
+            this.charts.push(chart);
+        },
+
+        renderPieChart(elId, dataId, isDark, fg) {
+            const raw = JSON.parse(document.getElementById(dataId)?.textContent || '[]');
+            if (!raw.length) return;
+
+            const labels = raw.map(d => d.label);
+            const series = raw.map(d => d.value);
+
+            const opts = {
+                chart: {
+                    type: 'donut',
+                    height: 250,
+                    background: 'transparent',
+                    fontFamily: 'inherit',
+                    foreColor: fg,
+                },
+                series,
+                labels,
+                legend: {
+                    position: 'bottom',
+                    labels: { colors: fg },
+                },
+                dataLabels: {
+                    enabled: true,
+                    formatter(val) { return Math.round(val) + '%'; },
+                },
+                tooltip: { theme: isDark ? 'dark' : 'light' },
+                colors: ['#6366f1', '#06b6d4', '#f59e0b', '#ef4444', '#8b5cf6', '#10b981', '#ec4899', '#64748b'],
+                plotOptions: {
+                    pie: {
+                        donut: {
+                            size: '55%',
+                            labels: {
+                                show: true,
+                                total: {
+                                    show: true,
+                                    label: 'Total',
+                                    color: fg,
+                                },
+                            },
+                        },
+                    },
+                },
+            };
+
+            const chart = new ApexCharts(document.getElementById(elId), opts);
+            chart.render();
+            this.charts.push(chart);
+        },
+    };
+}
+</script>
 {% endblock %}
