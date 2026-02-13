@@ -169,9 +169,12 @@ async def ar_content_list(
     if not current_user.is_active:
         # Redirect to login page if user is not active
         return RedirectResponse(url="/admin/login", status_code=303)
-    # Get pagination parameters from query string
+    # Get pagination and filter parameters from query string
     page = int(request.query_params.get("page", 1))
     page_size = int(request.query_params.get("page_size", 20))
+    filter_company = request.query_params.get("company", "").strip()
+    filter_status = request.query_params.get("status", "").strip()
+    filter_search = request.query_params.get("search", "").strip()
     
     # Validate page_size - only allow 20, 30, 40, 50
     if page_size not in [20, 30, 40, 50]:
@@ -181,24 +184,50 @@ async def ar_content_list(
         # Optimized: Load models directly instead of using API function to avoid duplicate queries
         from sqlalchemy.orm import selectinload
         from sqlalchemy import func
+        from app.models.company import Company
+        
+        # Build base query with filters
+        base_conditions = []
+        if filter_company:
+            base_conditions.append(Company.name == filter_company)
+        if filter_status:
+            base_conditions.append(ARContent.status == filter_status)
+        if filter_search:
+            search_like = f"%{filter_search}%"
+            base_conditions.append(
+                ARContent.order_number.ilike(search_like)
+                | ARContent.customer_name.ilike(search_like)
+                | ARContent.customer_email.ilike(search_like)
+                | ARContent.customer_phone.ilike(search_like)
+            )
+        
+        # Count total items matching filters
+        count_stmt = select(func.count(ARContent.id)).join(Company)
+        for cond in base_conditions:
+            count_stmt = count_stmt.where(cond)
+        count_result = await db.execute(count_stmt)
+        total = count_result.scalar_one()
         
         # Calculate offset from page and page_size
         skip = (page - 1) * page_size
-        
-        # Count total items (single query)
-        count_stmt = select(func.count(ARContent.id))
-        count_result = await db.execute(count_stmt)
-        total = count_result.scalar_one()
         
         # Calculate total pages
         total_pages = (total + page_size - 1) // page_size
         
         # Get items with pagination, sorted by created_at DESC (newest first)
         # Use selectinload to eagerly load company and project to avoid N+1
-        stmt = select(ARContent).options(
-            selectinload(ARContent.company), 
-            selectinload(ARContent.project)
-        ).order_by(ARContent.created_at.desc()).offset(skip).limit(page_size)
+        stmt = (
+            select(ARContent)
+            .join(Company)
+            .options(
+                selectinload(ARContent.company),
+                selectinload(ARContent.project),
+            )
+            .order_by(ARContent.created_at.desc())
+        )
+        for cond in base_conditions:
+            stmt = stmt.where(cond)
+        stmt = stmt.offset(skip).limit(page_size)
         result = await db.execute(stmt)
         ar_content_models_list = list(result.scalars().all())
         
@@ -301,9 +330,19 @@ async def ar_content_list(
 
             ar_content_list.append(item_dict)
         
-        # Extract unique companies and statuses for filters
-        unique_companies = list(set(item.get('company_name', '') for item in ar_content_list if item.get('company_name')))
-        unique_statuses = list(set(item.get('status', '') for item in ar_content_list if item.get('status')))
+        # Fetch ALL unique company names and statuses for filter dropdowns
+        company_names_stmt = (
+            select(Company.name)
+            .join(ARContent, ARContent.company_id == Company.id)
+            .distinct()
+            .order_by(Company.name)
+        )
+        company_names_result = await db.execute(company_names_stmt)
+        unique_companies = [row[0] for row in company_names_result.all() if row[0]]
+
+        status_stmt = select(ARContent.status).distinct().order_by(ARContent.status)
+        status_result = await db.execute(status_stmt)
+        unique_statuses = [row[0] for row in status_result.all() if row[0]]
         
         # Set total_count and total_pages from calculated values
         total_count = total
@@ -328,7 +367,10 @@ async def ar_content_list(
         "page_size": page_size,
         "total_count": total_count,
         "total_pages": total_pages,
-        "current_user": current_user
+        "current_user": current_user,
+        "filter_company": filter_company,
+        "filter_status": filter_status,
+        "filter_search": filter_search,
     }
     return templates.TemplateResponse("ar-content/list.html", context)
 

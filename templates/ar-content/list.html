@@ -15,9 +15,9 @@
     window.arContentList = function arContentList() {
         return {
             filters: {
-                company: '',
-                status: '',
-                search: ''
+                company: '{{ filter_company|default("", true) }}',
+                status: '{{ filter_status|default("", true) }}',
+                search: '{{ filter_search|default("", true) }}'
             },
             pageSize: {{ page_size }},
             showDeleteModal: false,
@@ -192,7 +192,8 @@
             <div>
                 <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Company</label>
                 <select class="form-select"
-                        x-model="filters.company">
+                        x-model="filters.company"
+                        @change="applyFilters()">
                     <option value="">All Companies</option>
                     {% for company in unique_companies %}
                     <option value="{{ company }}">{{ company }}</option>
@@ -202,7 +203,8 @@
             <div>
                 <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Status</label>
                 <select class="form-select"
-                        x-model="filters.status">
+                        x-model="filters.status"
+                        @change="applyFilters()">
                     <option value="">All Statuses</option>
                     {% for status in unique_statuses %}
                     <option value="{{ status }}">{{ status }}</option>
