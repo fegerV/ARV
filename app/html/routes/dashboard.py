@@ -59,13 +59,23 @@ async def admin_dashboard(
         )
         active_ar_content_count = active_ar_content.scalar() or 0
         
-        # Views in last 30 days
+        # Total views (all-time) — sum of views_count from AR content
+        total_views_q = await db.execute(
+            select(func.coalesce(func.sum(ARContent.views_count), 0))
+        )
+        total_views_count = total_views_q.scalar() or 0
+
+        # Views in last 30 days (from session records)
         since = datetime.now(timezone.utc) - timedelta(days=30)
         views_30d = await db.execute(
             select(func.count()).select_from(ARViewSession).where(ARViewSession.created_at >= since)
         )
         views_30d_count = views_30d.scalar() or 0
-        
+
+        # If no sessions recorded yet, use total_views as fallback
+        if views_30d_count == 0 and total_views_count > 0:
+            views_30d_count = total_views_count
+
         # Get last 5 AR content items
         recent_ar_content_query = (
             select(ARContent)
@@ -92,6 +102,7 @@ async def admin_dashboard(
             "active_projects": active_projects_count,
             "total_ar_content": total_ar_content_count,
             "active_ar_content": active_ar_content_count,
+            "total_views": total_views_count,
             "views_30d": views_30d_count,
             "recent_content": recent_content,
         }
@@ -104,6 +115,7 @@ async def admin_dashboard(
             "active_projects": 0,
             "total_ar_content": 0,
             "active_ar_content": 0,
+            "total_views": 0,
             "views_30d": 0,
             "recent_content": [],
         }

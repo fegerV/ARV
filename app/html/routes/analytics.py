@@ -90,6 +90,15 @@ async def get_analytics_data(db: AsyncSession, period: int = _DEFAULT_PERIOD) ->
             )
         ).scalar() or 0
 
+        # Fallback: if no ARViewSession records exist, use SUM(views_count) from ARContent
+        if total_views == 0:
+            fallback_views = (
+                await db.execute(
+                    select(func.coalesce(func.sum(ARContent.views_count), 0))
+                )
+            ).scalar() or 0
+            total_views = fallback_views
+
         try:
             unique_sessions = (
                 await db.execute(
@@ -100,6 +109,10 @@ async def get_analytics_data(db: AsyncSession, period: int = _DEFAULT_PERIOD) ->
             ).scalar() or 0
         except Exception:
             unique_sessions = int(total_views * 0.7) if total_views else 0
+
+        # Fallback for unique sessions
+        if unique_sessions == 0 and total_views > 0:
+            unique_sessions = total_views
 
         active_content = (
             await db.execute(
@@ -205,6 +218,28 @@ async def get_analytics_data(db: AsyncSession, period: int = _DEFAULT_PERIOD) ->
                     "company_name": company_name or "—",
                     "views": views,
                 })
+        else:
+            # Fallback: use views_count from ARContent when no sessions recorded
+            fallback_top_q = (
+                select(
+                    ARContent.id,
+                    ARContent.order_number,
+                    ARContent.views_count,
+                    Company.name.label("company_name"),
+                )
+                .join(Company, ARContent.company_id == Company.id, isouter=True)
+                .where(ARContent.views_count > 0)
+                .order_by(ARContent.views_count.desc())
+                .limit(10)
+            )
+            fallback_rows = (await db.execute(fallback_top_q)).all()
+            for row in fallback_rows:
+                top_content.append({
+                    "id": row[0],
+                    "order_number": row[1] or f"#{row[0]}",
+                    "company_name": row[3] or "—",
+                    "views": row[2] or 0,
+                })
 
         # --- Company stats -----------------------------------------------------
 
@@ -244,6 +279,29 @@ async def get_analytics_data(db: AsyncSession, period: int = _DEFAULT_PERIOD) ->
                     "sessions": sessions,
                     "avg_duration": round(float(avg_d), 1) if avg_d else 0,
                     "video_rate": vp_rate,
+                })
+        else:
+            # Fallback: aggregate views_count per company from ARContent
+            fallback_cq = (
+                select(
+                    ARContent.company_id,
+                    func.coalesce(func.sum(ARContent.views_count), 0).label("views"),
+                    Company.name.label("cname"),
+                )
+                .join(Company, ARContent.company_id == Company.id, isouter=True)
+                .group_by(ARContent.company_id, Company.name)
+                .having(func.sum(ARContent.views_count) > 0)
+                .order_by(func.sum(ARContent.views_count).desc())
+            )
+            fallback_crows = (await db.execute(fallback_cq)).all()
+            for cid, views, cname in fallback_crows:
+                company_stats.append({
+                    "id": cid,
+                    "name": cname or f"Company #{cid}",
+                    "views": int(views),
+                    "sessions": int(views),
+                    "avg_duration": 0,
+                    "video_rate": 0,
                 })
 
         # --- Device type distribution ------------------------------------------

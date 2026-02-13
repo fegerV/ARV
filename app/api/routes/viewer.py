@@ -3,7 +3,7 @@ from typing import Optional
 from uuid import UUID
 
 import structlog
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
@@ -13,6 +13,7 @@ from datetime import datetime, timezone, timedelta
 from app.core.config import settings
 from app.core.database import get_db
 from app.models.ar_content import ARContent
+from app.models.ar_view_session import ARViewSession
 from app.models.company import Company
 from app.schemas.viewer import VIEWER_MANIFEST_VERSION, ViewerManifestResponse, ViewerManifestVideo
 from app.services.video_scheduler import get_active_video, update_rotation_state
@@ -274,6 +275,7 @@ async def get_viewer_content_check(
 @router.get("/ar/{unique_id}/manifest", response_model=ViewerManifestResponse)
 async def get_viewer_manifest(
     unique_id: str,
+    request: Request,
     db: AsyncSession = Depends(get_db),
 ):
     """
@@ -341,6 +343,58 @@ async def get_viewer_manifest(
 
     try:
         ar_content.views_count = (ar_content.views_count or 0) + 1
+
+        # Parse User-Agent for device/browser/os info
+        import uuid as _uuid
+        ua_string = request.headers.get("user-agent", "")
+        device_type = "unknown"
+        browser_name = "unknown"
+        os_name = "unknown"
+        if ua_string:
+            ua_lower = ua_string.lower()
+            # Detect device type
+            if "android" in ua_lower or "mobile" in ua_lower:
+                device_type = "mobile"
+            elif "ipad" in ua_lower or "tablet" in ua_lower:
+                device_type = "tablet"
+            elif "windows" in ua_lower or "macintosh" in ua_lower or "linux" in ua_lower:
+                device_type = "desktop"
+            # Detect OS
+            if "android" in ua_lower:
+                os_name = "Android"
+            elif "iphone" in ua_lower or "ipad" in ua_lower:
+                os_name = "iOS"
+            elif "windows" in ua_lower:
+                os_name = "Windows"
+            elif "macintosh" in ua_lower or "mac os" in ua_lower:
+                os_name = "macOS"
+            elif "linux" in ua_lower:
+                os_name = "Linux"
+            # Detect browser
+            if "vertexar" in ua_lower or "arcore" in ua_lower:
+                browser_name = "Vertex AR App"
+            elif "chrome" in ua_lower and "safari" in ua_lower:
+                browser_name = "Chrome"
+            elif "firefox" in ua_lower:
+                browser_name = "Firefox"
+            elif "safari" in ua_lower:
+                browser_name = "Safari"
+
+        # Create an ARViewSession so that the analytics dashboard has data
+        ip_address = request.client.host if request.client else None
+        session = ARViewSession(
+            ar_content_id=ar_content.id,
+            project_id=ar_content.project_id,
+            company_id=ar_content.company_id,
+            session_id=str(_uuid.uuid4()),
+            user_agent=ua_string[:500] if ua_string else None,
+            device_type=device_type,
+            browser=browser_name,
+            os=os_name,
+            ip_address=ip_address,
+            video_played=True,
+        )
+        db.add(session)
         await db.commit()
         await db.refresh(ar_content)
         logger.info("viewer_manifest_views_incremented", ar_content_id=ar_content.id, views_count=ar_content.views_count)

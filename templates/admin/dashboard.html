@@ -57,8 +57,8 @@
                 </div>
             </a>
             
-            <!-- Views (30 days) -->
-            <div class="bg-white dark:bg-gray-900 rounded-lg shadow p-6">
+            <!-- Total Views -->
+            <a href="/analytics" class="bg-white dark:bg-gray-900 rounded-lg shadow p-6 hover:shadow-lg transition-shadow">
                 <div class="flex items-center">
                     <div class="p-3 rounded-full bg-yellow-100 dark:bg-yellow-900 text-yellow-500 dark:text-yellow-300 mr-4">
                         <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -67,12 +67,12 @@
                         </svg>
                     </div>
                     <div class="flex-1">
-                        <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Views (30 days)</p>
-                        <p class="text-2xl font-semibold text-gray-900 dark:text-white">{{ views_30d }}</p>
-                        <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Last 30 days</p>
+                        <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Total Views</p>
+                        <p class="text-2xl font-semibold text-gray-900 dark:text-white">{{ total_views }}</p>
+                        <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">{{ views_30d }} last 30 days</p>
                     </div>
                 </div>
-            </div>
+            </a>
         </div>
     
         <!-- Main Content Grid -->
