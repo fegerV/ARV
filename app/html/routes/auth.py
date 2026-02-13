@@ -84,8 +84,8 @@ async def login_form(
         logger.warning("Failed login attempt", email=username)
         
         if user:
-            # Increment login attempts
-            user.login_attempts += 1
+            # Increment login attempts (guard against NULL)
+            user.login_attempts = (user.login_attempts or 0) + 1
             
             # Lock account after MAX_LOGIN_ATTEMPTS
             if user.login_attempts >= 5:
