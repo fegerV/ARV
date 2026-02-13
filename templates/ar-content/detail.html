@@ -991,12 +991,15 @@ document.addEventListener('alpine:init', function() {
                     </p>
                 </div>
                 <div class="flex flex-wrap gap-2">
-                    <button @click="showQRDialog = true" class="btn btn-secondary">
-                        <span class="material-icons mr-2">qr_code</span>QR-код
-                    </button>
                     <a href="/ar-content" class="btn btn-secondary">
                         <span class="material-icons mr-2">arrow_back</span>Назад
                     </a>
+                    <a href="/ar-content/{{ ar_content.id }}/edit" class="btn btn-secondary">
+                        <span class="material-icons mr-2">edit</span>Редактировать
+                    </a>
+                    <button @click="showQRDialog = true" class="btn btn-secondary">
+                        <span class="material-icons mr-2">qr_code</span>QR-код
+                    </button>
                     <button @click="showDeleteDialog = true" class="btn btn-danger">
                         <span class="material-icons mr-2">delete</span>Удалить
                     </button>
@@ -1032,7 +1035,46 @@ document.addEventListener('alpine:init', function() {
     </div>
     
     <!-- ============================================ -->
-    <!-- БЛОК 2: ОСНОВНАЯ ИНФОРМАЦИЯ -->
+    <!-- БЛОК 2: КЛЮЧЕВЫЕ МЕТРИКИ -->
+    <!-- ============================================ -->
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+        <div class="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-4 flex flex-col">
+            <div class="flex items-center gap-2 mb-2">
+                <span class="material-icons text-blue-500 text-lg">visibility</span>
+                <span class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">Просмотры</span>
+            </div>
+            <div class="text-2xl font-bold text-gray-900 dark:text-white">{{ ar_content.views_count or 0 }}</div>
+            <div class="text-xs text-gray-500 dark:text-gray-400 mt-1">за всё время</div>
+        </div>
+        <div class="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-4 flex flex-col">
+            <div class="flex items-center gap-2 mb-2">
+                <span class="material-icons text-green-500 text-lg">trending_up</span>
+                <span class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">30 дней</span>
+            </div>
+            <div class="text-2xl font-bold text-gray-900 dark:text-white">{{ ar_content.views_30_days or 0 }}</div>
+            <div class="text-xs text-gray-500 dark:text-gray-400 mt-1">просмотров</div>
+        </div>
+        <div class="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-4 flex flex-col">
+            <div class="flex items-center gap-2 mb-2">
+                <span class="material-icons text-purple-500 text-lg">videocam</span>
+                <span class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">Видео</span>
+            </div>
+            <div class="text-2xl font-bold text-gray-900 dark:text-white" x-text="videos ? videos.length : 0"></div>
+            <div class="text-xs text-gray-500 dark:text-gray-400 mt-1 truncate" x-text="activeVideoTitle || 'нет активного'"></div>
+        </div>
+        <div class="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-4 flex flex-col">
+            <div class="flex items-center gap-2 mb-2">
+                <span class="material-icons text-lg" :class="arContent.marker_status === 'ready' ? 'text-green-500' : 'text-yellow-500'">qr_code_2</span>
+                <span class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">Маркер</span>
+            </div>
+            <div class="text-lg font-bold text-gray-900 dark:text-white" x-text="arContent.marker_status === 'ready' ? 'Готов' : (arContent.marker_status || '—')"></div>
+            <div class="text-xs mt-1" :class="markerMetrics.is_valid === true ? 'text-green-600 dark:text-green-400' : markerMetrics.is_valid === false ? 'text-red-600 dark:text-red-400' : 'text-gray-500 dark:text-gray-400'"
+                 x-text="markerMetrics.is_valid === true ? 'Валидный' : markerMetrics.is_valid === false ? 'Невалидный' : 'не проверен'"></div>
+        </div>
+    </div>
+
+    <!-- ============================================ -->
+    <!-- БЛОК 3: ОСНОВНАЯ ИНФОРМАЦИЯ -->
     <!-- ============================================ -->
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
         <!-- Информация о заказчике -->
@@ -1114,7 +1156,7 @@ document.addEventListener('alpine:init', function() {
     {% endif %}
         
     <!-- ============================================ -->
-    <!-- БЛОК 3: УПРАВЛЕНИЕ ВИДЕО -->
+    <!-- БЛОК 4: УПРАВЛЕНИЕ ВИДЕО -->
     <!-- ============================================ -->
     <div class="card p-5 mb-6">
         <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6 pb-4 border-b border-gray-200 dark:border-gray-700">
@@ -1294,7 +1336,7 @@ document.addEventListener('alpine:init', function() {
     </div>
     
     <!-- ============================================ -->
-    <!-- БЛОК 4: РАСПИСАНИЕ РОТАЦИИ ВИДЕО -->
+    <!-- БЛОК 4b: РАСПИСАНИЕ РОТАЦИИ ВИДЕО -->
     <!-- ============================================ -->
     <div class="card p-5 mb-6" x-show="videos && videos.length > 0">
         <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6 pb-4 border-b border-gray-200 dark:border-gray-700">
@@ -1496,246 +1538,141 @@ document.addEventListener('alpine:init', function() {
     </div>
     
     <!-- ============================================ -->
-    <!-- БЛОК 5: СТАТИСТИКА И АНАЛИТИКА -->
+    <!-- БЛОК 5: ССЫЛКА И QR-КОД -->
     <!-- ============================================ -->
     <div class="card p-5 mb-6">
-        <div class="flex items-center gap-2 mb-6 pb-4 border-b border-gray-200 dark:border-gray-700">
-            <span class="material-icons text-indigo-600 dark:text-indigo-400">analytics</span>
-            <h3 class="text-xl font-semibold text-gray-900 dark:text-white">Статистика</h3>
+        <div class="flex items-center gap-2 mb-4 pb-3 border-b border-gray-200 dark:border-gray-700">
+            <span class="material-icons text-cyan-600 dark:text-cyan-400">link</span>
+            <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Ссылка и QR-код</h3>
         </div>
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div class="bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-800/20 border border-blue-200 dark:border-blue-800 p-5 rounded-lg">
-                <div class="flex items-center justify-between mb-2">
-                    <span class="material-icons text-blue-600 dark:text-blue-400">visibility</span>
-                    <span class="text-xs font-medium text-blue-600 dark:text-blue-400 uppercase">Всего</span>
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <!-- Ссылка и действия -->
+            <div class="lg:col-span-2 space-y-3">
+                <div class="flex flex-col sm:flex-row gap-2 items-stretch">
+                    <input type="text" 
+                           :value="fullArUrl" 
+                           readonly
+                           placeholder="Ссылка для AR-просмотра"
+                           class="form-input flex-1 text-sm">
+                    <button @click="copyLink" class="btn btn-secondary text-sm">
+                        <span class="material-icons text-sm mr-1">content_copy</span>Копировать
+                    </button>
                 </div>
-                <div class="text-3xl font-bold text-gray-900 dark:text-white mb-1">{{ ar_content.views_count or 0 }}</div>
-                <div class="text-sm text-gray-600 dark:text-gray-400">просмотров</div>
+                <div class="flex flex-wrap gap-2">
+                    <button @click="window.open(fullArUrl, '_blank')" 
+                            :disabled="!fullArUrl"
+                            class="btn btn-primary text-sm">
+                        <span class="material-icons text-sm mr-1">open_in_new</span>Открыть ссылку
+                    </button>
+                    {% if ar_content.unique_link %}
+                    <button @click="window.open('/view/{{ ar_content.unique_link.split('/')[-1] }}', '_blank')" 
+                            class="btn btn-success text-sm">
+                        <span class="material-icons text-sm mr-1">play_arrow</span>AR Просмотр
+                    </button>
+                    {% endif %}
+                    <button @click="showQRDialog = true" class="btn btn-secondary text-sm">
+                        <span class="material-icons text-sm mr-1">download</span>Скачать QR
+                    </button>
+                </div>
+                <p class="text-xs text-gray-500 dark:text-gray-400">
+                    Отправьте ссылку или QR-код клиенту для просмотра AR-контента
+                </p>
             </div>
-            <div class="bg-gradient-to-br from-green-50 to-green-100 dark:from-green-900/20 dark:to-green-800/20 border border-green-200 dark:border-green-800 p-5 rounded-lg">
-                <div class="flex items-center justify-between mb-2">
-                    <span class="material-icons text-green-600 dark:text-green-400">trending_up</span>
-                    <span class="text-xs font-medium text-green-600 dark:text-green-400 uppercase">30 дней</span>
+            <!-- QR Code Preview -->
+            <div class="flex items-center justify-center p-4 bg-gray-50 dark:bg-gray-700/50 rounded-xl">
+                <div class="text-center">
+                    <div class="bg-white p-3 rounded-lg inline-block shadow-sm">
+                        <img :src="qrCodeUrl(140)"
+                             :alt="'QR Code'"
+                             loading="lazy"
+                             class="mx-auto"
+                             @click="showQRDialog = true"
+                             style="cursor:pointer">
+                    </div>
                 </div>
-                <div class="text-3xl font-bold text-gray-900 dark:text-white mb-1">{{ ar_content.views_30_days or 0 }}</div>
-                <div class="text-sm text-gray-600 dark:text-gray-400">просмотров</div>
-            </div>
-            <div class="bg-gradient-to-br from-purple-50 to-purple-100 dark:from-purple-900/20 dark:to-purple-800/20 border border-purple-200 dark:border-purple-800 p-5 rounded-lg">
-                <div class="flex items-center justify-between mb-2">
-                    <span class="material-icons text-purple-600 dark:text-purple-400">play_circle</span>
-                    <span class="text-xs font-medium text-purple-600 dark:text-purple-400 uppercase">Активное</span>
-                </div>
-                <div class="text-base font-semibold text-gray-900 dark:text-white mb-1 truncate">{{ ar_content.active_video_title or '—' }}</div>
-                <div class="text-sm text-gray-600 dark:text-gray-400">видео</div>
             </div>
         </div>
     </div>
 
     <!-- ============================================ -->
-    <!-- БЛОК 6: МАРКЕР И КАЧЕСТВО ИЗОБРАЖЕНИЯ -->
+    <!-- БЛОК 6: МАРКЕР И КАЧЕСТВО -->
     <!-- ============================================ -->
     <div class="card p-5 mb-6">
-        <div class="flex items-center justify-between mb-6 pb-4 border-b border-gray-200 dark:border-gray-700">
+        <div class="flex items-center justify-between mb-4 pb-3 border-b border-gray-200 dark:border-gray-700">
             <div class="flex items-center gap-2">
                 <span class="material-icons text-teal-600 dark:text-teal-400">qr_code_2</span>
-                <h3 class="text-xl font-semibold text-gray-900 dark:text-white">Маркер и качество изображения</h3>
+                <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Маркер и качество</h3>
             </div>
-            <button @click="regenerateMedia()" 
-                    :disabled="regeneratingMedia"
-                    class="btn btn-secondary text-sm px-3 py-1.5">
-                <span class="material-icons text-sm mr-1" x-show="!regeneratingMedia">auto_fix_high</span>
-                <span class="material-icons text-sm mr-1 animate-spin" x-show="regeneratingMedia">refresh</span>
-                <span x-show="!regeneratingMedia">Обновить</span>
-                <span x-show="regeneratingMedia">Обновление...</span>
-            </button>
-        </div>
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div class="bg-gray-50 dark:bg-gray-700/60 p-4 rounded-lg">
-                    <div class="text-sm font-medium text-gray-500 dark:text-gray-300 mb-1">Статус маркера</div>
-                    <div class="flex items-center gap-2">
-                        <span class="text-sm font-medium text-gray-900 dark:text-white" x-text="arContent.marker_status || '—'"></span>
-                        <template x-if="markerMetrics.is_valid === true">
-                            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-100">
-                                <span class="material-icons text-xs mr-1">check_circle</span>Валидный
-                            </span>
-                        </template>
-                        <template x-if="markerMetrics.is_valid === false">
-                            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-100">
-                                <span class="material-icons text-xs mr-1">error</span>Невалидный
-                            </span>
-                        </template>
-                        <template x-if="markerMetrics.is_valid === null || markerMetrics.is_valid === undefined">
-                            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200">
-                                <span class="material-icons text-xs mr-1">help</span>Неизвестно
-                            </span>
-                        </template>
-                    </div>
-                    <template x-if="markerMetrics.validation_warnings && markerMetrics.validation_warnings.length > 0">
-                        <div class="mt-2 space-y-1">
-                            <template x-for="warning in markerMetrics.validation_warnings" :key="warning">
-                                <div class="text-xs text-yellow-600 dark:text-yellow-400 flex items-start">
-                                    <span class="material-icons text-xs mr-1 mt-0.5">warning</span>
-                                    <span x-text="warning"></span>
-                                </div>
-                            </template>
-                        </div>
-                    </template>
-                </div>
-                <div class="bg-gray-50 dark:bg-gray-700/60 p-4 rounded-lg">
-                    <div class="text-sm font-medium text-gray-500 dark:text-gray-300">Вес маркера</div>
-                    <div class="text-sm text-gray-900 dark:text-white" x-text="formatBytes(markerMetrics.file_size_bytes)"></div>
-                </div>
-                <div class="bg-gray-50 dark:bg-gray-700/60 p-4 rounded-lg">
-                    <div class="text-sm font-medium text-gray-500 dark:text-gray-300">Скорость генерации</div>
-                    <div class="text-sm text-gray-900 dark:text-white" x-text="formatSeconds(markerMetrics.generation_time_seconds)"></div>
-                </div>
-                <div class="bg-gray-50 dark:bg-gray-700/60 p-4 rounded-lg">
-                    <div class="text-sm font-medium text-gray-500 dark:text-gray-300">Features</div>
-                    <div class="text-sm text-gray-900 dark:text-white" x-text="markerMetrics.features_count ?? '—'"></div>
-                </div>
-                <div class="bg-gray-50 dark:bg-gray-700/60 p-4 rounded-lg">
-                    <div class="text-sm font-medium text-gray-500 dark:text-gray-300">Плотность features</div>
-                    <div class="text-sm text-gray-900 dark:text-white" x-text="formatDensity(markerMetrics.features_density)"></div>
-                </div>
-                <div class="bg-gray-50 dark:bg-gray-700/60 p-4 rounded-lg">
-                    <div class="text-sm font-medium text-gray-500 dark:text-gray-300">Вероятность распознавания</div>
-                    <div class="text-sm text-gray-900 dark:text-white" x-text="formatPercent(markerMetrics.image_quality?.recognition_probability)"></div>
-                </div>
-                <div class="bg-gray-50 dark:bg-gray-700/60 p-4 rounded-lg">
-                    <div class="text-sm font-medium text-gray-500 dark:text-gray-300">Контраст</div>
-                    <div class="text-sm text-gray-900 dark:text-white" x-text="formatScore(markerMetrics.image_quality?.contrast)"></div>
-                </div>
-                <div class="bg-gray-50 dark:bg-gray-700/60 p-4 rounded-lg">
-                    <div class="text-sm font-medium text-gray-500 dark:text-gray-300">Яркость</div>
-                    <div class="text-sm text-gray-900 dark:text-white" x-text="formatScore(markerMetrics.image_quality?.brightness)"></div>
-                </div>
-                <div class="bg-gray-50 dark:bg-gray-700/60 p-4 rounded-lg">
-                    <div class="text-sm font-medium text-gray-500 dark:text-gray-300">Резкость</div>
-                    <div class="text-sm text-gray-900 dark:text-white" x-text="formatScore(markerMetrics.image_quality?.sharpness)"></div>
-                </div>
-            </div>
-            <div class="mt-4 flex flex-wrap items-center gap-3">
-                <a :href="arContent.marker_url" target="_blank" class="btn btn-secondary" x-show="arContent.marker_url">
-                    <span class="material-icons mr-2">download</span>Скачать маркер
+            <div class="flex items-center gap-2">
+                <a :href="arContent.marker_url" target="_blank" class="btn btn-secondary text-sm px-3 py-1.5" x-show="arContent.marker_url">
+                    <span class="material-icons text-sm mr-1">download</span>Скачать
                 </a>
-                <a :href="`/api/ar-content/${arContent.id}/marker/validate`" target="_blank" class="btn btn-secondary" x-show="arContent.marker_url">
-                    <span class="material-icons mr-2">verified</span>Проверить маркер
-                </a>
-                <div class="text-xs text-gray-500 dark:text-gray-400" x-show="!arContent.marker_url">
-                    Маркер не доступен для скачивания
-                </div>
+                <button @click="regenerateMedia()" 
+                        :disabled="regeneratingMedia"
+                        class="btn btn-primary text-sm px-3 py-1.5">
+                    <span class="material-icons text-sm mr-1" x-show="!regeneratingMedia">auto_fix_high</span>
+                    <span class="material-icons text-sm mr-1 animate-spin" x-show="regeneratingMedia">refresh</span>
+                    <span x-show="!regeneratingMedia">Обновить</span>
+                    <span x-show="regeneratingMedia">...</span>
+                </button>
             </div>
         </div>
-    </div>
 
-    <!-- ============================================ -->
-    <!-- БЛОК 7: ССЫЛКИ И QR-КОД -->
-    <!-- ============================================ -->
-    <div class="card p-5 mb-6">
-        <div class="flex items-center gap-2 mb-6 pb-4 border-b border-gray-200 dark:border-gray-700">
-            <span class="material-icons text-cyan-600 dark:text-cyan-400">link</span>
-            <h3 class="text-xl font-semibold text-gray-900 dark:text-white">Ссылки и QR-код</h3>
+        <!-- Предупреждения -->
+        <template x-if="markerMetrics.validation_warnings && markerMetrics.validation_warnings.length > 0">
+            <div class="mb-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-3">
+                <template x-for="warning in markerMetrics.validation_warnings" :key="warning">
+                    <div class="text-xs text-yellow-700 dark:text-yellow-300 flex items-start gap-1">
+                        <span class="material-icons text-xs mt-0.5">warning</span>
+                        <span x-text="warning"></span>
+                    </div>
+                </template>
+            </div>
+        </template>
+
+        <!-- Метрики маркера — показываются только заполненные -->
+        <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+            <div class="bg-gray-50 dark:bg-gray-700/50 p-3 rounded-lg" x-show="markerMetrics.file_size_bytes">
+                <div class="text-xs font-medium text-gray-500 dark:text-gray-400 mb-0.5">Размер</div>
+                <div class="text-sm font-semibold text-gray-900 dark:text-white" x-text="formatBytes(markerMetrics.file_size_bytes)"></div>
+            </div>
+            <div class="bg-gray-50 dark:bg-gray-700/50 p-3 rounded-lg" x-show="markerMetrics.generation_time_seconds">
+                <div class="text-xs font-medium text-gray-500 dark:text-gray-400 mb-0.5">Генерация</div>
+                <div class="text-sm font-semibold text-gray-900 dark:text-white" x-text="formatSeconds(markerMetrics.generation_time_seconds)"></div>
+            </div>
+            <div class="bg-gray-50 dark:bg-gray-700/50 p-3 rounded-lg" x-show="markerMetrics.features_count">
+                <div class="text-xs font-medium text-gray-500 dark:text-gray-400 mb-0.5">Features</div>
+                <div class="text-sm font-semibold text-gray-900 dark:text-white" x-text="markerMetrics.features_count"></div>
+            </div>
+            <div class="bg-gray-50 dark:bg-gray-700/50 p-3 rounded-lg" x-show="markerMetrics.image_quality?.recognition_probability != null">
+                <div class="text-xs font-medium text-gray-500 dark:text-gray-400 mb-0.5">Распознавание</div>
+                <div class="text-sm font-semibold text-gray-900 dark:text-white" x-text="formatPercent(markerMetrics.image_quality?.recognition_probability)"></div>
+            </div>
+            <div class="bg-gray-50 dark:bg-gray-700/50 p-3 rounded-lg" x-show="markerMetrics.image_quality?.contrast != null">
+                <div class="text-xs font-medium text-gray-500 dark:text-gray-400 mb-0.5">Контраст</div>
+                <div class="text-sm font-semibold text-gray-900 dark:text-white" x-text="formatScore(markerMetrics.image_quality?.contrast)"></div>
+            </div>
+            <div class="bg-gray-50 dark:bg-gray-700/50 p-3 rounded-lg" x-show="markerMetrics.image_quality?.sharpness != null">
+                <div class="text-xs font-medium text-gray-500 dark:text-gray-400 mb-0.5">Резкость</div>
+                <div class="text-sm font-semibold text-gray-900 dark:text-white" x-text="formatScore(markerMetrics.image_quality?.sharpness)"></div>
+            </div>
+            <div class="bg-gray-50 dark:bg-gray-700/50 p-3 rounded-lg" x-show="markerMetrics.features_density">
+                <div class="text-xs font-medium text-gray-500 dark:text-gray-400 mb-0.5">Плотность</div>
+                <div class="text-sm font-semibold text-gray-900 dark:text-white" x-text="formatDensity(markerMetrics.features_density)"></div>
+            </div>
+            <div class="bg-gray-50 dark:bg-gray-700/50 p-3 rounded-lg" x-show="markerMetrics.image_quality?.brightness != null">
+                <div class="text-xs font-medium text-gray-500 dark:text-gray-400 mb-0.5">Яркость</div>
+                <div class="text-sm font-semibold text-gray-900 dark:text-white" x-text="formatScore(markerMetrics.image_quality?.brightness)"></div>
+            </div>
         </div>
-            <div class="flex flex-col sm:flex-row gap-3 items-stretch mb-4">
-                <input type="text" 
-                       :value="fullArUrl" 
-                       readonly
-                       placeholder="Ссылка для AR-просмотра (обновите страницу, если пусто)"
-                       class="form-input flex-1">
-                <button @click="copyLink" class="btn btn-secondary">
-                    <span class="material-icons mr-2">content_copy</span>Копировать
-                </button>
-                <button @click="window.open(fullArUrl, '_blank')" 
-                        :disabled="!fullArUrl"
-                        class="btn btn-primary">
-                    <span class="material-icons mr-2">open_in_new</span>Открыть
-                </button>
-                {% if ar_content.unique_link %}
-                <button @click="window.open('/view/{{ ar_content.unique_link.split('/')[-1] }}', '_blank')" 
-                        class="btn btn-success">
-                    <span class="material-icons mr-2">play_arrow</span>AR Просмотр
-                </button>
-                {% endif %}
-            </div>
-            <p class="text-xs text-gray-500 dark:text-gray-400 mb-3">
-                Ссылка для отправки клиенту
-            </p>
-            
-            <!-- QR Code Preview -->
-            <div class="flex items-center justify-center p-4 bg-gray-50 dark:bg-gray-700/60 rounded-lg">
-                <div class="text-center">
-                    <img :src="qrCodeUrl(150)"
-                         :alt="'QR Code for ' + arContent.order_number"
-                         loading="lazy"
-                         class="mx-auto mb-2">
-                    <p class="text-sm text-gray-600 dark:text-gray-400" x-text="fullArUrl"></p>
-                </div>
-            </div>
+
+        <!-- Если нет данных маркера -->
+        <div x-show="!markerMetrics.file_size_bytes && !markerMetrics.features_count && (!markerMetrics.image_quality || markerMetrics.image_quality.recognition_probability == null)" class="text-center py-6 text-gray-400 dark:text-gray-500">
+            <span class="material-icons text-3xl mb-2 block">info</span>
+            <p class="text-sm">Данные маркера появятся после генерации</p>
         </div>
     </div>
     
-    <!-- ============================================ -->
-    <!-- БЛОК 8: ЗАМЕНА МЕДИА-КОНТЕНТА -->
-    <!-- ============================================ -->
-    <div class="card p-5 mb-6">
-        <div class="flex items-center gap-2 mb-6 pb-4 border-b border-gray-200 dark:border-gray-700">
-            <span class="material-icons text-amber-600 dark:text-amber-400">edit</span>
-            <h3 class="text-xl font-semibold text-gray-900 dark:text-white">Замена фото и видео</h3>
-        </div>
-        <div class="space-y-4">
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                        Новое фото
-                    </label>
-                    <input type="file"
-                           accept="image/*"
-                           @change="handleReplacePhotoChange"
-                           x-ref="replacePhotoInput"
-                           class="form-input w-full">
-                    <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                        Заменит текущее фото и пересоздаст маркер
-                    </p>
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                        Новое видео
-                    </label>
-                    <input type="file"
-                           accept="video/*"
-                           @change="handleReplaceVideoChange"
-                           x-ref="replaceVideoInput"
-                           class="form-input w-full">
-                    <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                        Заменит активное видео
-                    </p>
-                </div>
-            </div>
-            <label class="inline-flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
-                <input type="checkbox" class="form-checkbox" x-model="regenerateOnSave">
-                Перегенерировать маркер при сохранении (если фото не меняли)
-            </label>
-            <div class="flex flex-wrap gap-2">
-                <button @click="handleSave()"
-                        :disabled="saving || uploadingPhoto || uploadingVideo"
-                        class="btn btn-primary">
-                    <span class="material-icons mr-2" x-show="!saving">save</span>
-                    <span class="material-icons mr-2 animate-spin" x-show="saving">refresh</span>
-                    <span x-show="!saving">Сохранить изменения</span>
-                    <span x-show="saving">Сохранение...</span>
-                </button>
-                <button @click="regenerateMedia()"
-                        :disabled="regeneratingMedia"
-                        class="btn btn-secondary">
-                    <span class="material-icons mr-2" x-show="!regeneratingMedia">auto_fix_high</span>
-                    <span class="material-icons mr-2 animate-spin" x-show="regeneratingMedia">refresh</span>
-                    <span x-show="!regeneratingMedia">Перегенерировать маркер</span>
-                    <span x-show="regeneratingMedia">Обновление...</span>
-                </button>
-            </div>
-        </div>
-    </div>
-
     <!-- Portrait Lightbox -->
     <div x-show="showPortraitLightbox" 
      @click.self="showPortraitLightbox = false"
