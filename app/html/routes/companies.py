@@ -199,7 +199,7 @@ async def company_create_post(
     # Get form data
     form_data = await request.form()
     name = form_data.get("name", "").strip()
-    contact_email = form_data.get("contact_email", "").strip()
+    contact_email = form_data.get("contact_email", "").strip() or None
     status = form_data.get("status", "active")
     
     if not name:
@@ -324,7 +324,7 @@ async def company_update_post(
     # Get form data
     form_data = await request.form()
     name = form_data.get("name", "").strip()
-    contact_email = form_data.get("contact_email", "").strip()
+    contact_email = form_data.get("contact_email", "").strip() or None
     status = form_data.get("status", "active")
     
     if not name:

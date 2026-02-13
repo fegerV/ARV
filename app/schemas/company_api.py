@@ -7,8 +7,15 @@ from app.enums import CompanyStatus
 class CompanyCreate(BaseModel):
     """Schema for creating a new company"""
     name: str = Field(..., min_length=1, max_length=255, description="Company name")
-    contact_email: EmailStr = Field(..., description="Contact email address")
+    contact_email: Optional[EmailStr] = Field(None, description="Contact email address")
     status: Optional[CompanyStatus] = Field(default=CompanyStatus.ACTIVE, description="Company status")
+
+    @validator('contact_email', pre=True)
+    def empty_string_to_none(cls, v):
+        """Convert empty string to None so Pydantic skips EmailStr validation."""
+        if isinstance(v, str) and not v.strip():
+            return None
+        return v
 
     @validator('status')
     def validate_status(cls, v):
@@ -25,6 +32,13 @@ class CompanyUpdate(BaseModel):
     name: Optional[str] = Field(None, min_length=1, max_length=255, description="Company name")
     contact_email: Optional[EmailStr] = Field(None, description="Contact email address")
     status: Optional[CompanyStatus] = Field(None, description="Company status")
+
+    @validator('contact_email', pre=True)
+    def empty_string_to_none(cls, v):
+        """Convert empty string to None so Pydantic skips EmailStr validation."""
+        if isinstance(v, str) and not v.strip():
+            return None
+        return v
 
     @validator('status')
     def validate_status(cls, v):
