@@ -1,8 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">AR Viewer</string>
+    <string name="app_description">Приложение для просмотра дополненной реальности.\nОтсканируйте QR-код на маркере или введите идентификатор вручную.</string>
     <string name="splash_loading">Загрузка…</string>
-    <string name="unique_id_hint">Введите unique_id или откройте ссылку</string>
+    <string name="unique_id_hint">Введите unique_id или вставьте ссылку</string>
     <string name="open">Открыть</string>
     <string name="enter_unique_id">Введите unique_id</string>
     <string name="loading_content">Загрузка контента: %1$s</string>
@@ -47,11 +48,6 @@
     <string name="stop_recording">Стоп</string>
     <string name="video_saved">Видео сохранено в галерею</string>
     <string name="video_save_failed">Не удалось сохранить видео</string>
-
-    <!-- Sharing -->
-    <string name="share">Поделиться</string>
-    <string name="share_ar_content">Поделиться AR</string>
-    <string name="share_no_content">Сначала сделайте снимок или запишите видео</string>
 
     <!-- QR Scanner -->
     <string name="scan_qr">Сканировать QR</string>

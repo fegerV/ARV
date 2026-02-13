@@ -1,12 +1,15 @@
 package ru.neuroimagen.arviewer
 
+import android.Manifest
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Bundle
 import android.view.View
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
 import com.google.gson.Gson
 import kotlinx.coroutines.Dispatchers
@@ -17,6 +20,10 @@ import ru.neuroimagen.arviewer.data.model.ViewerError
 import ru.neuroimagen.arviewer.databinding.ActivityMainBinding
 import ru.neuroimagen.arviewer.ui.ViewerErrorMessages
 
+/**
+ * Main screen: QR scanning (primary action) and manual unique_id input.
+ * Requests all required permissions (camera, microphone) at startup.
+ */
 class MainActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityMainBinding
@@ -25,6 +32,18 @@ class MainActivity : AppCompatActivity() {
 
     /** Last uniqueId we tried to open; used when user taps Retry. */
     private var lastAttemptedUniqueId: String? = null
+
+    // ── Permission request at startup ────────────────────────────────
+
+    private val permissionsLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) { results ->
+        val cameraGranted = results[Manifest.permission.CAMERA] == true
+        if (!cameraGranted) {
+            Toast.makeText(this, R.string.error_camera_required, Toast.LENGTH_LONG).show()
+        }
+        // Microphone denial is not critical — recording will work without audio
+    }
 
     private val qrScannerLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
@@ -47,13 +66,40 @@ class MainActivity : AppCompatActivity() {
         binding.buttonScanQr.setOnClickListener { openQrScanner() }
         binding.buttonRetry.setOnClickListener { onRetryClicked() }
 
+        requestRequiredPermissions()
         handleIntent(intent)
     }
+
+    // ── Permissions ──────────────────────────────────────────────────
+
+    /**
+     * Request all permissions the app needs upfront so individual screens
+     * don't interrupt the user with dialogs mid-action.
+     */
+    private fun requestRequiredPermissions() {
+        val needed = mutableListOf<String>()
+        if (!hasPermission(Manifest.permission.CAMERA)) {
+            needed.add(Manifest.permission.CAMERA)
+        }
+        if (!hasPermission(Manifest.permission.RECORD_AUDIO)) {
+            needed.add(Manifest.permission.RECORD_AUDIO)
+        }
+        if (needed.isNotEmpty()) {
+            permissionsLauncher.launch(needed.toTypedArray())
+        }
+    }
+
+    private fun hasPermission(permission: String): Boolean =
+        ContextCompat.checkSelfPermission(this, permission) == PackageManager.PERMISSION_GRANTED
+
+    // ── QR scanner ───────────────────────────────────────────────────
 
     private fun openQrScanner() {
         val intent = Intent(this, QrScannerActivity::class.java)
         qrScannerLauncher.launch(intent)
     }
+
+    // ── Intent handling ──────────────────────────────────────────────
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
@@ -70,16 +116,16 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    // ── Open viewer ──────────────────────────────────────────────────
+
     private fun onOpenClicked() {
         val input = binding.editUniqueId.text.toString().trim()
         if (input.isEmpty()) {
             Toast.makeText(this, getString(R.string.enter_unique_id), Toast.LENGTH_SHORT).show()
             return
         }
-        // Парсим ввод: может быть UUID, URL или deep link
         val uniqueId = extractUniqueId(input)
         if (uniqueId == null) {
-            // Показываем более понятную ошибку в зависимости от типа ввода
             val errorMsg = if (looksLikeUrl(input)) {
                 getString(R.string.error_invalid_link_format)
             } else {
@@ -92,15 +138,13 @@ class MainActivity : AppCompatActivity() {
     }
 
     /**
-     * Извлекает unique_id из ввода пользователя.
-     * Поддерживает: UUID напрямую, https://ar.neuroimagen.ru[:port]/view/{id}, arv://view/{id}
+     * Extracts unique_id from user input.
+     * Supports: raw UUID, https://ar.neuroimagen.ru[:port]/view/{id}, arv://view/{id}
      */
     private fun extractUniqueId(input: String): String? {
-        // Если это уже UUID — вернуть как есть
         if (UUID_REGEX.matches(input)) {
             return input
         }
-        // Попробовать распарсить как URL
         return try {
             val uri = Uri.parse(input)
             parseUniqueIdFromUri(uri)
@@ -109,9 +153,6 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    /**
-     * Проверяет, выглядит ли ввод как URL (для показа соответствующей ошибки).
-     */
     private fun looksLikeUrl(input: String): Boolean {
         return input.startsWith("http://") || input.startsWith("https://") || input.startsWith("arv://")
     }
@@ -148,6 +189,8 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    // ── Panel switching ──────────────────────────────────────────────
+
     private fun onRetryClicked() {
         val id = lastAttemptedUniqueId
         if (!id.isNullOrBlank()) {
@@ -178,7 +221,7 @@ class MainActivity : AppCompatActivity() {
 
     companion object {
         private const val EXPECTED_HOST = "ar.neuroimagen.ru"
-        
+
         private val UUID_REGEX = Regex(
             "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
         )
@@ -193,22 +236,18 @@ class MainActivity : AppCompatActivity() {
         fun parseUniqueIdFromUri(uri: Uri): String? {
             return when (uri.scheme) {
                 "arv" -> {
-                    // arv://view/{unique_id}
                     if (uri.host == "view") {
                         uri.pathSegments.firstOrNull()?.takeIf { UUID_REGEX.matches(it) }
                             ?: uri.path?.trimStart('/')?.takeIf { UUID_REGEX.matches(it) }
                     } else {
-                        // arv://{unique_id}
                         uri.host?.takeIf { UUID_REGEX.matches(it) }
                             ?: uri.pathSegments.firstOrNull()?.takeIf { UUID_REGEX.matches(it) }
                     }
                 }
                 "https", "http" -> {
-                    // Проверяем хост (uri.host не включает порт)
                     if (uri.host != EXPECTED_HOST) {
                         return null
                     }
-                    // Ожидаем /view/{unique_id}
                     val segments = uri.pathSegments
                     if (segments.size >= 2 && segments[0] == "view") {
                         segments[1].takeIf { UUID_REGEX.matches(it) }
