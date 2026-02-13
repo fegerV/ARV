@@ -44,7 +44,7 @@ async def login_form(
 ):
     """Handle form-based login for HTML interface"""
     from app.api.routes.auth import verify_password, create_access_token
-    from datetime import datetime, timedelta
+    from datetime import datetime, timedelta, timezone
     from sqlalchemy import select
     from app.models.user import User
     import structlog
@@ -64,7 +64,7 @@ async def login_form(
 
     # Check if account is locked
     if user and user.locked_until:
-        if datetime.utcnow() < user.locked_until:
+        if datetime.now(timezone.utc) < user.locked_until:
             logger.warning("Login attempt on locked account", email=username)
             # Return login page with error
             context = {
@@ -91,7 +91,7 @@ async def login_form(
             if user.login_attempts >= 5:
                 from datetime import timedelta
                 LOCKOUT_DURATION = timedelta(minutes=15)
-                user.locked_until = datetime.utcnow() + LOCKOUT_DURATION
+                user.locked_until = datetime.now(timezone.utc) + LOCKOUT_DURATION
                 await db.commit()
                 
                 logger.warning("Account locked due to excessive login attempts",
@@ -133,7 +133,7 @@ async def login_form(
         # Reset login attempts on successful login
         user.login_attempts = 0
         user.locked_until = None
-        user.last_login_at = datetime.utcnow()
+        user.last_login_at = datetime.now(timezone.utc)
         await db.commit()
 
         # Create JWT token with configured expiry
