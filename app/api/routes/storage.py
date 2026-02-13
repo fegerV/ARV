@@ -217,6 +217,8 @@ async def proxy_yandex_disk_file(
         "png": "image/png",
         "jpg": "image/jpeg",
         "jpeg": "image/jpeg",
+        "webp": "image/webp",
+        "gif": "image/gif",
         "mp4": "video/mp4",
         "webm": "video/webm",
         "mov": "video/quicktime",

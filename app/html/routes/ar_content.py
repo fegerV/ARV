@@ -28,7 +28,7 @@ from app.utils.ar_content import build_public_url
 from app.html.deps import get_html_db
 from app.api.routes.auth import get_current_user_optional
 from app.html.mock import MOCK_AR_CONTENT, AR_CONTENT_DETAIL_MOCK_DATA, PROJECT_CREATE_MOCK_DATA
-from app.html.filters import datetime_format
+from app.html.filters import datetime_format, storage_url
 from app.core.config import settings
 import structlog
 from datetime import datetime
@@ -41,6 +41,27 @@ router = APIRouter()
 templates = Jinja2Templates(directory="templates")
 # Add datetime filter to templates
 templates.env.filters["datetime_format"] = datetime_format
+templates.env.filters["storage_url"] = storage_url
+
+# URL fields that may contain yadisk:// references
+_URL_FIELDS = (
+    "photo_url", "video_url", "thumbnail_url",
+    "qr_code_url", "marker_url", "preview_url",
+)
+
+
+def _resolve_yadisk_urls(data: dict, company_id=None) -> dict:
+    """Replace ``yadisk://`` references with admin-proxy URLs in-place.
+
+    Converts fields like ``photo_url``, ``video_url``, etc. from the internal
+    ``yadisk://relative/path`` format to ``/api/storage/yd-file?path=…&company_id=…``
+    so that browsers can fetch the resources via the streaming proxy endpoint.
+    """
+    for field in _URL_FIELDS:
+        value = data.get(field)
+        if value and str(value).startswith("yadisk://"):
+            data[field] = storage_url(value, company_id)
+    return data
 
 
 def _serialize_datetime(value):
@@ -274,7 +295,10 @@ async def ar_content_list(
             # Final fallback: use photo_url for thumbnail if still missing
             if not item_dict['thumbnail_url'] and item_dict.get('photo_url'):
                 item_dict['thumbnail_url'] = item_dict['photo_url']
-            
+
+            # Resolve yadisk:// URLs to admin-proxy URLs
+            _resolve_yadisk_urls(item_dict, company_id=item_dict.get('company_id'))
+
             ar_content_list.append(item_dict)
         
         # Extract unique companies and statuses for filters
@@ -638,6 +662,9 @@ async def ar_content_edit(
             for project in projects
         ]
 
+    # Resolve yadisk:// URLs for the edit form
+    _resolve_yadisk_urls(ar_content, company_id=ar_content.get("company_id"))
+
     context = {
         "request": request,
         "ar_content": ar_content,
@@ -976,9 +1003,13 @@ async def ar_content_detail(
             base = (settings.PUBLIC_URL or "").rstrip("/")
             public_url = f"{base}/view/{uid}" if base else f"/view/{uid}"
         
+        # Resolve yadisk:// references in the main dict so templates work
+        _company_id = ar_content.get("company_id")
+        _resolve_yadisk_urls(ar_content, company_id=_company_id)
+
         ar_content_js = {
             "id": ar_content.get("id"),
-            "company_id": ar_content.get("company_id"),
+            "company_id": _company_id,
             "project_id": ar_content.get("project_id"),
             "order_number": ar_content.get("order_number"),
             "unique_id": uid,
@@ -1077,6 +1108,13 @@ async def ar_content_detail(
             'updated_at': ar_content.get('updated_at').isoformat() if ar_content.get('updated_at') and hasattr(ar_content.get('updated_at'), 'isoformat') else ar_content.get('updated_at')
         }
     
+    # Resolve yadisk:// URLs in video items
+    _cid = ar_content.get("company_id") if isinstance(ar_content, dict) else None
+    for v in videos:
+        _resolve_yadisk_urls(v, company_id=_cid)
+    if active_video_info:
+        _resolve_yadisk_urls(active_video_info, company_id=_cid)
+
     context = {
         "request": request,
         "ar_content": ar_content,

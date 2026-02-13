@@ -289,7 +289,9 @@ async def get_provider_for_company(company) -> StorageProvider:
         creds = token_encryption.decrypt_credentials(company.yandex_disk_token)
         oauth_token = creds.get("access_token", "")
         if oauth_token:
-            return YandexDiskStorageProvider(oauth_token=oauth_token)
+            # Use company slug as the root folder on Yandex Disk
+            folder_name = getattr(company, "slug", None) or getattr(company, "name", "VertexAR")
+            return YandexDiskStorageProvider(oauth_token=oauth_token, base_prefix=folder_name)
         logger.warning(
             "yd_token_missing_after_decrypt",
             company_id=company.id,
