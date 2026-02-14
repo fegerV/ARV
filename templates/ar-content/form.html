@@ -105,23 +105,8 @@
                 </div>
             </div>
 
-            <!-- Duration -->
-            <div class="p-6 border-b border-gray-200 dark:border-gray-700">
-                <h3 class="text-lg font-medium text-gray-900 dark:text-white mb-4">Длительность доступа</h3>
-                <div>
-                    <label for="duration_years" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                        Период действия <span class="text-red-500">*</span>
-                    </label>
-                    <select name="duration_years" id="duration_years"
-                            class="form-select"
-                            x-model="durationYears"
-                            required x-cloak>
-                        <option value="1" {% if not ar_content or ar_content.duration_years == 1 or ar_content.duration_years == '1' %}selected{% endif %}>1 год</option>
-                        <option value="3" {% if ar_content and (ar_content.duration_years == 3 or ar_content.duration_years == '3') %}selected{% endif %}>3 года</option>
-                        <option value="5" {% if ar_content and (ar_content.duration_years == 5 or ar_content.duration_years == '5') %}selected{% endif %}>5 лет</option>
-                    </select>
-                </div>
-            </div>
+            <!-- Duration (hidden, default 30 years) -->
+            <input type="hidden" name="duration_years" :value="durationYears">
 
             <!-- File Upload -->
             <div class="p-6 border-b border-gray-200 dark:border-gray-700">
@@ -328,7 +313,7 @@
                         <li x-show="!selectedCompany">Компания</li>
                         <li x-show="!selectedProject">Проект</li>
                         <li x-show="!customerName">Имя заказчика</li>
-                        <li x-show="!durationYears">Период действия</li>
+                        <!-- duration_years скрыт, всегда 30 -->
                         <li x-show="(!arContent || !arContent.id) && !hasNewPhoto">Портрет (изображение)</li>
                         <li x-show="(!arContent || !arContent.id) && !hasNewVideo">Видео</li>
                     </ul>
@@ -356,7 +341,7 @@ function arContentForm() {
         customerName: arContent?.customer_name ? String(arContent.customer_name) : '',
         customerPhone: arContent?.customer_phone ? String(arContent.customer_phone) : '',
         customerEmail: arContent?.customer_email ? String(arContent.customer_email) : '',
-        durationYears: arContent?.duration_years ? String(arContent.duration_years) : '1',
+        durationYears: arContent?.duration_years ? String(arContent.duration_years) : '30',
         hasNewPhoto: false,
         hasNewVideo: false,
         loading: false,

@@ -79,7 +79,7 @@
                               class="form-input">{{ settings.general.site_description|default('B2B SaaS платформа для создания AR-контента') }}</textarea>
                 </div>
 
-                <div class="grid grid-cols-1 sm:grid-cols-3 gap-5">
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
                     <div>
                         <label for="timezone" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Часовой пояс</label>
                         <select id="timezone" name="timezone" class="form-select">
@@ -96,13 +96,9 @@
                             <option value="en" {% if settings.general.language == 'en' %}selected{% endif %}>English</option>
                         </select>
                     </div>
-                    <div>
-                        <label for="default_subscription_years" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Срок подписки (лет)</label>
-                        <input type="number" name="default_subscription_years" id="default_subscription_years"
-                               value="{{ settings.general.default_subscription_years|default(1) }}"
-                               min="1" max="10" class="form-input">
-                    </div>
                 </div>
+                <!-- default_subscription_years hidden, always 30 -->
+                <input type="hidden" name="default_subscription_years" value="30">
 
                 <div class="flex items-center gap-3 p-4 bg-amber-50 dark:bg-amber-900/20 rounded-xl border border-amber-200 dark:border-amber-800">
                     <input id="maintenance_mode" name="maintenance_mode" type="checkbox"

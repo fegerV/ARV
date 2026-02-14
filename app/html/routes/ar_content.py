@@ -1192,7 +1192,7 @@ async def ar_content_create_post(
         customer_name = form_data.get("customer_name", "").strip()
         customer_phone = form_data.get("customer_phone", "").strip()
         customer_email = form_data.get("customer_email", "").strip()
-        duration_years = int(form_data.get("duration_years", 1))
+        duration_years = int(form_data.get("duration_years", 30))
         
         # Get files from form
         photo_file = form_data.get("photo_file")
@@ -1203,8 +1203,6 @@ async def ar_content_create_post(
             raise ValueError("Company and Project are required")
         if not customer_name:
             raise ValueError("Customer name is required")
-        if duration_years not in [1, 3, 5]:
-            raise ValueError("Duration must be 1, 3, or 5 years")
         if not photo_file or not video_file:
             raise ValueError("Photo and video files are required")
         
@@ -1299,13 +1297,11 @@ async def ar_content_update_post(
         customer_name = form_data.get("customer_name", "").strip()
         customer_phone = form_data.get("customer_phone", "").strip()
         customer_email = form_data.get("customer_email", "").strip()
-        duration_years = int(form_data.get("duration_years", 1))
+        duration_years = int(form_data.get("duration_years", 30))
         
         # Validation
         if not customer_name:
             raise ValueError("Customer name is required")
-        if duration_years not in [1, 3, 5]:
-            raise ValueError("Duration must be 1, 3, or 5 years")
         
         # Call API to update AR content
         # Convert ar_content to dict if it's a Pydantic model

@@ -244,8 +244,8 @@ async def _create_ar_content(
     is_yd = isinstance(provider, YandexDiskStorageProvider)
     
     # Validate duration years
-    if duration_years not in [1, 3, 5]:
-        raise HTTPException(status_code=400, detail="duration_years must be one of: 1, 3, 5")
+    if duration_years < 1:
+        raise HTTPException(status_code=400, detail="duration_years must be >= 1")
     
     # Validate customer email if provided
     if customer_email:
@@ -611,7 +611,7 @@ async def create_ar_content(
     customer_name: Optional[str] = Form(None),
     customer_phone: Optional[str] = Form(None),
     customer_email: Optional[str] = Form(None),
-    duration_years: int = Form(...),
+    duration_years: int = Form(30),
     auto_enhance: bool = Form(False),
     photo_file: UploadFile = File(...),
     video_file: UploadFile = File(...),
@@ -665,14 +665,14 @@ async def parse_ar_content_data(request: Request):
         customer_phone = metadata.get("customer_phone")
         customer_email = metadata.get("customer_email")
         
-        # Map playback_duration to duration_years
-        playback_duration = metadata.get("playback_duration", "1_year")
+        # Map playback_duration to duration_years (legacy support, default 30)
+        playback_duration = metadata.get("playback_duration", "")
         duration_mapping = {
             "1_year": 1,
             "3_years": 3,
-            "5_years": 5
+            "5_years": 5,
         }
-        duration_years = duration_mapping.get(playback_duration, 1)
+        duration_years = duration_mapping.get(playback_duration, 30)
         
         # Get files (image/video for legacy, photo_file/video_file for new)
         image_file = form.get("image")
@@ -693,15 +693,12 @@ async def parse_ar_content_data(request: Request):
         customer_phone = form.get("customer_phone")
         customer_email = form.get("customer_email")
         
-        # Parse duration_years
+        # Parse duration_years (default: 30 years)
         duration_years_str = form.get("duration_years")
-        if not duration_years_str:
-            raise HTTPException(status_code=400, detail="duration_years is required")
-        
         try:
-            duration_years = int(duration_years_str)
-        except ValueError:
-            raise HTTPException(status_code=400, detail="duration_years must be an integer")
+            duration_years = int(duration_years_str) if duration_years_str else 30
+        except (ValueError, TypeError):
+            duration_years = 30
         
         # Get files
         actual_photo_file = form.get("photo_file")
@@ -795,14 +792,14 @@ async def create_ar_content_legacy(
     customer_phone = metadata.get("customer_phone")
     customer_email = metadata.get("customer_email")
     
-    # Map playback_duration to duration_years
-    playback_duration = metadata.get("playback_duration", "1_year")
+    # Map playback_duration to duration_years (legacy support, default 30)
+    playback_duration = metadata.get("playback_duration", "")
     duration_mapping = {
         "1_year": 1,
         "3_years": 3,
-        "5_years": 5
+        "5_years": 5,
     }
-    duration_years = duration_mapping.get(playback_duration, 1)
+    duration_years = duration_mapping.get(playback_duration, 30)
     
     logger.info(
         "ar_content_creation_legacy_request",

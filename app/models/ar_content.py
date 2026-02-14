@@ -56,7 +56,7 @@ class ARContent(Base):
     customer_email = Column(String(255), nullable=True)
     
     # Subscription and usage
-    duration_years = Column(Integer, default=1, nullable=False)
+    duration_years = Column(Integer, default=30, nullable=False)
     views_count = Column(Integer, default=0, nullable=False)
     
     # Video rotation state
@@ -91,7 +91,7 @@ class ARContent(Base):
         Index('ix_ar_content_created_at', 'created_at'),
         Index('ix_ar_content_status', 'status'),
         Index('ix_ar_content_unique_id', 'unique_id'),
-        CheckConstraint('duration_years IN (1, 3, 5)', name='check_duration_years'),
+        CheckConstraint('duration_years >= 1', name='check_duration_years'),
         CheckConstraint('views_count >= 0', name='check_views_count_non_negative'),
     )
     

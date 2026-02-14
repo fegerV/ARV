@@ -1,7 +1,7 @@
 from typing import Optional, Dict, Any, List
 from uuid import UUID
 from datetime import datetime
-from pydantic import BaseModel, Field, EmailStr, field_validator
+from pydantic import BaseModel, Field, EmailStr
 from app.enums import ArContentStatus
 
 
@@ -10,14 +10,7 @@ class ArContentCreate(BaseModel):
     customer_name: Optional[str] = None
     customer_phone: Optional[str] = None
     customer_email: Optional[EmailStr] = None
-    duration_years: int = Field(default=1)
-    
-    @field_validator('duration_years')
-    @classmethod
-    def validate_duration_years(cls, v):
-        if v not in [1, 3, 5]:
-            raise ValueError('duration_years must be one of: 1, 3, 5')
-        return v
+    duration_years: int = Field(default=30)
     
     class Config:
         from_attributes = True
@@ -29,13 +22,6 @@ class ArContentUpdate(BaseModel):
     customer_email: Optional[EmailStr] = None
     status: Optional[ArContentStatus] = None
     duration_years: Optional[int] = None
-    
-    @field_validator('duration_years')
-    @classmethod
-    def validate_duration_years(cls, v):
-        if v is not None and v not in [1, 3, 5]:
-            raise ValueError('duration_years must be one of: 1, 3, 5')
-        return v
     
     class Config:
         from_attributes = True

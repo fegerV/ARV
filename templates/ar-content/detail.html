@@ -1035,11 +1035,7 @@ document.addEventListener('alpine:init', function() {
                     <span class="text-gray-600 dark:text-gray-400">Создан:</span>
                     <span class="font-medium text-gray-900 dark:text-white">{{ ar_content.created_at | datetime_format if ar_content.created_at else '—' }}</span>
                 </div>
-                <div class="flex items-center gap-2 text-sm">
-                    <span class="material-icons text-purple-600 dark:text-purple-400 text-base">timer</span>
-                    <span class="text-gray-600 dark:text-gray-400">Срок:</span>
-                    <span class="font-medium text-gray-900 dark:text-white" x-text="((arContent.duration_years || 1) + ' год')"></span>
-                </div>
+                <!-- Срок действия скрыт — бессрочный доступ (30 лет) -->
             </div>
         </div>
     </div>
@@ -1176,7 +1172,7 @@ document.addEventListener('alpine:init', function() {
                     <h3 class="text-xl font-semibold text-gray-900 dark:text-white">Управление видео</h3>
                 </div>
                 <p class="text-sm text-gray-600 dark:text-gray-400">
-                    Срок действия видео устанавливается автоматически при загрузке на основе срока заказа ({{ ar_content.get('duration_years', 5) }} лет).
+                    Загруженные видео работают бессрочно. При необходимости видео можно отключить вручную.
                 </p>
             </div>
             <button @click="showUploadDialog = true" class="btn btn-primary">
@@ -1375,14 +1371,13 @@ document.addEventListener('alpine:init', function() {
                             Расписание не настроено
                         </h4>
                         <p class="text-sm text-blue-800 dark:text-blue-200 mb-3">
-                            По умолчанию используется <strong>фиксированное видео</strong>. Система автоматически выберет активное видео, которое будет проигрываться весь срок действия ({{ ar_content.get('duration_years', 5) }} лет).
+                            По умолчанию используется <strong>фиксированное видео</strong>. Система автоматически выберет активное видео, которое будет проигрываться бессрочно.
                         </p>
                         <div class="text-xs text-blue-700 dark:text-blue-300 space-y-1">
                             <p><strong>Как это работает:</strong></p>
                             <ul class="list-disc list-inside space-y-1 ml-2">
                                 <li>Выберите активное видео кнопкой "Сделать активным" в списке видео</li>
-                                <li>Срок действия видео устанавливается автоматически при загрузке (на основе duration_years заказа)</li>
-                                <li>Видео будет проигрываться до истечения срока действия</li>
+                                <li>Видео работает бессрочно до ручного отключения</li>
                                 <li>Для настройки ротации между несколькими видео нажмите "Создать расписание"</li>
                             </ul>
                         </div>
@@ -1467,7 +1462,7 @@ document.addEventListener('alpine:init', function() {
                             <option value="random_daily">Случайное ежедневно — случайное видео каждый день</option>
                         </select>
                         <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                            <strong>Фиксированное</strong> — одно видео проигрывается весь срок действия ({{ ar_content.get('duration_years', 5) }} лет). Это стандартный режим для большинства заказов.
+                            <strong>Фиксированное</strong> — одно видео проигрывается бессрочно. Стандартный режим для большинства заказов.
                         </p>
                     </div>
                     
@@ -1482,7 +1477,7 @@ document.addEventListener('alpine:init', function() {
                             </template>
                         </select>
                         <p class="mt-1 text-xs text-gray-500 dark:text-gray-400" x-show="rotationScheduleForm.rotation_type === 'fixed'">
-                            Выберите видео, которое будет проигрываться весь срок действия заказа ({{ ar_content.get('duration_years', 5) }} лет). Срок действия видео устанавливается автоматически при загрузке.
+                            Выберите видео, которое будет проигрываться бессрочно.
                         </p>
                         <p class="mt-1 text-xs text-gray-500 dark:text-gray-400" x-show="rotationScheduleForm.rotation_type === 'date_specific'">
                             Видео, которое будет использоваться по умолчанию, если нет совпадений по датам.

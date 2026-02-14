@@ -49,14 +49,7 @@ class ARContentCreateRequest(BaseModel):
     customer_name: Optional[str] = Field(None, description="Customer name")
     customer_phone: Optional[str] = Field(None, description="Customer phone")
     customer_email: Optional[EmailStr] = Field(None, description="Customer email")
-    duration_years: int = Field(1, description="Duration in years (1, 3, or 5)")
-    
-    @field_validator('duration_years')
-    @classmethod
-    def validate_duration_years(cls, v):
-        if v not in [1, 3, 5]:
-            raise ValueError('duration_years must be one of: 1, 3, 5')
-        return v
+    duration_years: int = Field(30, description="Duration in years (default: 30)")
 
 
 class ARContentUpdateRequest(BaseModel):
@@ -65,14 +58,7 @@ class ARContentUpdateRequest(BaseModel):
     customer_phone: Optional[str] = Field(None, description="Customer phone")
     customer_email: Optional[EmailStr] = Field(None, description="Customer email")
     status: Optional[str] = Field(None, description="Status")
-    duration_years: Optional[int] = Field(None, description="Duration in years (1, 3, or 5)")
-    
-    @field_validator('duration_years')
-    @classmethod
-    def validate_duration_years(cls, v):
-        if v is not None and v not in [1, 3, 5]:
-            raise ValueError('duration_years must be one of: 1, 3, 5')
-        return v
+    duration_years: Optional[int] = Field(None, description="Duration in years")
 
 
 class VideoItem(BaseModel):
