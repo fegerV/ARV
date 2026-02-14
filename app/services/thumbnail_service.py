@@ -213,32 +213,86 @@ class ThumbnailService:
                 "error": str(e),
             }
 
+    def _derive_size_name(self, base_name: str, size_label: str) -> str:
+        """Формирует имя файла для конкретного размера превью.
+
+        Пример: ``video_1_thumb.webp`` → ``video_1_thumb_small.webp``
+        """
+        stem = Path(base_name).stem
+        return f"{stem}_{size_label}.webp"
+
+    async def _extract_video_frame(
+        self,
+        video_path: str,
+        time_position: float,
+    ) -> str:
+        """Извлекает один кадр из видео через ffmpeg.
+
+        Returns:
+            Путь к временному PNG-файлу с кадром.
+
+        Raises:
+            RuntimeError: если ffmpeg вернул ненулевой код.
+            FileNotFoundError: если временный файл не был создан.
+        """
+        temp_frame_file = tempfile.NamedTemporaryFile(suffix=".png", delete=False)
+        temp_frame = temp_frame_file.name
+        temp_frame_file.close()
+
+        cmd = [
+            "ffmpeg",
+            "-ss", str(time_position),
+            "-i", video_path,
+            "-vframes", "1",
+            "-f", "image2",
+            temp_frame,
+            "-y",
+        ]
+
+        process = await asyncio.create_subprocess_exec(
+            *cmd,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        _, stderr = await process.communicate()
+
+        if process.returncode != 0:
+            error_msg = stderr.decode()
+            raise RuntimeError(f"Video frame extraction failed: {error_msg}")
+
+        if not os.path.exists(temp_frame):
+            raise FileNotFoundError(f"Temp frame file not created: {temp_frame}")
+
+        return temp_frame
+
     async def generate_video_thumbnail(
         self,
         video_path: str,
         output_dir: Optional[str] = None,
         thumbnail_name: Optional[str] = None,
-        time_position: float = 1.0,  # секунда видео для создания превью
+        time_position: float = 1.0,
         provider=None,
-        company_id: Optional[int] = None
+        company_id: Optional[int] = None,
     ) -> dict:
-        """
-        Генерация превью для видео с помощью ffmpeg
-        
+        """Генерация пропорциональных WebP-превью для видео в 3 размерах.
+
+        Создаёт ``small``, ``medium`` и ``large`` превью из одного кадра,
+        извлечённого с помощью ffmpeg.
+
         Args:
-            video_path: путь к исходному видео
-            output_dir: директория для сохранения превью
-            thumbnail_name: имя файла превью (по умолчанию будет сгенерировано)
-            time_position: время в секундах для захвата кадра
-            provider: провайдер хранилища (опционально)
-            company_id: ID компании для формирования пути в хранилище
-            
+            video_path: путь к исходному видео.
+            output_dir: директория для сохранения превью.
+            thumbnail_name: базовое имя файла превью.
+            time_position: секунда видео для захвата кадра.
+            provider: провайдер хранилища (опционально).
+            company_id: ID компании для формирования пути в хранилище.
+
         Returns:
-            dict с информацией о превью
+            dict с полями ``status``, ``thumbnail_path``, ``thumbnail_url``,
+            ``thumbnails`` (все размеры).
         """
-        # Record generation duration
         start_time = time.time()
-        
+
         log = logger.bind(video_path=video_path, company_id=company_id)
         log.info("video_thumbnail_generation_started")
 
@@ -246,115 +300,93 @@ class ThumbnailService:
             if output_dir is None:
                 output_dir = str(Path(settings.MEDIA_ROOT) / "thumbnails")
 
-            # Определяем имя файла превью
             if not thumbnail_name:
                 video_filename = Path(video_path).stem
                 thumbnail_name = f"{video_filename}_thumb.webp"
 
-            # Путь к временному файлу кадра
-            temp_frame_file = tempfile.NamedTemporaryFile(suffix='.png', delete=False)
-            temp_frame = temp_frame_file.name
-            temp_frame_file.close()  # Close but don't delete since we need the file
-            
-            # Извлекаем кадр из видео с помощью ffmpeg
-            cmd = [
-                "ffmpeg",
-                "-ss", str(time_position),  # Позиция в видео
-                "-i", video_path,  # Входной файл
-                "-vframes", "1",  # Количество кадров
-                "-f", "image2",  # Формат вывода
-                temp_frame,  # Выходной файл
-                "-y"  # Перезапись без запроса
-            ]
+            # --- Извлекаем кадр из видео ---
+            temp_frame = await self._extract_video_frame(video_path, time_position)
 
-            process = await asyncio.create_subprocess_exec(
-                *cmd,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE,
-            )
+            try:
+                generated: dict[str, dict] = {}
 
-            stdout, stderr = await process.communicate()
+                with Image.open(temp_frame) as img:
+                    if img.mode in ("RGBA", "LA", "P"):
+                        img = img.convert("RGB")
 
-            if process.returncode != 0:
-                error_msg = stderr.decode()
-                log.error("video_frame_extraction_failed", error=error_msg)
-                raise RuntimeError(f"Video frame extraction failed: {error_msg}")
+                    # Генерируем превью для каждого размера
+                    for size_label, dimensions in self.thumbnail_sizes.items():
+                        thumb = img.copy()
+                        thumb.thumbnail(dimensions, Image.Resampling.LANCZOS)
 
-            # Проверяем что временный файл создан
-            if not os.path.exists(temp_frame):
-                raise FileNotFoundError(f"Temp frame file not created: {temp_frame}")
+                        from io import BytesIO
+                        buf = BytesIO()
+                        thumb.save(buf, "WEBP", quality=self.quality, method=6)
+                        data = buf.getvalue()
 
-            # Создаем превью из извлеченного кадра
-            with Image.open(temp_frame) as img:
-                # Преобразуем в RGB если нужно
-                if img.mode in ('RGBA', 'LA', 'P'):
-                    img = img.convert('RGB')
-                
-                # Создаем превью с сохранением пропорций
-                # Use medium size for video thumbnails
-                img.thumbnail(self.thumbnail_sizes[self.default_size], Image.Resampling.LANCZOS)
-                
-                # Сохраняем превью в байты
-                from io import BytesIO
-                buffer = BytesIO()
-                img.save(buffer, 'WEBP', quality=self.quality, method=6)
-                thumbnail_data = buffer.getvalue()
+                        size_filename = self._derive_size_name(thumbnail_name, size_label)
 
-            # Удаляем временный файл
-            if os.path.exists(temp_frame):
-                os.remove(temp_frame)
+                        if provider:
+                            prefix = f"thumbnails/{company_id}" if company_id else "thumbnails"
+                            remote_path = f"{prefix}/{size_filename}"
+                            url = await self._save_thumbnail_with_provider(
+                                data, provider, remote_path, "image/webp",
+                            )
+                            generated[size_label] = {
+                                "path": remote_path,
+                                "url": url,
+                                "size": dimensions,
+                            }
+                        else:
+                            thumb_dir = Path(output_dir)
+                            thumb_dir.mkdir(parents=True, exist_ok=True)
+                            out_file = thumb_dir / size_filename
 
+                            with open(out_file, "wb") as f:
+                                f.write(data)
 
-            # Если предоставлен провайдер, загружаем через него
-            if provider:
-                # Формируем путь в хранилище
-                storage_path = f"thumbnails/{company_id}/{thumbnail_name}" if company_id else f"thumbnails/{thumbnail_name}"
-                thumbnail_url = await self._save_thumbnail_with_provider(
-                    thumbnail_data,
-                    provider,
-                    storage_path,
-                    "image/webp"
-                )
-                thumbnail_path = storage_path
-            else:
-                # Сохраняем локально
-                thumb_dir = Path(output_dir)
-                thumb_dir.mkdir(parents=True, exist_ok=True)
-                output_file = thumb_dir / thumbnail_name
-                
-                with open(output_file, 'wb') as f:
-                    f.write(thumbnail_data)
-                
-                # Проверяем что файл создан
-                if not output_file.exists():
-                    raise FileNotFoundError(f"Thumbnail file not created: {output_file}")
-                
-                thumbnail_path = str(output_file)
-                thumbnail_url = f"/storage/thumbnails/{thumbnail_name}"
+                            if not out_file.exists():
+                                raise FileNotFoundError(
+                                    f"Thumbnail file not created: {out_file}"
+                                )
+
+                            generated[size_label] = {
+                                "path": str(out_file),
+                                "url": f"/storage/thumbnails/{size_filename}",
+                                "size": dimensions,
+                            }
+            finally:
+                # Удаляем временный файл кадра в любом случае
+                if os.path.exists(temp_frame):
+                    os.remove(temp_frame)
+
+            # Основной thumbnail — medium
+            main = generated[self.default_size]
 
             # Record metrics
             duration = time.time() - start_time
-            THUMBNAIL_GENERATION_DURATION.labels(type='video').observe(duration)
-            THUMBNAIL_GENERATION_COUNT.labels(type='video', status='success').inc()
+            THUMBNAIL_GENERATION_DURATION.labels(type="video").observe(duration)
+            THUMBNAIL_GENERATION_COUNT.labels(type="video", status="success").inc()
 
             log.info(
                 "video_thumbnail_generation_success",
-                thumbnail_url=thumbnail_url,
-                thumbnail_path=thumbnail_path,
+                thumbnail_url=main["url"],
+                thumbnail_path=main["path"],
+                sizes_generated=list(generated.keys()),
             )
 
             return {
-                "thumbnail_path": thumbnail_path,
-                "thumbnail_url": thumbnail_url,
+                "thumbnail_path": main["path"],
+                "thumbnail_url": main["url"],
                 "status": "ready",
+                "thumbnails": generated,
             }
 
         except Exception as e:
-            # Record failure metrics
             duration = time.time() - start_time
-            THUMBNAIL_GENERATION_DURATION.labels(type='video').observe(duration)
-            THUMBNAIL_GENERATION_COUNT.labels(type='video', status='failure').inc()
-            
+            THUMBNAIL_GENERATION_DURATION.labels(type="video").observe(duration)
+            THUMBNAIL_GENERATION_COUNT.labels(type="video", status="failure").inc()
+
             log.error("video_thumbnail_generation_error", error=str(e), exc_info=True)
             return {
                 "status": "failed",

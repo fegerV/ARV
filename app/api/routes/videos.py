@@ -30,7 +30,16 @@ from app.services.thumbnail_service import ThumbnailService
 from app.enums import VideoStatus
 
 
+import structlog
+
+_log = structlog.get_logger()
+
+
 async def _generate_video_thumbnail_task(video_id: int, video_path: str) -> None:
+    """Фоновая задача: генерация мультиразмерных WebP-превью для видео."""
+    log = _log.bind(video_id=video_id, video_path=video_path)
+    log.info("video_thumbnail_task_started")
+
     svc = ThumbnailService()
     result = await svc.generate_video_thumbnail(
         video_path,
@@ -38,6 +47,10 @@ async def _generate_video_thumbnail_task(video_id: int, video_path: str) -> None
     )
 
     if result.get("status") != "ready":
+        log.warning(
+            "video_thumbnail_task_failed",
+            error=result.get("error", "unknown"),
+        )
         async with AsyncSessionLocal() as session:
             v = await session.get(Video, video_id)
             if v:
@@ -48,11 +61,18 @@ async def _generate_video_thumbnail_task(video_id: int, video_path: str) -> None
     async with AsyncSessionLocal() as session:
         v = await session.get(Video, video_id)
         if not v:
+            log.warning("video_thumbnail_task_video_not_found")
             return
         v.thumbnail_path = result.get("thumbnail_path")
         v.preview_url = result.get("thumbnail_url")
         v.status = VideoStatus.READY
         await session.commit()
+
+    log.info(
+        "video_thumbnail_task_completed",
+        thumbnail_url=result.get("thumbnail_url"),
+        sizes=list(result.get("thumbnails", {}).keys()),
+    )
 
 router = APIRouter()
 

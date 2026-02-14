@@ -1214,42 +1214,24 @@ document.addEventListener('alpine:init', function() {
             </div>
         </div>
 
-        <!-- Активное видео -->
-        <template x-if="videos && videos.length > 0">
-            <div class="mb-6">
-                <div class="bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 border-2 border-green-200 dark:border-green-800 rounded-lg p-5">
-                    <div class="flex items-center gap-2 mb-4">
-                        <span class="material-icons text-green-600 dark:text-green-400">play_circle</span>
-                        <h4 class="text-lg font-semibold text-gray-900 dark:text-white">Активное видео</h4>
-                        <span class="ml-auto inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-100" x-text="activeVideoSourceLabel"></span>
+        <!-- Баннер активного видео (компактный, без дублирования плеера) -->
+        <template x-if="videos && videos.length > 0 && activeVideo">
+            <div class="mb-6 bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 border border-green-200 dark:border-green-800 rounded-lg px-4 py-3">
+                <div class="flex flex-wrap items-center gap-3">
+                    <span class="material-icons text-green-600 dark:text-green-400">play_circle</span>
+                    <div class="flex-1 min-w-0">
+                        <span class="text-sm font-semibold text-gray-900 dark:text-white">Активное видео:</span>
+                        <span class="text-sm text-gray-700 dark:text-gray-300 ml-1 truncate" x-text="activeVideoTitle || '—'"></span>
                     </div>
-                    <div class="mb-3">
-                        <div class="text-base font-medium text-gray-900 dark:text-white mb-1" x-text="activeVideoTitle || '—'"></div>
-                        <div class="text-xs text-gray-600 dark:text-gray-400" x-show="activeVideoSchedule">
-                            📅 Расписание: <span x-text="formatSchedule(activeVideoSchedule)"></span>
-                        </div>
-                    </div>
-                    <div class="bg-white dark:bg-gray-800 rounded-lg overflow-hidden shadow-sm border border-gray-200 dark:border-gray-700">
-                        <template x-if="activeVideo && isImagePreview(activeVideo.preview_url)">
-                            <img :src="activeVideo.preview_url" alt="Active video preview" class="w-full max-h-96 object-contain mx-auto block">
-                        </template>
-                        <template x-if="activeVideo && !isImagePreview(activeVideo.preview_url)">
-                            <video :src="activeVideo.video_url" controls class="w-full max-h-96 object-contain mx-auto block"></video>
-                        </template>
-                        <template x-if="!activeVideo">
-                            <div class="w-full h-48 flex items-center justify-center text-gray-400 dark:text-gray-500">
-                                <div class="text-center">
-                                    <span class="material-icons text-4xl mb-2 block">videocam_off</span>
-                                    <p class="text-sm">Нет активного видео</p>
-                                </div>
-                            </div>
-                        </template>
+                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-100" x-text="activeVideoSourceLabel"></span>
+                    <div class="text-xs text-gray-600 dark:text-gray-400" x-show="activeVideoSchedule">
+                        <span x-text="formatSchedule(activeVideoSchedule)"></span>
                     </div>
                 </div>
             </div>
         </template>
 
-        <!-- Список всех видео -->
+        <!-- Пустое состояние: нет видео -->
         <template x-if="!videos || videos.length === 0">
             <div class="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-6 text-center">
                 <span class="material-icons text-4xl text-yellow-600 dark:text-yellow-400 mb-3 block">videocam_off</span>
@@ -1260,6 +1242,7 @@ document.addEventListener('alpine:init', function() {
             </div>
         </template>
 
+        <!-- Список всех видео -->
         <template x-if="videos && videos.length > 0">
             <div>
                 <h4 class="text-base font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
@@ -1271,14 +1254,23 @@ document.addEventListener('alpine:init', function() {
                     <template x-for="video in videos" :key="video.id">
                         <div class="border-2 rounded-lg overflow-hidden transition-all hover:shadow-lg"
                              :class="video.is_active ? 'border-green-500 dark:border-green-400 bg-green-50/50 dark:bg-green-900/10' : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800'">
-                            <!-- Превью видео -->
-                            <div class="bg-gray-900 aspect-video flex items-center justify-center overflow-hidden">
+                            <!-- Превью видео (пропорциональное, 4:3) -->
+                            <div class="relative bg-gray-900 overflow-hidden" style="aspect-ratio: 4/3;">
                                 <template x-if="isImagePreview(video.preview_url)">
-                                    <img :src="video.preview_url" alt="Video preview" class="w-full h-full object-contain">
+                                    <img :src="video.preview_url" alt="Video preview" loading="lazy" class="absolute inset-0 w-full h-full object-cover">
                                 </template>
-                                <template x-if="!isImagePreview(video.preview_url)">
-                                    <video :src="video.video_url" controls class="w-full h-full object-contain"></video>
+                                <template x-if="!isImagePreview(video.preview_url) && video.video_url">
+                                    <video :src="video.video_url" preload="metadata" muted class="absolute inset-0 w-full h-full object-cover"></video>
                                 </template>
+                                <template x-if="!isImagePreview(video.preview_url) && !video.video_url">
+                                    <div class="absolute inset-0 flex items-center justify-center text-gray-500">
+                                        <span class="material-icons text-4xl">videocam_off</span>
+                                    </div>
+                                </template>
+                                <!-- Бейдж активного видео на превью -->
+                                <div x-show="video.is_active" class="absolute top-2 right-2 inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-semibold bg-green-500 text-white shadow">
+                                    <span class="material-icons text-xs">play_arrow</span>Активно
+                                </div>
                             </div>
                             
                             <!-- Информация о видео -->
@@ -1288,9 +1280,6 @@ document.addEventListener('alpine:init', function() {
                                         <div class="text-sm font-semibold text-gray-900 dark:text-white truncate" x-text="video.title || 'Видео'"></div>
                                         <div class="flex items-center gap-2 mt-1">
                                             <span class="text-xs px-2 py-0.5 rounded-full font-medium" :class="videoStatusClass(video.status)" x-text="video.status"></span>
-                                            <span x-show="video.is_active" class="text-xs px-2 py-0.5 rounded-full bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-100 font-medium">
-                                                Активно
-                                            </span>
                                         </div>
                                     </div>
                                 </div>
