@@ -298,7 +298,12 @@ class ThumbnailService:
 
         try:
             if output_dir is None:
-                output_dir = str(Path(settings.MEDIA_ROOT) / "thumbnails")
+                # Thumbnails are served via /storage/ which is mounted from
+                # STORAGE_BASE_PATH.  Saving under MEDIA_ROOT (a different
+                # directory on most servers) would cause 404s.
+                output_dir = str(
+                    Path(settings.STORAGE_BASE_PATH).resolve() / "thumbnails"
+                )
 
             if not thumbnail_name:
                 video_filename = Path(video_path).stem

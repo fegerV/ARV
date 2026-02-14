@@ -214,115 +214,160 @@ async def upload_videos(
     content_id: str,
     videos: List[UploadFile] = File(...),
     background_tasks: BackgroundTasks = None,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
 ):
+    """Upload one or multiple videos for AR content.
+
+    Supports both local and Yandex Disk storage providers.  For YD the
+    video is saved to a temp file, metadata extracted with ffprobe, then
+    uploaded to Yandex Disk.  A thumbnail generation background task is
+    always enqueued.
     """
-    Upload one or multiple videos for AR content.
-    
-    Args:
-        content_id: AR content ID
-        videos: List of video files to upload
-        db: Database session
-        
-    Returns:
-        List of created video objects with metadata
-    """
-    import structlog
-    logger = structlog.get_logger()
-    
+    log = _log.bind(content_id=content_id)
+
     try:
         content_uuid = int(content_id)
-        logger.info("video_upload_started", content_id=content_id, videos_count=len(videos))
+        log.info("video_upload_started", videos_count=len(videos))
     except (TypeError, ValueError):
-        logger.error("invalid_content_id", content_id=content_id)
+        log.error("invalid_content_id")
         raise HTTPException(status_code=400, detail="content_id must be int")
 
     # Verify AR content exists and load relations eagerly
     from sqlalchemy.orm import selectinload
-    stmt_content = select(ARContent).options(
-        selectinload(ARContent.company),
-        selectinload(ARContent.project)
-    ).where(ARContent.id == content_uuid)
+
+    stmt_content = (
+        select(ARContent)
+        .options(
+            selectinload(ARContent.company),
+            selectinload(ARContent.project),
+        )
+        .where(ARContent.id == content_uuid)
+    )
     result_content = await db.execute(stmt_content)
     ar_content = result_content.scalar_one_or_none()
     if not ar_content:
         raise HTTPException(status_code=404, detail="AR content not found")
-    
+
+    # Resolve storage provider for the company
+    from app.core.storage_providers import get_provider_for_company
+    from app.core.yandex_disk_provider import YandexDiskStorageProvider
+
+    provider = await get_provider_for_company(ar_content.company)
+    is_yd = isinstance(provider, YandexDiskStorageProvider)
+
+    # Build YD relative prefix (same structure used during AR content creation)
+    yd_relative_prefix: Optional[str] = None
+    if is_yd:
+        from app.utils.slug_utils import generate_slug
+        from app.utils.ar_content import sanitize_filename
+
+        project_slug = (
+            generate_slug(ar_content.project.name)
+            if ar_content.project
+            else f"Project_{ar_content.project_id}"
+        )
+        order_folder = sanitize_filename(ar_content.order_number, max_length=50)
+        yd_relative_prefix = f"{project_slug}/{order_folder}"
+
     # Check if this is the first video for this AR content
     existing_videos_count = await db.scalar(
         select(func.count(Video.id)).where(Video.ar_content_id == content_uuid)
     )
     is_first_video = existing_videos_count == 0
-    
-    # Build storage paths with company and project names
+
+    # Build local storage paths (used for metadata extraction & local storage)
     storage_base_path = build_ar_content_storage_path(
         company_id=ar_content.company_id,
         project_id=ar_content.project_id,
         order_number=ar_content.order_number,
         company_name=ar_content.company.name if ar_content.company else None,
-        project_name=ar_content.project.name if ar_content.project else None
+        project_name=ar_content.project.name if ar_content.project else None,
     )
     videos_storage_path = storage_base_path / "videos"
-    previews_storage_path = storage_base_path / "previews"
-    
+
     created_videos = []
-    
+
     for upload_file in videos:
-        # Validate file
         validate_video_file(upload_file)
-        
+
         # Calculate subscription_end based on AR content duration_years
         subscription_end = None
         if ar_content.duration_years:
-            subscription_end = datetime.utcnow() + timedelta(days=365 * ar_content.duration_years)
-        
+            subscription_end = datetime.utcnow() + timedelta(
+                days=365 * ar_content.duration_years,
+            )
+
         # Create video record first to get ID
         video = Video(
             ar_content_id=content_uuid,
             filename=upload_file.filename,
             status=VideoStatus.PROCESSING,
-            rotation_type='none',
+            rotation_type="none",
             is_active=False,
             subscription_end=subscription_end,
         )
-        
+
         db.add(video)
         await db.flush()  # Get the video ID without committing
-        
-        # Generate filename and save file
+
         try:
             filename = generate_video_filename(upload_file.filename, video.id)
-            video_path = videos_storage_path / filename
-            
-            # Save uploaded file
-            await save_uploaded_video(upload_file, video_path)
-            
-            # Extract metadata
-            metadata = await get_video_metadata(str(video_path))
-            
-            # Update video with metadata
-            video.video_path = str(video_path)
-            video.video_url = build_public_url(video_path)
-            video.preview_url = video.video_url
-            video.duration = int(metadata["duration"]) if metadata.get("duration") is not None else None
+            local_video_path = videos_storage_path / filename
+
+            # Always save locally first — ffprobe needs a local file
+            await save_uploaded_video(upload_file, local_video_path)
+
+            # Extract metadata from the local file
+            metadata = await get_video_metadata(str(local_video_path))
+
+            if is_yd:
+                # Upload to Yandex Disk
+                yd_dest = f"{yd_relative_prefix}/videos/{filename}"
+                yd_ref = await provider.save_file(
+                    str(local_video_path), yd_dest,
+                )
+                db_video_path = yd_ref or provider.get_public_url(yd_dest)
+                db_video_url = db_video_path
+                log.info(
+                    "video_uploaded_to_yd",
+                    video_id=video.id,
+                    yd_dest=yd_dest,
+                )
+            else:
+                db_video_path = str(local_video_path)
+                db_video_url = build_public_url(local_video_path)
+
+            # Update video record
+            video.video_path = db_video_path
+            video.video_url = db_video_url
+            video.preview_url = db_video_url
+            video.duration = (
+                int(metadata["duration"])
+                if metadata.get("duration") is not None
+                else None
+            )
             video.width = metadata.get("width")
             video.height = metadata.get("height")
             video.size_bytes = metadata.get("size_bytes")
             video.mime_type = metadata.get("mime_type")
-            
+
             # If this is the first video, mark it as active
             if is_first_video and len(created_videos) == 0:
                 video.is_active = True
                 ar_content.active_video_id = video.id
-            
-            # Commit this video
+
             await db.commit()
             await db.refresh(video)
-            
-            # Enqueue preview generation task
+
+            # Enqueue preview generation task.
+            # For YD videos the task will download from YD to a temp file.
             if background_tasks is not None and video.video_path:
-                background_tasks.add_task(_generate_video_thumbnail_task, video.id, str(video_path))
-            
+                background_tasks.add_task(
+                    _generate_video_thumbnail_task,
+                    video.id,
+                    video.video_path,
+                )
+
             created_videos.append({
                 "id": video.id,
                 "title": video.filename,
@@ -341,28 +386,28 @@ async def upload_videos(
                 "created_at": video.created_at,
                 "updated_at": video.updated_at,
             })
-            
-        except Exception as e:
-            # Rollback this video's transaction
+
+        except Exception as exc:
             await db.rollback()
-            logger.error("video_upload_failed", 
-                        content_id=content_id, 
-                        filename=upload_file.filename, 
-                        error=str(e), 
-                        exc_info=True)
+            log.error(
+                "video_upload_failed",
+                filename=upload_file.filename,
+                error=str(exc),
+                exc_info=True,
+            )
             raise HTTPException(
                 status_code=500,
-                detail=f"Failed to process video {upload_file.filename}: {str(e)}"
+                detail=f"Failed to process video {upload_file.filename}: {str(exc)}",
             )
-    
-    logger.info("video_upload_completed", content_id=content_id, videos_count=len(created_videos))
+
+    log.info("video_upload_completed", videos_count=len(created_videos))
     return {
         "message": f"Successfully uploaded {len(created_videos)} video(s)",
         "videos": created_videos,
         "ar_content": {
             "id": ar_content.id,
-            "active_video_id": ar_content.active_video_id
-        }
+            "active_video_id": ar_content.active_video_id,
+        },
     }
 
 

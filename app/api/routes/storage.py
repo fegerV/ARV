@@ -1,5 +1,5 @@
 import structlog
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
@@ -179,13 +179,29 @@ async def list_storage_connections(
 # Yandex Disk proxy — stream files for admin panel preview
 # ------------------------------------------------------------------
 
+_YD_MIME_MAP = {
+    "png": "image/png",
+    "jpg": "image/jpeg",
+    "jpeg": "image/jpeg",
+    "webp": "image/webp",
+    "gif": "image/gif",
+    "mp4": "video/mp4",
+    "webm": "video/webm",
+    "mov": "video/quicktime",
+}
+
+
 @router.get("/yd-file")
 async def proxy_yandex_disk_file(
+    request: Request,
     path: str = Query(..., description="Relative file path on Yandex Disk"),
     company_id: int = Query(..., description="Company ID that owns the file"),
     db: AsyncSession = Depends(get_db),
 ):
     """Proxy-stream a file from Yandex Disk for the admin panel.
+
+    Supports HTTP Range requests so that ``<video>`` elements can seek
+    and the browser does not need to download the entire file at once.
 
     The admin panel cannot reference ``yadisk://`` URLs directly — this
     endpoint fetches a temporary download link, then streams the content
@@ -213,28 +229,62 @@ async def proxy_yandex_disk_file(
 
     # Determine MIME type from extension
     ext = path.rsplit(".", 1)[-1].lower() if "." in path else ""
-    mime_map = {
-        "png": "image/png",
-        "jpg": "image/jpeg",
-        "jpeg": "image/jpeg",
-        "webp": "image/webp",
-        "gif": "image/gif",
-        "mp4": "video/mp4",
-        "webm": "video/webm",
-        "mov": "video/quicktime",
-    }
-    content_type = mime_map.get(ext, "application/octet-stream")
+    content_type = _YD_MIME_MAP.get(ext, "application/octet-stream")
 
-    async def _stream():
-        async with httpx.AsyncClient(timeout=120.0) as client:
-            async with client.stream("GET", download_url, follow_redirects=True) as resp:
-                resp.raise_for_status()
-                async for chunk in resp.aiter_bytes(chunk_size=65536):
-                    yield chunk
+    range_header = request.headers.get("range")
+
+    # Build upstream request headers — pass Range through to YD
+    upstream_headers: dict = {}
+    if range_header:
+        upstream_headers["Range"] = range_header
+
+    # Open a persistent client that stays alive while the response streams.
+    # The generator's ``finally`` block ensures proper cleanup.
+    client = httpx.AsyncClient(timeout=120.0)
+
+    try:
+        upstream = await client.send(
+            client.build_request(
+                "GET", download_url, headers=upstream_headers,
+            ),
+            stream=True,
+            follow_redirects=True,
+        )
+        upstream.raise_for_status()
+    except httpx.HTTPStatusError:
+        await client.aclose()
+        raise HTTPException(status_code=502, detail="Yandex Disk download failed")
+    except Exception:
+        await client.aclose()
+        raise HTTPException(status_code=502, detail="Yandex Disk connection error")
+
+    response_headers: dict = {
+        "Cache-Control": "private, max-age=1800",
+        "Accept-Ranges": "bytes",
+    }
+
+    # Pass through Content-Length / Content-Range from upstream
+    for key in ("content-length", "content-range"):
+        value = upstream.headers.get(key)
+        if value:
+            # Use canonical header casing
+            response_headers[key.title()] = value
+
+    status_code = upstream.status_code  # 200 or 206
+
+    async def _body():
+        """Stream chunks from the Yandex Disk download URL."""
+        try:
+            async for chunk in upstream.aiter_bytes(chunk_size=65_536):
+                yield chunk
+        finally:
+            await upstream.aclose()
+            await client.aclose()
 
     logger.info("yd_proxy_stream", company_id=company_id, path=path)
     return StreamingResponse(
-        _stream(),
+        _body(),
+        status_code=status_code,
         media_type=content_type,
-        headers={"Cache-Control": "private, max-age=1800"},
+        headers=response_headers,
     )
