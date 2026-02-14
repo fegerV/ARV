@@ -889,33 +889,49 @@ document.addEventListener('alpine:init', function() {
         async saveRotationSchedule() {
             this.savingRotationSchedule = true;
             try {
+                const formType = this.rotationScheduleForm.rotation_type;
+                
+                // Coerce default_video_id to int or null
+                let defaultVideoId = this.rotationScheduleForm.default_video_id;
+                defaultVideoId = (defaultVideoId && defaultVideoId !== '' && defaultVideoId !== 'null')
+                    ? parseInt(defaultVideoId, 10)
+                    : null;
+
                 const payload = {
-                    rotation_type: this.rotationScheduleForm.rotation_type,
-                    default_video_id: this.rotationScheduleForm.default_video_id || null,
-                    no_repeat_days: parseInt(this.rotationScheduleForm.no_repeat_days) || 1,
-                    notify_before_expiry_days: parseInt(this.rotationScheduleForm.notify_before_expiry_days) || 7,
-                    is_active: this.rotationScheduleForm.is_active,
+                    rotation_type: formType,
+                    default_video_id: defaultVideoId,
+                    no_repeat_days: parseInt(this.rotationScheduleForm.no_repeat_days, 10) || 1,
+                    notify_before_expiry_days: parseInt(this.rotationScheduleForm.notify_before_expiry_days, 10) || 7,
+                    is_active: !!this.rotationScheduleForm.is_active,
                 };
                 
-                // Parse video sequence if needed
-                if (this.rotationScheduleForm.video_sequence_text) {
-                    payload.video_sequence = this.rotationScheduleForm.video_sequence_text
+                // Parse video_sequence for cycle/random types, clear for fixed/date_specific
+                if (formType === 'daily_cycle' || formType === 'weekly_cycle' || formType === 'random_daily') {
+                    const text = this.rotationScheduleForm.video_sequence_text || '';
+                    payload.video_sequence = text
                         .split(',')
-                        .map(id => parseInt(id.trim()))
-                        .filter(id => !isNaN(id));
+                        .map(id => parseInt(id.trim(), 10))
+                        .filter(id => !isNaN(id) && id > 0);
+                    if (payload.video_sequence.length === 0) {
+                        // Auto-fill from loaded videos
+                        payload.video_sequence = this.videos.map(v => v.id);
+                    }
+                } else {
+                    payload.video_sequence = [];
                 }
                 
-                const url = this.rotationSchedule 
+                // Correct URLs:
+                //   CREATE/UPDATE by content: POST /api/rotation/ar-content/{contentId}
+                //   UPDATE by schedule:       PUT  /api/rotation/{scheduleId}
+                const url = this.rotationSchedule
                     ? `/api/rotation/${this.rotationSchedule.id}`
-                    : `/api/ar-content/${this.arContent.id}/rotation`;
+                    : `/api/rotation/ar-content/${this.arContent.id}`;
                 
                 const method = this.rotationSchedule ? 'PUT' : 'POST';
                 
                 const response = await fetch(url, {
                     method: method,
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
+                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(payload),
                 });
                 
@@ -927,12 +943,9 @@ document.addEventListener('alpine:init', function() {
                 this.showToast('Расписание сохранено', 'success');
                 this.showRotationScheduleDialog = false;
                 
-                // Reload page to get updated schedule
-                setTimeout(() => {
-                    window.location.reload();
-                }, 1000);
+                setTimeout(() => { window.location.reload(); }, 800);
             } catch (error) {
-                this.showToast('Не удалось сохранить расписание: ' + error.message, 'error');
+                this.showToast('Ошибка: ' + error.message, 'error');
                 console.error('Rotation schedule save error:', error);
             } finally {
                 this.savingRotationSchedule = false;
@@ -950,17 +963,14 @@ document.addEventListener('alpine:init', function() {
                 });
                 
                 if (!response.ok) {
-                    throw new Error('Не удалось удалить расписание');
+                    const errorData = await response.json().catch(() => ({}));
+                    throw new Error(errorData.detail || errorData.message || 'Не удалось удалить расписание');
                 }
                 
                 this.showToast('Расписание удалено', 'success');
-                
-                // Reload page to get updated schedule
-                setTimeout(() => {
-                    window.location.reload();
-                }, 1000);
+                setTimeout(() => { window.location.reload(); }, 800);
             } catch (error) {
-                this.showToast('Не удалось удалить расписание', 'error');
+                this.showToast('Ошибка: ' + error.message, 'error');
                 console.error('Rotation schedule delete error:', error);
             }
         }
@@ -1479,27 +1489,47 @@ document.addEventListener('alpine:init', function() {
                         </p>
                     </div>
                     
-                    <div x-show="rotationScheduleForm.rotation_type === 'daily_cycle' || rotationScheduleForm.rotation_type === 'weekly_cycle'">
+                    <div x-show="rotationScheduleForm.rotation_type === 'daily_cycle' || rotationScheduleForm.rotation_type === 'weekly_cycle' || rotationScheduleForm.rotation_type === 'random_daily'">
                         <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                             Последовательность видео (ID через запятую)
                         </label>
                         <input type="text" 
                                x-model="rotationScheduleForm.video_sequence_text"
-                               placeholder="1, 2, 3"
+                               :placeholder="videos.map(v => v.id).join(', ')"
                                class="form-input w-full">
-                        <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                            Введите ID видео через запятую в нужном порядке
-                        </p>
+                        <div class="mt-1 space-y-1">
+                            <p class="text-xs text-gray-500 dark:text-gray-400">
+                                Укажите ID видео в нужном порядке. Если оставить пустым — будут использованы все видео.
+                            </p>
+                            <div class="flex flex-wrap gap-1">
+                                <template x-for="video in videos" :key="video.id">
+                                    <span class="inline-flex items-center gap-1 px-2 py-0.5 bg-gray-100 dark:bg-gray-700 text-xs rounded-md text-gray-600 dark:text-gray-300">
+                                        <span class="font-medium" x-text="'#' + video.id"></span>
+                                        <span x-text="video.title || 'Без названия'"></span>
+                                    </span>
+                                </template>
+                            </div>
+                            <button type="button"
+                                    @click="rotationScheduleForm.video_sequence_text = videos.map(v => v.id).join(', ')"
+                                    class="text-xs text-blue-600 dark:text-blue-400 hover:underline">
+                                Заполнить всеми видео
+                            </button>
+                        </div>
                     </div>
                     
-                    <div x-show="rotationScheduleForm.rotation_type === 'random_daily'">
-                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                            Не повторять видео (дней)
-                        </label>
-                        <input type="number" 
-                               x-model="rotationScheduleForm.no_repeat_days"
-                               min="1"
-                               class="form-input w-full">
+                    <div x-show="rotationScheduleForm.rotation_type === 'random_daily'" class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                Не повторять видео (дней)
+                            </label>
+                            <input type="number" 
+                                   x-model="rotationScheduleForm.no_repeat_days"
+                                   min="1"
+                                   class="form-input w-full">
+                            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                                Видео не будет повторяться указанное число дней подряд
+                            </p>
+                        </div>
                     </div>
                     
                     <div>
