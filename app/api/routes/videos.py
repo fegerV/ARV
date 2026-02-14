@@ -44,7 +44,7 @@ def _is_yadisk_path(path: str) -> bool:
     return path.startswith(_YADISK_PREFIX)
 
 
-async def _download_yadisk_video(video_id: int, yadisk_path: str) -> str | None:
+async def _download_yadisk_video(video_id: int, yadisk_path: str) -> Optional[str]:
     """Скачивает видео с Yandex Disk во временный файл.
 
     Returns:
@@ -105,7 +105,7 @@ async def _generate_video_thumbnail_task(video_id: int, video_path: str) -> None
     log.info("video_thumbnail_task_started")
 
     local_path = video_path
-    tmp_downloaded: str | None = None
+    tmp_downloaded: Optional[str] = None
 
     # Если видео на Yandex Disk — скачиваем во временный файл
     if _is_yadisk_path(video_path):

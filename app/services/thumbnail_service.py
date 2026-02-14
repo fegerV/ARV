@@ -308,7 +308,7 @@ class ThumbnailService:
             temp_frame = await self._extract_video_frame(video_path, time_position)
 
             try:
-                generated: dict[str, dict] = {}
+                generated = {}
 
                 with Image.open(temp_frame) as img:
                     if img.mode in ("RGBA", "LA", "P"):
