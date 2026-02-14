@@ -21,6 +21,9 @@ document.addEventListener('alpine:init', function() {
     function portraitUrlFromContent(c) {
         return (c && (c.thumbnail_url || c.photo_url)) || '';
     }
+    function portraitFullUrlFromContent(c) {
+        return (c && c.photo_url) || '';
+    }
 
     var arContent = {};
     var videos = [];
@@ -90,6 +93,7 @@ document.addEventListener('alpine:init', function() {
 
     var initialFullArUrl = fullArUrlFromContent(arContent);
     var initialPortraitUrl = portraitUrlFromContent(arContent);
+    var initialPortraitFullUrl = portraitFullUrlFromContent(arContent);
     
     console.log('arContentDetail initialized:', { 
         arContent_id: arContent && arContent.id, 
@@ -112,6 +116,8 @@ document.addEventListener('alpine:init', function() {
         showDeleteVideoDialog: false,
         videoToDelete: null,
         deletingVideo: false,
+        showVideoPlayerDialog: false,
+        videoPlayerUrl: null,
         showRotationScheduleDialog: false,
         downloadingQR: false,
         uploadingVideo: false,
@@ -130,6 +136,7 @@ document.addEventListener('alpine:init', function() {
         regenerateOnSave: true,
         fullArUrl: initialFullArUrl,
         portraitUrl: initialPortraitUrl,
+        portraitFullUrl: initialPortraitFullUrl,
         rotationScheduleForm: {
             rotation_type: 'fixed',
             default_video_id: null,
@@ -147,6 +154,9 @@ document.addEventListener('alpine:init', function() {
             if (!this.portraitUrl) {
                 this.portraitUrl = portraitUrlFromContent(this.arContent);
             }
+            if (!this.portraitFullUrl) {
+                this.portraitFullUrl = portraitFullUrlFromContent(this.arContent);
+            }
             if (Object.keys(this.arContent).length === 0) {
                 console.warn('arContent is empty, trying to reload...');
                 const self = this;
@@ -159,6 +169,7 @@ document.addEventListener('alpine:init', function() {
                                 self.arContent = JSON.parse(text);
                                 self.fullArUrl = fullArUrlFromContent(self.arContent);
                                 self.portraitUrl = portraitUrlFromContent(self.arContent);
+                                self.portraitFullUrl = portraitFullUrlFromContent(self.arContent);
                             }
                         } catch (e) {
                             console.error('Failed to reload arContent:', e);
@@ -385,6 +396,17 @@ document.addEventListener('alpine:init', function() {
             if (url) {
                 window.open(url, '_blank');
             }
+        },
+
+        playVideo(url) {
+            if (!url) return;
+            this.videoPlayerUrl = url;
+            this.showVideoPlayerDialog = true;
+        },
+
+        closeVideoPlayer() {
+            this.showVideoPlayerDialog = false;
+            this.videoPlayerUrl = null;
         },
 
         async regenerateThumbnail(video) {
@@ -1175,16 +1197,16 @@ document.addEventListener('alpine:init', function() {
                         <span class="material-icons text-sm mr-1">upload</span>Загрузить
                     </button>
                 </div>
-                <div class="bg-gray-50 dark:bg-gray-700/50 rounded-lg overflow-hidden border-2 border-dashed border-gray-200 dark:border-gray-600">
+                <div class="flex justify-center">
                     <template x-if="portraitUrl">
                         <img :src="portraitUrl"
                              alt="Portrait"
                              loading="lazy"
                              @click="showPortraitLightbox = true"
-                             class="w-full max-h-96 object-contain cursor-pointer hover:opacity-90 transition-opacity mx-auto block">
+                             class="max-h-96 rounded-lg object-contain cursor-pointer hover:opacity-90 transition-opacity shadow-sm">
                     </template>
                     <template x-if="!portraitUrl">
-                        <div class="w-full h-64 flex items-center justify-center text-gray-400 dark:text-gray-500">
+                        <div class="w-full h-64 bg-gray-50 dark:bg-gray-700/50 rounded-lg border-2 border-dashed border-gray-200 dark:border-gray-600 flex items-center justify-center text-gray-400 dark:text-gray-500">
                             <div class="text-center">
                                 <span class="material-icons text-5xl mb-3 block">image_not_supported</span>
                                 <p class="text-sm">Портрет не загружен</p>
@@ -1325,8 +1347,13 @@ document.addEventListener('alpine:init', function() {
                                         <span class="material-icons text-4xl">videocam_off</span>
                                     </div>
                                 </template>
+                                <!-- Кнопка Play поверх превью -->
+                                <button x-show="video.video_url" @click="playVideo(video.video_url)"
+                                        class="absolute inset-0 flex items-center justify-center bg-black/0 hover:bg-black/30 transition-colors group">
+                                    <span class="material-icons text-5xl text-white opacity-70 group-hover:opacity-100 drop-shadow-lg transition-opacity">play_circle</span>
+                                </button>
                                 <!-- Бейдж активного видео на превью -->
-                                <div x-show="video.is_active" class="absolute top-2 right-2 inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-semibold bg-green-500 text-white shadow">
+                                <div x-show="video.is_active" class="absolute top-2 right-2 inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-semibold bg-green-500 text-white shadow pointer-events-none">
                                     <span class="material-icons text-xs">play_arrow</span>Активно
                                 </div>
                             </div>
@@ -1377,8 +1404,8 @@ document.addEventListener('alpine:init', function() {
                                         <span x-show="video.is_active">Уже активно</span>
                                     </button>
                                     <div class="flex gap-2">
-                                        <button @click="openVideo(video.video_url)" class="btn btn-secondary flex-1 text-xs px-3 py-1.5">
-                                            <span class="material-icons text-sm mr-1">open_in_new</span>Открыть
+                                        <button @click="playVideo(video.video_url)" class="btn btn-secondary flex-1 text-xs px-3 py-1.5">
+                                            <span class="material-icons text-sm mr-1">play_circle</span>Проиграть
                                         </button>
                                         <button @click="regenerateThumbnail(video)"
                                                 :disabled="video._regenerating"
@@ -1680,10 +1707,10 @@ document.addEventListener('alpine:init', function() {
     </div>
 
     <!-- ============================================ -->
-    <!-- БЛОК 6: МАРКЕР И КАЧЕСТВО (скрыт, если данных нет) -->
+    <!-- БЛОК 6: МАРКЕР И КАЧЕСТВО (скрыт, если нет реальных метрик) -->
     <!-- ============================================ -->
     <div class="card p-5 mb-6"
-         x-show="arContent.marker_status || arContent.marker_url || markerMetrics.file_size_bytes || markerMetrics.features_count || (markerMetrics.image_quality && markerMetrics.image_quality.recognition_probability != null)">
+         x-show="markerMetrics.file_size_bytes || markerMetrics.features_count || (markerMetrics.image_quality && markerMetrics.image_quality.recognition_probability != null)">
         <div class="flex items-center justify-between mb-4 pb-3 border-b border-gray-200 dark:border-gray-700">
             <div class="flex items-center gap-2">
                 <span class="material-icons text-teal-600 dark:text-teal-400">qr_code_2</span>
@@ -1759,24 +1786,43 @@ document.addEventListener('alpine:init', function() {
         </div>
     </div>
     
-    <!-- Portrait Lightbox -->
+    <!-- Video Player Lightbox -->
+    <div x-show="showVideoPlayerDialog"
+     @click.self="closeVideoPlayer()"
+     @keydown.escape.window="closeVideoPlayer()"
+     class="fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-4"
+     x-cloak>
+        <div class="relative max-w-4xl w-full">
+            <button @click="closeVideoPlayer()"
+                    class="absolute -top-10 right-0 z-10 text-white hover:text-gray-300">
+                <span class="material-icons text-3xl">close</span>
+            </button>
+            <template x-if="videoPlayerUrl">
+                <video :src="videoPlayerUrl"
+                       controls autoplay
+                       class="w-full max-h-[85vh] rounded-lg shadow-2xl bg-black">
+                </video>
+            </template>
+        </div>
+    </div>
+
+    <!-- Portrait Lightbox (полный размер изображения) -->
     <div x-show="showPortraitLightbox" 
      @click.self="showPortraitLightbox = false"
      @keydown.escape.window="showPortraitLightbox = false"
-     class="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4"
+     class="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4"
      x-cloak>
-        <div class="relative max-w-4xl w-full">
+        <div class="relative max-w-4xl w-full flex items-center justify-center">
             <button @click="showPortraitLightbox = false"
                     class="absolute top-4 right-4 z-10 text-white hover:text-gray-300">
                 <span class="material-icons text-3xl">close</span>
             </button>
-            <template x-if="portraitUrl">
-                <img :src="portraitUrl" 
+            <template x-if="portraitFullUrl || portraitUrl">
+                <img :src="portraitFullUrl || portraitUrl" 
                      alt="Portrait" 
-                     loading="lazy" 
-                     class="w-full h-auto max-h-[90vh] object-contain">
+                     class="max-w-full max-h-[90vh] object-contain rounded-lg shadow-2xl">
             </template>
-            <template x-if="!portraitUrl">
+            <template x-if="!portraitFullUrl && !portraitUrl">
                 <div class="w-full h-64 flex items-center justify-center text-white">
                     <div class="text-center">
                         <span class="material-icons text-4xl mb-2">image</span>
