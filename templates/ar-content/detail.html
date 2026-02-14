@@ -109,6 +109,9 @@ document.addEventListener('alpine:init', function() {
         showUploadDialog: false,
         showPhotoUploadDialog: false,
         showDeleteDialog: false,
+        showDeleteVideoDialog: false,
+        videoToDelete: null,
+        deletingVideo: false,
         showRotationScheduleDialog: false,
         downloadingQR: false,
         uploadingVideo: false,
@@ -402,6 +405,37 @@ document.addEventListener('alpine:init', function() {
                 this.showToast('Не удалось запустить перегенерацию', 'error');
             } finally {
                 video._regenerating = false;
+            }
+        },
+
+        confirmDeleteVideo(video) {
+            this.videoToDelete = video;
+            this.showDeleteVideoDialog = true;
+        },
+
+        async deleteVideo() {
+            if (!this.videoToDelete || this.deletingVideo) return;
+            this.deletingVideo = true;
+            try {
+                const resp = await csrfFetch(`/api/videos/videos/${this.videoToDelete.id}`, {
+                    method: 'DELETE',
+                });
+                if (!resp.ok) {
+                    const err = await resp.json().catch(() => ({}));
+                    this.showToast(err.detail || 'Не удалось удалить видео', 'error');
+                    return;
+                }
+                this.videos = this.videos.filter(v => v.id !== this.videoToDelete.id);
+                this.showToast('Видео удалено', 'success');
+                if (this.videoToDelete.is_active) {
+                    this.activeVideoInfo = null;
+                }
+            } catch (e) {
+                this.showToast('Ошибка при удалении видео', 'error');
+            } finally {
+                this.deletingVideo = false;
+                this.showDeleteVideoDialog = false;
+                this.videoToDelete = null;
             }
         },
 
@@ -1089,7 +1123,8 @@ document.addEventListener('alpine:init', function() {
             <div class="text-2xl font-bold text-gray-900 dark:text-white" x-text="videos ? videos.length : 0"></div>
             <div class="text-xs text-gray-500 dark:text-gray-400 mt-1 truncate" x-text="activeVideoTitle || 'нет активного'"></div>
         </div>
-        <div class="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-4 flex flex-col">
+        <div class="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-4 flex flex-col"
+             x-show="arContent.marker_status">
             <div class="flex items-center gap-2 mb-2">
                 <span class="material-icons text-lg" :class="arContent.marker_status === 'ready' ? 'text-green-500' : 'text-yellow-500'">qr_code_2</span>
                 <span class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">Маркер</span>
@@ -1350,6 +1385,11 @@ document.addEventListener('alpine:init', function() {
                                                 class="btn btn-secondary text-xs px-2 py-1.5"
                                                 title="Перегенерировать превью">
                                             <span class="material-icons text-sm" :class="video._regenerating ? 'animate-spin' : ''">refresh</span>
+                                        </button>
+                                        <button @click="confirmDeleteVideo(video)"
+                                                class="btn text-xs px-2 py-1.5 border border-red-300 dark:border-red-700 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20"
+                                                title="Удалить видео">
+                                            <span class="material-icons text-sm">delete</span>
                                         </button>
                                     </div>
                                 </div>
@@ -1640,9 +1680,10 @@ document.addEventListener('alpine:init', function() {
     </div>
 
     <!-- ============================================ -->
-    <!-- БЛОК 6: МАРКЕР И КАЧЕСТВО -->
+    <!-- БЛОК 6: МАРКЕР И КАЧЕСТВО (скрыт, если данных нет) -->
     <!-- ============================================ -->
-    <div class="card p-5 mb-6">
+    <div class="card p-5 mb-6"
+         x-show="arContent.marker_status || arContent.marker_url || markerMetrics.file_size_bytes || markerMetrics.features_count || (markerMetrics.image_quality && markerMetrics.image_quality.recognition_probability != null)">
         <div class="flex items-center justify-between mb-4 pb-3 border-b border-gray-200 dark:border-gray-700">
             <div class="flex items-center gap-2">
                 <span class="material-icons text-teal-600 dark:text-teal-400">qr_code_2</span>
@@ -1871,6 +1912,40 @@ document.addEventListener('alpine:init', function() {
                     </button>
                 </div>
             </form>
+        </div>
+    </div>
+
+    <!-- Delete Video Confirmation Modal -->
+    <div x-show="showDeleteVideoDialog"
+     @click.self="showDeleteVideoDialog = false"
+     @keydown.escape.window="showDeleteVideoDialog = false"
+     class="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4"
+     x-cloak>
+        <div class="relative bg-white dark:bg-gray-800 rounded-lg p-6 max-w-md w-full">
+            <button @click="showDeleteVideoDialog = false"
+                    class="absolute top-4 right-4 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200">
+                <span class="material-icons">close</span>
+            </button>
+            <div class="text-center mb-4">
+                <div class="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-red-100 dark:bg-red-900 mb-4">
+                    <span class="material-icons text-red-600 dark:text-red-400">videocam_off</span>
+                </div>
+                <h3 class="text-lg font-medium text-gray-900 dark:text-white mb-2">Удалить видео</h3>
+                <p class="text-sm text-gray-600 dark:text-gray-400">
+                    Вы уверены, что хотите удалить видео
+                    <strong x-text="videoToDelete?.title || 'Видео'"></strong>?
+                    Это действие нельзя отменить.
+                </p>
+            </div>
+            <div class="flex gap-2">
+                <button @click="deleteVideo()" :disabled="deletingVideo" class="btn btn-danger flex-1">
+                    <span class="material-icons mr-2" x-show="!deletingVideo">delete</span>
+                    <span class="material-icons mr-2 animate-spin" x-show="deletingVideo">refresh</span>
+                    <span x-show="!deletingVideo">Удалить</span>
+                    <span x-show="deletingVideo">Удаление...</span>
+                </button>
+                <button @click="showDeleteVideoDialog = false" class="btn btn-secondary flex-1">Отмена</button>
+            </div>
         </div>
     </div>
 
