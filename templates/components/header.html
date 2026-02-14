@@ -1,7 +1,7 @@
 <header class="fixed top-0 right-0 left-0 lg:left-64 h-16 bg-white dark:bg-gray-800 shadow-md flex items-center px-4 z-30 transition-all duration-300">
     <div class="flex items-center space-x-4">
         <!-- Mobile hamburger menu -->
-        <button @click="window.dispatchEvent(new Event('toggle-sidebar'))" 
+        <button @click="$store.sidebar.toggle()" 
                 class="lg:hidden material-icons text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white p-1">
             menu
         </button>

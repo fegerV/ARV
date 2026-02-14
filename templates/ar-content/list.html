@@ -102,11 +102,8 @@
             
             console.log('Attempting to delete AR content:', arContentId);
             
-            fetch(`/api/ar-content/${arContentId}`, {
-                method: 'DELETE',
-                headers: {
-                    'Content-Type': 'application/json'
-                }
+            csrfFetch(`/api/ar-content/${arContentId}`, {
+                method: 'DELETE'
             })
             .then(response => {
                 console.log('Delete response status:', response.status);
@@ -145,28 +142,7 @@
         },
         
         showToast(message, type = 'info') {
-            // Try to use global showToast function if available
-            if (typeof window.showToast === 'function') {
-                window.showToast(message, type);
-                return;
-            }
-            
-            // Fallback: create toast manually
-            const toast = document.createElement('div');
-            const bgColor = type === 'success' ? 'bg-green-500' : type === 'error' ? 'bg-red-500' : 'bg-blue-500';
-            toast.className = `fixed bottom-4 right-4 ${bgColor} text-white px-4 py-2 rounded shadow z-50`;
-            toast.textContent = message;
-            document.body.appendChild(toast);
-            
-            setTimeout(() => {
-                if (document.body.contains(toast)) {
-                    toast.style.opacity = '0';
-                    toast.style.transition = 'opacity 0.3s';
-                    setTimeout(() => {
-                        document.body.removeChild(toast);
-                    }, 300);
-                }
-            }, 3000);
+            window.showToast(message, type);
         }
     };
     }

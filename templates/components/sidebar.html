@@ -1,8 +1,8 @@
 <!-- Mobile overlay -->
-<div x-data="sidebarMobile()" 
-     x-show="open" 
+<div x-data
+     x-show="$store.sidebar.open" 
      x-cloak
-     @click="open = false" 
+     @click="$store.sidebar.open = false" 
      class="fixed inset-0 bg-black/50 z-40 lg:hidden"
      x-transition:enter="transition-opacity ease-out duration-300"
      x-transition:enter-start="opacity-0"
@@ -13,15 +13,15 @@
 </div>
 
 <!-- Sidebar -->
-<div x-data="sidebarMobile()" 
+<div x-data
      id="sidebar" 
      class="fixed top-0 left-0 h-screen bg-gray-800 dark:bg-gray-800 text-white w-64 z-50 transition-transform duration-300 lg:translate-x-0"
-     :class="open ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'">
+     :class="$store.sidebar.open ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'">
     
     <div class="p-4 border-b border-gray-700 dark:border-gray-700 flex items-center justify-between">
         <h1 class="text-xl font-bold">Vertex AR</h1>
         <!-- Close button for mobile -->
-        <button @click="open = false" class="lg:hidden p-1 rounded hover:bg-gray-700">
+        <button @click="$store.sidebar.open = false" class="lg:hidden p-1 rounded hover:bg-gray-700">
             <span class="material-icons">close</span>
         </button>
     </div>
@@ -29,49 +29,65 @@
     <div class="p-2 overflow-y-auto" style="height: calc(100vh - 65px);">
         <ul class="space-y-1">
             <li>
-                <a href="/admin" class="nav-item flex items-center p-2 rounded hover:bg-gray-700 dark:hover:bg-gray-700 group" :class="{'bg-gray-700': isActive('/admin')}" @click="closeMobile()">
+                <a href="/admin" class="nav-item flex items-center p-2 rounded hover:bg-gray-700 dark:hover:bg-gray-700 group"
+                   :class="{'bg-gray-700': window.location.pathname === '/admin' || window.location.pathname.startsWith('/admin/')}"
+                   @click="$store.sidebar.closeMobile()">
                     <span class="material-icons mr-3">dashboard</span>
                     <span class="sidebar-text">Dashboard</span>
                 </a>
             </li>
             <li>
-                <a href="/companies" class="nav-item flex items-center p-2 rounded hover:bg-gray-700 dark:hover:bg-gray-700 group" :class="{'bg-gray-700': isActive('/companies')}" @click="closeMobile()">
+                <a href="/companies" class="nav-item flex items-center p-2 rounded hover:bg-gray-700 dark:hover:bg-gray-700 group"
+                   :class="{'bg-gray-700': window.location.pathname === '/companies' || window.location.pathname.startsWith('/companies/')}"
+                   @click="$store.sidebar.closeMobile()">
                     <span class="material-icons mr-3">business</span>
                     <span class="sidebar-text">Companies</span>
                 </a>
             </li>
             <li>
-                <a href="/projects" class="nav-item flex items-center p-2 rounded hover:bg-gray-700 dark:hover:bg-gray-700 group" :class="{'bg-gray-700': isActive('/projects')}" @click="closeMobile()">
+                <a href="/projects" class="nav-item flex items-center p-2 rounded hover:bg-gray-700 dark:hover:bg-gray-700 group"
+                   :class="{'bg-gray-700': window.location.pathname === '/projects' || window.location.pathname.startsWith('/projects/')}"
+                   @click="$store.sidebar.closeMobile()">
                     <span class="material-icons mr-3">folder</span>
                     <span class="sidebar-text">Projects</span>
                 </a>
             </li>
             <li>
-                <a href="/ar-content" class="nav-item flex items-center p-2 rounded hover:bg-gray-700 dark:hover:bg-gray-700 group" :class="{'bg-gray-700': isActive('/ar-content')}" @click="closeMobile()">
+                <a href="/ar-content" class="nav-item flex items-center p-2 rounded hover:bg-gray-700 dark:hover:bg-gray-700 group"
+                   :class="{'bg-gray-700': window.location.pathname === '/ar-content' || window.location.pathname.startsWith('/ar-content/')}"
+                   @click="$store.sidebar.closeMobile()">
                     <span class="material-icons mr-3">view_in_ar</span>
                     <span class="sidebar-text">AR Content</span>
                 </a>
             </li>
             <li>
-                <a href="/storage" class="nav-item flex items-center p-2 rounded hover:bg-gray-700 dark:hover:bg-gray-700 group" :class="{'bg-gray-700': isActive('/storage')}" @click="closeMobile()">
+                <a href="/storage" class="nav-item flex items-center p-2 rounded hover:bg-gray-700 dark:hover:bg-gray-700 group"
+                   :class="{'bg-gray-700': window.location.pathname === '/storage' || window.location.pathname.startsWith('/storage/')}"
+                   @click="$store.sidebar.closeMobile()">
                     <span class="material-icons mr-3">storage</span>
                     <span class="sidebar-text">Storage</span>
                 </a>
             </li>
             <li>
-                <a href="/analytics" class="nav-item flex items-center p-2 rounded hover:bg-gray-700 dark:hover:bg-gray-700 group" :class="{'bg-gray-700': isActive('/analytics')}" @click="closeMobile()">
+                <a href="/analytics" class="nav-item flex items-center p-2 rounded hover:bg-gray-700 dark:hover:bg-gray-700 group"
+                   :class="{'bg-gray-700': window.location.pathname === '/analytics' || window.location.pathname.startsWith('/analytics/')}"
+                   @click="$store.sidebar.closeMobile()">
                     <span class="material-icons mr-3">analytics</span>
                     <span class="sidebar-text">Analytics</span>
                 </a>
             </li>
             <li>
-                <a href="/notifications" class="nav-item flex items-center p-2 rounded hover:bg-gray-700 dark:hover:bg-gray-700 group" :class="{'bg-gray-700': isActive('/notifications')}" @click="closeMobile()">
+                <a href="/notifications" class="nav-item flex items-center p-2 rounded hover:bg-gray-700 dark:hover:bg-gray-700 group"
+                   :class="{'bg-gray-700': window.location.pathname === '/notifications' || window.location.pathname.startsWith('/notifications/')}"
+                   @click="$store.sidebar.closeMobile()">
                     <span class="material-icons mr-3">notifications</span>
                     <span class="sidebar-text">Notifications</span>
                 </a>
             </li>
             <li>
-                <a href="/settings" class="nav-item flex items-center p-2 rounded hover:bg-gray-700 dark:hover:bg-gray-700 group" :class="{'bg-gray-700': isActive('/settings')}" @click="closeMobile()">
+                <a href="/settings" class="nav-item flex items-center p-2 rounded hover:bg-gray-700 dark:hover:bg-gray-700 group"
+                   :class="{'bg-gray-700': window.location.pathname === '/settings' || window.location.pathname.startsWith('/settings/')}"
+                   @click="$store.sidebar.closeMobile()">
                     <span class="material-icons mr-3">settings</span>
                     <span class="sidebar-text">Settings</span>
                 </a>
@@ -79,28 +95,3 @@
         </ul>
     </div>
 </div>
-
-<script>
-    function sidebarMobile() {
-        return {
-            open: false,
-            
-            init() {
-                // Listen for toggle event from header
-                window.addEventListener('toggle-sidebar', () => {
-                    this.open = !this.open;
-                });
-            },
-            
-            closeMobile() {
-                if (window.innerWidth < 1024) {
-                    this.open = false;
-                }
-            },
-            
-            isActive(route) {
-                return window.location.pathname === route || window.location.pathname.startsWith(route + '/');
-            }
-        }
-    }
-</script>

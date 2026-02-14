@@ -32,27 +32,78 @@
 
     {# ── Summary cards (6 items) ───────────────────────────────────────── #}
     <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-6">
-        {% set cards = [
-            ('visibility',   'Total Views',       analytics_data.total_views|default(0),      'blue'),
-            ('people',       'Unique Sessions',   analytics_data.unique_sessions|default(0),  'green'),
-            ('view_in_ar',   'Active Content',    analytics_data.active_content|default(0),   'purple'),
-            ('timer',        'Avg Duration',      (analytics_data.avg_duration|default(0)|string) ~ ' s', 'orange'),
-            ('play_circle',  'Video Play Rate',   (analytics_data.video_play_rate|default(0)|string) ~ '%', 'teal'),
-            ('inventory',    'Total Content',     analytics_data.total_content|default(0),    'indigo'),
-        ] %}
-        {% for icon, title, value, color in cards %}
+        <!-- Total Views -->
         <div class="card !p-4">
             <div class="flex items-center gap-3">
-                <div class="p-2 rounded-full bg-{{ color }}-100 text-{{ color }}-600 dark:bg-{{ color }}-900/30 dark:text-{{ color }}-400 shrink-0">
-                    <span class="material-icons text-lg">{{ icon }}</span>
+                <div class="p-2 rounded-full bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400 shrink-0">
+                    <span class="material-icons text-lg">visibility</span>
                 </div>
                 <div class="min-w-0">
-                    <p class="text-xs text-gray-500 dark:text-gray-400 truncate">{{ title }}</p>
-                    <p class="text-lg font-bold text-gray-900 dark:text-white">{{ value }}</p>
+                    <p class="text-xs text-gray-500 dark:text-gray-400 truncate">Total Views</p>
+                    <p class="text-lg font-bold text-gray-900 dark:text-white">{{ analytics_data.total_views|default(0) }}</p>
                 </div>
             </div>
         </div>
-        {% endfor %}
+        <!-- Unique Sessions -->
+        <div class="card !p-4">
+            <div class="flex items-center gap-3">
+                <div class="p-2 rounded-full bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400 shrink-0">
+                    <span class="material-icons text-lg">people</span>
+                </div>
+                <div class="min-w-0">
+                    <p class="text-xs text-gray-500 dark:text-gray-400 truncate">Unique Sessions</p>
+                    <p class="text-lg font-bold text-gray-900 dark:text-white">{{ analytics_data.unique_sessions|default(0) }}</p>
+                </div>
+            </div>
+        </div>
+        <!-- Active Content -->
+        <div class="card !p-4">
+            <div class="flex items-center gap-3">
+                <div class="p-2 rounded-full bg-purple-100 text-purple-600 dark:bg-purple-900/30 dark:text-purple-400 shrink-0">
+                    <span class="material-icons text-lg">view_in_ar</span>
+                </div>
+                <div class="min-w-0">
+                    <p class="text-xs text-gray-500 dark:text-gray-400 truncate">Active Content</p>
+                    <p class="text-lg font-bold text-gray-900 dark:text-white">{{ analytics_data.active_content|default(0) }}</p>
+                </div>
+            </div>
+        </div>
+        <!-- Avg Duration -->
+        <div class="card !p-4">
+            <div class="flex items-center gap-3">
+                <div class="p-2 rounded-full bg-orange-100 text-orange-600 dark:bg-orange-900/30 dark:text-orange-400 shrink-0">
+                    <span class="material-icons text-lg">timer</span>
+                </div>
+                <div class="min-w-0">
+                    <p class="text-xs text-gray-500 dark:text-gray-400 truncate">Avg Duration</p>
+                    <p class="text-lg font-bold text-gray-900 dark:text-white">{{ analytics_data.avg_duration|default(0) }} s</p>
+                </div>
+            </div>
+        </div>
+        <!-- Video Play Rate -->
+        <div class="card !p-4">
+            <div class="flex items-center gap-3">
+                <div class="p-2 rounded-full bg-teal-100 text-teal-600 dark:bg-teal-900/30 dark:text-teal-400 shrink-0">
+                    <span class="material-icons text-lg">play_circle</span>
+                </div>
+                <div class="min-w-0">
+                    <p class="text-xs text-gray-500 dark:text-gray-400 truncate">Video Play Rate</p>
+                    <p class="text-lg font-bold text-gray-900 dark:text-white">{{ analytics_data.video_play_rate|default(0) }}%</p>
+                </div>
+            </div>
+        </div>
+        <!-- Total Content -->
+        <div class="card !p-4">
+            <div class="flex items-center gap-3">
+                <div class="p-2 rounded-full bg-indigo-100 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-400 shrink-0">
+                    <span class="material-icons text-lg">inventory</span>
+                </div>
+                <div class="min-w-0">
+                    <p class="text-xs text-gray-500 dark:text-gray-400 truncate">Total Content</p>
+                    <p class="text-lg font-bold text-gray-900 dark:text-white">{{ analytics_data.total_content|default(0) }}</p>
+                </div>
+            </div>
+        </div>
     </div>
 
     {# ── Views line chart ──────────────────────────────────────────────── #}
