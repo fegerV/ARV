@@ -384,6 +384,27 @@ document.addEventListener('alpine:init', function() {
             }
         },
 
+        async regenerateThumbnail(video) {
+            if (video._regenerating) return;
+            video._regenerating = true;
+            video._previewFailed = false;
+            try {
+                const resp = await csrfFetch(`/api/videos/${video.id}/regenerate-thumbnail`, {
+                    method: 'POST',
+                });
+                if (!resp.ok) {
+                    const err = await resp.json().catch(() => ({}));
+                    this.showToast(err.detail || 'Ошибка перегенерации превью', 'error');
+                    return;
+                }
+                this.showToast('Превью генерируется, обновите страницу через несколько секунд', 'success');
+            } catch (e) {
+                this.showToast('Не удалось запустить перегенерацию', 'error');
+            } finally {
+                video._regenerating = false;
+            }
+        },
+
         async setActiveVideo(videoId) {
             try {
                 const response = await fetch(`/api/videos/ar-content/${this.arContent.id}/playback-mode`, {
@@ -1254,15 +1275,17 @@ document.addEventListener('alpine:init', function() {
                     <template x-for="video in videos" :key="video.id">
                         <div class="border-2 rounded-lg overflow-hidden transition-all hover:shadow-lg"
                              :class="video.is_active ? 'border-green-500 dark:border-green-400 bg-green-50/50 dark:bg-green-900/10' : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800'">
-                            <!-- Превью видео (пропорциональное, 4:3) -->
+                            <!-- Превью видео (пропорциональное, 4:3, с fallback при 404) -->
                             <div class="relative bg-gray-900 overflow-hidden" style="aspect-ratio: 4/3;">
-                                <template x-if="isImagePreview(video.preview_url)">
-                                    <img :src="video.preview_url" alt="Video preview" loading="lazy" class="absolute inset-0 w-full h-full object-cover">
+                                <template x-if="isImagePreview(video.preview_url) && !video._previewFailed">
+                                    <img :src="video.preview_url" alt="Video preview" loading="lazy"
+                                         @error="video._previewFailed = true"
+                                         class="absolute inset-0 w-full h-full object-cover">
                                 </template>
-                                <template x-if="!isImagePreview(video.preview_url) && video.video_url">
+                                <template x-if="(!isImagePreview(video.preview_url) || video._previewFailed) && video.video_url">
                                     <video :src="video.video_url" preload="metadata" muted class="absolute inset-0 w-full h-full object-cover"></video>
                                 </template>
-                                <template x-if="!isImagePreview(video.preview_url) && !video.video_url">
+                                <template x-if="(!isImagePreview(video.preview_url) || video._previewFailed) && !video.video_url">
                                     <div class="absolute inset-0 flex items-center justify-center text-gray-500">
                                         <span class="material-icons text-4xl">videocam_off</span>
                                     </div>
@@ -1318,9 +1341,17 @@ document.addEventListener('alpine:init', function() {
                                         <span x-show="!video.is_active">Сделать активным</span>
                                         <span x-show="video.is_active">Уже активно</span>
                                     </button>
-                                    <button @click="openVideo(video.video_url)" class="btn btn-secondary w-full text-xs px-3 py-1.5">
-                                        <span class="material-icons text-sm mr-1">open_in_new</span>Открыть
-                                    </button>
+                                    <div class="flex gap-2">
+                                        <button @click="openVideo(video.video_url)" class="btn btn-secondary flex-1 text-xs px-3 py-1.5">
+                                            <span class="material-icons text-sm mr-1">open_in_new</span>Открыть
+                                        </button>
+                                        <button @click="regenerateThumbnail(video)"
+                                                :disabled="video._regenerating"
+                                                class="btn btn-secondary text-xs px-2 py-1.5"
+                                                title="Перегенерировать превью">
+                                            <span class="material-icons text-sm" :class="video._regenerating ? 'animate-spin' : ''">refresh</span>
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
                         </div>

@@ -77,6 +77,38 @@ async def _generate_video_thumbnail_task(video_id: int, video_path: str) -> None
 router = APIRouter()
 
 
+@router.post("/{video_id}/regenerate-thumbnail")
+async def regenerate_video_thumbnail(
+    video_id: int,
+    background_tasks: BackgroundTasks,
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """Перегенерация WebP-превью для существующего видео.
+
+    Запускает фоновую задачу генерации мультиразмерных превью.
+    Возвращает статус немедленно — результат будет доступен после обработки.
+    """
+    video = await db.get(Video, video_id)
+    if not video:
+        raise HTTPException(status_code=404, detail="Video not found")
+
+    if not video.video_path:
+        raise HTTPException(
+            status_code=400,
+            detail="Video file path is missing, cannot generate thumbnail",
+        )
+
+    video.status = VideoStatus.PROCESSING
+    await db.commit()
+
+    background_tasks.add_task(
+        _generate_video_thumbnail_task, video.id, video.video_path,
+    )
+
+    _log.info("video_thumbnail_regeneration_requested", video_id=video_id)
+    return {"status": "processing", "video_id": video_id}
+
+
 def parse_subscription_preset(preset: str) -> datetime:
     """Parse subscription preset like '1y', '2y' to datetime."""
     if preset == '1y':
