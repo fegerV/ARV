@@ -53,7 +53,8 @@ class YandexDiskStorageProvider(StorageProvider):
         """Recursively create directories on Disk (mkdir -p equivalent)."""
         parts = PurePosixPath(disk_path).parts
         # ``parts`` for ``app:/VertexAR/slug/001`` → ('app:', 'VertexAR', 'slug', '001')
-        for i in range(1, len(parts) + 1):
+        # Начинаем с i=2, т.к. "app:" — корень YD, его нельзя создать через mkdir
+        for i in range(2, len(parts) + 1):
             folder = "/".join(parts[:i])
             async with httpx.AsyncClient(timeout=_DEFAULT_TIMEOUT) as client:
                 resp = await client.put(

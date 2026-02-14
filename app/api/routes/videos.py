@@ -30,21 +30,107 @@ from app.services.thumbnail_service import ThumbnailService
 from app.enums import VideoStatus
 
 
+import os
+import tempfile
 import structlog
 
 _log = structlog.get_logger()
 
+_YADISK_PREFIX = "yadisk://"
+
+
+def _is_yadisk_path(path: str) -> bool:
+    """Проверяет, является ли путь ссылкой на Yandex Disk."""
+    return path.startswith(_YADISK_PREFIX)
+
+
+async def _download_yadisk_video(video_id: int, yadisk_path: str) -> str | None:
+    """Скачивает видео с Yandex Disk во временный файл.
+
+    Returns:
+        Путь к временному файлу или None при ошибке.
+    """
+    log = _log.bind(video_id=video_id, yadisk_path=yadisk_path)
+
+    from app.models.ar_content import ARContent
+    from app.models.company import Company
+    from app.core.storage_providers import get_provider_for_company
+    from app.core.yandex_disk_provider import YandexDiskStorageProvider
+
+    async with AsyncSessionLocal() as session:
+        video = await session.get(Video, video_id)
+        if not video:
+            log.warning("yadisk_download_video_not_found")
+            return None
+
+        ar_content = await session.get(ARContent, video.ar_content_id)
+        if not ar_content:
+            log.warning("yadisk_download_ar_content_not_found")
+            return None
+
+        company = await session.get(Company, ar_content.company_id)
+        if not company:
+            log.warning("yadisk_download_company_not_found")
+            return None
+
+    provider = await get_provider_for_company(company)
+    if not isinstance(provider, YandexDiskStorageProvider):
+        log.warning("yadisk_download_wrong_provider")
+        return None
+
+    relative_path = yadisk_path[len(_YADISK_PREFIX):]
+
+    suffix = os.path.splitext(relative_path)[1] or ".mp4"
+    tmp = tempfile.NamedTemporaryFile(suffix=suffix, delete=False)
+    tmp_path = tmp.name
+    tmp.close()
+
+    success = await provider.get_file(relative_path, tmp_path)
+    if not success:
+        log.error("yadisk_download_failed", relative_path=relative_path)
+        if os.path.exists(tmp_path):
+            os.remove(tmp_path)
+        return None
+
+    log.info("yadisk_download_success", tmp_path=tmp_path)
+    return tmp_path
+
 
 async def _generate_video_thumbnail_task(video_id: int, video_path: str) -> None:
-    """Фоновая задача: генерация мультиразмерных WebP-превью для видео."""
+    """Фоновая задача: генерация мультиразмерных WebP-превью для видео.
+
+    Поддерживает как локальные пути, так и ``yadisk://`` ссылки.
+    """
     log = _log.bind(video_id=video_id, video_path=video_path)
     log.info("video_thumbnail_task_started")
 
-    svc = ThumbnailService()
-    result = await svc.generate_video_thumbnail(
-        video_path,
-        thumbnail_name=f"video_{video_id}_thumb.webp",
-    )
+    local_path = video_path
+    tmp_downloaded: str | None = None
+
+    # Если видео на Yandex Disk — скачиваем во временный файл
+    if _is_yadisk_path(video_path):
+        tmp_downloaded = await _download_yadisk_video(video_id, video_path)
+        if not tmp_downloaded:
+            log.error("video_thumbnail_task_yadisk_download_failed")
+            async with AsyncSessionLocal() as session:
+                v = await session.get(Video, video_id)
+                if v:
+                    v.status = VideoStatus.FAILED
+                    await session.commit()
+            return
+        local_path = tmp_downloaded
+
+    try:
+        svc = ThumbnailService()
+        result = await svc.generate_video_thumbnail(
+            local_path,
+            thumbnail_name=f"video_{video_id}_thumb.webp",
+        )
+    finally:
+        # Удаляем временный файл если скачивали с YD
+        if tmp_downloaded and os.path.exists(tmp_downloaded):
+            os.remove(tmp_downloaded)
+            log.info("yadisk_temp_file_cleaned", tmp_path=tmp_downloaded)
 
     if result.get("status") != "ready":
         log.warning(

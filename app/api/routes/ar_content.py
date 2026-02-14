@@ -232,7 +232,8 @@ async def _create_ar_content(
     photo_file: UploadFile,
     video_file: UploadFile,
     auto_enhance: bool,
-    db: AsyncSession
+    db: AsyncSession,
+    background_tasks: Optional["BackgroundTasks"] = None,
 ):
     """Внутренняя функция для создания AR-контента"""
     # Validate company and project relationship
@@ -453,7 +454,21 @@ async def _create_ar_content(
     ar_content.active_video_id = video_record.id
     await db.commit()
     await db.refresh(ar_content)
-    
+
+    # Запускаем фоновую генерацию превью видео
+    if background_tasks is not None and video_record.video_path:
+        from app.api.routes.videos import _generate_video_thumbnail_task
+        background_tasks.add_task(
+            _generate_video_thumbnail_task,
+            video_record.id,
+            video_record.video_path,
+        )
+        logger.info(
+            "video_thumbnail_task_enqueued",
+            video_id=video_record.id,
+            video_path=video_record.video_path,
+        )
+
     # ARCore: marker = photo image (no .mind generation)
     try:
         ar_content.marker_path = db_photo_path
@@ -615,7 +630,8 @@ async def create_ar_content(
     auto_enhance: bool = Form(False),
     photo_file: UploadFile = File(...),
     video_file: UploadFile = File(...),
-    db: AsyncSession = Depends(get_db)
+    background_tasks: BackgroundTasks = None,
+    db: AsyncSession = Depends(get_db),
 ):
     """Create new AR content with photo and video files."""
     return await _create_ar_content(
@@ -628,7 +644,8 @@ async def create_ar_content(
         photo_file=photo_file,
         video_file=video_file,
         auto_enhance=auto_enhance,
-        db=db
+        db=db,
+        background_tasks=background_tasks,
     )
 
 
@@ -723,7 +740,8 @@ async def create_ar_content_hierarchical(
     company_id: int,
     project_id: int,
     data: dict = Depends(parse_ar_content_data),
-    db: AsyncSession = Depends(get_db)
+    background_tasks: BackgroundTasks = None,
+    db: AsyncSession = Depends(get_db),
 ):
     """Create new AR content within a specific company and project with photo and video files."""
     log = structlog.get_logger()
@@ -750,7 +768,8 @@ async def create_ar_content_hierarchical(
             photo_file=data["photo_file"],
             video_file=data["video_file"],
             auto_enhance=bool(data.get("auto_enhance")),
-            db=db
+            db=db,
+            background_tasks=background_tasks,
         )
     except HTTPException:
         raise
@@ -776,7 +795,8 @@ async def create_ar_content_legacy(
     image: UploadFile = File(...),
     video: UploadFile = File(...),
     description: str = Form(""),
-    db: AsyncSession = Depends(get_db)
+    background_tasks: BackgroundTasks = None,
+    db: AsyncSession = Depends(get_db),
 ):
     """Create new AR content with legacy format (image/video files and JSON metadata string)."""
     logger = structlog.get_logger()
@@ -825,7 +845,8 @@ async def create_ar_content_legacy(
         photo_file=image,  # Map 'image' to 'photo_file'
         video_file=video,  # Map 'video' to 'video_file'
         auto_enhance=False,
-        db=db
+        db=db,
+        background_tasks=background_tasks,
     )
 
 
