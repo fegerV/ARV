@@ -10,7 +10,17 @@ Group=arv
 WorkingDirectory=/opt/arv/app
 EnvironmentFile=/opt/arv/app/.env
 
-ExecStart=/opt/arv/venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8000 --workers 2 --log-level info --access-log
+ExecStart=/opt/arv/venv/bin/gunicorn app.main:app \
+    --bind 127.0.0.1:8000 \
+    --workers 2 \
+    --worker-class uvicorn.workers.UvicornWorker \
+    --timeout 120 \
+    --graceful-timeout 30 \
+    --keep-alive 5 \
+    --max-requests 1000 \
+    --max-requests-jitter 50 \
+    --access-logfile - \
+    --log-level info
 
 Restart=always
 RestartSec=5

@@ -1,74 +1,63 @@
-from fastapi import HTTPException, status, Request
-from slowapi import Limiter, _rate_limit_exceeded_handler
-from slowapi.util import get_remote_address
-from slowapi.errors import RateLimitExceeded
+"""Rate-limiting middleware.
+
+Uses ``slowapi`` with the real client IP extracted from ``X-Real-IP``
+(set by Nginx) so it works correctly behind a reverse proxy.
+"""
+
 import time
-from typing import Dict, Any
+from typing import Callable
 
-# Initialize rate limiter with IP address as default key
-limiter = Limiter(key_func=get_remote_address)
+from fastapi import FastAPI, Request
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+import structlog
 
-def get_user_rate_limit_key(request: Request) -> str:
-    """Generate a rate limit key based on the request - IP for unauthenticated, user ID for authenticated"""
-    # Check if the request has an authenticated user
-    try:
-        # Extract user from request state if available
-        current_user = getattr(request.state, "user", None)
-        if current_user and hasattr(current_user, "id"):
-            # For authenticated users, use user ID as part of the key
-            return f"user_{current_user.id}"
-        else:
-            # For unauthenticated requests, use IP address
-            return get_remote_address(request)
-    except:
-        # Fallback to IP address if user extraction fails
-        return get_remote_address(request)
+logger = structlog.get_logger()
 
-def add_rate_limit_headers(response, request_limit, current_limit, window_size=60):
-    """Add rate limit headers to response"""
-    response.headers["X-RateLimit-Limit"] = str(request_limit)
-    response.headers["X-RateLimit-Remaining"] = str(max(0, current_limit))
-    response.headers["X-RateLimit-Reset"] = str(int(time.time()) + window_size)
 
-def setup_rate_limiting(app):
-    """Setup rate limiting for the FastAPI application"""
-    # Set up the limiter instance
+# ── Key function ─────────────────────────────────────────────────────
+
+def _get_real_ip(request: Request) -> str:
+    """Extract the real client IP from reverse-proxy headers.
+
+    Priority: X-Real-IP → first entry in X-Forwarded-For → direct peer.
+    """
+    real_ip = request.headers.get("x-real-ip")
+    if real_ip:
+        return real_ip.strip()
+    forwarded = request.headers.get("x-forwarded-for")
+    if forwarded:
+        return forwarded.split(",")[0].strip()
+    return request.client.host if request.client else "unknown"
+
+
+# Global limiter — default 100 requests / minute per IP
+limiter = Limiter(
+    key_func=_get_real_ip,
+    default_limits=["100/minute"],
+    # NOTE: In-memory storage (default). For multi-worker setups switch to
+    # Redis backend by setting RATELIMIT_STORAGE_URI in env (see slowapi docs).
+    # Example: storage_uri="redis://localhost:6379/1"
+)
+
+
+# ── Setup ────────────────────────────────────────────────────────────
+
+def setup_rate_limiting(app: FastAPI) -> None:
+    """Register the slowapi limiter and a middleware that adds real headers."""
     app.state.limiter = limiter
     app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
-    
-    # Add rate limit middleware to update response headers with rate limit info
+
     @app.middleware("http")
-    async def rate_limit_middleware(request: Request, call_next):
+    async def rate_limit_header_middleware(request: Request, call_next):  # type: ignore[override]
         response = await call_next(request)
-        
-        # Add rate limit headers to response
-        # Note: slowapi automatically handles rate limiting,
-        # we're just adding the headers for client information
-        current_user = getattr(request.state, "user", None)
-        if current_user and hasattr(current_user, "id"):
-            # Authenticated user - 100 requests per hour
-            add_rate_limit_headers(response, 100, 100, 3600)  # 1 hour window
-        else:
-            # Unauthenticated user - 100 requests per minute
-            add_rate_limit_headers(response, 100, 100, 60)  # 1 minute window
-        
+        # Expose the real client IP as a debug header (helpful for ops)
+        response.headers["X-Client-IP"] = _get_real_ip(request)
         return response
 
-# Decorator for applying rate limits to specific routes
-def rate_limit(max_requests: int, window_size: str, per_user: bool = True):
-    """
-    Decorator to apply rate limiting to specific routes
-    :param max_requests: Maximum number of requests allowed
-    :param window_size: Time window (e.g., "minute", "hour", "day")
-    :param per_user: Whether to apply rate limit per user or per IP
-    """
-    def decorator(func):
-        # Create a wrapper function that adds rate limiting
-        if per_user:
-            # Use user-specific rate limiting
-            limited_func = limiter.limit(f"{max_requests}/{window_size}", key_func=get_user_rate_limit_key)(func)
-        else:
-            # Use IP-based rate limiting
-            limited_func = limiter.limit(f"{max_requests}/{window_size}")(func)
-        return limited_func
-    return decorator
+
+# ── Decorator for per-route limits ───────────────────────────────────
+
+def rate_limit(limit_string: str) -> Callable:
+    """Apply a per-route rate limit, e.g. ``@rate_limit("5/minute")``."""
+    return limiter.limit(limit_string)

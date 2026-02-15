@@ -67,6 +67,26 @@ async def lifespan(app: FastAPI) -> AsyncGenerator:
     except RuntimeError:
         pass
 
+    # ── Sentry (error tracking) ─────────────────────────────────────
+    if settings.SENTRY_DSN:
+        try:
+            import sentry_sdk
+            from sentry_sdk.integrations.fastapi import FastApiIntegration
+            from sentry_sdk.integrations.sqlalchemy import SqlalchemyIntegration
+
+            sentry_sdk.init(
+                dsn=settings.SENTRY_DSN,
+                environment=settings.ENVIRONMENT,
+                traces_sample_rate=0.1 if settings.is_production else 1.0,
+                integrations=[FastApiIntegration(), SqlalchemyIntegration()],
+                send_default_pii=False,
+            )
+            logger.info("sentry_initialised", environment=settings.ENVIRONMENT)
+        except ImportError:
+            logger.warning("sentry_sdk_not_installed")
+        except Exception as exc:
+            logger.error("sentry_init_failed", error=str(exc))
+
     logger.info(
         "application_startup",
         environment=settings.ENVIRONMENT,
@@ -123,14 +143,19 @@ configure_logging()
 # Initialize logger after logging is configured
 logger = structlog.get_logger()
 
+# Disable OpenAPI docs in production (security best-practice)
+_docs_url = None if settings.is_production else "/docs"
+_redoc_url = None if settings.is_production else "/redoc"
+_openapi_url = None if settings.is_production else "/openapi.json"
+
 # Create FastAPI application
 app = FastAPI(
     title="Vertex AR B2B Platform",
     description="B2B SaaS platform for creating AR content based on image recognition (NFT markers)",
     version="0.1.0",
-    docs_url="/docs", # Standard FastAPI docs URL
-    redoc_url="/redoc",  # Standard FastAPI redoc URL
-    openapi_url="/openapi.json",  # Standard FastAPI openapi URL
+    docs_url=_docs_url,
+    redoc_url=_redoc_url,
+    openapi_url=_openapi_url,
     lifespan=lifespan,
     default_response_class=ORJSONResponse,
     contact={
@@ -160,6 +185,22 @@ app.add_middleware(
     GZipMiddleware,
     minimum_size=500,
 )
+
+
+# ── X-Request-ID middleware (request tracing) ────────────────────────
+@app.middleware("http")
+async def request_id_middleware(request: Request, call_next):
+    """Attach a unique request ID to every request for log correlation."""
+    from uuid import uuid4
+
+    request_id = request.headers.get("x-request-id") or str(uuid4())
+    # Bind to structlog context so every log line includes request_id
+    structlog.contextvars.clear_contextvars()
+    structlog.contextvars.bind_contextvars(request_id=request_id)
+
+    response = await call_next(request)
+    response.headers["X-Request-ID"] = request_id
+    return response
 
 # Include HTML routes
 from app.html import html_router

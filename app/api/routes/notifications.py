@@ -1,7 +1,7 @@
 from datetime import datetime
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import func, select
 import httpx
 import smtplib
 from email.mime.text import MIMEText
@@ -75,10 +75,10 @@ async def list_notifications(
     res = await db.execute(stmt)
     items = res.scalars().all()
     
-    # Get total count for pagination
-    count_stmt = select(Notification)
+    # Get total count for pagination — scalar COUNT instead of loading all rows
+    count_stmt = select(func.count()).select_from(Notification)
     count_res = await db.execute(count_stmt)
-    total = len(count_res.scalars().all())
+    total = count_res.scalar() or 0
     
     notification_items = []
     for n in items:

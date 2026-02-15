@@ -1,3 +1,4 @@
+import json as _json
 from pathlib import Path
 from typing import Optional
 from uuid import UUID
@@ -11,6 +12,7 @@ from datetime import datetime, timezone, timedelta
 
 from app.core.config import settings
 from app.core.database import get_db
+from app.core.redis import redis_client
 from app.models.ar_content import ARContent
 from app.models.ar_view_session import ARViewSession
 from app.models.company import Company
@@ -21,6 +23,34 @@ from app.core.storage_providers import get_provider_for_company
 
 logger = structlog.get_logger()
 router = APIRouter()
+
+# ── Manifest cache helpers ───────────────────────────────────────────
+_MANIFEST_CACHE_TTL = 30  # seconds
+_MANIFEST_CACHE_PREFIX = "manifest:"
+
+
+async def _get_cached_manifest(unique_id: str) -> Optional[dict]:
+    """Return cached manifest dict or None."""
+    try:
+        raw = await redis_client.get(f"{_MANIFEST_CACHE_PREFIX}{unique_id}")
+        if raw:
+            return _json.loads(raw)
+    except Exception:
+        # Redis down — fall through to DB
+        pass
+    return None
+
+
+async def _set_cached_manifest(unique_id: str, payload: dict) -> None:
+    """Store manifest dict in Redis with TTL."""
+    try:
+        await redis_client.set(
+            f"{_MANIFEST_CACHE_PREFIX}{unique_id}",
+            _json.dumps(payload, default=str),
+            ex=_MANIFEST_CACHE_TTL,
+        )
+    except Exception:
+        pass  # Redis down — cache miss next time, no big deal
 
 
 def _is_yadisk_ref(path_or_url: Optional[str]) -> bool:
@@ -287,6 +317,23 @@ async def get_viewer_manifest(
     except (ValueError, TypeError):
         raise HTTPException(status_code=400, detail="Invalid unique_id format")
 
+    # ── Try Redis cache first (views counting is best-effort anyway) ──
+    cached = await _get_cached_manifest(unique_id)
+    if cached:
+        # Record view asynchronously even on cache hit
+        try:
+            stmt = select(ARContent).where(ARContent.unique_id == unique_id)
+            res = await db.execute(stmt)
+            ar_content = res.scalar_one_or_none()
+            if ar_content:
+                await _record_view(ar_content, request, db)
+        except Exception:
+            pass  # best-effort
+        return JSONResponse(
+            content=cached,
+            headers={"X-Manifest-Version": VIEWER_MANIFEST_VERSION, "X-Cache": "HIT"},
+        )
+
     try:
         return await _build_manifest(unique_id, request, db)
     except HTTPException:
@@ -412,6 +459,11 @@ async def _build_manifest(
         expires_at=expires_at_str,
         status=ar_status,
     )
+    payload = response.model_dump(mode="json")
+
+    # ── Cache in Redis ──────────────────────────────────────────────
+    await _set_cached_manifest(unique_id, payload)
+
     logger.info(
         "viewer_manifest_served",
         unique_id=unique_id,
@@ -420,8 +472,8 @@ async def _build_manifest(
         video_url=video_url_abs,
     )
     return JSONResponse(
-        content=response.model_dump(mode="json"),
-        headers={"X-Manifest-Version": VIEWER_MANIFEST_VERSION},
+        content=payload,
+        headers={"X-Manifest-Version": VIEWER_MANIFEST_VERSION, "X-Cache": "MISS"},
     )
 
 

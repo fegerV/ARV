@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, ForeignKey
+from sqlalchemy import Column, Index, Integer, String, Boolean, DateTime, ForeignKey
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import relationship
 from app.core.database import Base
@@ -8,11 +8,17 @@ from datetime import datetime
 
 class ARViewSession(Base):
     __tablename__ = "ar_view_sessions"
-    
+
+    __table_args__ = (
+        Index("ix_ar_view_sessions_created_at", "created_at"),
+        Index("ix_ar_view_sessions_company_id", "company_id"),
+        Index("ix_ar_view_sessions_project_id", "project_id"),
+        Index("ix_ar_view_sessions_ar_content_id", "ar_content_id"),
+    )
+
     # Use Integer as primary key to match migration
     id = Column(Integer, primary_key=True, index=True)
     
-    # Исправляем ссылку на правильное имя таблицы
     ar_content_id = Column(Integer, ForeignKey("ar_content.id"), nullable=False)
     project_id = Column(Integer, ForeignKey("projects.id"), nullable=False)
     company_id = Column(Integer, ForeignKey("companies.id"), nullable=False)

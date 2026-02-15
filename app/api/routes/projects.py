@@ -1,4 +1,4 @@
-from typing import List, Optional
+from typing import Dict, List, Optional, Sequence
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
@@ -16,6 +16,26 @@ from app.schemas.project_api import (
 from app.api.routes.auth import get_current_active_user
 
 router = APIRouter(tags=["projects"])
+
+
+async def _batch_ar_content_counts(
+    db: AsyncSession,
+    project_ids: Sequence[int],
+) -> Dict[int, int]:
+    """Fetch AR-content counts for multiple projects in a single query.
+
+    Returns a dict mapping ``project_id`` → count (default 0).
+    """
+    if not project_ids:
+        return {}
+    stmt = (
+        select(ARContent.project_id, func.count())
+        .where(ARContent.project_id.in_(project_ids))
+        .group_by(ARContent.project_id)
+    )
+    rows = await db.execute(stmt)
+    counts = {pid: cnt for pid, cnt in rows.all()}
+    return counts
 
 
 def _generate_project_links(project_id: int) -> ProjectLinks:
@@ -47,27 +67,21 @@ async def get_projects_by_company(
     result = await db.execute(query)
     projects = result.scalars().all()
 
-    # Format response for frontend
-    projects_data = []
-    for project in projects:
-        # Count AR content for this project
-        ar_content_count_query = (
-            select(func.count())
-            .select_from(ARContent)
-            .where(ARContent.project_id == project.id)
-        )
-        ar_content_count_result = await db.execute(ar_content_count_query)
-        ar_content_count = ar_content_count_result.scalar()
+    # Batch COUNT — single query instead of N+1
+    counts = await _batch_ar_content_counts(db, [p.id for p in projects])
 
-        projects_data.append({
+    projects_data = [
+        {
             "id": project.id,
             "name": project.name,
             "status": project.status,
             "company_id": project.company_id,
-            "ar_content_count": ar_content_count,
+            "ar_content_count": counts.get(project.id, 0),
             "created_at": project.created_at.isoformat() if project.created_at else None,
             "updated_at": project.updated_at.isoformat() if project.updated_at else None,
-        })
+        }
+        for project in projects
+    ]
 
     logger.info("company_projects_fetched", company_id=company_id, count=len(projects_data))
 
@@ -94,27 +108,21 @@ async def get_projects_by_company_no_auth(
     result = await db.execute(query)
     projects = result.scalars().all()
 
-    # Format response for frontend
-    projects_data = []
-    for project in projects:
-        # Count AR content for this project
-        ar_content_count_query = (
-            select(func.count())
-            .select_from(ARContent)
-            .where(ARContent.project_id == project.id)
-        )
-        ar_content_count_result = await db.execute(ar_content_count_query)
-        ar_content_count = ar_content_count_result.scalar()
+    # Batch COUNT — single query instead of N+1
+    counts = await _batch_ar_content_counts(db, [p.id for p in projects])
 
-        projects_data.append({
+    projects_data = [
+        {
             "id": project.id,
             "name": project.name,
             "status": project.status,
             "company_id": project.company_id,
-            "ar_content_count": ar_content_count,
+            "ar_content_count": counts.get(project.id, 0),
             "created_at": project.created_at.isoformat() if project.created_at else None,
             "updated_at": project.updated_at.isoformat() if project.updated_at else None,
-        })
+        }
+        for project in projects
+    ]
 
     logger.info("company_projects_fetched_no_auth", company_id=company_id, count=len(projects_data))
 
@@ -165,24 +173,21 @@ async def list_projects(
    result = await db.execute(query)
    projects = result.scalars().all()
    
-   # Build response items
-   items = []
-   for project in projects:
-       # Load AR content count efficiently
-       ar_content_count_query = select(func.count()).select_from(ARContent).where(ARContent.project_id == project.id)
-       ar_content_count_result = await db.execute(ar_content_count_query)
-       ar_content_count = ar_content_count_result.scalar()
-       
-       item = ProjectListItem(
+   # Batch COUNT — single query instead of N+1
+   counts = await _batch_ar_content_counts(db, [p.id for p in projects])
+
+   items = [
+       ProjectListItem(
            id=str(project.id),
            name=project.name,
            status=project.status,
            company_id=project.company_id,
-           ar_content_count=ar_content_count,
+           ar_content_count=counts.get(project.id, 0),
            created_at=project.created_at,
-           _links=_generate_project_links(project.id)
+           _links=_generate_project_links(project.id),
        )
-       items.append(item)
+       for project in projects
+   ]
    
    logger.info("projects_listed", total=total, page=page, page_size=page_size)
    
@@ -230,24 +235,21 @@ async def list_projects_for_company(
     result = await db.execute(query)
     projects = result.scalars().all()
     
-    # Build response items
-    items = []
-    for project in projects:
-        # Load AR content count efficiently
-        ar_content_count_query = select(func.count()).select_from(ARContent).where(ARContent.project_id == project.id)
-        ar_content_count_result = await db.execute(ar_content_count_query)
-        ar_content_count = ar_content_count_result.scalar()
-        
-        item = ProjectListItem(
+    # Batch COUNT — single query instead of N+1
+    counts = await _batch_ar_content_counts(db, [p.id for p in projects])
+
+    items = [
+        ProjectListItem(
             id=str(project.id),
             name=project.name,
             status=project.status,
             company_id=project.company_id,
-            ar_content_count=ar_content_count,
+            ar_content_count=counts.get(project.id, 0),
             created_at=project.created_at,
-            _links=_generate_project_links(project.id)
+            _links=_generate_project_links(project.id),
         )
-        items.append(item)
+        for project in projects
+    ]
     
     logger.info("company_projects_listed", company_id=company_id, total=total, page=page, page_size=page_size)
     

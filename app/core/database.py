@@ -30,6 +30,8 @@ def _build_engine():
             "pool_size": settings.DB_POOL_SIZE,
             "max_overflow": settings.DB_MAX_OVERFLOW,
             "pool_pre_ping": True,
+            "pool_recycle": 1800,   # recycle stale connections every 30 min
+            "pool_timeout": 30,     # fail fast if pool exhausted (seconds)
         }
 
     return create_async_engine(
