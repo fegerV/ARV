@@ -21,6 +21,7 @@ import com.google.mlkit.vision.common.InputImage
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import ru.neuroimagen.arviewer.ar.ArSessionHelper
 import ru.neuroimagen.arviewer.data.api.ApiProvider
 import ru.neuroimagen.arviewer.data.model.ViewerError
 import ru.neuroimagen.arviewer.databinding.ActivityMainBinding
@@ -220,6 +221,16 @@ class MainActivity : AppCompatActivity() {
 
     private fun openViewer(uniqueId: String) {
         lastAttemptedUniqueId = uniqueId
+
+        // ── Pre-flight: check ARCore support BEFORE heavy network loading ──
+        if (!ArSessionHelper.isArCoreSupported(this)) {
+            showErrorPanel(
+                getString(R.string.error_device_not_supported),
+                retryable = false,
+            )
+            return
+        }
+
         showLoadingPanel()
         lifecycleScope.launch {
             val result = withContext(Dispatchers.IO) { repository.loadManifest(uniqueId) }
@@ -233,20 +244,29 @@ class MainActivity : AppCompatActivity() {
                     showMainPanel()
                 },
                 onFailure = { throwable ->
-                    val message = when (val error = throwable as? ViewerError) {
-                        is ViewerError.Server -> getString(R.string.error_server, error.code)
-                        is ViewerError.Network -> {
-                            val base = getString(R.string.error_network)
-                            val detail = if (!error.msg.isNullOrBlank()) "\n(${error.msg})" else ""
-                            val hint = getString(R.string.error_network_hint)
-                            "$base$detail\n\n$hint"
-                        }
-                        is ViewerError -> getString(ViewerErrorMessages.getMessageResId(error))
-                        else -> getString(R.string.error_unknown)
-                    }
-                    showErrorPanel(message)
+                    val error = throwable as? ViewerError
+                    val message = buildErrorMessage(error, throwable)
+                    val retryable = error?.let { ViewerErrorMessages.isRetryable(it) } ?: true
+                    showErrorPanel(message, retryable)
                 }
             )
+        }
+    }
+
+    /**
+     * Build a human-readable error message from a [ViewerError] or generic throwable.
+     */
+    private fun buildErrorMessage(error: ViewerError?, throwable: Throwable): String {
+        return when (error) {
+            is ViewerError.Server -> getString(R.string.error_server, error.code)
+            is ViewerError.Network -> {
+                val base = getString(R.string.error_network)
+                val detail = if (!error.msg.isNullOrBlank()) "\n(${error.msg})" else ""
+                val hint = getString(R.string.error_network_hint)
+                "$base$detail\n\n$hint"
+            }
+            is ViewerError -> getString(ViewerErrorMessages.getMessageResId(error))
+            else -> getString(R.string.error_unknown)
         }
     }
 
@@ -273,11 +293,18 @@ class MainActivity : AppCompatActivity() {
         binding.panelError.visibility = View.GONE
     }
 
-    private fun showErrorPanel(message: String) {
+    /**
+     * Show the error panel with a message.
+     *
+     * @param message  User-facing error text.
+     * @param retryable  If `false`, the "Retry" button is hidden (permanent errors).
+     */
+    private fun showErrorPanel(message: String, retryable: Boolean = true) {
         binding.panelMain.visibility = View.GONE
         binding.panelLoading.visibility = View.GONE
         binding.panelError.visibility = View.VISIBLE
         binding.textError.text = message
+        binding.buttonRetry.visibility = if (retryable) View.VISIBLE else View.GONE
     }
 
     companion object {

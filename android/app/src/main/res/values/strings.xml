@@ -24,9 +24,17 @@
     <string name="error_unknown">Неизвестная ошибка</string>
     <string name="error_camera_required">Для AR нужен доступ к камере. Разрешите в настройках приложения.</string>
     <string name="error_arcore_required">Требуется ARCore. Установите из Play Маркета.</string>
-    <string name="error_arcore_session">Не удалось запустить AR. Проверьте поддержку устройства.</string>
+    <string name="error_arcore_session">Не удалось запустить AR-сессию. Попробуйте перезапустить приложение.</string>
     <string name="error_video_playback">Ошибка воспроизведения видео: %1$s</string>
     <string name="error_microphone_required">Для записи со звуком нужен доступ к микрофону</string>
+
+    <!-- Device compatibility errors -->
+    <string name="error_device_not_supported">Ваше устройство не поддерживает дополненную реальность (ARCore).\n\nДля работы приложения необходимо устройство из списка поддерживаемых Google ARCore:\nhttps://developers.google.com/ar/devices</string>
+    <string name="error_arcore_install_requested">Для работы AR необходим компонент Google Play Services for AR.\n\nОткроется страница установки — после установки вернитесь в приложение и попробуйте снова.</string>
+    <string name="error_arcore_user_declined">Вы отклонили установку ARCore.\n\nДля работы дополненной реальности необходим компонент Google Play Services for AR. Установите его из Play Маркета и попробуйте снова.</string>
+    <string name="error_arcore_sdk_too_old">Версия Android на вашем устройстве слишком старая для ARCore.\n\nОбновите систему до Android 7.0 (Nougat) или новее в настройках устройства.</string>
+    <string name="error_ar_title">Не удалось запустить AR</string>
+    <string name="ar_error_go_back">Назад</string>
 
     <!-- AR loading screen -->
     <string name="ar_scene_placeholder">AR-сцена (загрузка…)</string>

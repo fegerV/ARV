@@ -33,8 +33,10 @@ import com.google.gson.Gson
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import ru.neuroimagen.arviewer.ar.ArCoreCheckResult
 import ru.neuroimagen.arviewer.ar.ArRenderer
 import ru.neuroimagen.arviewer.ar.ArSessionHelper
+import ru.neuroimagen.arviewer.ar.ArSessionResult
 import ru.neuroimagen.arviewer.ar.RecordableEGLConfigChooser
 import ru.neuroimagen.arviewer.data.api.ApiProvider
 import ru.neuroimagen.arviewer.data.cache.MarkerCache
@@ -219,21 +221,67 @@ class ArViewerActivity : AppCompatActivity() {
 
     /**
      * Starts AR scene. Call only when camera permission is granted.
+     *
+     * Uses granular [ArCoreCheckResult] and [ArSessionResult] to provide
+     * clear, device-specific error messages instead of generic Toasts.
      */
     private fun startArWithPermission(manifest: ViewerManifest, bitmap: Bitmap) {
         if (isDestroyed) return
-        if (!ArSessionHelper.checkAndInstallArCore(this)) {
-            Toast.makeText(this, R.string.error_arcore_required, Toast.LENGTH_LONG).show()
-            finish()
-            return
+
+        // ── Step 1: Check & install ARCore ──────────────────────────
+        when (val checkResult = ArSessionHelper.checkAndInstallArCore(this)) {
+            is ArCoreCheckResult.Ready -> { /* proceed */ }
+
+            is ArCoreCheckResult.DeviceNotSupported -> {
+                showArError(getString(R.string.error_device_not_supported))
+                return
+            }
+            is ArCoreCheckResult.InstallRequested -> {
+                // Play Store install dialog was shown; activity will resume later.
+                showArError(getString(R.string.error_arcore_install_requested))
+                return
+            }
+            is ArCoreCheckResult.UserDeclinedInstall -> {
+                showArError(getString(R.string.error_arcore_user_declined))
+                return
+            }
+            is ArCoreCheckResult.SdkTooOld -> {
+                showArError(getString(R.string.error_arcore_sdk_too_old))
+                return
+            }
+            is ArCoreCheckResult.Unknown -> {
+                showArError(getString(R.string.error_arcore_session))
+                return
+            }
         }
+
         if (isDestroyed) return
-        val session = ArSessionHelper.createSession(this, bitmap, manifest)
-        if (session == null) {
-            Toast.makeText(this, R.string.error_arcore_session, Toast.LENGTH_LONG).show()
-            finish()
-            return
+
+        // ── Step 2: Create ARCore session ───────────────────────────
+        val session = when (val sessionResult = ArSessionHelper.createSession(this, bitmap, manifest)) {
+            is ArSessionResult.Success -> sessionResult.session
+            is ArSessionResult.DeviceNotCompatible -> {
+                showArError(getString(R.string.error_device_not_supported))
+                return
+            }
+            is ArSessionResult.ArCoreNotInstalled -> {
+                showArError(getString(R.string.error_arcore_install_requested))
+                return
+            }
+            is ArSessionResult.UserDeclined -> {
+                showArError(getString(R.string.error_arcore_user_declined))
+                return
+            }
+            is ArSessionResult.SdkTooOld -> {
+                showArError(getString(R.string.error_arcore_sdk_too_old))
+                return
+            }
+            is ArSessionResult.Failed -> {
+                showArError(getString(R.string.error_arcore_session))
+                return
+            }
         }
+
         if (isDestroyed) return
         arSession = session
 
@@ -527,6 +575,20 @@ class ArViewerActivity : AppCompatActivity() {
     private fun onGlSurfaceTouch(event: MotionEvent): Boolean {
         scaleDetector?.onTouchEvent(event)
         return true
+    }
+
+    // ── Error UI ───────────────────────────────────────────────────
+
+    /**
+     * Show a full-screen error message with a "Back" button instead of
+     * a transient Toast.  The user can read the message at their own pace.
+     */
+    private fun showArError(message: String) {
+        stopLoadingTipsCycle()
+        val errorView = layoutInflater.inflate(R.layout.layout_ar_error, null)
+        errorView.findViewById<TextView>(R.id.text_ar_error).text = message
+        errorView.findViewById<Button>(R.id.button_ar_error_back).setOnClickListener { finish() }
+        setContentView(errorView)
     }
 
     companion object {
