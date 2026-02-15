@@ -95,10 +95,24 @@ async def lifespan(app: FastAPI) -> AsyncGenerator:
         logger.info("defaults_seeded")
     except Exception as se:
         logger.error("defaults_seeding_failed", error=str(se))
+
+    # Start backup scheduler
+    try:
+        from app.core.scheduler import init_scheduler, scheduler as _scheduler
+        await init_scheduler()
+    except Exception as exc:
+        logger.error("scheduler_startup_failed", error=str(exc))
     
     yield
     
     # Shutdown
+    try:
+        from app.core.scheduler import scheduler as _sched
+        if _sched.running:
+            _sched.shutdown(wait=False)
+            logger.info("scheduler_stopped")
+    except Exception:
+        pass
     logger.info("application_shutdown")
     logger.info("database_closed")
 
@@ -154,7 +168,8 @@ app.include_router(html_router)
 # Include API routers
 from app.api.routes import (
     auth, companies, projects, ar_content, storage, analytics, notifications,
-    rotation, oauth, public, settings as routes_settings, viewer, videos, health, alerts_ws
+    rotation, oauth, public, settings as routes_settings, viewer, videos, health, alerts_ws,
+    backups,
 )
 
 # Health must be registered before ar_content (which has greedy /{content_id} under /api)
@@ -170,6 +185,7 @@ app.include_router(routes_settings.router, prefix="/api/settings", tags=["Settin
 app.include_router(viewer.router, prefix="/api/viewer", tags=["Viewer"])
 app.include_router(videos.router, prefix="/api/videos", tags=["Videos"])
 app.include_router(alerts_ws.router, prefix="/api/ws", tags=["WebSocket"])
+app.include_router(backups.router, prefix="/api/backups", tags=["Backups"])
 app.include_router(companies.router, prefix="/api", tags=["Companies"])
 app.include_router(projects.router, prefix="/api", tags=["Projects"])
 # ar_content last: has greedy GET /{content_id} that matches any /api/... path

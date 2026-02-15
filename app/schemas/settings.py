@@ -11,6 +11,7 @@ class SettingCategory(str, Enum):
     API = "api"
     INTEGRATIONS = "integrations"
     AR = "ar"
+    BACKUP = "backup"
 
 class SettingDataType(str, Enum):
     STRING = "string"
@@ -102,6 +103,18 @@ class ARSettings(BaseModel):
     default_ar_viewer_theme: str = "default"
     qr_code_expiration_days: int = 365
     
+class BackupSettings(BaseModel):
+    """Database backup configuration."""
+
+    backup_enabled: bool = False
+    backup_company_id: Optional[int] = None
+    backup_yd_folder: str = "backups"
+    backup_schedule: str = "daily"
+    backup_cron: str = "0 3 * * *"
+    backup_retention_days: int = 30
+    backup_max_copies: int = 30
+
+
 class AllSettings(BaseModel):
     general: GeneralSettings
     security: SecuritySettings
@@ -110,3 +123,4 @@ class AllSettings(BaseModel):
     api: APISettings
     integrations: IntegrationSettings
     ar: ARSettings
+    backup: BackupSettings

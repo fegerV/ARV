@@ -47,6 +47,14 @@
             <span class="material-icons text-lg">view_in_ar</span>
             AR-контент
         </button>
+        <button @click="activeTab = 'backup'"
+                :class="activeTab === 'backup'
+                    ? 'bg-blue-600 text-white shadow-sm'
+                    : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700'"
+                class="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium whitespace-nowrap transition-all">
+            <span class="material-icons text-lg">backup</span>
+            Бэкапы
+        </button>
     </div>
 
     <!-- ===================== ОСНОВНЫЕ НАСТРОЙКИ ===================== -->
@@ -257,6 +265,171 @@
             </form>
         </div>
     </div>
+
+    <!-- ===================== БЭКАПЫ ===================== -->
+    <div x-show="activeTab === 'backup'" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0 translate-y-1" x-transition:enter-end="opacity-100 translate-y-0">
+
+        <!-- Настройки бэкапов -->
+        <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden mb-6">
+            <div class="px-6 py-5 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
+                <div>
+                    <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Бэкап базы данных</h3>
+                    <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">Автоматическое резервное копирование PostgreSQL на Яндекс Диск</p>
+                </div>
+                <button type="button" @click="runBackupNow()" :disabled="backupRunning"
+                        class="btn btn-primary text-sm flex items-center gap-1.5">
+                    <span class="material-icons text-base" :class="backupRunning && 'animate-spin'">
+                        <template x-if="!backupRunning">backup</template>
+                        <template x-if="backupRunning">refresh</template>
+                    </span>
+                    <span x-text="backupRunning ? 'Создание...' : 'Создать сейчас'"></span>
+                </button>
+            </div>
+
+            <form method="post" action="/settings/backup" class="p-6 space-y-6">
+
+                <!-- Enable toggle -->
+                <div class="flex items-center gap-3 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-xl border border-blue-200 dark:border-blue-800">
+                    <input id="backup_enabled" name="backup_enabled" type="checkbox"
+                           {% if settings.backup.backup_enabled %}checked{% endif %}
+                           value="on"
+                           class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
+                    <label for="backup_enabled" class="text-sm">
+                        <span class="font-medium text-gray-900 dark:text-white">Автоматический бэкап</span>
+                        <span class="text-gray-500 dark:text-gray-400 block text-xs mt-0.5">Регулярное резервное копирование по расписанию</span>
+                    </label>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                    <!-- Company selector -->
+                    <div>
+                        <label for="backup_company_id" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Yandex Disk аккаунт</label>
+                        <select id="backup_company_id" name="backup_company_id" class="form-select">
+                            <option value="0">-- Не выбрано --</option>
+                            {% for c in yd_companies %}
+                            <option value="{{ c.id }}" {% if settings.backup.backup_company_id == c.id %}selected{% endif %}>{{ c.name }}</option>
+                            {% endfor %}
+                        </select>
+                        <p class="text-xs text-gray-400 dark:text-gray-500 mt-1">Компания с подключённым Яндекс Диском</p>
+                    </div>
+                    <!-- Folder on YD -->
+                    <div>
+                        <label for="backup_yd_folder" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Папка на Яндекс Диске</label>
+                        <input type="text" name="backup_yd_folder" id="backup_yd_folder"
+                               value="{{ settings.backup.backup_yd_folder|default('backups') }}"
+                               class="form-input" placeholder="backups">
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                    <!-- Schedule -->
+                    <div>
+                        <label for="backup_schedule" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Расписание</label>
+                        <select id="backup_schedule" name="backup_schedule" class="form-select"
+                                x-model="backupSchedule">
+                            <option value="daily" {% if settings.backup.backup_schedule == 'daily' %}selected{% endif %}>Ежедневно в 03:00</option>
+                            <option value="twice_daily" {% if settings.backup.backup_schedule == 'twice_daily' %}selected{% endif %}>Каждые 12 часов (03:00, 15:00)</option>
+                            <option value="weekly" {% if settings.backup.backup_schedule == 'weekly' %}selected{% endif %}>Еженедельно (пн 03:00)</option>
+                            <option value="custom" {% if settings.backup.backup_schedule == 'custom' %}selected{% endif %}>Своё cron-выражение</option>
+                        </select>
+                    </div>
+                    <!-- Custom cron (only when schedule=custom) -->
+                    <div x-show="backupSchedule === 'custom'" x-transition>
+                        <label for="backup_cron" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Cron-выражение</label>
+                        <input type="text" name="backup_cron" id="backup_cron"
+                               value="{{ settings.backup.backup_cron|default('0 3 * * *') }}"
+                               class="form-input font-mono text-sm" placeholder="0 3 * * *">
+                        <p class="text-xs text-gray-400 dark:text-gray-500 mt-1">Формат: мин час день месяц день_недели</p>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                    <div>
+                        <label for="backup_retention_days" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Хранить (дней)</label>
+                        <input type="number" name="backup_retention_days" id="backup_retention_days"
+                               value="{{ settings.backup.backup_retention_days|default(30) }}"
+                               min="1" max="365" class="form-input">
+                    </div>
+                    <div>
+                        <label for="backup_max_copies" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Макс. копий</label>
+                        <input type="number" name="backup_max_copies" id="backup_max_copies"
+                               value="{{ settings.backup.backup_max_copies|default(30) }}"
+                               min="1" max="100" class="form-input">
+                        <p class="text-xs text-gray-400 dark:text-gray-500 mt-1">Старые копии удаляются автоматически</p>
+                    </div>
+                </div>
+
+                <div class="flex flex-col sm:flex-row justify-end gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
+                    <button type="button" onclick="window.location.reload()" class="btn btn-secondary w-full sm:w-auto">Отмена</button>
+                    <button type="submit" class="btn btn-primary w-full sm:w-auto">
+                        <span class="material-icons text-sm mr-1">save</span>Сохранить
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <!-- Backup history table -->
+        <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
+            <div class="px-6 py-5 border-b border-gray-200 dark:border-gray-700">
+                <h3 class="text-lg font-semibold text-gray-900 dark:text-white">История бэкапов</h3>
+                <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">Последние операции резервного копирования</p>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                    <thead class="bg-gray-50 dark:bg-gray-900/40">
+                        <tr>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Дата</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Статус</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Размер</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Триггер</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Путь на YD</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
+                        {% for bkp in backup_history %}
+                        <tr>
+                            <td class="px-4 py-3 text-sm text-gray-700 dark:text-gray-300 whitespace-nowrap">
+                                {{ bkp.started_at.strftime('%d.%m.%Y %H:%M') if bkp.started_at else '—' }}
+                            </td>
+                            <td class="px-4 py-3 text-sm whitespace-nowrap">
+                                {% if bkp.status == 'success' %}
+                                <span class="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-full bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">
+                                    <span class="material-icons text-xs">check_circle</span>OK
+                                </span>
+                                {% elif bkp.status == 'running' %}
+                                <span class="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">
+                                    <span class="material-icons text-xs animate-spin">refresh</span>В процессе
+                                </span>
+                                {% else %}
+                                <span class="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-full bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
+                                      title="{{ bkp.error_message or '' }}">
+                                    <span class="material-icons text-xs">error</span>Ошибка
+                                </span>
+                                {% endif %}
+                            </td>
+                            <td class="px-4 py-3 text-sm text-gray-700 dark:text-gray-300 whitespace-nowrap">
+                                {% if bkp.size_bytes %}{{ (bkp.size_bytes / 1048576)|round(2) }} МБ{% else %}—{% endif %}
+                            </td>
+                            <td class="px-4 py-3 text-sm text-gray-500 dark:text-gray-400 whitespace-nowrap">
+                                {{ 'Авто' if bkp.trigger == 'scheduled' else 'Вручную' }}
+                            </td>
+                            <td class="px-4 py-3 text-xs text-gray-400 dark:text-gray-500 font-mono truncate max-w-[200px]" title="{{ bkp.yd_path or '' }}">
+                                {{ bkp.yd_path or '—' }}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                        {% if not backup_history %}
+                        <tr>
+                            <td colspan="5" class="px-4 py-8 text-center text-sm text-gray-400 dark:text-gray-500">
+                                Бэкапов пока нет
+                            </td>
+                        </tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
 </div>
 
 <style>
@@ -268,9 +441,11 @@
 function settingsPage() {
     return {
         activeTab: '{{ active_section|default("general") }}',
+        backupSchedule: '{{ settings.backup.backup_schedule|default("daily") }}',
+        backupRunning: false,
         init() {
             const hash = window.location.hash.substring(1);
-            if (['general', 'security', 'ar'].includes(hash)) {
+            if (['general', 'security', 'ar', 'backup'].includes(hash)) {
                 this.activeTab = hash;
             }
             this.$watch('activeTab', (val) => {
@@ -285,6 +460,23 @@ function settingsPage() {
                     }
                 });
             });
+        },
+        async runBackupNow() {
+            if (this.backupRunning) return;
+            this.backupRunning = true;
+            try {
+                const resp = await (window.csrfFetch || fetch)('/api/backups/run', { method: 'POST' });
+                const data = await resp.json();
+                if (resp.ok) {
+                    if (window.showToast) window.showToast('Бэкап запущен. Обновите страницу через пару минут.', 'success');
+                } else {
+                    if (window.showToast) window.showToast(data.detail || 'Ошибка запуска бэкапа', 'error');
+                }
+            } catch (err) {
+                if (window.showToast) window.showToast('Ошибка сети', 'error');
+            } finally {
+                setTimeout(() => { this.backupRunning = false; }, 3000);
+            }
         }
     };
 }

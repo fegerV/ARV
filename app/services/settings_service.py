@@ -4,7 +4,8 @@ from typing import Dict, Any, Optional, List
 from app.models.settings import SystemSettings
 from app.schemas.settings import (
     AllSettings, GeneralSettings, SecuritySettings, StorageSettings,
-    NotificationSettings, APISettings, IntegrationSettings, ARSettings
+    NotificationSettings, APISettings, IntegrationSettings, ARSettings,
+    BackupSettings,
 )
 import json
 import logging
@@ -168,6 +169,16 @@ class SettingsService:
             qr_code_expiration_days=settings_dict.get("qr_code_expiration_days", 365)
         )
         
+        backup = BackupSettings(
+            backup_enabled=settings_dict.get("backup_enabled", False),
+            backup_company_id=settings_dict.get("backup_company_id"),
+            backup_yd_folder=settings_dict.get("backup_yd_folder", "backups"),
+            backup_schedule=settings_dict.get("backup_schedule", "daily"),
+            backup_cron=settings_dict.get("backup_cron", "0 3 * * *"),
+            backup_retention_days=settings_dict.get("backup_retention_days", 30),
+            backup_max_copies=settings_dict.get("backup_max_copies", 30),
+        )
+
         return AllSettings(
             general=general,
             security=security,
@@ -175,7 +186,8 @@ class SettingsService:
             notifications=notifications,
             api=api,
             integrations=integrations,
-            ar=ar
+            ar=ar,
+            backup=backup,
         )
     
     async def update_general_settings(self, settings: GeneralSettings) -> GeneralSettings:
@@ -261,5 +273,18 @@ class SettingsService:
         await self.set_setting("default_ar_viewer_theme", settings.default_ar_viewer_theme, "string", "ar")
         await self.set_setting("qr_code_expiration_days", settings.qr_code_expiration_days, "integer", "ar")
         
+        await self.db.commit()
+        return settings
+
+    async def update_backup_settings(self, settings: BackupSettings) -> BackupSettings:
+        """Update database backup settings."""
+        await self.set_setting("backup_enabled", settings.backup_enabled, "boolean", "backup")
+        await self.set_setting("backup_company_id", settings.backup_company_id, "integer", "backup")
+        await self.set_setting("backup_yd_folder", settings.backup_yd_folder, "string", "backup")
+        await self.set_setting("backup_schedule", settings.backup_schedule, "string", "backup")
+        await self.set_setting("backup_cron", settings.backup_cron, "string", "backup")
+        await self.set_setting("backup_retention_days", settings.backup_retention_days, "integer", "backup")
+        await self.set_setting("backup_max_copies", settings.backup_max_copies, "integer", "backup")
+
         await self.db.commit()
         return settings

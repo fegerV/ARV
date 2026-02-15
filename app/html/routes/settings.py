@@ -1,18 +1,22 @@
 """HTML routes for the Settings page.
 
-Kept sections: general, security, ar.
-Removed (not wired to business logic): storage, notifications, api, integrations.
+Sections: general, security, ar, backup.
 """
+
+from typing import Optional
 
 from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.routes.auth import get_current_user_optional
 from app.html.deps import get_html_db
 from app.html.filters import datetime_format
-from app.schemas.settings import ARSettings, GeneralSettings, SecuritySettings
+from app.models.company import Company
+from app.schemas.settings import ARSettings, BackupSettings, GeneralSettings, SecuritySettings
+from app.services.backup_service import BackupService
 from app.services.settings_service import SettingsService
 
 import logging
@@ -28,11 +32,24 @@ templates.env.filters["datetime_format"] = datetime_format
 # Helpers
 # ---------------------------------------------------------------------------
 
-def _require_active_user(current_user) -> RedirectResponse | None:
+def _require_active_user(current_user) -> Optional[RedirectResponse]:
     """Return a redirect if the user is missing or inactive, else ``None``."""
     if not current_user or not current_user.is_active:
         return RedirectResponse(url="/admin/login", status_code=303)
     return None
+
+
+async def _yd_companies(db: AsyncSession) -> list[dict]:
+    """Return companies that have a Yandex Disk token configured."""
+    stmt = select(Company).where(
+        Company.storage_provider == "yandex_disk",
+        Company.yandex_disk_token.isnot(None),
+    )
+    result = await db.execute(stmt)
+    return [
+        {"id": c.id, "name": c.name}
+        for c in result.scalars().all()
+    ]
 
 
 async def _render_settings(
@@ -40,8 +57,8 @@ async def _render_settings(
     db: AsyncSession,
     current_user,
     active_section: str = "general",
-    success_message: str | None = None,
-    error_message: str | None = None,
+    success_message: Optional[str] = None,
+    error_message: Optional[str] = None,
 ) -> HTMLResponse:
     """Build the settings page response with fresh data from DB."""
     settings_service = SettingsService(db)
@@ -52,6 +69,32 @@ async def _render_settings(
         from app.html.mock import SETTINGS_MOCK_DATA
         all_settings = SETTINGS_MOCK_DATA["settings"]
 
+    # Extra context for the Backup tab
+    yd_company_list: list[dict] = []
+    backup_history: list[dict] = []
+    try:
+        yd_company_list = await _yd_companies(db)
+    except Exception:
+        pass
+    try:
+        svc = BackupService()
+        records = await svc.list_backups(db, limit=10)
+        backup_history = [
+            {
+                "id": r.id,
+                "started_at": r.started_at,
+                "finished_at": r.finished_at,
+                "status": r.status,
+                "size_bytes": r.size_bytes,
+                "yd_path": r.yd_path,
+                "error_message": r.error_message,
+                "trigger": r.trigger,
+            }
+            for r in records
+        ]
+    except Exception:
+        pass
+
     return templates.TemplateResponse(
         "settings.html",
         {
@@ -61,6 +104,8 @@ async def _render_settings(
             "active_section": active_section,
             "success_message": success_message,
             "error_message": error_message,
+            "yd_companies": yd_company_list,
+            "backup_history": backup_history,
         },
     )
 
@@ -224,4 +269,73 @@ async def update_ar_settings(
             request, db, current_user,
             active_section="ar",
             error_message="Не удалось сохранить настройки",
+        )
+
+
+# ---------------------------------------------------------------------------
+# POST  /settings/backup
+# ---------------------------------------------------------------------------
+
+_SCHEDULE_CRON_MAP = {
+    "daily": "0 3 * * *",
+    "twice_daily": "0 3,15 * * *",
+    "weekly": "0 3 * * 1",
+}
+
+
+@router.post("/settings/backup")
+async def update_backup_settings(
+    request: Request,
+    current_user=Depends(get_current_user_optional),
+    db: AsyncSession = Depends(get_html_db),
+    backup_enabled: str = Form("off"),
+    backup_company_id: int = Form(0),
+    backup_yd_folder: str = Form("backups"),
+    backup_schedule: str = Form("daily"),
+    backup_cron: str = Form("0 3 * * *"),
+    backup_retention_days: int = Form(30),
+    backup_max_copies: int = Form(30),
+):
+    """Save backup settings and reschedule the APScheduler job."""
+    redirect = _require_active_user(current_user)
+    if redirect:
+        return redirect
+
+    is_enabled = backup_enabled == "on"
+
+    # Map preset schedule names to cron expressions
+    if backup_schedule != "custom":
+        effective_cron = _SCHEDULE_CRON_MAP.get(backup_schedule, "0 3 * * *")
+    else:
+        effective_cron = backup_cron
+
+    settings_service = SettingsService(db)
+    try:
+        await settings_service.update_backup_settings(
+            BackupSettings(
+                backup_enabled=is_enabled,
+                backup_company_id=backup_company_id or None,
+                backup_yd_folder=backup_yd_folder.strip("/") or "backups",
+                backup_schedule=backup_schedule,
+                backup_cron=effective_cron,
+                backup_retention_days=max(1, backup_retention_days),
+                backup_max_copies=max(1, backup_max_copies),
+            )
+        )
+
+        # Reschedule the APScheduler job in real time
+        from app.core.scheduler import reschedule_backup
+        reschedule_backup(effective_cron, enabled=is_enabled and bool(backup_company_id))
+
+        return await _render_settings(
+            request, db, current_user,
+            active_section="backup",
+            success_message="Настройки бэкапов сохранены",
+        )
+    except Exception as exc:
+        logger.error("Error updating backup settings: %s", exc)
+        return await _render_settings(
+            request, db, current_user,
+            active_section="backup",
+            error_message="Не удалось сохранить настройки бэкапов",
         )
