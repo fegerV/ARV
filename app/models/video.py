@@ -20,7 +20,7 @@ class Video(Base):
         Index("ix_videos_ar_content_id", "ar_content_id"),
     )
 
-    id = Column(Integer, primary_key=True, index=True)
+    id = Column(Integer, primary_key=True)
     ar_content_id = Column(Integer, ForeignKey("ar_content.id"), nullable=False)
 
     # File information

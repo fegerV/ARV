@@ -22,7 +22,7 @@ class VideoRotationSchedule(Base):
         Index("ix_vrs_ar_content_id", "ar_content_id"),
     )
 
-    id = Column(Integer, primary_key=True, index=True)
+    id = Column(Integer, primary_key=True)
 
     ar_content_id = Column(Integer, ForeignKey("ar_content.id", ondelete="CASCADE"), nullable=False)
 

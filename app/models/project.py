@@ -22,7 +22,7 @@ class Project(Base):
         Index("ix_project_company_name", "company_id", "name"),
     )
 
-    id = Column(Integer, primary_key=True, index=True)
+    id = Column(Integer, primary_key=True)
 
     name = Column(String(255), nullable=False)
     status = Column(String(50), default=ProjectStatus.ACTIVE, nullable=False)

@@ -22,7 +22,7 @@ class ARViewSession(Base):
         Index("ix_ar_view_sessions_ar_content_id", "ar_content_id"),
     )
 
-    id = Column(Integer, primary_key=True, index=True)
+    id = Column(Integer, primary_key=True)
 
     ar_content_id = Column(Integer, ForeignKey("ar_content.id"), nullable=False)
     project_id = Column(Integer, ForeignKey("projects.id"), nullable=True)

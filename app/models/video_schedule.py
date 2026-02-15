@@ -20,7 +20,7 @@ class VideoSchedule(Base):
         CheckConstraint("start_time <= end_time", name="check_schedule_time_range"),
     )
 
-    id = Column(Integer, primary_key=True, index=True)
+    id = Column(Integer, primary_key=True)
     video_id = Column(Integer, ForeignKey("videos.id", ondelete="CASCADE"), nullable=False)
 
     start_time = Column(DateTime(timezone=True), nullable=False)

@@ -44,10 +44,12 @@ class ARContent(Base):
     __tablename__ = "ar_content"
     
     # Use Integer as primary key to match migration
-    id = Column(Integer, primary_key=True, index=True)
+    id = Column(Integer, primary_key=True)
     
     # Foreign Keys
-    project_id = Column(Integer, ForeignKey("projects.id"), nullable=False, index=True)
+    # project_id indexed via composite ix_ar_content_project_order
+    project_id = Column(Integer, ForeignKey("projects.id"), nullable=False)
+    # company_id indexed via composite ix_ar_content_company_project
     company_id = Column(Integer, ForeignKey("companies.id"), nullable=False)
     active_video_id = Column(Integer, ForeignKey("videos.id"), nullable=True)
     

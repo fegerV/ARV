@@ -21,7 +21,7 @@ class BackupHistory(Base):
         Index("ix_backup_history_started_at", "started_at"),
     )
 
-    id = Column(Integer, primary_key=True, index=True)
+    id = Column(Integer, primary_key=True)
     started_at = Column(DateTime, nullable=False, default=_utcnow)
     finished_at = Column(DateTime, nullable=True)
     status = Column(String(20), nullable=False, default="running")

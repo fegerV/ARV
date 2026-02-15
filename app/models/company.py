@@ -22,7 +22,7 @@ class Company(Base):
         Index("ix_companies_slug", "slug", unique=True),
     )
 
-    id = Column(Integer, primary_key=True, index=True)
+    id = Column(Integer, primary_key=True)
 
     # Basic information
     name = Column(String(255), nullable=False)
