@@ -11,7 +11,7 @@ from datetime import datetime, timezone
 
 def _utcnow() -> datetime:
     """Timezone-aware UTC now."""
-    return datetime.now(timezone.utc)
+    return datetime.now(timezone.utc).replace(tzinfo=None)
 
 
 class UUIDString(TypeDecorator):

@@ -10,7 +10,7 @@ from app.enums import ProjectStatus
 
 
 def _utcnow() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(timezone.utc).replace(tzinfo=None)
 
 
 class Project(Base):
