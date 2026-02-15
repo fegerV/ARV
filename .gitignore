@@ -32,7 +32,7 @@ env/
 *~
 .DS_Store
 
-# Local deps (e.g. cloned mind-ar-js for build_mindar_cpu.py)
+# Local deps
 deps/
 
 # Environment variables
@@ -53,12 +53,8 @@ storage/
 *.log
 logs/
 
-# Node.js (Frontend)
+# Node.js
 node_modules/
-npm-debug.log
-yarn-debug.log
-yarn-error.log
-.pnpm-debug.log
 
 # Android (machine-specific)
 android/local.properties
@@ -71,6 +67,7 @@ frontend/build/
 
 # Testing
 .coverage
+coverage.xml
 htmlcov/
 .pytest_cache/
 .tox/

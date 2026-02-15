@@ -169,9 +169,17 @@ async def ar_content_list(
     if not current_user.is_active:
         # Redirect to login page if user is not active
         return RedirectResponse(url="/admin/login", status_code=303)
-    # Get pagination and filter parameters from query string
-    page = int(request.query_params.get("page", 1))
-    page_size = int(request.query_params.get("page_size", 20))
+    # Get pagination and filter parameters from query string (safe parsing)
+    try:
+        page = int(request.query_params.get("page", 1))
+        if page < 1:
+            page = 1
+    except (ValueError, TypeError):
+        page = 1
+    try:
+        page_size = int(request.query_params.get("page_size", 20))
+    except (ValueError, TypeError):
+        page_size = 20
     filter_company = request.query_params.get("company", "").strip()
     filter_status = request.query_params.get("status", "").strip()
     filter_search = request.query_params.get("search", "").strip()

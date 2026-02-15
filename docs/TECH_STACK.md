@@ -194,35 +194,9 @@ ARV - это B2B SaaS платформа для создания AR-контен
 - Иконки в интерфейсе
 - Загружается через CDN
 
-## AR/VR
+## AR
 
-### MindAR 1.2.5
-
-**Описание**: JavaScript библиотека для AR на основе распознавания изображений
-
-**Особенности**:
-- Работает в браузере (WebAR)
-- Не требует установки приложений
-- Поддержка NFT (Natural Feature Tracking) маркеров
-- Интеграция с Three.js
-
-**Использование**:
-- Распознавание изображений в AR viewer
-- Генерация маркеров (.mind файлы)
-- Отображение AR-контента
-
-**Node.js зависимости**:
-- `mind-ar`: Основная библиотека
-- `canvas`: Для серверной генерации маркеров
-
-### Three.js (планируется)
-
-**Описание**: 3D библиотека для WebGL
-
-**Планируемое использование**:
-- 3D модели в AR
-- Расширенная визуализация
-- Интерактивные 3D объекты
+AR-просмотр реализован через Android-приложение **AR Viewer** (ARCore + Kotlin). WebAR (MindAR) отключён. Маркер = загруженное фото (JPEG/PNG), формат .mind не используется.
 
 ## Обработка медиа
 
@@ -322,25 +296,22 @@ ARV - это B2B SaaS платформа для создания AR-контен
 - Изоляция окружений
 - Упрощение разработки
 
-### Redis (планируется)
+### Nginx
 
-**Описание**: In-memory хранилище данных
+**Описание**: Веб-сервер и reverse proxy (используется в продакшене)
 
-**Планируемое использование**:
-- Кэширование
-- Сессии
-- Очереди задач
-- Pub/Sub для уведомлений
+**Использование**:
+- Reverse proxy для FastAPI (Uvicorn)
+- Раздача статических файлов (`/storage/`)
+- SSL/TLS терминация (Let's Encrypt)
 
-### Nginx (планируется)
+### APScheduler 3.10+
 
-**Описание**: Веб-сервер и reverse proxy
+**Описание**: Планировщик задач для Python
 
-**Планируемое использование**:
-- Reverse proxy для FastAPI
-- Раздача статических файлов
-- SSL/TLS терминация
-- Load balancing
+**Использование**:
+- Автоматические бэкапы PostgreSQL по cron-расписанию
+- `AsyncIOScheduler` для интеграции с asyncio
 
 ## Утилиты разработки
 
@@ -400,24 +371,6 @@ ARV - это B2B SaaS платформа для создания AR-контен
 - Проверка типов
 - Обнаружение ошибок типизации
 
-## Зависимости Node.js
-
-### mind-ar 1.2.5
-
-**Описание**: Библиотека для генерации AR-маркеров
-
-**Использование**:
-- Генерация .mind файлов
-- Компиляция маркеров
-
-### canvas 3.2.0
-
-**Описание**: Серверная реализация Canvas API
-
-**Использование**:
-- Обработка изображений в Node.js
-- Генерация маркеров
-
 ## Архитектурные решения
 
 ### Серверный рендеринг (SSR)
@@ -458,34 +411,20 @@ ARV - это B2B SaaS платформа для создания AR-контен
 
 ## Версии и совместимость
 
-Все версии зависимостей зафиксированы в:
-- `requirements.txt` - Python зависимости
-- `package.json` - Node.js зависимости
-
-Рекомендуется использовать точные версии для воспроизводимости окружений.
+Все версии зависимостей зафиксированы в `requirements.txt`.
 
 ## Обновление зависимостей
-
-### Python
 
 ```bash
 pip install --upgrade -r requirements.txt
 ```
 
-### Node.js
-
-```bash
-npm update
-```
-
-⚠️ **Важно**: После обновления протестируйте приложение на совместимость.
-
 ## Дополнительные ресурсы
 
-- [FastAPI Documentation](https://fastapi.tiangolo.com/)
-- [SQLAlchemy Documentation](https://docs.sqlalchemy.org/)
-- [Alembic Documentation](https://alembic.sqlalchemy.org/)
-- [MindAR Documentation](https://github.com/hiukim/mind-ar-js)
-- [htmx Documentation](https://htmx.org/)
-- [Alpine.js Documentation](https://alpinejs.dev/)
-- [Tailwind CSS Documentation](https://tailwindcss.com/)
+- [FastAPI](https://fastapi.tiangolo.com/)
+- [SQLAlchemy](https://docs.sqlalchemy.org/)
+- [Alembic](https://alembic.sqlalchemy.org/)
+- [htmx](https://htmx.org/)
+- [Alpine.js](https://alpinejs.dev/)
+- [Tailwind CSS](https://tailwindcss.com/)
+- [APScheduler](https://apscheduler.readthedocs.io/)

@@ -4,7 +4,7 @@
 
 ## Обзор
 
-ARV - это B2B SaaS платформа для создания AR-контента, построенная на современной архитектуре с использованием FastAPI, SQLAlchemy и серверного рендеринга. Платформа поддерживает создание AR-контента с распознаванием изображений через MindAR.
+ARV — B2B SaaS платформа для создания AR-контента, построенная на FastAPI, SQLAlchemy (async) и серверном рендеринге. AR-просмотр реализован через Android-приложение (ARCore). Маркер = загруженное фото (MindAR не используется). Хранилище — локальное FS или Яндекс Диск. Бэкапы БД — автоматические на Яндекс Диск через APScheduler.
 
 ## Архитектурные принципы
 
@@ -47,21 +47,21 @@ ARV - это B2B SaaS платформа для создания AR-контен
 
 ```
 app/
-├── main.py                 # Точка входа, настройка FastAPI
-├── core/                   # Ядро приложения
-│   ├── config.py          # Конфигурация
-│   ├── database.py        # Подключение к БД
-│   ├── security.py        # Безопасность (JWT, пароли)
-│   └── storage_providers.py  # Провайдеры хранения
-├── api/                   # API маршруты
-│   └── routes/            # Отдельные модули API
-├── html/                  # HTML маршруты
-│   └── routes/            # Отдельные модули HTML
-├── models/               # SQLAlchemy модели
-├── schemas/              # Pydantic схемы
-├── services/             # Бизнес-логика
-├── utils/                 # Вспомогательные функции
-└── middleware/           # Middleware (rate limiting)
+├── main.py                    # Точка входа, lifespan (startup/shutdown)
+├── core/                      # Ядро приложения
+│   ├── config.py              # Pydantic Settings, env
+│   ├── database.py            # AsyncSession, engine, seed_defaults
+│   ├── security.py            # JWT, хеширование паролей
+│   ├── scheduler.py           # APScheduler (бэкапы по cron)
+│   ├── storage_providers.py   # Фабрика провайдеров хранения
+│   └── yandex_disk_provider.py # YD Storage Provider
+├── api/routes/                # REST API endpoints
+├── html/routes/               # Серверный HTML-рендеринг
+├── models/                    # SQLAlchemy модели (incl. BackupHistory)
+├── schemas/                   # Pydantic схемы (incl. BackupSettings)
+├── services/                  # Бизнес-логика (backup_service, video_scheduler и др.)
+├── utils/                     # Вспомогательные функции
+└── middleware/                # Middleware (rate limiting)
 ```
 
 ## Компоненты системы
@@ -76,11 +76,13 @@ app/
 - `projects.py` - Управление проектами
 - `ar_content.py` - Управление AR-контентом
 - `videos.py` - Управление видео
+- `backups.py` - Бэкапы БД (запуск, история, статус)
 - `viewer.py` - AR viewer API
-- `storage.py` - Управление хранилищем
+- `storage.py` - Управление хранилищем, прокси YD
 - `notifications.py` - Уведомления
 - `analytics.py` - Аналитика
 - `settings.py` - Настройки системы
+- `rotation.py` - Ротация видео (расписание)
 - `oauth.py` - OAuth интеграции
 - `health.py` - Health checks
 
@@ -148,9 +150,9 @@ SQLAlchemy модели для работы с базой данных.
    ↓
 4. Storage Provider сохраняет файлы
    ↓
-5. MindAR Generator создает маркер
+5. Фото сохраняется как маркер для ARCore
    ↓
-6. Thumbnail Service создает превью
+6. Thumbnail Service создает превью (WebP, 3 размера)
    ↓
 7. Данные сохраняются в БД через Models
    ↓
@@ -166,11 +168,11 @@ SQLAlchemy модели для работы с базой данных.
    ↓
 3. Video Scheduler выбирает активное видео
    ↓
-4. Возвращается маркер и видео
+4. Возвращается JSON-манифест (маркер URL, видео URL)
    ↓
-5. Браузер загружает MindAR
+5. Приложение AR Viewer (ARCore) загружает маркер
    ↓
-6. MindAR распознает изображение
+6. ARCore распознает изображение
    ↓
 7. Видео воспроизводится поверх изображения
    ↓
@@ -219,10 +221,9 @@ storage/
 └── VertexAR/
     └── {project_name}/
         └── {order_number}/
-            ├── photo.{ext}
+            ├── photo.{ext}         # Фото (маркер для ARCore)
             ├── video.{ext}
-            ├── marker.mind
-            ├── thumbnail.webp
+            ├── thumbnail.webp     # WebP превью
             └── qr_code.png
 ```
 
@@ -372,9 +373,9 @@ storage/
 ```
 User → HTML Form → API Route → Service → Storage → DB
                                     ↓
-                              MindAR Generator
+                         ThumbnailService (WebP)
                                     ↓
-                              Marker File
+                         Фото = маркер (ARCore)
 ```
 
 ## Расширяемость

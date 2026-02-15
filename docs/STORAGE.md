@@ -4,7 +4,7 @@
 
 ## Обзор
 
-Платформа использует абстракцию провайдеров хранения для работы с файлами. В настоящее время поддерживается локальное файловое хранилище, с возможностью расширения до облачных провайдеров (S3, Yandex Object Storage).
+Платформа использует абстракцию провайдеров хранения для работы с файлами. Поддерживается два провайдера: локальное файловое хранилище и Яндекс Диск. Провайдер выбирается на уровне компании.
 
 ## Архитектура хранения
 
@@ -14,19 +14,16 @@
 
 ```python
 StorageProvider (ABC)
-    ↓
-LocalStorageProvider
-    ↓
-S3StorageProvider (планируется)
-    ↓
-YandexStorageProvider (планируется)
+    ├── LocalStorageProvider       # Локальное FS
+    └── YandexDiskStorageProvider  # Яндекс Диск API
 ```
 
 ### Основные компоненты
 
-1. **StorageProvider** (`app/core/storage_providers.py`) - Абстрактный базовый класс
-2. **LocalStorageProvider** - Реализация для локального хранилища
-3. **get_storage_provider()** - Фабрика для получения провайдера
+1. **StorageProvider** (`app/core/storage_providers.py`) — абстрактный базовый класс
+2. **LocalStorageProvider** — реализация для локального FS
+3. **YandexDiskStorageProvider** (`app/core/yandex_disk_provider.py`) — реализация для Яндекс Диска
+4. **get_storage_provider()** — фабрика: возвращает провайдер по настройкам компании
 
 ## Структура хранения
 
@@ -37,18 +34,16 @@ storage/
 └── VertexAR/
     └── {project_name}/
         └── {order_number}/
-            ├── photo.{ext}          # Фото заказчика
-            ├── video.{ext}          # Видео (deprecated, используется videos/)
-            ├── marker.mind          # AR-маркер
-            ├── thumbnail.webp       # Превью фото
-            └── qr_code.png         # QR-код для AR viewer
+            ├── photo.{ext}          # Фото (маркер для ARCore)
+            ├── video.{ext}          # Видео
+            ├── thumbnail.webp       # Превью (WebP, 3 размера)
+            └── qr_code.png          # QR-код для AR viewer
 ```
 
 **Пример:**
 ```
 storage/VertexAR/Портреты/ORD-20260125-4492/
 ├── photo.jpg
-├── marker.mind
 ├── thumbnail.webp
 └── qr_code.png
 ```
@@ -370,10 +365,9 @@ print(f"Общий размер: {stats['total_size_mb']} MB")
 
 ### AR-маркеры
 
-- **Формат**: .mind (JSON)
-- **Путь**: `{order_path}/marker.mind`
-- **Использование**: Распознавание изображений в MindAR
-- **Генерация**: Автоматически через MindAR Generator
+- **Маркер**: Загруженное фото (JPEG/PNG) = маркер для ARCore
+- **Путь**: совпадает с `photo_path`
+- **Генерация**: Не требуется (фото используется напрямую)
 
 ### Превью (thumbnails)
 

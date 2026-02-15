@@ -66,7 +66,8 @@ async def admin_dashboard(
         total_views_count = total_views_q.scalar() or 0
 
         # Views in last 30 days (from session records)
-        since = datetime.now(timezone.utc) - timedelta(days=30)
+        # Use naive UTC to match the column type (DateTime without timezone)
+        since = datetime.utcnow() - timedelta(days=30)
         views_30d = await db.execute(
             select(func.count()).select_from(ARViewSession).where(ARViewSession.created_at >= since)
         )

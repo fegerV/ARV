@@ -277,21 +277,6 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 
 logger.info("storage_mounted", storage_dir=storage_dir)
 
-# Add debug endpoint to test file access
-@app.get("/debug/storage-test")
-async def debug_storage_test():
-    """Debug endpoint to test file access."""
-    import os
-    test_path = os.path.join(storage_dir, "VertexAR", "Posters", "001_Vertex_AR", "Портреты", "ORD-20260125-1122", "thumbnail.webp")
-    exists = os.path.exists(test_path)
-    return {
-        "storage_dir": storage_dir,
-        "test_path": test_path,
-        "exists": exists,
-        "files_in_dir": os.listdir(os.path.dirname(test_path)) if os.path.exists(os.path.dirname(test_path)) else []
-    }
-
-
 # Favicon endpoint (used when Nginx proxies /favicon.ico to backend)
 @app.get("/favicon.ico")
 async def favicon():

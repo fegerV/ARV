@@ -1,139 +1,219 @@
-# Развертывание Vertex AR
+# Развёртывание Vertex AR
 
-## Локальное развертывание для тестов
+## Требования
 
-### Требования
 - Python 3.11+
-- Node.js 18+ (для генерации AR-маркеров)
+- PostgreSQL 12+ (продакшен)
 - Docker & Docker Compose (опционально)
+- Nginx (reverse proxy, продакшен)
 - Git
+- ffmpeg (для генерации превью видео)
 
-### Шаг 1: Клонирование репозитория
+## Локальное развертывание (разработка)
+
+### 1. Клонирование и настройка
+
 ```bash
-git clone <repository-url>
+git clone https://github.com/fegerV/ARV
 cd ARV
-```
-
-### Шаг 2: Виртуальное окружение
-```bash
 python -m venv venv
 source venv/bin/activate  # Linux/Mac
-# или
-venv\Scripts\activate     # Windows
-```
-
-### Шаг 3: Зависимости
-```bash
 pip install -r requirements.txt
 ```
 
-### Шаг 4: Настройка .env
+### 2. Переменные окружения
+
+```bash
+cp .env.example .env
+```
+
+Ключевые переменные для разработки:
+
 ```bash
 DATABASE_URL=sqlite+aiosqlite:///./test_vertex_ar.db
-SECRET_KEY=your-secret-key-here
-LOG_LEVEL=INFO
+SECRET_KEY=dev-secret-key
 STORAGE_BASE_PATH=./storage
 LOCAL_STORAGE_PATH=./storage
+LOG_LEVEL=DEBUG
 ```
 
-### Шаг 5: Создание тестовых данных
+### 3. Миграции и запуск
+
 ```bash
-python scripts/test_data/create_sample_data.py
+alembic upgrade head
+uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-### Шаг 6: Запуск сервера
-```bash
-python -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+### 4. Проверка
 
-# или через скрипт
-python scripts/servers/run_admin_test_server.py
-```
-
-### Шаг 7: Проверка
 - Админ-панель: http://localhost:8000/admin
 - API документация: http://localhost:8000/docs
 - Health check: http://localhost:8000/health
+- Логин: `admin@vertexar.com` / `admin123`
 
-## Продуктивное развертывание (Docker Compose)
+## Продуктивное развёртывание (Ubuntu + systemd)
 
-### Шаг 1: .env для продакшена
+Это текущая конфигурация боевого сервера `ar.neuroimagen.ru`.
+
+### 1. Подготовка сервера
+
 ```bash
-cp .env.example .env.production
+sudo useradd -r -s /bin/bash -d /opt/arv arv
+sudo mkdir -p /opt/arv/{app,storage,venv}
+sudo chown -R arv:arv /opt/arv
 ```
 
-Настройте следующие переменные:
+### 2. Клонирование и установка
+
 ```bash
+sudo -u arv bash -c 'cd /opt/arv && git clone https://github.com/fegerV/ARV app'
+sudo -u arv bash -c 'cd /opt/arv && python3 -m venv venv'
+sudo -u arv bash -c 'cd /opt/arv/app && source /opt/arv/venv/bin/activate && pip install -r requirements.txt'
+```
+
+### 3. Переменные окружения
+
+```bash
+# /opt/arv/app/.env
 ENVIRONMENT=production
 DEBUG=false
-DATABASE_URL=postgresql://user:password@db:5432/vertex_ar
-SECRET_KEY=your-secure-secret-key-here
-STORAGE_BASE_PATH=/app/storage
+DATABASE_URL=postgresql+asyncpg://arv:PASSWORD@localhost:5432/arv
+SECRET_KEY=your-production-secret
+STORAGE_BASE_PATH=/opt/arv/storage
+LOCAL_STORAGE_PATH=/opt/arv/storage
+PUBLIC_URL=https://ar.neuroimagen.ru
+LOG_LEVEL=INFO
 ```
 
-### Шаг 2: Запуск
+### 4. Миграции
+
 ```bash
+sudo -u arv bash -c 'cd /opt/arv/app && source /opt/arv/venv/bin/activate && alembic upgrade head'
+```
+
+### 5. Systemd-юнит
+
+```ini
+# /etc/systemd/system/arv.service
+[Unit]
+Description=Vertex AR FastAPI Application
+After=network.target postgresql.service
+
+[Service]
+Type=simple
+User=arv
+WorkingDirectory=/opt/arv/app
+ExecStart=/opt/arv/venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8000 --workers 2 --log-level info --access-log
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+```
+
+```bash
+sudo systemctl daemon-reload
+sudo systemctl enable arv
+sudo systemctl start arv
+```
+
+### 6. Nginx (reverse proxy)
+
+```nginx
+server {
+    listen 443 ssl http2;
+    server_name ar.neuroimagen.ru;
+
+    ssl_certificate     /etc/letsencrypt/live/ar.neuroimagen.ru/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/ar.neuroimagen.ru/privkey.pem;
+
+    client_max_body_size 200M;
+
+    location / {
+        proxy_pass http://127.0.0.1:8000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    location /storage/ {
+        alias /opt/arv/storage/;
+        expires 30d;
+        add_header Cache-Control "public, immutable";
+    }
+}
+```
+
+## Обновление на сервере
+
+```bash
+sudo -u arv bash -c 'cd /opt/arv/app && git pull'
+sudo -u arv bash -c 'cd /opt/arv/app && source /opt/arv/venv/bin/activate && pip install -r requirements.txt'
+sudo -u arv bash -c 'cd /opt/arv/app && source /opt/arv/venv/bin/activate && alembic upgrade head'
+sudo systemctl restart arv
+```
+
+## Docker Compose (альтернативный вариант)
+
+```bash
+cp .env.example .env.production
+# Настройте переменные окружения
 docker compose up -d --build
 ```
 
-## Проверка функциональности
+## Мониторинг и логи
 
-### Проверка API
 ```bash
-curl http://localhost:8000/health
-```
+# Статус сервиса
+sudo systemctl status arv
 
-### Проверка админки
-- http://localhost:8000/admin
+# Логи приложения (последние 100 строк)
+sudo journalctl -u arv -n 100 --no-pager
 
-### Скрипты проверок
-```bash
-python scripts/checks/final_admin_check.py
-python scripts/checks/check_ar_content_pages.py
-```
+# Логи в реальном времени
+sudo journalctl -u arv -f
 
-## Troubleshooting
+# Логи Nginx
+sudo journalctl -u nginx -n 50
 
-### Проблемы с БД
-```bash
-ls -la test_vertex_ar.db
-alembic upgrade head
-```
-
-### Проблемы с MindAR
-```bash
-node -v
-npm list mind-ar
-npm list canvas
-```
-
-### Логи
-```bash
-tail -f logs/app.log
+# Docker логи (при использовании Docker Compose)
 docker compose logs -f app
 ```
 
-## Структура хранения файлов
+## Бэкапы БД
 
-### Новая структура (текущая)
-```
-storage/
-└── VertexAR/
-    └── {project_name}/
-        └── {order_number}/
-            ├── photo.{ext}
-            ├── video.{ext}
-            ├── qr_code.png
-            ├── thumbnail.webp
-            └── marker.mind
-```
+Бэкапы настраиваются через админку: **Settings → Бэкапы**. Подробности:
 
-### Настройка STORAGE_BASE_PATH
+- Автоматический бэкап PostgreSQL → gzip → Яндекс Диск
+- Расписание: ежедневно, каждые 12ч, еженедельно, custom cron
+- Ротация по возрасту (дни) и количеству копий
+- Ручной запуск через кнопку в UI
+- API: `POST /api/backups/run`
 
-В `.env` файле или переменных окружения:
+## Troubleshooting
+
+### Сервис не запускается
+
 ```bash
-STORAGE_BASE_PATH=./storage  # Относительно корня проекта
-# или
-STORAGE_BASE_PATH=/app/storage  # Абсолютный путь в контейнере
+sudo journalctl -u arv -n 50 --no-pager
+# Проверьте ошибки в выводе
 ```
 
-**Важно**: Убедитесь, что путь не содержит `/content/` в новой версии системы.
+### Проблемы с миграциями
+
+```bash
+sudo -u arv bash -c 'cd /opt/arv/app && source /opt/arv/venv/bin/activate && alembic current'
+sudo -u arv bash -c 'cd /opt/arv/app && source /opt/arv/venv/bin/activate && alembic upgrade head'
+```
+
+### Видео не загружается / нет превью
+
+- Проверьте наличие `ffmpeg`: `which ffmpeg`
+- Проверьте права на `STORAGE_BASE_PATH`
+- Логи: `sudo journalctl -u arv --grep "thumbnail\|ffmpeg\|video" -n 50`
+
+### Яндекс Диск ошибки
+
+- Проверьте срок действия OAuth-токена компании
+- Логи: `sudo journalctl -u arv --grep "yd_\|yandex\|DiskPath" -n 50`

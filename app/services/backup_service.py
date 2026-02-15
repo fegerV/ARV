@@ -113,8 +113,8 @@ class BackupService:
                     % company_id
                 )
 
-            with open(gz_path, "rb") as fh:
-                data = fh.read()
+            # Read in a thread to avoid blocking the event loop for large files
+            data = await asyncio.to_thread(Path(gz_path).read_bytes)
             await provider.save_file_bytes(data, yd_remote_path)
 
             # 4. Update record
@@ -218,8 +218,15 @@ class BackupService:
     # Internal helpers
     # ------------------------------------------------------------------
 
+    # Maximum time (seconds) to wait for pg_dump before killing it.
+    PG_DUMP_TIMEOUT: int = 600  # 10 minutes
+
     async def _run_pg_dump(self) -> str:
-        """Run ``pg_dump`` and return the path to the resulting SQL file."""
+        """Run ``pg_dump`` and return the path to the resulting SQL file.
+
+        Includes a timeout to prevent hanging indefinitely if the
+        database is unresponsive.
+        """
         params = _parse_database_url(settings.DATABASE_URL)
 
         tmp = tempfile.NamedTemporaryFile(suffix=".sql", delete=False)
@@ -247,7 +254,20 @@ class BackupService:
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
         )
-        _, stderr = await process.communicate()
+
+        try:
+            _, stderr = await asyncio.wait_for(
+                process.communicate(),
+                timeout=self.PG_DUMP_TIMEOUT,
+            )
+        except asyncio.TimeoutError:
+            process.kill()
+            await process.wait()
+            if os.path.exists(tmp_path):
+                os.remove(tmp_path)
+            raise RuntimeError(
+                f"pg_dump timed out after {self.PG_DUMP_TIMEOUT}s"
+            )
 
         if process.returncode != 0:
             error_msg = stderr.decode(errors="replace")

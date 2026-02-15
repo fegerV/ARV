@@ -73,7 +73,8 @@ async def get_analytics_data(db: AsyncSession, period: int = _DEFAULT_PERIOD) ->
         Dictionary ready to be passed into the Jinja2 template context.
     """
     try:
-        now = datetime.now(timezone.utc)
+        # Use naive UTC to match the column type (DateTime without timezone)
+        now = datetime.utcnow()
         since = now - timedelta(days=period) if period > 0 else None
 
         def _time_filter(stmt):

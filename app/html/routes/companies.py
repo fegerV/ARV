@@ -50,9 +50,17 @@ async def companies_list(
     if not current_user.is_active:
         return RedirectResponse(url="/admin/login", status_code=303)
     
-    # Extract query parameters
-    page = int(request.query_params.get('page', 1))
-    page_size = int(request.query_params.get('page_size', 20))
+    # Extract query parameters (safe parsing)
+    try:
+        page = int(request.query_params.get('page', 1))
+        if page < 1:
+            page = 1
+    except (ValueError, TypeError):
+        page = 1
+    try:
+        page_size = int(request.query_params.get('page_size', 20))
+    except (ValueError, TypeError):
+        page_size = 20
     search = request.query_params.get('search', '')
     status_filter = request.query_params.get('status', '')
     

@@ -207,7 +207,7 @@ async def notification_delete(
             return JSONResponse(content={"error": "Notification not found"}, status_code=404)
         
         # Delete notification
-        db.delete(notification)
+        await db.delete(notification)
         await db.commit()
         
         logger.info("notification_deleted", notification_id=notification_id)

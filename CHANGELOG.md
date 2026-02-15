@@ -2,51 +2,79 @@
 
 All notable changes to this project will be documented in this file.
 
-## [Unreleased]
+## [2.1.0] - 2026-02-15
 
 ### Added
-- **Video Playback Modes**: Implemented three playback modes for AR content videos:
-  - **Manual Mode**: Fixed single video playback. User manually selects the active video.
-  - **Sequential Mode**: Videos switch sequentially (1→2→3→...→last). Stops at the last video.
-  - **Cyclic Mode**: Videos switch cyclically (1→2→3→...→1→2→...). Wraps around after the last video.
-- **Automatic Video Rotation**: Videos automatically switch to the next one after the current video ends in AR viewer.
-- **Playback Mode API Endpoint**: New endpoint `/api/videos/ar-content/{content_id}/playback-mode` for switching between playback modes.
-- **Rotation State Management**: Automatic rotation state updates in viewer endpoints for sequential/cyclic modes.
-- **UI Enhancements**: 
-  - Playback mode selector with inline help text in AR content detail page
-  - Green border highlight for active video
-  - Improved video rotation controls
+- **Database Backup System**: automated PostgreSQL backups to Yandex Disk
+  - `BackupService` — pg_dump → gzip → upload to YD → rotation
+  - `APScheduler` integration — cron-based scheduling (daily / 12h / weekly / custom)
+  - Backup history model (`backup_history` table) with status tracking
+  - API endpoints: `POST /api/backups/run`, `GET /history`, `GET /status`, `DELETE /{id}`
+  - Admin UI: new "Бэкапы" tab in Settings with configuration form, manual trigger, history table
+  - Automatic rotation by retention days and max copies
+- **Yandex Disk Storage Provider**: upload/download/proxy for company files via YD API
+  - Per-company storage provider selection (local / yandex_disk)
+  - HTTP Range header proxy for video seeking from YD
+  - Video upload to YD with automatic thumbnail generation
+- **Multi-size WebP Thumbnails**: video thumbnails in 3 sizes (150×112, 320×240, 640×480)
+- **Video Management**: upload additional videos, delete videos, regenerate thumbnails
+- **Lightbox Improvements**: high-res portrait photos, video player in lightbox
 
 ### Changed
-- **Video Rotation Logic**: Updated rotation logic to properly handle sequential and cyclic modes:
-  - Sequential mode: Returns current video based on rotation_state, stops at last video
-  - Cyclic mode: Returns current video based on rotation_state, wraps around
-- **AR Viewer**: Modified to disable video loop and automatically switch to next video after playback ends
-- **Rotation State Updates**: Rotation state is now automatically incremented when viewer requests active video (for sequential/cyclic modes)
+- Settings page: added "Бэкапы" tab alongside general, security, AR
+- `AllSettings` schema now includes `BackupSettings`
+- `SettingsService` extended with `update_backup_settings()`
+- Application lifespan now starts/stops APScheduler
 
 ### Fixed
-- **Rotation State Not Updating**: Fixed issue where rotation_state was not being updated when viewer requested active video
-- **Sequential Mode Logic**: Fixed sequential mode to return current video instead of next video
-- **Video Rotation Type**: Updated rotation_type values from (DAILY, WEEKLY, MONTHLY, CUSTOM) to (none, sequential, cyclic)
+- **Dashboard crash** (`dashboard_data_error`): datetime naive/aware mismatch when querying `ar_view_sessions` — switched to `datetime.utcnow()` for naive column compatibility
+- **Project update crash**: undefined `description` variable in `projects.py` form error handler (lines 529, 584)
+- **Notification delete**: missing `await` on `db.delete()` in `notifications.py`
+- **Query params crash**: uncaught `int()` on invalid pagination params (`?page=abc`) in companies, projects, ar-content list pages
+- **Yandex Disk `DiskPathFormatError`**: `_ensure_directory` now skips `app:` as directory
+- **Video proxy streaming**: rewrote YD proxy to support HTTP Range requests (partial content 206)
 
-### Documentation
-- Updated API.md with comprehensive documentation for playback modes
-- Added examples for all three playback modes
-- Updated Viewer API documentation with correct response format and rotation behavior
+### Security
+- Removed debug endpoint `/debug/storage-test` (leaked filesystem paths in production)
+- Added `get_current_active_user` auth dependency on all backup API endpoints
+- Input validation: clamped `backup_retention_days` and `backup_max_copies` to positive values
+- `pg_dump` timeout (10 min) to prevent hanging on unresponsive database
 
-## [2.0.0] - Previous Release
+### Removed
+- `temp_page.html` — temporary file
+- `requirements_minimal.txt` — outdated subset
+- `WORK_DESCRIPTION.md` — one-time work report
+- `scripts/backup/cron-backups.example` — replaced by APScheduler
+- `scripts/backup/continuous-backup.sh` — replaced by APScheduler
+- `scripts/backup/backup-test.sh` — replaced by APScheduler
+- `docs/VIDEO_ROTATION_ANALYSIS.md` — one-time analysis
+- `docs/COMPETITOR_ANALYSIS_OJV_WEBAR.md` — one-time analysis
+- `docs/FIX_PREVIEW_LINKS_QR.md` — resolved fix report
+
+## [2.0.1] - 2026-02-14
+
+### Added
+- **Video Playback Modes**: manual, sequential, cyclic rotation
+- **Automatic Video Rotation**: videos switch after playback ends in AR viewer
+- Playback mode API endpoint
+
+### Fixed
+- Rotation state not updating in viewer
+- Sequential mode returning wrong video
+- Video rotation type values corrected
+
+## [2.0.0] - Initial Release
 
 ### Features
-- User management and authentication
+- User management and JWT authentication
 - Company and project management
 - AR content creation and management
 - Media file storage and management
-- AR marker generation (MindAR)
+- AR marker generation
 - Preview and thumbnail generation
-- JWT authentication
-- OAuth integrations
+- OAuth integrations (Yandex)
 - API documentation (Swagger/OpenAPI)
 - Docker containerization
-- Automatic migrations
+- Automatic database migrations (Alembic)
 - Notification system
-- Analytics and statistics
+- Analytics and statistics dashboard

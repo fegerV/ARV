@@ -8,7 +8,9 @@ from __future__ import annotations
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.api.routes.auth import get_current_active_user
 from app.core.database import get_db
+from app.models.user import User
 from app.services.backup_service import BackupService
 from app.services.settings_service import SettingsService
 
@@ -19,6 +21,7 @@ router = APIRouter()
 async def run_backup_now(
     background_tasks: BackgroundTasks,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
 ) -> dict:
     """Trigger an immediate database backup.
 
@@ -51,10 +54,11 @@ async def backup_history(
     limit: int = 20,
     offset: int = 0,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
 ) -> list[dict]:
     """Return recent backup records."""
     service = BackupService()
-    records = await service.list_backups(db, limit=limit, offset=offset)
+    records = await service.list_backups(db, limit=min(limit, 100), offset=max(offset, 0))
     return [
         {
             "id": r.id,
@@ -74,6 +78,7 @@ async def backup_history(
 @router.get("/status")
 async def backup_status(
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
 ) -> dict:
     """Return the status of the most recent backup."""
     service = BackupService()
@@ -96,6 +101,7 @@ async def backup_status(
 async def delete_backup(
     backup_id: int,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
 ) -> dict:
     """Delete a backup record and its file on Yandex Disk."""
     service = BackupService()

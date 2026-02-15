@@ -11,35 +11,18 @@
 ### ER-диаграмма связей
 
 ```
-Users
-  │
-  └─→ (нет прямой связи)
+Users (администраторы)
 
 Companies
-  │
   ├─→ Projects (1:N)
-  │     │
   │     └─→ ARContent (1:N)
-  │           │
   │           ├─→ Videos (1:N)
-  │           │     │
-  │           │     └─→ VideoSchedules (1:N)
-  │           │
+  │           │     └─→ VideoRotationSchedules (1:N)
   │           └─→ ARViewSessions (1:N)
-  │
-  └─→ ARContent (1:N, через project)
+  └─→ BackupHistory (1:N, аккаунт YD)
 
-StorageConnections
-  │
-  └─→ StorageFolders (1:N)
-
-Notifications
-  │
-  └─→ (связи с company_id, project_id, ar_content_id)
-
-SystemSettings
-  │
-  └─→ (независимая таблица)
+Notifications → (company_id, project_id, ar_content_id)
+SystemSettings (key-value, категории: general, security, ar, storage, backup)
 ```
 
 ## Основные модели
@@ -339,11 +322,27 @@ SystemSettings
 
 **Категории**:
 - `general` - Общие настройки
-- `storage` - Настройки хранилища
-- `notifications` - Настройки уведомлений
-- `api` - Настройки API
-- `integrations` - Настройки интеграций
+- `security` - Безопасность
 - `ar` - Настройки AR
+- `storage` - Настройки хранилища
+- `backup` - Настройки бэкапов
+
+### BackupHistory (История бэкапов)
+
+**Таблица**: `backup_history`
+
+**Описание**: Записи о выполненных бэкапах БД
+
+**Поля**:
+- `id` (Integer, PK) - Уникальный идентификатор
+- `started_at` (DateTime) - Время начала бэкапа
+- `finished_at` (DateTime, nullable) - Время завершения
+- `status` (String(20), default="running") - Статус: running, completed, failed
+- `size_bytes` (BigInteger, nullable) - Размер файла в байтах
+- `yd_path` (String(500), nullable) - Путь на Яндекс Диске
+- `company_id` (Integer, FK → companies.id, nullable) - ID компании (YD аккаунт)
+- `error_message` (Text, nullable) - Сообщение об ошибке
+- `trigger` (String(20), default="manual") - Тип запуска: manual, scheduled
 
 ### ARViewSession (Сессии просмотра AR)
 
