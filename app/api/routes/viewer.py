@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
-from sqlalchemy.orm import selectinload
+# selectinload removed: company loaded explicitly via db.get() to avoid MissingGreenlet
 from datetime import datetime, timezone, timedelta
 
 from app.core.config import settings
@@ -309,18 +309,17 @@ async def _build_manifest(
     db: AsyncSession,
 ) -> JSONResponse:
     """Core manifest builder extracted for clean error handling."""
-    stmt = (
-        select(ARContent)
-        .options(selectinload(ARContent.company))
-        .where(ARContent.unique_id == unique_id)
-    )
+    stmt = select(ARContent).where(ARContent.unique_id == unique_id)
     res = await db.execute(stmt)
     ar_content = res.scalar_one_or_none()
     if not ar_content:
         raise HTTPException(status_code=404, detail="AR content not found")
 
-    # Save company reference early — before any commit that may expire relationships.
-    company = ar_content.company
+    # Load company explicitly to avoid MissingGreenlet from lazy-loading
+    # a relationship in async context (selectinload is unreliable here).
+    company: Optional[Company] = None
+    if ar_content.company_id:
+        company = await db.get(Company, ar_content.company_id)
 
     creation = ar_content.created_at.replace(tzinfo=None) if ar_content.created_at.tzinfo else ar_content.created_at
     expiry_date = creation + timedelta(days=ar_content.duration_years * 365)
