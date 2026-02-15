@@ -180,15 +180,24 @@ async def get_storage_info(db: AsyncSession) -> dict:
         from app.core.storage_providers import get_provider_for_company
         from app.core.yandex_disk_provider import YandexDiskStorageProvider
 
+        # Batch load project counts for all companies (avoid N+1)
+        company_ids = [c.id for c in companies]
+        project_counts_map: dict[int, int] = {}
+        if company_ids:
+            pc_stmt = (
+                select(Project.company_id, sa_func.count(Project.id))
+                .where(Project.company_id.in_(company_ids))
+                .group_by(Project.company_id)
+            )
+            pc_result = await db.execute(pc_stmt)
+            project_counts_map = {cid: cnt for cid, cnt in pc_result.all()}
+
         company_storage = []
         yd_quota: dict | None = None  # Filled once for any YD company
 
         for company in companies:
             try:
-                # Project count
-                count_stmt = select(sa_func.count(Project.id)).where(Project.company_id == company.id)
-                count_result = await db.execute(count_stmt)
-                projects_count = count_result.scalar() or 0
+                projects_count = project_counts_map.get(company.id, 0)
 
                 storage_type = getattr(company, "storage_provider", "local")
                 storage_used = "—"

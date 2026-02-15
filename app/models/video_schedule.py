@@ -1,34 +1,36 @@
-from sqlalchemy import Column, Integer, String, DateTime, Boolean, ForeignKey, CheckConstraint
-from sqlalchemy.dialects.postgresql import UUID
+"""Video schedule model."""
+
+from datetime import datetime, timezone
+
+from sqlalchemy import CheckConstraint, Column, DateTime, ForeignKey, Index, Integer, String
 from sqlalchemy.orm import relationship
+
 from app.core.database import Base
-import uuid
-from datetime import datetime
+
+
+def _utcnow() -> datetime:
+    return datetime.now(timezone.utc)
 
 
 class VideoSchedule(Base):
     __tablename__ = "video_schedules"
+
     __table_args__ = (
-        CheckConstraint('start_time <= end_time', name='check_schedule_time_range'),
+        Index("ix_video_schedules_video_id", "video_id"),
+        CheckConstraint("start_time <= end_time", name="check_schedule_time_range"),
     )
 
-    # Use Integer as primary key to match migration
     id = Column(Integer, primary_key=True, index=True)
     video_id = Column(Integer, ForeignKey("videos.id", ondelete="CASCADE"), nullable=False)
-    
-    # Schedule time window (TIMESTAMPTZ in PostgreSQL)
+
     start_time = Column(DateTime(timezone=True), nullable=False)
     end_time = Column(DateTime(timezone=True), nullable=False)
-    
-    # Status automatically computed based on current time
-    status = Column(String(20), default="active")  # 'active', 'expired'
-    
-    # Optional description for the schedule
+
+    status = Column(String(20), default="active", nullable=False)
     description = Column(String(500))
-    
-    # Timestamps
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
-    
+
+    created_at = Column(DateTime, default=_utcnow, nullable=False)
+    updated_at = Column(DateTime, default=_utcnow, onupdate=_utcnow, nullable=False)
+
     # Relationships
     video = relationship("Video", back_populates="schedules")

@@ -6,7 +6,12 @@ from app.core.database import Base
 from app.enums import ArContentStatus
 import re
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
+
+
+def _utcnow() -> datetime:
+    """Timezone-aware UTC now."""
+    return datetime.now(timezone.utc)
 
 
 class UUIDString(TypeDecorator):
@@ -81,8 +86,8 @@ class ARContent(Base):
     marker_metadata = Column(JSON().with_variant(JSONB, "postgresql"), nullable=True)  # Additional marker metadata
     
     # Timestamps
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    created_at = Column(DateTime, default=_utcnow, nullable=False)
+    updated_at = Column(DateTime, default=_utcnow, onupdate=_utcnow, nullable=False)
     
     # Constraints and Indexes
     __table_args__ = (
@@ -90,7 +95,7 @@ class ARContent(Base):
         Index('ix_ar_content_company_project', 'company_id', 'project_id'),
         Index('ix_ar_content_created_at', 'created_at'),
         Index('ix_ar_content_status', 'status'),
-        Index('ix_ar_content_unique_id', 'unique_id'),
+        Index('ix_ar_content_active_video_id', 'active_video_id'),
         CheckConstraint('duration_years >= 1', name='check_duration_years'),
         CheckConstraint('views_count >= 0', name='check_views_count_non_negative'),
     )

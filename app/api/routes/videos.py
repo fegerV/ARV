@@ -433,15 +433,22 @@ async def list_videos(
     result = await db.execute(stmt)
     videos = result.scalars().all()
     
-    video_responses = []
-    for video in videos:
-        # Get schedules for this video
-        schedules_stmt = select(VideoScheduleModel).where(VideoScheduleModel.video_id == video.id)
+    # Batch load all schedules for all videos (avoid N+1)
+    video_ids = [v.id for v in videos]
+    schedule_map: dict[int, list] = {}
+    if video_ids:
+        schedules_stmt = select(VideoScheduleModel).where(VideoScheduleModel.video_id.in_(video_ids))
         schedules_result = await db.execute(schedules_stmt)
-        schedules = schedules_result.scalars().all()
+        all_schedules = schedules_result.scalars().all()
+        for schedule in all_schedules:
+            schedule_map.setdefault(schedule.video_id, []).append(schedule)
+
+    video_responses = []
+    now = datetime.utcnow()
+    for video in videos:
+        schedules = schedule_map.get(video.id, [])
         
         # Compute status and days remaining
-        now = datetime.utcnow()
         status = compute_video_status(video, now)
         days_remaining = compute_days_remaining(video, now)
         

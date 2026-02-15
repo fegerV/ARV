@@ -1,9 +1,16 @@
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, Text, BigInteger, ForeignKey
+"""Storage connection and folder models."""
+
+from datetime import datetime, timezone
+
+from sqlalchemy import BigInteger, Boolean, Column, DateTime, ForeignKey, Index, Integer, String, Text
 from sqlalchemy import JSON
 from sqlalchemy.dialects.postgresql import JSONB
-from sqlalchemy.orm import relationship
-from datetime import datetime
+
 from app.core.database import Base
+
+
+def _utcnow() -> datetime:
+    return datetime.now(timezone.utc)
 
 
 class StorageConnection(Base):
@@ -11,44 +18,38 @@ class StorageConnection(Base):
 
     id = Column(Integer, primary_key=True)
     name = Column(String(255), unique=True, nullable=False)
-    provider = Column(String(50), nullable=False, default="local_disk")  # Simplified to only local_disk
-
-    # For local_disk storage
+    provider = Column(String(50), nullable=False, default="local_disk")
     base_path = Column(String(500), nullable=False)
 
-    # Default connection (only for Vertex AR)
-    is_default = Column(Boolean, default=False)
-
-    # Status
-    is_active = Column(Boolean, default=True)
+    is_default = Column(Boolean, default=False, nullable=False)
+    is_active = Column(Boolean, default=True, nullable=False)
     last_tested_at = Column(DateTime)
     test_status = Column(String(50))
     test_error = Column(Text)
 
     storage_metadata = Column("metadata", JSON().with_variant(JSONB, "postgresql"), default={})
 
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-    created_by = Column(Integer, nullable=True)  # FK omitted until users table exists
-
-    # Relationships - removed as Company model no longer has storage_connection
+    created_at = Column(DateTime, default=_utcnow, nullable=False)
+    updated_at = Column(DateTime, default=_utcnow, onupdate=_utcnow, nullable=False)
+    created_by = Column(Integer, nullable=True)
 
 
 class StorageFolder(Base):
     __tablename__ = "storage_folders"
 
+    __table_args__ = (
+        Index("ix_storage_folders_company_id", "company_id"),
+    )
+
     id = Column(Integer, primary_key=True)
-    company_id = Column(Integer, ForeignKey("companies.id"))
+    company_id = Column(Integer, ForeignKey("companies.id"), nullable=True)
 
     name = Column(String(255), nullable=False)
     path = Column(String(500), nullable=False)
-    folder_type = Column(String(50))  # 'ar_content', 'videos', 'markers', 'thumbnails', 'qr-codes'
+    folder_type = Column(String(50))
 
-    # Stats
-    files_count = Column(Integer, default=0)
-    total_size_bytes = Column(BigInteger, default=0)
+    files_count = Column(Integer, default=0, nullable=False)
+    total_size_bytes = Column(BigInteger, default=0, nullable=False)
 
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-
-    # Relationships - removed as Company model no longer has folders
+    created_at = Column(DateTime, default=_utcnow, nullable=False)
+    updated_at = Column(DateTime, default=_utcnow, onupdate=_utcnow, nullable=False)

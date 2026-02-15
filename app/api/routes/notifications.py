@@ -1,7 +1,7 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import func, select
+from sqlalchemy import func, select, update
 import httpx
 import smtplib
 from email.mime.text import MIMEText
@@ -122,18 +122,29 @@ async def mark_all_notifications_read(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
 ):
-    stmt = select(Notification)
+    """Mark all notifications as read.
+
+    Loads only id + metadata columns (not full rows) and skips
+    already-read notifications to reduce I/O.
+    """
+    stmt = select(Notification.id, Notification.notification_metadata)
     res = await db.execute(stmt)
-    items = res.scalars().all()
+    rows = res.all()
 
     updated = 0
-    for n in items:
-        meta = dict(n.notification_metadata or {})
-        if not meta.get("is_read"):
-            meta["is_read"] = True
-            meta["read_at"] = datetime.utcnow().isoformat()
-            n.notification_metadata = meta
-            updated += 1
+    now_iso = datetime.now(timezone.utc).isoformat()
+    for row_id, meta_raw in rows:
+        meta = dict(meta_raw or {})
+        if meta.get("is_read"):
+            continue
+        meta["is_read"] = True
+        meta["read_at"] = now_iso
+        await db.execute(
+            update(Notification)
+            .where(Notification.id == row_id)
+            .values(notification_metadata=meta)
+        )
+        updated += 1
 
     await db.commit()
     return NotificationMarkReadResponse(
@@ -160,7 +171,7 @@ async def mark_notifications_read(
         meta = dict(n.notification_metadata or {})
         if not meta.get("is_read"):
             meta["is_read"] = True
-            meta["read_at"] = datetime.utcnow().isoformat()
+            meta["read_at"] = datetime.now(timezone.utc).isoformat()
             n.notification_metadata = meta
             updated += 1
 

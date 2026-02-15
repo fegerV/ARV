@@ -423,20 +423,27 @@ async def ar_content_create(
         result = await db.execute(query)
         all_projects = result.scalars().all()
         
+        # Batch load AR content counts for all projects (avoid N+1)
+        project_ids = [p.id for p in all_projects]
+        ar_counts: dict[int, int] = {}
+        if project_ids:
+            counts_stmt = (
+                select(ARContent.project_id, func.count(ARContent.id))
+                .where(ARContent.project_id.in_(project_ids))
+                .group_by(ARContent.project_id)
+            )
+            counts_result = await db.execute(counts_stmt)
+            ar_counts = {pid: cnt for pid, cnt in counts_result.all()}
+
         # Build projects data manually
         projects = []
         for project in all_projects:
-            # Count AR content for this project
-            ar_content_count_query = select(func.count()).select_from(ARContent).where(ARContent.project_id == project.id)
-            ar_content_count_result = await db.execute(ar_content_count_query)
-            ar_content_count = ar_content_count_result.scalar()
-            
             project_dict = {
                 "id": str(project.id),
                 "name": project.name.replace('"', '"').replace("'", "&#x27;") if project.name else "",  # Защита от XSS и ошибок в JS
                 "status": project.status,
                 "company_id": project.company_id,
-                "ar_content_count": ar_content_count,
+                "ar_content_count": ar_counts.get(project.id, 0),
                 "created_at": project.created_at.isoformat() if hasattr(project.created_at, 'isoformat') else str(project.created_at) if project.created_at else None,
                 "updated_at": project.updated_at.isoformat() if hasattr(project.updated_at, 'isoformat') else str(project.updated_at) if project.updated_at else None,
                 "_links": {
@@ -572,18 +579,21 @@ async def ar_content_edit(
         result = await db.execute(query)
         all_projects = result.scalars().all()
 
+        # Batch load AR content counts for all projects (avoid N+1)
+        project_ids = [p.id for p in all_projects]
+        ar_counts_edit: dict[int, int] = {}
+        if project_ids:
+            counts_stmt = (
+                select(ARContent.project_id, func.count(ARContent.id))
+                .where(ARContent.project_id.in_(project_ids))
+                .group_by(ARContent.project_id)
+            )
+            counts_result = await db.execute(counts_stmt)
+            ar_counts_edit = {pid: cnt for pid, cnt in counts_result.all()}
+
         # Build projects data manually
         projects = []
         for project in all_projects:
-            # Count AR content for this project
-            ar_content_count_query = (
-                select(func.count())
-                .select_from(ARContent)
-                .where(ARContent.project_id == project.id)
-            )
-            ar_content_count_result = await db.execute(ar_content_count_query)
-            ar_content_count = ar_content_count_result.scalar()
-
             project_dict = {
                 "id": str(project.id),
                 "name": project.name.replace('"', '"').replace("'", "&#x27;")
@@ -591,7 +601,7 @@ async def ar_content_edit(
                 else "",  # Защита от XSS и ошибок в JS
                 "status": project.status,
                 "company_id": project.company_id,
-                "ar_content_count": ar_content_count,
+                "ar_content_count": ar_counts_edit.get(project.id, 0),
                 "created_at": project.created_at.isoformat()
                 if hasattr(project.created_at, "isoformat")
                 else str(project.created_at)

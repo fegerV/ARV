@@ -196,19 +196,26 @@ async def project_create(
         companies_result = await db.execute(companies_query)
         companies_db = companies_result.scalars().all()
         
+        # Batch load project counts for all companies (avoid N+1)
+        company_ids = [c.id for c in companies_db]
+        project_counts: dict[int, int] = {}
+        if company_ids:
+            pc_stmt = (
+                select(Project.company_id, func.count(Project.id))
+                .where(Project.company_id.in_(company_ids))
+                .group_by(Project.company_id)
+            )
+            pc_result = await db.execute(pc_stmt)
+            project_counts = {cid: cnt for cid, cnt in pc_result.all()}
+
         companies = []
         for company in companies_db:
-            # Count projects for each company
-            projects_count_query = select(func.count()).select_from(Project).where(Project.company_id == company.id)
-            projects_count_result = await db.execute(projects_count_query)
-            projects_count = projects_count_result.scalar()
-            
             companies.append({
                 "id": company.id,
                 "name": company.name,
                 "contact_email": company.contact_email,
                 "status": company.status,
-                "projects_count": projects_count,
+                "projects_count": project_counts.get(company.id, 0),
                 "created_at": company.created_at.isoformat() if company.created_at and hasattr(company.created_at, "isoformat") else company.created_at,
                 "updated_at": company.updated_at.isoformat() if company.updated_at and hasattr(company.updated_at, "isoformat") else company.updated_at
             })
