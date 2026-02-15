@@ -1,3 +1,4 @@
+import traceback as _traceback
 from pathlib import Path
 from typing import Optional
 from uuid import UUID
@@ -7,7 +8,6 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
-# selectinload removed: company loaded explicitly via db.get() to avoid MissingGreenlet
 from datetime import datetime, timezone, timedelta
 
 from app.core.config import settings
@@ -300,7 +300,11 @@ async def get_viewer_manifest(
             error_type=type(exc).__name__,
             exc_info=True,
         )
-        raise HTTPException(status_code=500, detail=f"Manifest generation failed: {type(exc).__name__}: {exc}")
+        tb = _traceback.format_exc()
+        raise HTTPException(
+            status_code=500,
+            detail=f"Manifest generation failed: {type(exc).__name__}: {exc}\n\nTraceback:\n{tb}",
+        )
 
 
 async def _build_manifest(
