@@ -15,12 +15,12 @@ def _utcnow() -> datetime:
 
 
 class AuditLog(Base):
-    __tablename__ = "audit_log"
+    __tablename__ = "audit_logs"
 
     __table_args__ = (
-        Index("ix_audit_log_entity", "entity_type", "entity_id"),
-        Index("ix_audit_log_actor_id", "actor_id"),
-        Index("ix_audit_log_created_at", "created_at"),
+        Index("ix_audit_logs_entity", "entity_type", "entity_id"),
+        Index("ix_audit_logs_actor_id", "actor_id"),
+        Index("ix_audit_logs_created_at", "created_at"),
     )
 
     id = Column(Integer, primary_key=True)

@@ -25,8 +25,8 @@ class ARViewSession(Base):
     id = Column(Integer, primary_key=True, index=True)
 
     ar_content_id = Column(Integer, ForeignKey("ar_content.id"), nullable=False)
-    project_id = Column(Integer, ForeignKey("projects.id"), nullable=False)
-    company_id = Column(Integer, ForeignKey("companies.id"), nullable=False)
+    project_id = Column(Integer, ForeignKey("projects.id"), nullable=True)
+    company_id = Column(Integer, ForeignKey("companies.id"), nullable=True)
 
     session_id = Column(String(36), nullable=False)
 
@@ -41,7 +41,7 @@ class ARViewSession(Base):
 
     duration_seconds = Column(Integer)
     tracking_quality = Column(String(50))
-    video_played = Column(Boolean, default=False, nullable=False)
+    video_played = Column(Boolean, default=False, server_default="false", nullable=False)
 
     created_at = Column(DateTime, default=_utcnow, nullable=False)
     updated_at = Column(DateTime, default=_utcnow, onupdate=_utcnow, nullable=False)
