@@ -1,4 +1,3 @@
-import traceback as _traceback
 from pathlib import Path
 from typing import Optional
 from uuid import UUID
@@ -300,10 +299,9 @@ async def get_viewer_manifest(
             error_type=type(exc).__name__,
             exc_info=True,
         )
-        tb = _traceback.format_exc()
         raise HTTPException(
             status_code=500,
-            detail=f"Manifest generation failed: {type(exc).__name__}: {exc}\n\nTraceback:\n{tb}",
+            detail=f"Manifest generation failed: {type(exc).__name__}: {exc}",
         )
 
 
@@ -371,20 +369,34 @@ async def _build_manifest(
     video_url_abs = _absolute_url(video.video_url or "")
     thumbnail_url_abs = _absolute_url(video.preview_url) if video.preview_url else None
 
+    # ── Extract ALL ORM data into plain values BEFORE _record_view ──
+    # _record_view may rollback on failure which expires every ORM object
+    # in the session, making subsequent attribute access raise MissingGreenlet.
+    video_id = video.id
+    video_title = video.filename or "video"
+    video_duration = video.duration
+    video_width = video.width
+    video_height = video.height
+    video_mime = video.mime_type
+    ar_order_number = ar_content.order_number or ""
+    ar_status = ar_content.status or "ready"
+    ar_content_id = ar_content.id
+    expires_at_str = expiry_date.isoformat() if hasattr(expiry_date, "isoformat") else str(expiry_date)
+
     # ── Increment views & create analytics session (best-effort) ─────
+    # MUST happen after all ORM attribute reads above.
     await _record_view(ar_content, request, db)
 
-    # ── Assemble response ────────────────────────────────────────────
-    expires_at_str = expiry_date.isoformat() if hasattr(expiry_date, "isoformat") else str(expiry_date)
+    # ── Assemble response (uses only plain Python values) ────────────
     video_payload = ViewerManifestVideo(
-        id=video.id,
-        title=video.filename or "video",
+        id=video_id,
+        title=video_title,
         video_url=video_url_abs,
         thumbnail_url=thumbnail_url_abs,
-        duration=video.duration,
-        width=video.width,
-        height=video.height,
-        mime_type=video.mime_type,
+        duration=video_duration,
+        width=video_width,
+        height=video_height,
+        mime_type=video_mime,
         selection_source=source,
         schedule_id=schedule_id,
         expires_in_days=expires_in,
@@ -393,17 +405,17 @@ async def _build_manifest(
     response = ViewerManifestResponse(
         manifest_version=VIEWER_MANIFEST_VERSION,
         unique_id=unique_id,
-        order_number=ar_content.order_number or "",
+        order_number=ar_order_number,
         marker_image_url=marker_image_url,
         photo_url=photo_url_abs,
         video=video_payload,
         expires_at=expires_at_str,
-        status=ar_content.status or "ready",
+        status=ar_status,
     )
     logger.info(
         "viewer_manifest_served",
         unique_id=unique_id,
-        ar_content_id=ar_content.id,
+        ar_content_id=ar_content_id,
         marker_image_url=marker_image_url,
         video_url=video_url_abs,
     )
