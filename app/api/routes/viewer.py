@@ -278,15 +278,37 @@ async def get_viewer_manifest(
     request: Request,
     db: AsyncSession = Depends(get_db),
 ):
-    """
-    Get viewer manifest for Android ARCore app.
-    Returns marker image URL (photo), video, expiry; increments views_count.
+    """Get viewer manifest for Android ARCore app.
+
+    Returns marker image URL (photo), active video, expiry date;
+    increments ``views_count`` and creates an ``ARViewSession`` for analytics.
     """
     try:
         UUID(unique_id)
     except (ValueError, TypeError):
         raise HTTPException(status_code=400, detail="Invalid unique_id format")
 
+    try:
+        return await _build_manifest(unique_id, request, db)
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.error(
+            "viewer_manifest_unhandled",
+            unique_id=unique_id,
+            error=str(exc),
+            error_type=type(exc).__name__,
+            exc_info=True,
+        )
+        raise HTTPException(status_code=500, detail=f"Manifest generation failed: {type(exc).__name__}: {exc}")
+
+
+async def _build_manifest(
+    unique_id: str,
+    request: Request,
+    db: AsyncSession,
+) -> JSONResponse:
+    """Core manifest builder extracted for clean error handling."""
     stmt = (
         select(ARContent)
         .options(selectinload(ARContent.company))
@@ -297,13 +319,16 @@ async def get_viewer_manifest(
     if not ar_content:
         raise HTTPException(status_code=404, detail="AR content not found")
 
+    # Save company reference early — before any commit that may expire relationships.
+    company = ar_content.company
+
     creation = ar_content.created_at.replace(tzinfo=None) if ar_content.created_at.tzinfo else ar_content.created_at
     expiry_date = creation + timedelta(days=ar_content.duration_years * 365)
     now = datetime.now(timezone.utc).replace(tzinfo=None)
     if now > expiry_date:
         raise HTTPException(status_code=403, detail="AR content subscription has expired")
 
-    if ar_content.status not in ["active", "ready"]:
+    if ar_content.status not in ("active", "ready"):
         raise HTTPException(status_code=400, detail="AR content is not active or ready")
 
     photo_url_rel = _photo_url_from_ar_content(ar_content)
@@ -316,6 +341,7 @@ async def get_viewer_manifest(
             detail="Marker is still being generated, try again later",
         )
 
+    # ── Active video selection ────────────────────────────────────────
     video_result = await get_active_video(ar_content.id, db)
     if not video_result:
         raise HTTPException(status_code=400, detail="No playable videos available for this AR content")
@@ -324,11 +350,11 @@ async def get_viewer_manifest(
     source = video_result["source"]
     schedule_id = video_result.get("schedule_id")
     expires_in = video_result.get("expires_in")
-    if source == "rotation" and getattr(video, "rotation_type", None) in ["sequential", "cyclic"]:
+
+    if source == "rotation" and getattr(video, "rotation_type", None) in ("sequential", "cyclic"):
         await update_rotation_state(ar_content, db)
 
-    # Resolve Yandex Disk yadisk:// references to temporary download URLs
-    company = ar_content.company
+    # ── Resolve Yandex Disk yadisk:// references ─────────────────────
     if company and _is_yadisk_ref(photo_url_rel):
         photo_url_rel = await _resolve_yd_url(photo_url_rel, company)
     if company and _is_yadisk_ref(video.video_url):
@@ -336,76 +362,20 @@ async def get_viewer_manifest(
     if company and _is_yadisk_ref(video.preview_url):
         video.preview_url = await _resolve_yd_url(video.preview_url, company)
 
+    # ── Build absolute URLs ──────────────────────────────────────────
     marker_image_url = _absolute_url(photo_url_rel)
     photo_url_abs = _absolute_url(photo_url_rel)
     video_url_abs = _absolute_url(video.video_url or "")
     thumbnail_url_abs = _absolute_url(video.preview_url) if video.preview_url else None
 
-    try:
-        ar_content.views_count = (ar_content.views_count or 0) + 1
+    # ── Increment views & create analytics session (best-effort) ─────
+    await _record_view(ar_content, request, db)
 
-        # Parse User-Agent for device/browser/os info
-        import uuid as _uuid
-        ua_string = request.headers.get("user-agent", "")
-        device_type = "unknown"
-        browser_name = "unknown"
-        os_name = "unknown"
-        if ua_string:
-            ua_lower = ua_string.lower()
-            # Detect device type
-            if "android" in ua_lower or "mobile" in ua_lower:
-                device_type = "mobile"
-            elif "ipad" in ua_lower or "tablet" in ua_lower:
-                device_type = "tablet"
-            elif "windows" in ua_lower or "macintosh" in ua_lower or "linux" in ua_lower:
-                device_type = "desktop"
-            # Detect OS
-            if "android" in ua_lower:
-                os_name = "Android"
-            elif "iphone" in ua_lower or "ipad" in ua_lower:
-                os_name = "iOS"
-            elif "windows" in ua_lower:
-                os_name = "Windows"
-            elif "macintosh" in ua_lower or "mac os" in ua_lower:
-                os_name = "macOS"
-            elif "linux" in ua_lower:
-                os_name = "Linux"
-            # Detect browser
-            if "vertexar" in ua_lower or "arcore" in ua_lower:
-                browser_name = "Vertex AR App"
-            elif "chrome" in ua_lower and "safari" in ua_lower:
-                browser_name = "Chrome"
-            elif "firefox" in ua_lower:
-                browser_name = "Firefox"
-            elif "safari" in ua_lower:
-                browser_name = "Safari"
-
-        # Create an ARViewSession so that the analytics dashboard has data
-        ip_address = request.client.host if request.client else None
-        session = ARViewSession(
-            ar_content_id=ar_content.id,
-            project_id=ar_content.project_id,
-            company_id=ar_content.company_id,
-            session_id=str(_uuid.uuid4()),
-            user_agent=ua_string[:500] if ua_string else None,
-            device_type=device_type,
-            browser=browser_name,
-            os=os_name,
-            ip_address=ip_address,
-            video_played=True,
-        )
-        db.add(session)
-        await db.commit()
-        await db.refresh(ar_content)
-        logger.info("viewer_manifest_views_incremented", ar_content_id=ar_content.id, views_count=ar_content.views_count)
-    except Exception as e:
-        logger.warning("failed_to_increment_views_manifest", error=str(e))
-        await db.rollback()
-
+    # ── Assemble response ────────────────────────────────────────────
     expires_at_str = expiry_date.isoformat() if hasattr(expiry_date, "isoformat") else str(expiry_date)
     video_payload = ViewerManifestVideo(
         id=video.id,
-        title=video.filename,
+        title=video.filename or "video",
         video_url=video_url_abs,
         thumbnail_url=thumbnail_url_abs,
         duration=video.duration,
@@ -438,3 +408,86 @@ async def get_viewer_manifest(
         content=response.model_dump(mode="json"),
         headers={"X-Manifest-Version": VIEWER_MANIFEST_VERSION},
     )
+
+
+async def _record_view(ar_content: ARContent, request: Request, db: AsyncSession) -> None:
+    """Increment ``views_count`` and persist an ``ARViewSession`` (best-effort)."""
+    import uuid as _uuid
+
+    try:
+        ar_content.views_count = (ar_content.views_count or 0) + 1
+
+        ua_string = request.headers.get("user-agent", "")
+        device_type, browser_name, os_name = _parse_user_agent(ua_string)
+
+        ip_address = request.client.host if request.client else None
+        session = ARViewSession(
+            ar_content_id=ar_content.id,
+            project_id=ar_content.project_id,
+            company_id=ar_content.company_id,
+            session_id=str(_uuid.uuid4()),
+            user_agent=ua_string[:500] if ua_string else None,
+            device_type=device_type,
+            browser=browser_name,
+            os=os_name,
+            ip_address=ip_address,
+            video_played=True,
+        )
+        db.add(session)
+        await db.commit()
+        await db.refresh(ar_content)
+        logger.info(
+            "viewer_manifest_views_incremented",
+            ar_content_id=ar_content.id,
+            views_count=ar_content.views_count,
+        )
+    except Exception as exc:
+        logger.warning("failed_to_increment_views_manifest", error=str(exc))
+        try:
+            await db.rollback()
+        except Exception:
+            pass
+
+
+def _parse_user_agent(ua_string: str) -> tuple[str, str, str]:
+    """Return ``(device_type, browser_name, os_name)`` from a User-Agent string."""
+    device_type = "unknown"
+    browser_name = "unknown"
+    os_name = "unknown"
+
+    if not ua_string:
+        return device_type, browser_name, os_name
+
+    ua_lower = ua_string.lower()
+
+    # Device type
+    if "android" in ua_lower or "mobile" in ua_lower:
+        device_type = "mobile"
+    elif "ipad" in ua_lower or "tablet" in ua_lower:
+        device_type = "tablet"
+    elif "windows" in ua_lower or "macintosh" in ua_lower or "linux" in ua_lower:
+        device_type = "desktop"
+
+    # OS
+    if "android" in ua_lower:
+        os_name = "Android"
+    elif "iphone" in ua_lower or "ipad" in ua_lower:
+        os_name = "iOS"
+    elif "windows" in ua_lower:
+        os_name = "Windows"
+    elif "macintosh" in ua_lower or "mac os" in ua_lower:
+        os_name = "macOS"
+    elif "linux" in ua_lower:
+        os_name = "Linux"
+
+    # Browser
+    if "vertexar" in ua_lower or "arcore" in ua_lower:
+        browser_name = "Vertex AR App"
+    elif "chrome" in ua_lower and "safari" in ua_lower:
+        browser_name = "Chrome"
+    elif "firefox" in ua_lower:
+        browser_name = "Firefox"
+    elif "safari" in ua_lower:
+        browser_name = "Safari"
+
+    return device_type, browser_name, os_name
