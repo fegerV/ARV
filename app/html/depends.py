@@ -13,7 +13,7 @@ from app.core.config import settings
 from app.api.routes.auth import get_current_active_user
 from app.api.routes.companies import list_companies, get_company
 from app.api.routes.projects import list_projects, get_project
-from app.api.routes.ar_content import list_all_ar_content, get_ar_content_by_id_legacy
+from app.api.routes.ar_content import list_all_ar_content, get_ar_content_by_id
 from app.api.routes.analytics import analytics_summary
 from app.mock_data import (
     DASHBOARD_MOCK_DATA, COMPANIES_MOCK_DATA, AR_CONTENT_MOCK_DATA,
@@ -117,7 +117,7 @@ async def get_ar_content_list(db: AsyncSession = Depends(get_db), current_user: 
 async def get_ar_content_detail(ar_content_id: int, db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_active_user)) -> Dict[str, Any]:
     """Get AR content detail with fallback to mock data."""
     try:
-        result = await get_ar_content_by_id_legacy(ar_content_id, db)
+        result = await get_ar_content_by_id(ar_content_id, db)
         ar_content = dict(result)
         
         # Convert datetime objects to strings for template

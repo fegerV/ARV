@@ -222,6 +222,64 @@ async def api_protected_route(request: Request, path: str):
     )
 
 
+# AR viewer landing page: /view/{unique_id}
+@app.get("/view/{unique_id}")
+async def ar_viewer_landing(unique_id: str):
+    """Landing page: open in AR Viewer app or download from Play Store."""
+    import html as html_escape
+    from datetime import datetime, timedelta, timezone
+    from sqlalchemy import select as sa_select
+    from fastapi import HTTPException
+    from fastapi.responses import HTMLResponse
+    from app.core.database import AsyncSessionLocal
+    from app.models.ar_content import ARContent
+
+    try:
+        UUID(unique_id)
+    except (ValueError, TypeError):
+        return JSONResponse(status_code=400, content={"detail": "Invalid unique_id format"})
+
+    try:
+        async with AsyncSessionLocal() as db:
+            stmt = sa_select(ARContent).where(ARContent.unique_id == unique_id)
+            result = await db.execute(stmt)
+            ar_content = result.scalar_one_or_none()
+
+        if not ar_content:
+            return JSONResponse(status_code=404, content={"detail": "AR content not found"})
+
+        creation_date = ar_content.created_at.replace(tzinfo=None) if ar_content.created_at.tzinfo else ar_content.created_at
+        expiry_date = creation_date + timedelta(days=ar_content.duration_years * 365)
+        if datetime.utcnow() > expiry_date:
+            return JSONResponse(status_code=403, content={"detail": "AR content subscription has expired"})
+
+        if ar_content.status not in ("active", "ready"):
+            return JSONResponse(status_code=400, content={"detail": "AR content is not active"})
+
+        base_url = (settings.PUBLIC_URL or "").rstrip("/")
+        app_link = f"{base_url}/view/{unique_id}" if base_url else f"/view/{unique_id}"
+        deep_link = f"arv://view/{unique_id}"
+        play_store_url = "https://play.google.com/store/apps/details?id=ru.neuroimagen.arviewer"
+        order_esc = html_escape.escape(ar_content.order_number or "AR")
+
+        page = f"""<!DOCTYPE html>
+<html lang="ru"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>AR Viewer — {order_esc}</title>
+<style>*{{margin:0;padding:0;box-sizing:border-box}}body{{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#1a1a1a;color:#eee;min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px}}h1{{font-size:1.5rem;margin-bottom:.5rem}}p{{font-size:.95rem;opacity:.9;margin-bottom:1.5rem;text-align:center;max-width:320px}}a{{display:inline-block;margin:8px;padding:14px 24px;border-radius:8px;font-size:1rem;text-decoration:none;font-weight:500}}.ba{{background:#1a73e8;color:#fff}}.bs{{background:#0d652d;color:#fff}}</style>
+</head><body>
+<h1>AR Viewer</h1>
+<p>Просмотр AR доступен в приложении. Откройте ссылку в приложении или установите его из Google Play.</p>
+<a class="ba" href="{html_escape.escape(deep_link)}">Открыть в приложении</a>
+<a class="ba" href="{html_escape.escape(app_link)}">Открыть по ссылке</a>
+<a class="bs" href="{html_escape.escape(play_store_url)}">Скачать в Google Play</a>
+<p style="margin-top:1.5rem;font-size:.85rem;opacity:.6">AR-контент отображается только в приложении AR Viewer (Android, ARCore).</p>
+</body></html>"""
+        return HTMLResponse(content=page)
+    except Exception as exc:
+        logger.error("ar_viewer_landing_error", unique_id=unique_id, error=str(exc))
+        return JSONResponse(status_code=500, content={"detail": "Internal server error"})
+
+
 # Legacy QR / links: old path /ar/{unique_id} → /view/{unique_id}
 @app.get("/ar/{unique_id}")
 async def legacy_ar_viewer_redirect(unique_id: str):

@@ -8,8 +8,6 @@ from fastapi.templating import Jinja2Templates
 from app.models.user import User
 from app.api.routes.ar_content import (
     get_ar_content_by_id, 
-    get_ar_viewer,
-    get_ar_content_by_id_legacy,
     _create_ar_content,
     update_ar_content,
     delete_ar_content_by_id
@@ -530,7 +528,7 @@ async def ar_content_edit(
 
     try:
         # Get the AR content
-        result = await get_ar_content_by_id_legacy(int(ar_content_id), db)
+        result = await get_ar_content_by_id(int(ar_content_id), db)
 
         # Convert to dict and handle datetime serialization
         if hasattr(result, "model_dump"):
@@ -1351,13 +1349,4 @@ async def ar_content_update_post(
         return RedirectResponse(url=f"/ar-content/{ar_content_id}/edit?error={str(e)}", status_code=303)
 
 
-@router.get("/view/{unique_id}", response_class=HTMLResponse)
-async def ar_content_viewer(
-    request: Request,
-    unique_id: str,
-    diagnose: Optional[str] = Query(None, description="Включить диагностику AR: ?diagnose=1"),
-    db: AsyncSession = Depends(get_html_db),
-):
-    """Public AR viewer page. Add ?diagnose=1 to send AR timing diagnostics to the server."""
-    from app.api.routes.ar_content import get_ar_viewer
-    return await get_ar_viewer(request=request, unique_id=unique_id, diagnose=diagnose, db=db)
+    # /view/{unique_id} landing page is registered on app root level in main.py
