@@ -164,7 +164,7 @@ def create_access_token_cookie(response: Response, access_token: str):
     )
 
 @router.post("/login", response_model=Token)
-@rate_limit(max_requests=10, window_size="minute", per_user=False)  # 10 login attempts per minute per IP
+@rate_limit("10/minute")
 async def login(
     request: Request,
     form_data: OAuth2PasswordRequestForm = Depends(),

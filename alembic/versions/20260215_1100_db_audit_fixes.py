@@ -57,6 +57,23 @@ def upgrade() -> None:
     _create_index_if_not_exists("ix_notifications_created_at", "notifications", ["created_at"])
     _create_index_if_not_exists("ix_notifications_type", "notifications", ["notification_type"])
 
+    # Clean up orphaned references before adding FK constraints
+    op.execute(sa.text(
+        "UPDATE notifications SET company_id = NULL "
+        "WHERE company_id IS NOT NULL "
+        "AND company_id NOT IN (SELECT id FROM companies)"
+    ))
+    op.execute(sa.text(
+        "UPDATE notifications SET project_id = NULL "
+        "WHERE project_id IS NOT NULL "
+        "AND project_id NOT IN (SELECT id FROM projects)"
+    ))
+    op.execute(sa.text(
+        "UPDATE notifications SET ar_content_id = NULL "
+        "WHERE ar_content_id IS NOT NULL "
+        "AND ar_content_id NOT IN (SELECT id FROM ar_content)"
+    ))
+
     op.create_foreign_key(
         "fk_notifications_company_id_companies",
         "notifications", "companies",
