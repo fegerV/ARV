@@ -1,3 +1,4 @@
+import asyncio
 import json as _json
 from pathlib import Path
 from typing import Optional
@@ -402,21 +403,41 @@ async def _build_manifest(
     if source == "rotation" and getattr(video, "rotation_type", None) in ("sequential", "cyclic"):
         await update_rotation_state(ar_content, db)
 
-    # ── Resolve Yandex Disk yadisk:// references ─────────────────────
+    # ── Resolve Yandex Disk yadisk:// references (in parallel) ──────
     # IMPORTANT: use local variables instead of mutating ORM fields.
     # Mutating video.video_url would persist the temporary download URL
     # back to the database on the next session commit, overwriting the
     # stable yadisk:// reference and causing expired-URL errors later.
+    #
+    # All YD resolves run concurrently via asyncio.gather() to cut
+    # manifest latency from ~1.5s (3 sequential HTTP calls) to ~0.5s.
     resolved_photo = photo_url_rel
     resolved_video = video.video_url
     resolved_preview = video.preview_url
 
-    if company and _is_yadisk_ref(resolved_photo):
-        resolved_photo = await _resolve_yd_url(resolved_photo, company)
-    if company and _is_yadisk_ref(resolved_video):
-        resolved_video = await _resolve_yd_url(resolved_video, company)
-    if company and _is_yadisk_ref(resolved_preview):
-        resolved_preview = await _resolve_yd_url(resolved_preview, company)
+    if company:
+        yd_tasks: list[tuple[str, str]] = []  # (field_name, yadisk_ref)
+        if _is_yadisk_ref(resolved_photo):
+            yd_tasks.append(("photo", resolved_photo))
+        if _is_yadisk_ref(resolved_video):
+            yd_tasks.append(("video", resolved_video))
+        if _is_yadisk_ref(resolved_preview):
+            yd_tasks.append(("preview", resolved_preview))
+
+        if yd_tasks:
+            results = await asyncio.gather(
+                *(
+                    _resolve_yd_url(ref, company)
+                    for _, ref in yd_tasks
+                ),
+            )
+            for (field_name, _original), result in zip(yd_tasks, results):
+                if field_name == "photo":
+                    resolved_photo = result
+                elif field_name == "video":
+                    resolved_video = result
+                elif field_name == "preview":
+                    resolved_preview = result
 
     # ── Build absolute URLs ──────────────────────────────────────────
     marker_image_url = _absolute_url(resolved_photo)

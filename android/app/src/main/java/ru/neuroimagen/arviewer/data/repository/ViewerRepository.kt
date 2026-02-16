@@ -1,7 +1,12 @@
 package ru.neuroimagen.arviewer.data.repository
 
 import android.content.Context
+import android.util.Log
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 import retrofit2.HttpException
 import ru.neuroimagen.arviewer.data.api.ViewerApi
 import ru.neuroimagen.arviewer.data.cache.ManifestCache
@@ -15,7 +20,12 @@ import javax.inject.Singleton
 
 /**
  * Repository for viewer API: check content, load manifest, fetch next active video.
- * Uses manifest cache for offline: on network failure returns cached manifest when available.
+ *
+ * Uses a **cache-first** strategy: if a cached manifest exists, it is returned
+ * immediately while a background refresh updates the cache for next time.
+ * This avoids a 2+ second network roundtrip (check + manifest + YD URL resolve)
+ * on repeated opens of the same AR content, since the video and marker are
+ * already in their own stable caches keyed by [ViewerManifest.uniqueId].
  */
 @Singleton
 class ViewerRepository @Inject constructor(
@@ -23,8 +33,16 @@ class ViewerRepository @Inject constructor(
     @ApplicationContext private val context: Context,
 ) {
 
+    private val backgroundScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
     /**
-     * Checks if content is available, then fetches manifest. On network error, falls back to cache.
+     * Loads manifest with cache-first strategy:
+     *
+     * 1. If a cached manifest exists → return it **instantly** and refresh
+     *    the cache in the background (stale-while-revalidate).
+     * 2. If no cache → full network fetch (check + manifest).
+     * 3. On network failure without cache → propagate error.
+     *
      * @return Result with [ViewerManifest] on success, or [ViewerError] on failure.
      */
     suspend fun loadManifest(uniqueId: String): Result<ViewerManifest> {
@@ -33,18 +51,37 @@ class ViewerRepository @Inject constructor(
             return Result.failure(ViewerError.Unavailable(ContentUnavailableReason.INVALID_UNIQUE_ID))
         }
 
+        val cached = ManifestCache.get(context, trimmed)
+        if (cached != null) {
+            Log.d(TAG, "Manifest cache HIT for $trimmed — returning instantly")
+            backgroundScope.launch { refreshManifest(trimmed) }
+            return Result.success(cached)
+        }
+
+        Log.d(TAG, "Manifest cache MISS for $trimmed — full network fetch")
         val networkResult = fetchManifestFromNetwork(trimmed)
         networkResult.getOrNull()?.let { manifest ->
             ManifestCache.put(context, trimmed, manifest)
             return Result.success(manifest)
         }
-        val networkFailure = networkResult.exceptionOrNull()
-        if (networkFailure is ViewerError.Network) {
-            ManifestCache.get(context, trimmed)?.let { cached ->
-                return Result.success(cached)
-            }
+        return Result.failure(
+            networkResult.exceptionOrNull() as? ViewerError
+                ?: ViewerError.Network(msg = "Unknown error"),
+        )
+    }
+
+    /**
+     * Background refresh: fetches fresh manifest from network and updates cache.
+     * Errors are silently logged — the user already has a working cached manifest.
+     */
+    private suspend fun refreshManifest(uniqueId: String) {
+        val result = fetchManifestFromNetwork(uniqueId)
+        result.getOrNull()?.let { manifest ->
+            ManifestCache.put(context, uniqueId, manifest)
+            Log.d(TAG, "Background manifest refresh OK for $uniqueId")
+        } ?: run {
+            Log.w(TAG, "Background manifest refresh failed for $uniqueId: ${result.exceptionOrNull()}")
         }
-        return Result.failure(networkFailure as? ViewerError ?: ViewerError.Network(msg = "Unknown error"))
     }
 
     /**
@@ -108,5 +145,9 @@ class ViewerRepository @Inject constructor(
             400 -> ViewerError.Server(code, msg = message)
             else -> ViewerError.Server(code, msg = message)
         }
+    }
+
+    companion object {
+        private const val TAG = "ViewerRepository"
     }
 }
