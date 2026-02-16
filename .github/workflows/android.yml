@@ -125,18 +125,22 @@ jobs:
         run: |
           cd android/app
           echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 -d > release.keystore
+          echo "Keystore size: $(wc -c < release.keystore) bytes"
           printf "storeFile=release.keystore\nstorePassword=%s\nkeyAlias=%s\nkeyPassword=%s\n" \
             "${{ secrets.ANDROID_KEYSTORE_PASSWORD }}" \
             "${{ secrets.ANDROID_KEY_ALIAS }}" \
             "${{ secrets.ANDROID_KEY_PASSWORD }}" \
             > keystore.properties
+          echo "keystore.properties created:"
+          grep -c '=' keystore.properties
+          echo "lines with values"
 
       - name: Build release AAB
         if: env.SKIP_RELEASE != 'true'
         run: |
           cd android
           chmod +x gradlew
-          ./gradlew bundleRelease --no-daemon --stacktrace
+          ./gradlew bundleRelease --no-daemon --info 2>&1 | tail -100
 
       - name: Upload release AAB
         if: env.SKIP_RELEASE != 'true'
