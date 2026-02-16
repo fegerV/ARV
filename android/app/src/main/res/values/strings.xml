@@ -37,8 +37,8 @@
     <string name="ar_error_go_back">Назад</string>
 
     <!-- AR loading screen -->
-    <string name="ar_scene_placeholder">AR-сцена (загрузка…)</string>
-    <string name="ar_loading_title">Подготовка AR-сцены…</string>
+    <string name="ar_scene_placeholder">Портал в AR (загрузка…)</string>
+    <string name="ar_loading_title">Открываем портал в дополненную реальность…</string>
     <string-array name="ar_loading_tips">
         <item>Обеспечьте хорошее освещение</item>
         <item>Держите камеру ровно</item>

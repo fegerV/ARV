@@ -20,6 +20,20 @@ android {
         buildConfigField("String", "API_BASE_URL", "\"https://ar.neuroimagen.ru\"")
     }
 
+    signingConfigs {
+        val keystorePropsFile = file("keystore.properties")
+        if (keystorePropsFile.exists()) {
+            create("release") {
+                val keystoreProps = java.util.Properties()
+                keystoreProps.load(keystorePropsFile.inputStream())
+                storeFile = file(keystoreProps["storeFile"]!!.toString())
+                storePassword = keystoreProps["storePassword"]!!.toString()
+                keyAlias = keystoreProps["keyAlias"]!!.toString()
+                keyPassword = keystoreProps["keyPassword"]!!.toString()
+            }
+        }
+    }
+
     buildTypes {
         debug {
             buildConfigField("String", "API_BASE_URL", "\"https://ar.neuroimagen.ru\"")
@@ -31,6 +45,7 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+            signingConfigs.findByName("release")?.let { signingConfig = it }
         }
     }
 

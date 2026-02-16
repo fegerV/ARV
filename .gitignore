@@ -61,6 +61,10 @@ android/local.properties
 android/.gradle/
 android/.kotlin/
 android/app/google-services.json
+# Release signing (never commit)
+android/app/keystore.properties
+android/app/*.jks
+android/app/*.keystore
 
 # Build artifacts
 frontend/dist/
