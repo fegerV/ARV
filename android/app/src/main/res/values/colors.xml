@@ -20,4 +20,7 @@
     <!-- Camera overlay (QR scanner — always dark, NOT overridden in night) -->
     <color name="camera_overlay">#CC000000</color>
     <color name="camera_text_shadow">#000000</color>
+
+    <!-- Launcher icon background -->
+    <color name="ic_launcher_background">#0A0E27</color>
 </resources>

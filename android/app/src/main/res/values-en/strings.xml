@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">AR Viewer</string>
+    <string name="app_name">Portal AR</string>
     <string name="splash_loading">Loading…</string>
     <string name="unique_id_hint">Enter unique_id or open link</string>
     <string name="open">Open</string>
