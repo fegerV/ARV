@@ -403,18 +403,26 @@ async def _build_manifest(
         await update_rotation_state(ar_content, db)
 
     # ── Resolve Yandex Disk yadisk:// references ─────────────────────
-    if company and _is_yadisk_ref(photo_url_rel):
-        photo_url_rel = await _resolve_yd_url(photo_url_rel, company)
-    if company and _is_yadisk_ref(video.video_url):
-        video.video_url = await _resolve_yd_url(video.video_url, company)
-    if company and _is_yadisk_ref(video.preview_url):
-        video.preview_url = await _resolve_yd_url(video.preview_url, company)
+    # IMPORTANT: use local variables instead of mutating ORM fields.
+    # Mutating video.video_url would persist the temporary download URL
+    # back to the database on the next session commit, overwriting the
+    # stable yadisk:// reference and causing expired-URL errors later.
+    resolved_photo = photo_url_rel
+    resolved_video = video.video_url
+    resolved_preview = video.preview_url
+
+    if company and _is_yadisk_ref(resolved_photo):
+        resolved_photo = await _resolve_yd_url(resolved_photo, company)
+    if company and _is_yadisk_ref(resolved_video):
+        resolved_video = await _resolve_yd_url(resolved_video, company)
+    if company and _is_yadisk_ref(resolved_preview):
+        resolved_preview = await _resolve_yd_url(resolved_preview, company)
 
     # ── Build absolute URLs ──────────────────────────────────────────
-    marker_image_url = _absolute_url(photo_url_rel)
-    photo_url_abs = _absolute_url(photo_url_rel)
-    video_url_abs = _absolute_url(video.video_url or "")
-    thumbnail_url_abs = _absolute_url(video.preview_url) if video.preview_url else None
+    marker_image_url = _absolute_url(resolved_photo)
+    photo_url_abs = _absolute_url(resolved_photo)
+    video_url_abs = _absolute_url(resolved_video or "")
+    thumbnail_url_abs = _absolute_url(resolved_preview) if resolved_preview else None
 
     # ── Extract ALL ORM data into plain values BEFORE _record_view ──
     # _record_view may rollback on failure which expires every ORM object

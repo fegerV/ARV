@@ -53,6 +53,7 @@
     <string name="photo_saved">Фото сохранено</string>
     <string name="photo_save_failed">Не удалось сохранить фото</string>
     <string name="record_video">Запись</string>
+    <string name="record_video_coming_soon">Запись видео будет доступна в следующей версии</string>
     <string name="stop_recording">Стоп</string>
     <string name="video_saved">Видео сохранено в галерею</string>
     <string name="video_save_failed">Не удалось сохранить видео</string>

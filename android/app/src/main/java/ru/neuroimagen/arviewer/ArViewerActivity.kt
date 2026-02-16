@@ -237,11 +237,15 @@ class ArViewerActivity : AppCompatActivity() {
      *
      * Uses granular [ArCoreCheckResult] and [ArSessionResult] to provide
      * clear, device-specific error messages instead of generic Toasts.
+     *
+     * ARCore session creation (augmented image DB) is offloaded to
+     * [Dispatchers.Default] so the main-thread Handler can keep cycling
+     * loading tips while the heavy work runs in the background.
      */
     private fun startArWithPermission(manifest: ViewerManifest, bitmap: Bitmap) {
         if (isDestroyed) return
 
-        // ── Step 1: Check & install ARCore ──────────────────────────
+        // ── Step 1: Check & install ARCore (fast, needs Activity) ───
         when (val checkResult = ArSessionHelper.checkAndInstallArCore(this)) {
             is ArCoreCheckResult.Ready -> { /* proceed */ }
 
@@ -269,36 +273,53 @@ class ArViewerActivity : AppCompatActivity() {
 
         if (isDestroyed) return
 
-        // ── Step 2: Create ARCore session ───────────────────────────
-        val session = when (val sessionResult = ArSessionHelper.createSession(this, bitmap, manifest)) {
-            is ArSessionResult.Success -> sessionResult.session
-            is ArSessionResult.DeviceNotCompatible -> {
-                showArError(getString(R.string.error_device_not_supported))
-                return
+        // ── Step 2: Create session on background thread ─────────────
+        // This keeps the main-thread message queue free so loading tips
+        // continue to rotate while the augmented image DB is built.
+        lifecycleScope.launch {
+            val sessionResult = withContext(Dispatchers.Default) {
+                ArSessionHelper.createSession(this@ArViewerActivity, bitmap, manifest)
             }
-            is ArSessionResult.ArCoreNotInstalled -> {
-                showArError(getString(R.string.error_arcore_install_requested))
-                return
+
+            if (isDestroyed) return@launch
+
+            val session = when (sessionResult) {
+                is ArSessionResult.Success -> sessionResult.session
+                is ArSessionResult.DeviceNotCompatible -> {
+                    showArError(getString(R.string.error_device_not_supported))
+                    return@launch
+                }
+                is ArSessionResult.ArCoreNotInstalled -> {
+                    showArError(getString(R.string.error_arcore_install_requested))
+                    return@launch
+                }
+                is ArSessionResult.UserDeclined -> {
+                    showArError(getString(R.string.error_arcore_user_declined))
+                    return@launch
+                }
+                is ArSessionResult.SdkTooOld -> {
+                    showArError(getString(R.string.error_arcore_sdk_too_old))
+                    return@launch
+                }
+                is ArSessionResult.Failed -> {
+                    showArError(getString(R.string.error_arcore_session))
+                    return@launch
+                }
             }
-            is ArSessionResult.UserDeclined -> {
-                showArError(getString(R.string.error_arcore_user_declined))
-                return
-            }
-            is ArSessionResult.SdkTooOld -> {
-                showArError(getString(R.string.error_arcore_sdk_too_old))
-                return
-            }
-            is ArSessionResult.Failed -> {
-                showArError(getString(R.string.error_arcore_session))
-                return
-            }
+
+            arSession = session
+
+            stopLoadingTipsCycle()
+
+            setupArScene(session, manifest)
         }
+    }
 
-        if (isDestroyed) return
-        arSession = session
-
-        stopLoadingTipsCycle()
-
+    /**
+     * Initialise GL surface, renderer, and UI controls after a successful
+     * ARCore session creation.  Must be called on the main thread.
+     */
+    private fun setupArScene(session: Session, manifest: ViewerManifest) {
         val renderer = ArRenderer(
             appContext = applicationContext,
             session = session,
