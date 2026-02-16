@@ -1,14 +1,12 @@
-from datetime import datetime, timedelta
 import os
-import structlog
-import psutil
-from fastapi import APIRouter
-from starlette.responses import Response
-from sqlalchemy import text, select
-from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.config import settings
-from app.core.database import engine, AsyncSessionLocal
+import psutil
+import structlog
+from fastapi import APIRouter
+from sqlalchemy import text
+from starlette.responses import Response
+
+from app.core.database import engine
 
 # Prometheus
 try:

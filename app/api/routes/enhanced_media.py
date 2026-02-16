@@ -1,12 +1,16 @@
 """
 Enhanced Media API routes with advanced validation, caching, and reliability.
 """
-from typing import Optional, List, Dict, Any
-from fastapi import APIRouter, HTTPException, Query, BackgroundTasks, Depends
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
-from pydantic import BaseModel, Field
+import hashlib
+import time
 import uuid
+from datetime import datetime
+from typing import Any, Dict, List, Optional
+
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
+from pydantic import BaseModel, Field
+from sqlalchemy import func, select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.models.ar_content import ARContent
@@ -427,7 +431,7 @@ async def generate_ar_content_thumbnails(
     try:
         # Parse UUID
         try:
-            content_uuid = uuid.UUID(content_id)
+            uuid.UUID(content_id)
         except ValueError:
             raise HTTPException(status_code=400, detail="Invalid content ID format")
         
@@ -584,11 +588,6 @@ async def get_media_stats(
     except Exception as e:
         logger.error("media_stats_failed", error=str(e))
         raise HTTPException(status_code=500, detail=f"Failed to get media stats: {str(e)}")
-
-# Import required modules
-import hashlib
-from sqlalchemy import func
-from datetime import datetime
 
 # Track service start time
 start_time = time.time()

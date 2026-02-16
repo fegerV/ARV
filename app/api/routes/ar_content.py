@@ -38,7 +38,6 @@ from app.utils.ar_content import (
 from app.services.marker_service import marker_service
 from app.core.storage_providers import get_provider_for_company
 
-from fastapi.responses import HTMLResponse
 import json
 
 logger = structlog.get_logger()
