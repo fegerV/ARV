@@ -1,6 +1,7 @@
 package ru.neuroimagen.arviewer.data.cache
 
 import android.content.Context
+import android.util.Log
 import com.google.gson.Gson
 import ru.neuroimagen.arviewer.data.model.ViewerManifest
 import java.io.File
@@ -14,6 +15,7 @@ import kotlin.concurrent.write
  */
 object ManifestCache {
 
+    private const val TAG = "ManifestCache"
     private const val CACHE_DIR_NAME = "manifest_cache"
     private const val MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000L // 7 days
 
@@ -36,15 +38,29 @@ object ManifestCache {
      * Returns cached manifest if present and not expired.
      */
     fun get(context: Context, uniqueId: String): ViewerManifest? = lock.read {
+        val start = System.currentTimeMillis()
         val file = cacheFile(context, uniqueId)
-        if (!file.exists()) return null
-        if (file.lastModified() + MAX_AGE_MS < System.currentTimeMillis()) {
+        if (!file.exists()) {
+            Log.d(TAG, "MISS — file not found for $uniqueId (${file.absolutePath})")
+            return null
+        }
+        val ageMs = System.currentTimeMillis() - file.lastModified()
+        if (ageMs > MAX_AGE_MS) {
+            Log.d(TAG, "MISS — expired (age=${ageMs / 1000}s) for $uniqueId")
             file.delete()
             return null
         }
-        runCatching {
+        val result = runCatching {
             gson.fromJson(file.readText(), ViewerManifest::class.java)
-        }.getOrNull()
+        }
+        val elapsed = System.currentTimeMillis() - start
+        result.onFailure { e ->
+            Log.e(TAG, "MISS — deserialization failed for $uniqueId in ${elapsed}ms", e)
+        }
+        result.onSuccess {
+            Log.d(TAG, "HIT for $uniqueId in ${elapsed}ms (age=${ageMs / 1000}s)")
+        }
+        result.getOrNull()
     }
 
     /**
@@ -52,8 +68,14 @@ object ManifestCache {
      */
     fun put(context: Context, uniqueId: String, manifest: ViewerManifest): Unit = lock.write {
         val file = cacheFile(context, uniqueId)
-        runCatching {
+        val result = runCatching {
             file.writeText(gson.toJson(manifest))
+        }
+        result.onSuccess {
+            Log.d(TAG, "PUT OK for $uniqueId (${file.length()} bytes)")
+        }
+        result.onFailure { e ->
+            Log.e(TAG, "PUT FAILED for $uniqueId", e)
         }
     }
 

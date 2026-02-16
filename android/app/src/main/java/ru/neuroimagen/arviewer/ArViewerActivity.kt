@@ -71,6 +71,7 @@ class ArViewerActivity : AppCompatActivity() {
     private var recordButton: Button? = null
     private var currentZoom = 1.0f
     private var scaleDetector: ScaleGestureDetector? = null
+    private var activityCreateTime = 0L
 
     // ── Loading tips ─────────────────────────────────────────────────
     private var tipsHandler: Handler? = null
@@ -98,6 +99,7 @@ class ArViewerActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        activityCreateTime = System.currentTimeMillis()
         setContentView(R.layout.activity_ar_viewer)
         supportActionBar?.setDisplayHomeAsUpEnabled(true)
 
@@ -171,6 +173,7 @@ class ArViewerActivity : AppCompatActivity() {
     private fun onManifestAndBitmapReady(manifest: ViewerManifest, bitmap: Bitmap) {
         if (isDestroyed) return
         if (arSession != null) return // AR already started
+        Log.d(TAG, "⏱ Manifest+bitmap ready at +${System.currentTimeMillis() - activityCreateTime}ms")
 
         if (!hasPermission(Manifest.permission.CAMERA)) {
             cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
@@ -309,6 +312,7 @@ class ArViewerActivity : AppCompatActivity() {
             }
 
             arSession = session
+            Log.d(TAG, "⏱ AR session ready at +${System.currentTimeMillis() - activityCreateTime}ms — loading complete")
 
             stopLoadingTipsCycle()
 

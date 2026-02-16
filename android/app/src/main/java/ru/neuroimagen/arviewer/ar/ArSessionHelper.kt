@@ -152,13 +152,24 @@ object ArSessionHelper {
      */
     fun createSession(activity: Activity, bitmap: Bitmap, manifest: ViewerManifest): ArSessionResult {
         return try {
+            val t0 = System.currentTimeMillis()
             val session = Session(activity)
+            val t1 = System.currentTimeMillis()
             val config = Config(session)
             val db = AugmentedImageDatabase(session)
+            val t2 = System.currentTimeMillis()
             db.addImage(MARKER_NAME, bitmap, MARKER_WIDTH_METERS)
+            val t3 = System.currentTimeMillis()
             config.augmentedImageDatabase = db
             config.focusMode = Config.FocusMode.AUTO
             session.configure(config)
+            val t4 = System.currentTimeMillis()
+            Log.d(
+                TAG,
+                "Session created: total=${t4 - t0}ms " +
+                    "(Session=${t1 - t0}ms, addImage=${t3 - t2}ms [${bitmap.width}×${bitmap.height}], " +
+                    "configure=${t4 - t3}ms)",
+            )
             ArSessionResult.Success(session)
         } catch (e: UnavailableDeviceNotCompatibleException) {
             Log.e(TAG, "Device not compatible", e)

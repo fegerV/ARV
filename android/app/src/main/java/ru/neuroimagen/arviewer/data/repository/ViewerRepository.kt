@@ -46,6 +46,7 @@ class ViewerRepository @Inject constructor(
      * @return Result with [ViewerManifest] on success, or [ViewerError] on failure.
      */
     suspend fun loadManifest(uniqueId: String): Result<ViewerManifest> {
+        val start = System.currentTimeMillis()
         val trimmed = uniqueId.trim()
         if (trimmed.isBlank()) {
             return Result.failure(ViewerError.Unavailable(ContentUnavailableReason.INVALID_UNIQUE_ID))
@@ -53,17 +54,21 @@ class ViewerRepository @Inject constructor(
 
         val cached = ManifestCache.get(context, trimmed)
         if (cached != null) {
-            Log.d(TAG, "Manifest cache HIT for $trimmed — returning instantly")
+            val elapsed = System.currentTimeMillis() - start
+            Log.d(TAG, "⚡ Manifest cache HIT for $trimmed — returning in ${elapsed}ms")
             backgroundScope.launch { refreshManifest(trimmed) }
             return Result.success(cached)
         }
 
         Log.d(TAG, "Manifest cache MISS for $trimmed — full network fetch")
         val networkResult = fetchManifestFromNetwork(trimmed)
+        val elapsed = System.currentTimeMillis() - start
         networkResult.getOrNull()?.let { manifest ->
             ManifestCache.put(context, trimmed, manifest)
+            Log.d(TAG, "Network manifest loaded in ${elapsed}ms for $trimmed")
             return Result.success(manifest)
         }
+        Log.w(TAG, "Network manifest FAILED in ${elapsed}ms for $trimmed")
         return Result.failure(
             networkResult.exceptionOrNull() as? ViewerError
                 ?: ViewerError.Network(msg = "Unknown error"),

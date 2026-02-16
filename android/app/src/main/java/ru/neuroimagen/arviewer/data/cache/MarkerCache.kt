@@ -3,6 +3,7 @@ package ru.neuroimagen.arviewer.data.cache
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.util.Log
 import java.io.File
 import java.util.concurrent.locks.ReentrantReadWriteLock
 import kotlin.concurrent.read
@@ -18,6 +19,7 @@ import kotlin.concurrent.write
  */
 object MarkerCache {
 
+    private const val TAG = "MarkerCache"
     private const val CACHE_DIR_NAME = "marker_cache"
     private const val MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000L // 7 days
 
@@ -45,16 +47,33 @@ object MarkerCache {
      * @return decoded Bitmap or null if miss / expired / error
      */
     fun get(context: Context, stableKey: String): Bitmap? = lock.read {
+        val start = System.currentTimeMillis()
         val file = cacheFile(context, stableKey)
-        if (!file.exists()) return null
-        if (file.lastModified() + MAX_AGE_MS < System.currentTimeMillis()) {
+        if (!file.exists()) {
+            Log.d(TAG, "MISS — file not found for $stableKey")
+            return null
+        }
+        val ageMs = System.currentTimeMillis() - file.lastModified()
+        if (ageMs > MAX_AGE_MS) {
+            Log.d(TAG, "MISS — expired (age=${ageMs / 1000}s) for $stableKey")
             file.delete()
             return null
         }
-        runCatching {
+        val result = runCatching {
             val bytes = file.readBytes()
-            BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
-        }.getOrNull()
+            val bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+            val elapsed = System.currentTimeMillis() - start
+            Log.d(
+                TAG,
+                "HIT for $stableKey in ${elapsed}ms " +
+                    "(${bytes.size / 1024}KB → ${bitmap.width}×${bitmap.height})",
+            )
+            bitmap
+        }
+        result.onFailure { e ->
+            Log.e(TAG, "MISS — decode failed for $stableKey", e)
+        }
+        result.getOrNull()
     }
 
     /**
@@ -65,8 +84,14 @@ object MarkerCache {
      */
     fun put(context: Context, stableKey: String, imageBytes: ByteArray): Unit = lock.write {
         val file = cacheFile(context, stableKey)
-        runCatching {
+        val result = runCatching {
             file.writeBytes(imageBytes)
+        }
+        result.onSuccess {
+            Log.d(TAG, "PUT OK for $stableKey (${imageBytes.size / 1024}KB)")
+        }
+        result.onFailure { e ->
+            Log.e(TAG, "PUT FAILED for $stableKey", e)
         }
     }
 
