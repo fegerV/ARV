@@ -39,17 +39,30 @@ def storage_url(url: str, company_id=None) -> str:
     return url
 
 
-def tojson_filter(value):
-    """Custom JSON filter that handles datetime objects and other Python types."""
-    def json_serializer(obj):
+def tojson_filter(value) -> Markup:
+    """Custom JSON filter that handles datetime objects and other Python types.
+
+    Returns ``Markup`` so Jinja2 auto-escaping does **not** mangle the
+    JSON (e.g. turning ``"`` into ``&quot;``).  This is critical when the
+    output is placed inside ``<script type="application/json">`` tags,
+    because browsers do not decode HTML entities in script content.
+
+    The ``</`` sequence is escaped to ``<\\/`` to prevent premature
+    closing of a ``<script>`` block in the HTML parser.
+    """
+
+    def _json_serializer(obj: object) -> object:
         if isinstance(obj, datetime):
             return obj.isoformat()
-        if hasattr(obj, '__dict__'):
+        if hasattr(obj, "__dict__"):
             return obj.__dict__
         raise TypeError(f"Type {type(obj)} not serializable")
-    
+
     try:
-        return json.dumps(value, default=json_serializer, ensure_ascii=False)
-    except Exception as e:
-        # Fallback to simple string representation
-        return json.dumps(str(value), ensure_ascii=False)
+        raw = json.dumps(value, default=_json_serializer, ensure_ascii=False)
+    except (TypeError, ValueError):
+        raw = json.dumps(str(value), ensure_ascii=False)
+
+    # Prevent "</script>" inside JSON from breaking the HTML parser.
+    safe = raw.replace("</", "<\\/")
+    return Markup(safe)

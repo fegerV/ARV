@@ -278,10 +278,8 @@
                 </div>
                 <button type="button" @click="runBackupNow()" :disabled="backupRunning"
                         class="btn btn-primary text-sm flex items-center gap-1.5">
-                    <span class="material-icons text-base" :class="backupRunning && 'animate-spin'">
-                        <template x-if="!backupRunning">backup</template>
-                        <template x-if="backupRunning">refresh</template>
-                    </span>
+                    <span class="material-icons text-base" :class="backupRunning && 'animate-spin'"
+                          x-text="backupRunning ? 'refresh' : 'backup'"></span>
                     <span x-text="backupRunning ? 'Создание...' : 'Создать сейчас'"></span>
                 </button>
             </div>
