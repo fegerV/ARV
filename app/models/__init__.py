@@ -16,6 +16,7 @@ from .notification import Notification
 from .email_queue import EmailQueue
 from .audit_log import AuditLog
 from .settings import SystemSettings
+from .backup import BackupHistory
 
 __all__ = [
     "CompanyStatus", "ProjectStatus", "ArContentStatus", "VideoStatus",
@@ -33,5 +34,6 @@ __all__ = [
     "Notification",
     "EmailQueue",
     "AuditLog",
-    "SystemSettings"
+    "SystemSettings",
+    "BackupHistory",
 ]

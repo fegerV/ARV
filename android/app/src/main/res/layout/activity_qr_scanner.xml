@@ -25,9 +25,9 @@
         android:layout_gravity="center_horizontal|top"
         android:layout_marginTop="48dp"
         android:text="@string/qr_scan_hint"
-        android:textColor="@android:color/white"
+        android:textColor="@color/ar_text_primary"
         android:textSize="16sp"
-        android:shadowColor="@android:color/black"
+        android:shadowColor="@color/camera_text_shadow"
         android:shadowDx="1"
         android:shadowDy="1"
         android:shadowRadius="2"
@@ -41,7 +41,7 @@
         android:layout_gravity="center"
         android:orientation="vertical"
         android:gravity="center"
-        android:background="#CC000000"
+        android:background="@color/camera_overlay"
         android:padding="24dp"
         android:visibility="gone"
         tools:visibility="visible">
@@ -50,14 +50,14 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:indeterminate="true"
-            android:indeterminateTint="@android:color/white"
+            android:indeterminateTint="@color/ar_text_primary"
             android:layout_marginBottom="16dp" />
 
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="@string/loading_content_short"
-            android:textColor="@android:color/white" />
+            android:textColor="@color/ar_text_primary" />
     </LinearLayout>
 
     <!-- Кнопка закрытия -->
@@ -70,6 +70,6 @@
         android:background="?attr/selectableItemBackgroundBorderless"
         android:contentDescription="@string/close"
         android:src="@drawable/ic_close"
-        android:tint="@android:color/white" />
+        android:tint="@color/ar_text_primary" />
 
 </FrameLayout>

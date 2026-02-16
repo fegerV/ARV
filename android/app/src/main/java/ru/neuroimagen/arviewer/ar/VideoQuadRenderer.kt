@@ -30,7 +30,7 @@ class VideoQuadRenderer {
     private val mvpMatrix = FloatArray(16)
 
     /**
-     * Call on GL thread. Creates OES texture and SurfaceTexture for ExoPlayer.
+     * Call on GL thread. Creates OES texture and SurfaceTexture for Media3 player.
      * @param context Android context for loading shader assets
      * @param videoWidth video width from manifest (0 = use default 1024)
      * @param videoHeight video height from manifest (0 = use default 576)

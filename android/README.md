@@ -1,6 +1,6 @@
 # AR Viewer (Android)
 
-Мобильное приложение **AR Viewer** для просмотра AR-контента (ARCore + Kotlin). Получает манифест с бэкенда ARV, отображает видео на маркере (растровое фото). Поддерживает кэширование и офлайн-режим, Splash Screen при старте.
+Мобильное приложение **AR Viewer** для просмотра AR-контента (ARCore + Kotlin). Получает манифест с бэкенда ARV, отображает видео на маркере (растровое фото). Поддерживает кэширование и офлайн-режим, Splash Screen API, тёмную тему, DI через Hilt и Firebase Crashlytics.
 
 **Полная документация:** [docs/ANDROID_APP.md](../docs/ANDROID_APP.md) (экраны, архитектура, версионирование, роадмап, сборка, CI).
 
@@ -34,12 +34,35 @@
 
 ## Структура
 
-- **SplashActivity** — экран загрузки при запуске по иконке (~1,5 с), затем переход в MainActivity.
-- **MainActivity** — ввод unique_id/URL, проверка (check), загрузка манифеста (с fallback на кэш при офлайн), переход в AR; обработка deep link с немедленным переходом в AR; кнопка «Сканировать QR».
+- **ArViewerApp** — `@HiltAndroidApp` entry point, инициализация Firebase Crashlytics.
+- **MainActivity** — ввод unique_id/URL, проверка (check), загрузка манифеста (с fallback на кэш при офлайн), переход в AR; обработка deep link; кнопка «Сканировать QR». SplashScreen API при старте.
 - **QrScannerActivity** — сканер QR (CameraX + ML Kit), возврат unique_id в MainActivity.
-- **ArViewerActivity** — ARCore-сессия, Augmented Images, загрузка маркера (с кэшем), фон камеры (OpenGL), ExoPlayer с кэшем видео на кваде по маркеру, кнопки «Снимок» и «Запись видео» (фото через PixelCopy + MediaStore).
-- **data/** — модели (ViewerManifest, ContentCheckResponse, ViewerError), ViewerApi (Retrofit), ViewerRepository; кэши ManifestCache, MarkerCache, VideoCache (ExoPlayer).
+- **ArViewerActivity** — ARCore-сессия, Augmented Images, загрузка маркера (с кэшем), фон камеры (OpenGL), Media3 с кэшем видео на кваде по маркеру, кнопки «Снимок» и «Запись видео» (фото через PixelCopy + MediaStore).
+- **di/** — Hilt-модули: `NetworkModule` (OkHttp, Retrofit, ViewerApi, Gson).
+- **ui/** — ViewModels: `MainViewModel`, `ArViewerViewModel` (оба `@HiltViewModel`).
+- **data/** — модели (ViewerManifest, ContentCheckResponse, ViewerError), ViewerApi (Retrofit), ViewerRepository (`@Inject`); кэши ManifestCache, MarkerCache, VideoCache (Media3).
 - **ar/** — BackgroundRenderer, VideoQuadRenderer, ArSessionHelper, ShaderUtil, шейдеры в `assets/shaders/`.
+- **util/** — `UniqueIdParser` (UUID-парсинг), `CrashReporter` (Firebase Crashlytics обёртка).
+
+## Firebase Crashlytics
+
+В `app/google-services.json` — placeholder-файл. Для включения отправки крэшей:
+
+1. Создать проект в [Firebase Console](https://console.firebase.google.com/).
+2. Добавить Android-приложение (package: `ru.neuroimagen.arviewer`).
+3. Скачать `google-services.json` и заменить placeholder в `android/app/`.
+4. Crashlytics инициализируется автоматически в `ArViewerApp.onCreate()` (отключен в debug-сборках).
+
+## Firebase Crashlytics
+
+Проект поставляется с placeholder-файлом `app/google-services.json`. Для реальной отправки крэш-отчётов:
+
+1. Создать проект в [Firebase Console](https://console.firebase.google.com/).
+2. Добавить Android-приложение с пакетом `ru.neuroimagen.arviewer`.
+3. Скачать `google-services.json` и заменить placeholder в `app/`.
+4. Crashlytics автоматически включится в release-билдах (`BuildConfig.DEBUG == false`).
+
+В debug-билдах сбор крэшей отключён через `CrashReporter.init(enabled = false)`.
 
 ## Сборка
 
@@ -59,7 +82,7 @@ cd android && .\gradlew.bat assembleDebug
 
 ## Стабильность и требования
 
-- **minSdk 24**, targetSdk 34; ARCore 1.40, ExoPlayer 2.19.
+- **minSdk 24**, targetSdk 35; ARCore 1.52, Media3 1.7.1, Kotlin 2.0, Hilt 2.51.1, Firebase Crashlytics.
 - Снимок экрана (PixelCopy) доступен с API 24; сохранение в MediaStore — с учётом разрешений (READ_MEDIA_IMAGES / WRITE_EXTERNAL_STORAGE для старых версий).
 - При падении сессии ARCore рендерер перестаёт рисовать кадры; при необходимости обрабатывать `UnavailableException` и показывать пользователю сообщение.
 
@@ -75,7 +98,7 @@ cd android && .\gradlew.bat assembleDebug
 
 ## Роадмап
 
-- **Сделано:** главный экран, deep links, QR-сканер, AR Viewer, кэш маркера/манифеста/видео, офлайн, Splash Screen, CI.
-- **В планах:** запись видео AR, ротация видео по расписанию, настройки, шаринг, аналитика, Splash API 12+.
+- **Сделано:** главный экран, deep links, QR-сканер, AR Viewer, кэш маркера/манифеста/видео, офлайн, SplashScreen API, Hilt DI, Firebase Crashlytics, тёмная тема, CI.
+- **В планах:** запись видео AR, ротация видео по расписанию, настройки, шаринг, аналитика.
 
 Подробный роадмап: [docs/ANDROID_APP.md](../docs/ANDROID_APP.md#6-роадмап).

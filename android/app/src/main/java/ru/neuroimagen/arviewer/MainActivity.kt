@@ -9,11 +9,14 @@ import android.util.Log
 import android.view.View
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
+import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
+import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
 import com.google.android.gms.tasks.Tasks
-import com.google.gson.Gson
 import com.google.mlkit.vision.barcode.BarcodeScannerOptions
 import com.google.mlkit.vision.barcode.BarcodeScanning
 import com.google.mlkit.vision.barcode.common.Barcode
@@ -22,23 +25,25 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import ru.neuroimagen.arviewer.ar.ArSessionHelper
-import ru.neuroimagen.arviewer.data.api.ApiProvider
 import ru.neuroimagen.arviewer.data.model.ViewerError
 import ru.neuroimagen.arviewer.databinding.ActivityMainBinding
+import ru.neuroimagen.arviewer.ui.MainViewModel
 import ru.neuroimagen.arviewer.ui.ViewerErrorMessages
+import dagger.hilt.android.AndroidEntryPoint
+import ru.neuroimagen.arviewer.util.UniqueIdParser
 
 /**
  * Main screen: QR scanning (primary action), QR from gallery, and manual unique_id input.
  * Requests all required permissions (camera, microphone) at startup.
+ *
+ * Also serves as the LAUNCHER activity with SplashScreen API (replaces SplashActivity).
+ * Business logic (manifest loading, retry) is delegated to [MainViewModel].
  */
+@AndroidEntryPoint
 class MainActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityMainBinding
-    private val repository get() = ApiProvider.viewerRepository
-    private val gson = Gson()
-
-    /** Last uniqueId we tried to open; used when user taps Retry. */
-    private var lastAttemptedUniqueId: String? = null
+    private val viewModel: MainViewModel by viewModels()
 
     // ── Permission request at startup ────────────────────────────────
 
@@ -75,17 +80,43 @@ class MainActivity : AppCompatActivity() {
     // ── Lifecycle ────────────────────────────────────────────────────
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        installSplashScreen()
         super.onCreate(savedInstanceState)
+
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
         binding.buttonOpen.setOnClickListener { onOpenClicked() }
         binding.buttonScanQr.setOnClickListener { openQrScanner() }
         binding.buttonOpenFromFile.setOnClickListener { pickImageLauncher.launch("image/*") }
-        binding.buttonRetry.setOnClickListener { onRetryClicked() }
+        binding.buttonRetry.setOnClickListener { viewModel.retry() }
 
+        observeUiState()
         requestRequiredPermissions()
         handleIntent(intent)
+    }
+
+    // ── State observation ────────────────────────────────────────────
+
+    private fun observeUiState() {
+        lifecycleScope.launch {
+            repeatOnLifecycle(Lifecycle.State.STARTED) {
+                viewModel.uiState.collect { state ->
+                    when (state) {
+                        is MainViewModel.UiState.Input -> showMainPanel()
+                        is MainViewModel.UiState.Loading -> showLoadingPanel()
+                        is MainViewModel.UiState.Error -> {
+                            val message = buildErrorMessage(state.viewerError, state.throwable)
+                            showErrorPanel(message, state.retryable)
+                        }
+                        is MainViewModel.UiState.NavigateToAr -> {
+                            navigateToArViewer(state.manifestJson, state.uniqueId)
+                            viewModel.onNavigated()
+                        }
+                    }
+                }
+            }
+        }
     }
 
     // ── Permissions ──────────────────────────────────────────────────
@@ -119,20 +150,20 @@ class MainActivity : AppCompatActivity() {
      * Decode a QR code from a picked gallery image using ML Kit.
      */
     private fun decodeQrFromImage(imageUri: Uri) {
-        showLoadingPanel()
+        viewModel.setLoading()
         lifecycleScope.launch {
             val uniqueId = withContext(Dispatchers.IO) {
                 scanBarcodeFromImage(imageUri)
             }
             if (uniqueId != null) {
                 binding.editUniqueId.setText(uniqueId)
-                openViewer(uniqueId)
+                viewModel.loadManifest(uniqueId)
             } else {
-                showMainPanel()
+                viewModel.resetToInput()
                 Toast.makeText(
                     this@MainActivity,
                     R.string.qr_not_found_in_image,
-                    Toast.LENGTH_LONG
+                    Toast.LENGTH_LONG,
                 ).show()
             }
         }
@@ -153,7 +184,7 @@ class MainActivity : AppCompatActivity() {
             val barcodes = Tasks.await(scanner.process(image))
             scanner.close()
             barcodes.firstNotNullOfOrNull { barcode ->
-                barcode.rawValue?.let { extractUniqueId(it) }
+                barcode.rawValue?.let { UniqueIdParser.extractFromInput(it) }
             }
         } catch (e: Exception) {
             Log.e(TAG, "Failed to decode QR from image", e)
@@ -171,7 +202,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun handleIntent(intent: Intent?) {
         val data: Uri = intent?.data ?: return
-        val uniqueId = parseUniqueIdFromUri(data) ?: return
+        val uniqueId = UniqueIdParser.parseFromUri(data) ?: return
         if (uniqueId.isNotBlank()) {
             binding.editUniqueId.setText(uniqueId)
             openViewer(uniqueId)
@@ -186,9 +217,9 @@ class MainActivity : AppCompatActivity() {
             Toast.makeText(this, getString(R.string.enter_unique_id), Toast.LENGTH_SHORT).show()
             return
         }
-        val uniqueId = extractUniqueId(input)
+        val uniqueId = UniqueIdParser.extractFromInput(input)
         if (uniqueId == null) {
-            val errorMsg = if (looksLikeUrl(input)) {
+            val errorMsg = if (UniqueIdParser.looksLikeUrl(input)) {
                 getString(R.string.error_invalid_link_format)
             } else {
                 getString(R.string.error_invalid_unique_id)
@@ -199,58 +230,23 @@ class MainActivity : AppCompatActivity() {
         openViewer(uniqueId)
     }
 
-    /**
-     * Extracts unique_id from user input.
-     * Supports: raw UUID, https://ar.neuroimagen.ru[:port]/view/{id}, arv://view/{id}
-     */
-    private fun extractUniqueId(input: String): String? {
-        if (UUID_REGEX.matches(input)) {
-            return input
-        }
-        return try {
-            val uri = Uri.parse(input)
-            parseUniqueIdFromUri(uri)
-        } catch (e: Exception) {
-            null
-        }
-    }
-
-    private fun looksLikeUrl(input: String): Boolean {
-        return input.startsWith("http://") || input.startsWith("https://") || input.startsWith("arv://")
-    }
-
     private fun openViewer(uniqueId: String) {
-        lastAttemptedUniqueId = uniqueId
-
-        // ── Pre-flight: check ARCore support BEFORE heavy network loading ──
+        // Pre-flight: check ARCore support BEFORE heavy network loading
         if (!ArSessionHelper.isArCoreSupported(this)) {
-            showErrorPanel(
-                getString(R.string.error_device_not_supported),
-                retryable = false,
-            )
+            viewModel.resetToInput()
+            Toast.makeText(this, R.string.error_device_not_supported, Toast.LENGTH_LONG).show()
             return
         }
+        viewModel.loadManifest(uniqueId)
+    }
 
-        showLoadingPanel()
-        lifecycleScope.launch {
-            val result = withContext(Dispatchers.IO) { repository.loadManifest(uniqueId) }
-            result.fold(
-                onSuccess = { manifest ->
-                    val json = gson.toJson(manifest)
-                    startActivity(Intent(this@MainActivity, ArViewerActivity::class.java).apply {
-                        putExtra(ArViewerActivity.EXTRA_MANIFEST_JSON, json)
-                        putExtra(ArViewerActivity.EXTRA_UNIQUE_ID, uniqueId)
-                    })
-                    showMainPanel()
-                },
-                onFailure = { throwable ->
-                    val error = throwable as? ViewerError
-                    val message = buildErrorMessage(error, throwable)
-                    val retryable = error?.let { ViewerErrorMessages.isRetryable(it) } ?: true
-                    showErrorPanel(message, retryable)
-                }
-            )
-        }
+    private fun navigateToArViewer(manifestJson: String, uniqueId: String) {
+        startActivity(
+            Intent(this, ArViewerActivity::class.java).apply {
+                putExtra(ArViewerActivity.EXTRA_MANIFEST_JSON, manifestJson)
+                putExtra(ArViewerActivity.EXTRA_UNIQUE_ID, uniqueId)
+            },
+        )
     }
 
     /**
@@ -271,15 +267,6 @@ class MainActivity : AppCompatActivity() {
     }
 
     // ── Panel switching ──────────────────────────────────────────────
-
-    private fun onRetryClicked() {
-        val id = lastAttemptedUniqueId
-        if (!id.isNullOrBlank()) {
-            openViewer(id)
-        } else {
-            showMainPanel()
-        }
-    }
 
     private fun showMainPanel() {
         binding.panelMain.visibility = View.VISIBLE
@@ -309,39 +296,5 @@ class MainActivity : AppCompatActivity() {
 
     companion object {
         private const val TAG = "MainActivity"
-        private const val EXPECTED_HOST = "ar.neuroimagen.ru"
-
-        private val UUID_REGEX = Regex(
-            "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
-        )
-
-        /**
-         * Parses unique_id from viewer deep link URI.
-         */
-        fun parseUniqueIdFromUri(uri: Uri): String? {
-            return when (uri.scheme) {
-                "arv" -> {
-                    if (uri.host == "view") {
-                        uri.pathSegments.firstOrNull()?.takeIf { UUID_REGEX.matches(it) }
-                            ?: uri.path?.trimStart('/')?.takeIf { UUID_REGEX.matches(it) }
-                    } else {
-                        uri.host?.takeIf { UUID_REGEX.matches(it) }
-                            ?: uri.pathSegments.firstOrNull()?.takeIf { UUID_REGEX.matches(it) }
-                    }
-                }
-                "https", "http" -> {
-                    if (uri.host != EXPECTED_HOST) {
-                        return null
-                    }
-                    val segments = uri.pathSegments
-                    if (segments.size >= 2 && segments[0] == "view") {
-                        segments[1].takeIf { UUID_REGEX.matches(it) }
-                    } else {
-                        null
-                    }
-                }
-                else -> null
-            }
-        }
     }
 }

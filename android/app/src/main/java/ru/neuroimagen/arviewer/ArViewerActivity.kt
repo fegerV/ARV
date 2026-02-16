@@ -4,7 +4,6 @@ import android.Manifest
 import android.content.ContentValues
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
-import android.graphics.BitmapFactory
 import android.opengl.GLSurfaceView
 import android.os.Build
 import android.os.Bundle
@@ -20,16 +19,20 @@ import android.widget.Button
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.activity.viewModels
+import androidx.annotation.OptIn
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
-import com.google.android.exoplayer2.ExoPlayer
-import com.google.android.exoplayer2.MediaItem
-import com.google.android.exoplayer2.PlaybackException
-import com.google.android.exoplayer2.Player
-import com.google.android.exoplayer2.source.ProgressiveMediaSource
+import androidx.lifecycle.repeatOnLifecycle
+import androidx.media3.common.MediaItem
+import androidx.media3.common.PlaybackException
+import androidx.media3.common.Player
+import androidx.media3.common.util.UnstableApi
+import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.source.ProgressiveMediaSource
 import com.google.ar.core.Session
-import com.google.gson.Gson
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -38,10 +41,11 @@ import ru.neuroimagen.arviewer.ar.ArRenderer
 import ru.neuroimagen.arviewer.ar.ArSessionHelper
 import ru.neuroimagen.arviewer.ar.ArSessionResult
 import ru.neuroimagen.arviewer.ar.RecordableEGLConfigChooser
-import ru.neuroimagen.arviewer.data.api.ApiProvider
-import ru.neuroimagen.arviewer.data.cache.MarkerCache
 import ru.neuroimagen.arviewer.data.cache.VideoCache
 import ru.neuroimagen.arviewer.data.model.ViewerManifest
+import dagger.hilt.android.AndroidEntryPoint
+import ru.neuroimagen.arviewer.ui.ArViewerViewModel
+import ru.neuroimagen.arviewer.util.CrashReporter
 import java.io.File
 import java.io.FileInputStream
 import java.io.OutputStream
@@ -50,14 +54,16 @@ import java.io.OutputStream
  * AR viewer scene: camera, ARCore Augmented Image, video overlay,
  * photo capture, and video recording (with optional microphone audio).
  *
- * Permissions (camera, microphone) are requested upfront in [MainActivity].
- * This activity only checks them as a fallback.
+ * Manifest parsing and marker bitmap loading are delegated to [ArViewerViewModel].
+ * This activity manages the AR session, GL surface, ExoPlayer, and recording.
  *
  * Receives either [EXTRA_MANIFEST_JSON] (pre-loaded) or [EXTRA_UNIQUE_ID] (will load manifest).
  */
+@AndroidEntryPoint
 class ArViewerActivity : AppCompatActivity() {
 
-    private val gson = Gson()
+    private val viewModel: ArViewerViewModel by viewModels()
+
     private var arSession: Session? = null
     private var exoPlayer: ExoPlayer? = null
     private var arRenderer: ArRenderer? = null
@@ -80,21 +86,12 @@ class ArViewerActivity : AppCompatActivity() {
         ActivityResultContracts.RequestPermission()
     ) { granted ->
         if (granted) {
-            pendingManifest?.let { manifest ->
-                pendingBitmap?.let { bitmap ->
-                    startArWithPermission(manifest, bitmap)
-                }
-            }
+            tryStartArFromViewModelState()
         } else {
             Toast.makeText(this, R.string.error_camera_required, Toast.LENGTH_LONG).show()
             finish()
         }
-        pendingManifest = null
-        pendingBitmap = null
     }
-
-    private var pendingManifest: ViewerManifest? = null
-    private var pendingBitmap: Bitmap? = null
 
     // ── Lifecycle ────────────────────────────────────────────────────
 
@@ -104,22 +101,12 @@ class ArViewerActivity : AppCompatActivity() {
         supportActionBar?.setDisplayHomeAsUpEnabled(true)
 
         startLoadingTipsCycle()
+        observeUiState()
 
-        val manifestJson = intent.getStringExtra(EXTRA_MANIFEST_JSON)
-        val uniqueId = intent.getStringExtra(EXTRA_UNIQUE_ID)
-
-        when {
-            !manifestJson.isNullOrBlank() -> {
-                try {
-                    val manifest = gson.fromJson(manifestJson, ViewerManifest::class.java)
-                    onManifestReady(manifest)
-                } catch (e: Exception) {
-                    finish()
-                }
-            }
-            !uniqueId.isNullOrBlank() -> loadManifestAndStart(uniqueId)
-            else -> finish()
-        }
+        viewModel.loadFromIntent(
+            manifestJson = intent.getStringExtra(EXTRA_MANIFEST_JSON),
+            uniqueId = intent.getStringExtra(EXTRA_UNIQUE_ID),
+        )
     }
 
     override fun onResume() {
@@ -146,6 +133,59 @@ class ArViewerActivity : AppCompatActivity() {
     override fun onSupportNavigateUp(): Boolean {
         onBackPressedDispatcher.onBackPressed()
         return true
+    }
+
+    // ── State observation ────────────────────────────────────────────
+
+    private fun observeUiState() {
+        lifecycleScope.launch {
+            repeatOnLifecycle(Lifecycle.State.STARTED) {
+                viewModel.uiState.collect { state ->
+                    when (state) {
+                        is ArViewerViewModel.UiState.Loading -> { /* tips are cycling */ }
+                        is ArViewerViewModel.UiState.Ready -> onManifestAndBitmapReady(
+                            state.manifest,
+                            state.markerBitmap,
+                        )
+                        is ArViewerViewModel.UiState.MarkerLoadFailed -> {
+                            Toast.makeText(this@ArViewerActivity, R.string.error_marker_not_available, Toast.LENGTH_LONG).show()
+                            finish()
+                        }
+                        is ArViewerViewModel.UiState.ManifestLoadFailed -> {
+                            Toast.makeText(this@ArViewerActivity, R.string.error_unknown, Toast.LENGTH_LONG).show()
+                            finish()
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // ── Manifest + bitmap ready ──────────────────────────────────────
+
+    /**
+     * Called when ViewModel has both manifest and marker bitmap.
+     * Checks camera permission before starting AR.
+     */
+    private fun onManifestAndBitmapReady(manifest: ViewerManifest, bitmap: Bitmap) {
+        if (isDestroyed) return
+        if (arSession != null) return // AR already started
+
+        if (!hasPermission(Manifest.permission.CAMERA)) {
+            cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
+            return
+        }
+        startArWithPermission(manifest, bitmap)
+    }
+
+    /**
+     * Re-read manifest/bitmap from ViewModel state after permission grant.
+     */
+    private fun tryStartArFromViewModelState() {
+        val state = viewModel.uiState.value
+        if (state is ArViewerViewModel.UiState.Ready) {
+            startArWithPermission(state.manifest, state.markerBitmap)
+        }
     }
 
     // ── Loading tips ─────────────────────────────────────────────────
@@ -190,33 +230,6 @@ class ArViewerActivity : AppCompatActivity() {
         tipsRunnable = null
     }
 
-    // ── Manifest loading ─────────────────────────────────────────────
-
-    private fun onManifestReady(manifest: ViewerManifest) {
-        lifecycleScope.launch {
-            if (isDestroyed) return@launch
-            val bitmap = withContext(Dispatchers.IO) {
-                loadMarkerBitmap(manifest.markerImageUrl)
-            }
-            if (isDestroyed) return@launch
-            if (bitmap == null) {
-                Toast.makeText(this@ArViewerActivity, R.string.error_marker_not_available, Toast.LENGTH_LONG).show()
-                finish()
-                return@launch
-            }
-            withContext(Dispatchers.Main) {
-                if (isDestroyed) return@withContext
-                if (!hasPermission(Manifest.permission.CAMERA)) {
-                    pendingManifest = manifest
-                    pendingBitmap = bitmap
-                    cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
-                    return@withContext
-                }
-                startArWithPermission(manifest, bitmap)
-            }
-        }
-    }
-
     // ── AR scene setup ───────────────────────────────────────────────
 
     /**
@@ -237,7 +250,6 @@ class ArViewerActivity : AppCompatActivity() {
                 return
             }
             is ArCoreCheckResult.InstallRequested -> {
-                // Play Store install dialog was shown; activity will resume later.
                 showArError(getString(R.string.error_arcore_install_requested))
                 return
             }
@@ -288,11 +300,15 @@ class ArViewerActivity : AppCompatActivity() {
         stopLoadingTipsCycle()
 
         val renderer = ArRenderer(
-            this,
-            session,
-            manifest,
+            appContext = applicationContext,
+            session = session,
+            manifest = manifest,
             onVideoSurfaceReady = { surface -> prepareVideoPlayer(surface, manifest) },
-            onMarkerTrackingChanged = { isTracking -> onMarkerTrackingChanged(isTracking) }
+            onMarkerTrackingChanged = { isTracking -> onMarkerTrackingChanged(isTracking) },
+            getDisplayRotation = {
+                @Suppress("DEPRECATION")
+                windowManager.defaultDisplay.rotation
+            },
         )
         arRenderer = renderer
 
@@ -472,9 +488,10 @@ class ArViewerActivity : AppCompatActivity() {
     // ── Video player ─────────────────────────────────────────────────
 
     /**
-     * Prepare ExoPlayer but do NOT start playback.
+     * Prepare Media3 player but do NOT start playback.
      * Video will begin playing when the marker is first recognized.
      */
+    @OptIn(UnstableApi::class)
     private fun prepareVideoPlayer(surface: Surface, manifest: ViewerManifest) {
         exoPlayer?.release()
         val player = ExoPlayer.Builder(this).build()
@@ -490,11 +507,13 @@ class ArViewerActivity : AppCompatActivity() {
                     Player.STATE_ENDED -> "ENDED"
                     else -> "UNKNOWN($playbackState)"
                 }
-                Log.d(TAG, "ExoPlayer state: $stateName")
+                Log.d(TAG, "Media3 player state: $stateName")
             }
 
             override fun onPlayerError(error: PlaybackException) {
-                Log.e(TAG, "ExoPlayer error: ${error.errorCodeName}", error)
+                Log.e(TAG, "Media3 player error: ${error.errorCodeName}", error)
+                CrashReporter.log("Media3 player error: ${error.errorCodeName}")
+                CrashReporter.recordException(error)
                 runOnUiThread {
                     Toast.makeText(
                         this@ArViewerActivity,
@@ -538,39 +557,6 @@ class ArViewerActivity : AppCompatActivity() {
     private fun hasPermission(permission: String): Boolean =
         ContextCompat.checkSelfPermission(this, permission) == PackageManager.PERMISSION_GRANTED
 
-    private fun absoluteMarkerUrl(url: String): String {
-        val trimmed = url.trim()
-        if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) return trimmed
-        val base = BuildConfig.API_BASE_URL.trimEnd('/')
-        return if (trimmed.startsWith("/")) "$base$trimmed" else "$base/$trimmed"
-    }
-
-    private suspend fun loadMarkerBitmap(url: String): Bitmap? = withContext(Dispatchers.IO) {
-        val absoluteUrl = absoluteMarkerUrl(url)
-        MarkerCache.get(this@ArViewerActivity, absoluteUrl)
-            ?: run {
-                val response = ApiProvider.viewerApi.downloadImage(absoluteUrl)
-                if (!response.isSuccessful) return@withContext null
-                val bytes = response.body()?.bytes() ?: return@withContext null
-                MarkerCache.put(this@ArViewerActivity, absoluteUrl, bytes)
-                BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
-            }
-    }
-
-    private fun loadManifestAndStart(uniqueId: String) {
-        val repository = ApiProvider.viewerRepository
-        lifecycleScope.launch {
-            val result = withContext(Dispatchers.IO) { repository.loadManifest(uniqueId) }
-            result.fold(
-                onSuccess = { onManifestReady(it) },
-                onFailure = {
-                    Toast.makeText(this@ArViewerActivity, R.string.error_unknown, Toast.LENGTH_LONG).show()
-                    finish()
-                }
-            )
-        }
-    }
-
     @Suppress("ClickableViewAccessibility")
     private fun onGlSurfaceTouch(event: MotionEvent): Boolean {
         scaleDetector?.onTouchEvent(event)
@@ -584,6 +570,7 @@ class ArViewerActivity : AppCompatActivity() {
      * a transient Toast.  The user can read the message at their own pace.
      */
     private fun showArError(message: String) {
+        CrashReporter.log("AR error displayed: $message")
         stopLoadingTipsCycle()
         val errorView = layoutInflater.inflate(R.layout.layout_ar_error, null)
         errorView.findViewById<TextView>(R.id.text_ar_error).text = message

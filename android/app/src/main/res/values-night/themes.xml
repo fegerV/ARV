@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <!-- Dark-theme overrides for system bars -->
     <style name="Theme.ArViewer" parent="Theme.MaterialComponents.DayNight.NoActionBar">
         <item name="colorPrimary">@color/primary</item>
         <item name="colorPrimaryVariant">@color/primary_dark</item>
@@ -7,18 +8,18 @@
         <item name="android:colorBackground">@color/background</item>
         <item name="colorSurface">@color/surface</item>
         <item name="colorOnSurface">@color/on_surface</item>
-        <item name="android:statusBarColor">@color/primary_dark</item>
-        <item name="android:navigationBarColor">@color/primary_dark</item>
+        <item name="android:statusBarColor">@color/background</item>
+        <item name="android:navigationBarColor">@color/background</item>
     </style>
 
-    <!-- SplashScreen API theme -->
+    <!-- SplashScreen API theme (dark) -->
     <style name="Theme.ArViewer.Splash" parent="Theme.SplashScreen">
-        <item name="windowSplashScreenBackground">@color/primary_dark</item>
+        <item name="windowSplashScreenBackground">@color/background</item>
         <item name="windowSplashScreenAnimatedIcon">@drawable/ic_launcher</item>
         <item name="postSplashScreenTheme">@style/Theme.ArViewer</item>
     </style>
 
-    <!-- Full-screen QR scanner -->
+    <!-- Full-screen QR scanner — same as day, always dark -->
     <style name="Theme.ArViewer.NoActionBar" parent="Theme.MaterialComponents.DayNight.NoActionBar">
         <item name="colorPrimary">@color/primary</item>
         <item name="colorPrimaryVariant">@color/primary_dark</item>

@@ -2,7 +2,7 @@
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#1A1A2E">
+    android:background="@color/ar_background">
 
     <LinearLayout
         android:layout_width="wrap_content"
@@ -17,7 +17,7 @@
             style="?android:attr/progressBarStyleLarge"
             android:layout_width="72dp"
             android:layout_height="72dp"
-            android:indeterminateTint="#7C4DFF" />
+            android:indeterminateTint="@color/ar_accent" />
 
         <TextView
             android:id="@+id/text_loading_title"
@@ -25,7 +25,7 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="24dp"
             android:text="@string/ar_loading_title"
-            android:textColor="#FFFFFF"
+            android:textColor="@color/ar_text_primary"
             android:textSize="20sp"
             android:textStyle="bold" />
 
@@ -36,7 +36,7 @@
             android:layout_marginTop="16dp"
             android:gravity="center"
             android:maxWidth="280dp"
-            android:textColor="#B0BEC5"
+            android:textColor="@color/ar_text_secondary"
             android:textSize="14sp" />
 
     </LinearLayout>

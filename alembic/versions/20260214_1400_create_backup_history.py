@@ -31,7 +31,11 @@ def upgrade() -> None:
         sa.Column("error_message", sa.Text(), nullable=True),
         sa.Column("trigger", sa.String(20), nullable=False, server_default="manual"),
     )
+    op.create_index("ix_backup_history_company_id", "backup_history", ["company_id"])
+    op.create_index("ix_backup_history_started_at", "backup_history", ["started_at"])
 
 
 def downgrade() -> None:
+    op.drop_index("ix_backup_history_started_at", table_name="backup_history")
+    op.drop_index("ix_backup_history_company_id", table_name="backup_history")
     op.drop_table("backup_history")

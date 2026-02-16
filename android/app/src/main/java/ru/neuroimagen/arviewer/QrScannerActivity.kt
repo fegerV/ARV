@@ -3,7 +3,6 @@ package ru.neuroimagen.arviewer
 import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
-import android.net.Uri
 import android.os.Bundle
 import android.util.Log
 import android.view.View
@@ -26,6 +25,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import ru.neuroimagen.arviewer.databinding.ActivityQrScannerBinding
+import dagger.hilt.android.AndroidEntryPoint
+import ru.neuroimagen.arviewer.util.UniqueIdParser
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 
@@ -37,6 +38,7 @@ import java.util.concurrent.Executors
  * - arv://view/{unique_id}
  * - Прямой unique_id (UUID формат)
  */
+@AndroidEntryPoint
 class QrScannerActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityQrScannerBinding
@@ -180,40 +182,13 @@ class QrScannerActivity : AppCompatActivity() {
 
     /**
      * Парсит содержимое QR кода и извлекает unique_id.
-     * 
+     * Делегирует парсинг общему [UniqueIdParser].
+     *
      * @param content содержимое QR кода (URL или UUID)
      * @return unique_id или null если формат не распознан
      */
     private fun parseQrContent(content: String): String? {
-        // Проверяем прямой UUID формат
-        if (UUID_REGEX.matches(content)) {
-            return content
-        }
-
-        // Пробуем распарсить как URL
-        return try {
-            val uri = Uri.parse(content)
-            when {
-                // https://ar.neuroimagen.ru[:port]/view/{unique_id}
-                uri.scheme in listOf("https", "http") && uri.host == EXPECTED_HOST -> {
-                    val segments = uri.pathSegments
-                    if (segments.size >= 2 && segments[0] == "view") {
-                        segments[1].takeIf { UUID_REGEX.matches(it) }
-                    } else {
-                        null
-                    }
-                }
-                // arv://view/{unique_id}
-                uri.scheme == "arv" && uri.host == "view" -> {
-                    uri.pathSegments.firstOrNull()?.takeIf { UUID_REGEX.matches(it) }
-                        ?: uri.path?.trimStart('/')?.takeIf { UUID_REGEX.matches(it) }
-                }
-                else -> null
-            }
-        } catch (e: Exception) {
-            Log.w(TAG, "Не удалось распарсить QR: $content", e)
-            null
-        }
+        return UniqueIdParser.extractFromInput(content)
     }
 
     /**
@@ -244,11 +219,6 @@ class QrScannerActivity : AppCompatActivity() {
 
     companion object {
         private const val TAG = "QrScannerActivity"
-        private const val EXPECTED_HOST = "ar.neuroimagen.ru"
         const val EXTRA_UNIQUE_ID = "extra_unique_id"
-        
-        private val UUID_REGEX = Regex(
-            "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
-        )
     }
 }

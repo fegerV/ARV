@@ -4,6 +4,8 @@ import android.content.Context
 import android.graphics.SurfaceTexture
 import android.opengl.GLES20
 import android.opengl.GLSurfaceView
+import android.os.Handler
+import android.os.Looper
 import android.util.Log
 import com.google.ar.core.AugmentedImage
 import com.google.ar.core.Frame
@@ -18,14 +20,20 @@ import javax.microedition.khronos.opengles.GL10
 /**
  * OpenGL renderer for AR: camera background, video quad on Augmented Image,
  * and optional recording to MP4 via [ArRecorder].
+ *
+ * Accepts [appContext] (application context) to avoid leaking the Activity.
+ * Uses [getDisplayRotation] callback instead of casting to Activity.
  */
 class ArRenderer(
-    private val context: Context,
+    private val appContext: Context,
     private val session: Session,
     private val manifest: ViewerManifest,
     private val onVideoSurfaceReady: (android.view.Surface) -> Unit,
-    private val onMarkerTrackingChanged: (Boolean) -> Unit = {}
+    private val onMarkerTrackingChanged: (Boolean) -> Unit = {},
+    private val getDisplayRotation: () -> Int = { 0 },
 ) : GLSurfaceView.Renderer {
+
+    private val mainHandler = Handler(Looper.getMainLooper())
 
     private lateinit var backgroundRenderer: BackgroundRenderer
     private lateinit var videoQuadRenderer: VideoQuadRenderer
@@ -91,17 +99,17 @@ class ArRenderer(
     override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) {
         GLES20.glClearColor(0f, 0f, 0f, 1f)
         backgroundRenderer = BackgroundRenderer()
-        val textureId = backgroundRenderer.createOnGlThread(context)
+        val textureId = backgroundRenderer.createOnGlThread(appContext)
         session.setCameraTextureName(textureId)
         session.resume()
 
         videoQuadRenderer = VideoQuadRenderer()
         val videoWidth = manifest.video.width ?: 0
         val videoHeight = manifest.video.height ?: 0
-        val (vidTexId, surfaceTexture) = videoQuadRenderer.createOnGlThread(context, videoWidth, videoHeight)
+        val (vidTexId, surfaceTexture) = videoQuadRenderer.createOnGlThread(appContext, videoWidth, videoHeight)
         videoTextureId = vidTexId
         videoSurfaceTexture = surfaceTexture
-        (context as? android.app.Activity)?.runOnUiThread {
+        mainHandler.post {
             onVideoSurfaceReady(android.view.Surface(surfaceTexture))
         }
     }
@@ -110,8 +118,7 @@ class ArRenderer(
         GLES20.glViewport(0, 0, width, height)
         surfaceWidth = width
         surfaceHeight = height
-        @Suppress("DEPRECATION")
-        val rotation = (context as? android.app.Activity)?.windowManager?.defaultDisplay?.rotation ?: 0
+        val rotation = getDisplayRotation()
         session.setDisplayGeometry(rotation, width, height)
     }
 
@@ -136,9 +143,7 @@ class ArRenderer(
         // Notify activity when marker tracking starts or stops
         if (hasTracking != wasTracking) {
             wasTracking = hasTracking
-            (context as? android.app.Activity)?.runOnUiThread {
-                onMarkerTrackingChanged(hasTracking)
-            }
+            mainHandler.post { onMarkerTrackingChanged(hasTracking) }
         }
 
         if (hasTracking && st != null) {
@@ -210,18 +215,14 @@ class ArRenderer(
                 recorder.prepare(file, surfaceWidth, surfaceHeight, enableAudio = audio)
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to start recording", e)
-                (context as? android.app.Activity)?.runOnUiThread {
-                    onRecordingStopped?.invoke(null)
-                }
+                mainHandler.post { onRecordingStopped?.invoke(null) }
             }
         }
 
         if (pendingRecordStop) {
             pendingRecordStop = false
             val path = recorder.stop()
-            (context as? android.app.Activity)?.runOnUiThread {
-                onRecordingStopped?.invoke(path)
-            }
+            mainHandler.post { onRecordingStopped?.invoke(path) }
         }
     }
 

@@ -1,6 +1,7 @@
 package ru.neuroimagen.arviewer.data.repository
 
 import android.content.Context
+import dagger.hilt.android.qualifiers.ApplicationContext
 import retrofit2.HttpException
 import ru.neuroimagen.arviewer.data.api.ViewerApi
 import ru.neuroimagen.arviewer.data.cache.ManifestCache
@@ -9,14 +10,17 @@ import ru.neuroimagen.arviewer.data.model.ViewerError
 import ru.neuroimagen.arviewer.data.model.ViewerManifest
 import ru.neuroimagen.arviewer.data.model.ViewerManifestVideo
 import java.io.IOException
+import javax.inject.Inject
+import javax.inject.Singleton
 
 /**
  * Repository for viewer API: check content, load manifest, fetch next active video.
  * Uses manifest cache for offline: on network failure returns cached manifest when available.
  */
-class ViewerRepository(
+@Singleton
+class ViewerRepository @Inject constructor(
     private val api: ViewerApi,
-    private val contextProvider: () -> Context
+    @ApplicationContext private val context: Context,
 ) {
 
     /**
@@ -31,12 +35,12 @@ class ViewerRepository(
 
         val networkResult = fetchManifestFromNetwork(trimmed)
         networkResult.getOrNull()?.let { manifest ->
-            ManifestCache.put(contextProvider(), trimmed, manifest)
+            ManifestCache.put(context, trimmed, manifest)
             return Result.success(manifest)
         }
         val networkFailure = networkResult.exceptionOrNull()
         if (networkFailure is ViewerError.Network) {
-            ManifestCache.get(contextProvider(), trimmed)?.let { cached ->
+            ManifestCache.get(context, trimmed)?.let { cached ->
                 return Result.success(cached)
             }
         }

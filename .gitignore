@@ -59,6 +59,8 @@ node_modules/
 # Android (machine-specific)
 android/local.properties
 android/.gradle/
+android/.kotlin/
+android/app/google-services.json
 
 # Build artifacts
 frontend/dist/
