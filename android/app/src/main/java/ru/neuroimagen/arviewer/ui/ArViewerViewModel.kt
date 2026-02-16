@@ -101,7 +101,7 @@ class ArViewerViewModel @Inject constructor(
     private fun loadMarkerBitmap(manifest: ViewerManifest) {
         viewModelScope.launch {
             val bitmap = withContext(Dispatchers.IO) {
-                fetchBitmap(manifest.markerImageUrl)
+                fetchBitmap(manifest.uniqueId, manifest.markerImageUrl)
             }
             _uiState.value = if (bitmap != null) {
                 UiState.Ready(manifest, bitmap)
@@ -113,16 +113,20 @@ class ArViewerViewModel @Inject constructor(
 
     /**
      * Load marker bitmap from cache or network.
+     *
+     * Cache is keyed by [uniqueId] (stable) rather than [url] (temporary for
+     * Yandex Disk content), so repeated opens hit the cache instead of
+     * re-downloading the full image every time.
      */
-    private suspend fun fetchBitmap(url: String): Bitmap? {
+    private suspend fun fetchBitmap(uniqueId: String, url: String): Bitmap? {
         val absoluteUrl = absoluteMarkerUrl(url)
 
-        return MarkerCache.get(appContext, absoluteUrl)
+        return MarkerCache.get(appContext, uniqueId)
             ?: run {
                 val response = viewerApi.downloadImage(absoluteUrl)
                 if (!response.isSuccessful) return null
                 val bytes = response.body()?.bytes() ?: return null
-                MarkerCache.put(appContext, absoluteUrl, bytes)
+                MarkerCache.put(appContext, uniqueId, bytes)
                 BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
             }
     }

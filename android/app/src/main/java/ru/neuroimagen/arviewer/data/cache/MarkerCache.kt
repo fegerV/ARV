@@ -4,15 +4,17 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import java.io.File
-import java.security.MessageDigest
 import java.util.concurrent.locks.ReentrantReadWriteLock
 import kotlin.concurrent.read
 import kotlin.concurrent.write
 
 /**
  * Disk cache for AR marker images.
- * Caches by URL (SHA-256 hash as filename). Reduces repeated network loads when
- * opening the same AR content.
+ *
+ * Keyed by a **stable identifier** (e.g. `unique_id`) rather than the download
+ * URL.  Yandex Disk generates a different temporary URL on every manifest
+ * request; URL-based keys caused 100 % cache misses and forced a 3+ MB
+ * re-download on every AR session open.
  */
 object MarkerCache {
 
@@ -21,30 +23,29 @@ object MarkerCache {
 
     private val lock = ReentrantReadWriteLock()
 
-    /**
-     * Returns cache directory for marker images. Uses app cache dir so OS can evict when needed.
-     */
     private fun cacheDir(context: Context): File {
         return File(context.cacheDir, CACHE_DIR_NAME).also {
             if (!it.exists()) it.mkdirs()
         }
     }
 
-    private fun cacheKey(url: String): String {
-        val bytes = MessageDigest.getInstance("SHA-256").digest(url.toByteArray(Charsets.UTF_8))
-        return bytes.joinToString("") { "%02x".format(it) }
+    /** Sanitise key to a safe filename (UUID is safe, but guard anyway). */
+    private fun safeFileName(stableKey: String): String {
+        return stableKey.replace(Regex("[^a-zA-Z0-9_-]"), "_").take(64)
     }
 
-    private fun cacheFile(context: Context, url: String): File {
-        return File(cacheDir(context), "${cacheKey(url)}.bin")
+    private fun cacheFile(context: Context, stableKey: String): File {
+        return File(cacheDir(context), "${safeFileName(stableKey)}.bin")
     }
 
     /**
      * Gets marker image from cache if present and not expired.
-     * @return decoded Bitmap or null if miss/expired/error
+     *
+     * @param stableKey content-stable key (e.g. `unique_id`), NOT the download URL
+     * @return decoded Bitmap or null if miss / expired / error
      */
-    fun get(context: Context, url: String): Bitmap? = lock.read {
-        val file = cacheFile(context, url)
+    fun get(context: Context, stableKey: String): Bitmap? = lock.read {
+        val file = cacheFile(context, stableKey)
         if (!file.exists()) return null
         if (file.lastModified() + MAX_AGE_MS < System.currentTimeMillis()) {
             file.delete()
@@ -58,10 +59,12 @@ object MarkerCache {
 
     /**
      * Saves marker image bytes to cache.
+     *
+     * @param stableKey  content-stable key (e.g. `unique_id`)
      * @param imageBytes raw image bytes (e.g. from HTTP response body)
      */
-    fun put(context: Context, url: String, imageBytes: ByteArray): Unit = lock.write {
-        val file = cacheFile(context, url)
+    fun put(context: Context, stableKey: String, imageBytes: ByteArray): Unit = lock.write {
+        val file = cacheFile(context, stableKey)
         runCatching {
             file.writeBytes(imageBytes)
         }

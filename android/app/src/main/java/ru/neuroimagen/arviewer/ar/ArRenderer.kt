@@ -59,6 +59,19 @@ class ArRenderer(
         zoomLevel = zoom
     }
 
+    // ── Video readiness ──────────────────────────────────────────────
+    @Volatile
+    private var videoReady = false
+
+    /**
+     * Signal whether the video player has decoded at least one frame.
+     * When false, the video quad is not drawn to avoid a black rectangle.
+     * Thread-safe; called from the UI thread by ExoPlayer listener.
+     */
+    fun setVideoReady(ready: Boolean) {
+        videoReady = ready
+    }
+
     // ── Recording ────────────────────────────────────────────────────
     private val recorder = ArRecorder()
 
@@ -137,6 +150,7 @@ class ArRenderer(
 
         // Update video texture once (shared across screen & encoder renders)
         val st = videoSurfaceTexture
+        val isReady = videoReady
         val allImages = session.getAllTrackables(AugmentedImage::class.java)
         val hasTracking = allImages.any { it.trackingState == TrackingState.TRACKING }
 
@@ -146,17 +160,17 @@ class ArRenderer(
             mainHandler.post { onMarkerTrackingChanged(hasTracking) }
         }
 
-        if (hasTracking && st != null) {
+        if (hasTracking && isReady && st != null) {
             st.updateTexImage()
         }
 
         // 1. Render to screen
-        renderScene(frame, allImages)
+        renderScene(frame, allImages, isReady)
 
         // 2. If recording, also render to encoder surface
         if (recorder.isRecording) {
             if (recorder.beginFrame()) {
-                renderScene(frame, allImages)
+                renderScene(frame, allImages, isReady)
                 recorder.endFrame(frame.timestamp)
             }
             // Restore screen viewport
@@ -170,8 +184,10 @@ class ArRenderer(
      * Render the full AR scene: camera background + video quads on tracked images.
      * Does NOT call [SurfaceTexture.updateTexImage] — that must happen once before
      * the first render in [onDrawFrame].
+     *
+     * @param isVideoReady when false the video quad is skipped to avoid a black rectangle
      */
-    private fun renderScene(frame: Frame, images: Collection<AugmentedImage>) {
+    private fun renderScene(frame: Frame, images: Collection<AugmentedImage>, isVideoReady: Boolean) {
         val zoom = zoomLevel
 
         GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT or GLES20.GL_DEPTH_BUFFER_BIT)
@@ -190,7 +206,7 @@ class ArRenderer(
         }
 
         for (image in images) {
-            if (image.trackingState == TrackingState.TRACKING) {
+            if (image.trackingState == TrackingState.TRACKING && isVideoReady) {
                 videoQuadRenderer.draw(
                     videoTextureId,
                     image.centerPose,

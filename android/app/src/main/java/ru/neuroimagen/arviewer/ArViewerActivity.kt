@@ -30,6 +30,7 @@ import androidx.media3.common.MediaItem
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
+import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.ProgressiveMediaSource
 import com.google.ar.core.Session
@@ -511,11 +512,27 @@ class ArViewerActivity : AppCompatActivity() {
     /**
      * Prepare Media3 player but do NOT start playback.
      * Video will begin playing when the marker is first recognized.
+     *
+     * Uses a stable cache key based on [ViewerManifest.uniqueId] and
+     * [ViewerManifestVideo.id] so that the video remains cached even when
+     * Yandex Disk generates a different temporary download URL each time.
      */
     @OptIn(UnstableApi::class)
     private fun prepareVideoPlayer(surface: Surface, manifest: ViewerManifest) {
         exoPlayer?.release()
-        val player = ExoPlayer.Builder(this).build()
+
+        val player = ExoPlayer.Builder(this)
+            .setLoadControl(
+                DefaultLoadControl.Builder()
+                    .setBufferDurationsMs(
+                        /* minBufferMs = */ 15_000,
+                        /* maxBufferMs = */ 60_000,
+                        /* bufferForPlaybackMs = */ 2_500,
+                        /* bufferForPlaybackAfterRebufferMs = */ 5_000,
+                    )
+                    .build()
+            )
+            .build()
         exoPlayer = player
 
         player.repeatMode = Player.REPEAT_MODE_ALL
@@ -529,6 +546,7 @@ class ArViewerActivity : AppCompatActivity() {
                     else -> "UNKNOWN($playbackState)"
                 }
                 Log.d(TAG, "Media3 player state: $stateName")
+                arRenderer?.setVideoReady(playbackState == Player.STATE_READY)
             }
 
             override fun onPlayerError(error: PlaybackException) {
@@ -545,15 +563,21 @@ class ArViewerActivity : AppCompatActivity() {
             }
         })
 
+        val stableCacheKey = "${manifest.uniqueId}_video_${manifest.video.id}"
+        val mediaItem = MediaItem.Builder()
+            .setUri(manifest.video.videoUrl)
+            .setCustomCacheKey(stableCacheKey)
+            .build()
+
         val cacheFactory = VideoCache.getDataSourceFactory(this)
         val mediaSource = ProgressiveMediaSource.Factory(cacheFactory)
-            .createMediaSource(MediaItem.fromUri(manifest.video.videoUrl))
+            .createMediaSource(mediaItem)
         player.setMediaSource(mediaSource)
         player.setVideoSurface(surface)
         player.volume = 0f
         player.prepare()
         player.playWhenReady = false
-        Log.d(TAG, "Video player prepared (muted, paused, waiting for marker)")
+        Log.d(TAG, "Video player prepared (cache key: $stableCacheKey, waiting for marker)")
     }
 
     /**
