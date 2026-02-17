@@ -7,7 +7,7 @@ from typing import Optional
 from fastapi import APIRouter, UploadFile, File, Form, Depends, HTTPException, Query, BackgroundTasks, Request
 import shutil
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func
+from sqlalchemy import delete as sa_delete, select, func, update as sa_update
 from sqlalchemy.orm import selectinload
 import structlog
 import re
@@ -1065,8 +1065,21 @@ async def delete_ar_content(
     # Clear the active_video_id reference to avoid circular dependency
     ar_content.active_video_id = None
     await db.commit()
-    
-    # Delete from database (this will cascade delete related videos due to cascade="all, delete-orphan")
+
+    # Remove FK references from related tables before deleting
+    from app.models.ar_view_session import ARViewSession
+    from app.models.notification import Notification
+
+    await db.execute(
+        sa_delete(ARViewSession).where(ARViewSession.ar_content_id == content_id)
+    )
+    await db.execute(
+        sa_update(Notification)
+        .where(Notification.ar_content_id == content_id)
+        .values(ar_content_id=None)
+    )
+
+    # Delete from database (cascades to related videos)
     await db.delete(ar_content)
     await db.commit()
 
@@ -1154,9 +1167,21 @@ async def delete_ar_content_by_id(
     # Clear the active_video_id reference to avoid circular dependency
     ar_content.active_video_id = None
     await db.commit()
-    
-    # Delete from database (this will cascade delete related videos due to cascade="all, delete-orphan")
-    # Use await for async delete operation
+
+    # Remove FK references from related tables before deleting
+    from app.models.ar_view_session import ARViewSession
+    from app.models.notification import Notification
+
+    await db.execute(
+        sa_delete(ARViewSession).where(ARViewSession.ar_content_id == content_id)
+    )
+    await db.execute(
+        sa_update(Notification)
+        .where(Notification.ar_content_id == content_id)
+        .values(ar_content_id=None)
+    )
+
+    # Delete from database (cascades to related videos)
     await db.delete(ar_content)
     await db.commit()
     
