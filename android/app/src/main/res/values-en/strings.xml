@@ -24,6 +24,7 @@
     <string name="error_camera_required">Camera access is required for AR. Grant it in app settings.</string>
     <string name="error_arcore_required">ARCore required. Install from Play Store.</string>
     <string name="error_arcore_session">Failed to start AR. Check device support.</string>
+    <string name="error_marker_quality">Marker image is not suitable for AR tracking.\n\nAutomatic recognition works best with photos containing sharp details and high contrast.\n\nTry uploading a different photo in your account.</string>
     <string name="capture_photo">Photo</string>
     <string name="photo_saved">Photo saved</string>
     <string name="photo_save_failed">Failed to save photo</string>

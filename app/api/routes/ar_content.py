@@ -1287,3 +1287,73 @@ async def get_ar_image(unique_id: str, db: AsyncSession = Depends(get_db)):
         
     except ValueError:
         raise HTTPException(status_code=400, detail="Invalid unique_id format")
+
+
+@router.post("/ar-content/photo/analyze", tags=["AR Content"])
+async def analyze_photo_quality(
+    photo_file: UploadFile = File(...),
+) -> dict:
+    """Analyze uploaded photo for AR marker tracking quality.
+
+    Accepts a photo via multipart upload, saves it to a temporary file,
+    runs ``ARCoreMarkerService.analyze_image_quality`` and returns
+    metrics, quality level, and recommendations **without** persisting
+    anything to the database.
+
+    The temporary file is deleted after analysis.
+    """
+    import tempfile
+    import os
+
+    allowed_extensions = {"jpeg", "jpg", "png", "webp"}
+    filename = photo_file.filename or ""
+    ext = Path(filename).suffix.lower().lstrip(".")
+    if ext not in allowed_extensions:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Photo must be one of: {', '.join(sorted(allowed_extensions))}",
+        )
+
+    tmp_path: str | None = None
+    try:
+        suffix = f".{ext}" if ext else ".jpg"
+        with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
+            tmp_path = tmp.name
+            contents = await photo_file.read()
+            if len(contents) > 10 * 1024 * 1024:
+                raise HTTPException(status_code=422, detail="File size must not exceed 10 MB")
+            tmp.write(contents)
+
+        import cv2
+
+        img = cv2.imread(tmp_path)
+        if img is None:
+            raise HTTPException(status_code=422, detail="Cannot decode image — upload a valid JPEG or PNG")
+
+        height, width = img.shape[:2]
+        metrics = marker_service.analyze_image_quality(tmp_path)
+        recommendations = marker_service.build_image_recommendations(metrics)
+        recognition_probability = metrics.get("recognition_probability")
+        quality_level = marker_service.get_quality_level(recognition_probability)
+
+        logger.info(
+            "photo_quality_analyzed",
+            width=width,
+            height=height,
+            quality_level=quality_level,
+            recognition_probability=recognition_probability,
+        )
+
+        return {
+            "recognition_probability": recognition_probability,
+            "quality_level": quality_level,
+            "metrics": metrics,
+            "recommendations": recommendations,
+            "resolution": {"width": width, "height": height},
+        }
+    finally:
+        if tmp_path:
+            try:
+                os.unlink(tmp_path)
+            except OSError:
+                pass

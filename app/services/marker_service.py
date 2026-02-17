@@ -81,6 +81,24 @@ class ARCoreMarkerService:
 
         return recommendations
 
+    @staticmethod
+    def get_quality_level(recognition_probability: float | None) -> str:
+        """Classify recognition probability into a human-readable quality level.
+
+        Returns:
+            ``"good"``  — probability >= 0.6 (reliable tracking)
+            ``"fair"``  — probability >= 0.35 (may be unstable)
+            ``"poor"``  — probability < 0.35 (high risk of failure)
+            ``"unknown"`` — probability is ``None``
+        """
+        if recognition_probability is None:
+            return "unknown"
+        if recognition_probability >= 0.6:
+            return "good"
+        if recognition_probability >= 0.35:
+            return "fair"
+        return "poor"
+
     def should_auto_enhance(self, image_quality: dict) -> bool:
         """Decide whether automatic enhancement should be applied."""
         if not image_quality:

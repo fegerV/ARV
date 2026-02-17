@@ -117,10 +117,8 @@
                         <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                             Портрет (изображение) <span class="text-red-500">*</span>
                         </label>
-                        <div class="relative">
+                        <div class="relative" x-data="photoUploader()" x-init="init()">
                             <div class="photo-upload-area"
-                                 x-data="photoUploader()"
-                                 x-init="init()"
                                  @click="triggerFileInput()"
                                  @dragover.prevent="dragOver = true"
                                  @dragleave.prevent="dragOver = false"
@@ -183,6 +181,111 @@
                                         <p class="text-sm text-gray-600 dark:text-gray-400 mt-2">Загрузка...</p>
                                     </div>
                                 </div>
+                            </div>
+
+                            <!-- Quality analysis: spinner -->
+                            <div x-show="analyzing" x-transition class="mt-3 flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
+                                <span class="material-icons text-base animate-spin">refresh</span>
+                                <span>Анализ качества маркера...</span>
+                            </div>
+
+                            <!-- Quality analysis: result card -->
+                            <div x-show="qualityResult && !analyzing"
+                                 x-transition:enter="transition-all duration-300"
+                                 x-transition:enter-start="opacity-0 -translate-y-1"
+                                 x-transition:enter-end="opacity-100 translate-y-0"
+                                 class="mt-3 rounded-lg border p-3 text-sm"
+                                 :class="{
+                                     'border-green-300 bg-green-50 dark:border-green-700 dark:bg-green-900/20': qualityColor() === 'green',
+                                     'border-yellow-300 bg-yellow-50 dark:border-yellow-700 dark:bg-yellow-900/20': qualityColor() === 'yellow',
+                                     'border-red-300 bg-red-50 dark:border-red-700 dark:bg-red-900/20': qualityColor() === 'red',
+                                 }">
+
+                                <!-- Header: icon + label -->
+                                <div class="flex items-center gap-2 mb-2">
+                                    <span class="material-icons text-lg"
+                                          :class="{
+                                              'text-green-600 dark:text-green-400': qualityColor() === 'green',
+                                              'text-yellow-600 dark:text-yellow-400': qualityColor() === 'yellow',
+                                              'text-red-600 dark:text-red-400': qualityColor() === 'red',
+                                          }"
+                                          x-text="qualityColor() === 'green' ? 'check_circle' : qualityColor() === 'yellow' ? 'warning' : 'error'">
+                                    </span>
+                                    <span class="font-medium"
+                                          :class="{
+                                              'text-green-800 dark:text-green-300': qualityColor() === 'green',
+                                              'text-yellow-800 dark:text-yellow-300': qualityColor() === 'yellow',
+                                              'text-red-800 dark:text-red-300': qualityColor() === 'red',
+                                          }"
+                                          x-text="qualityLabel()">
+                                    </span>
+                                </div>
+
+                                <!-- Progress bar -->
+                                <div class="mb-2">
+                                    <div class="flex items-center justify-between text-xs mb-1">
+                                        <span class="text-gray-600 dark:text-gray-400">Вероятность распознавания</span>
+                                        <span class="font-semibold"
+                                              :class="{
+                                                  'text-green-700 dark:text-green-300': qualityColor() === 'green',
+                                                  'text-yellow-700 dark:text-yellow-300': qualityColor() === 'yellow',
+                                                  'text-red-700 dark:text-red-300': qualityColor() === 'red',
+                                              }"
+                                              x-text="qualityPercent() + '%'">
+                                        </span>
+                                    </div>
+                                    <div class="w-full h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+                                        <div class="h-full rounded-full transition-all duration-500"
+                                             :class="{
+                                                 'bg-green-500': qualityColor() === 'green',
+                                                 'bg-yellow-500': qualityColor() === 'yellow',
+                                                 'bg-red-500': qualityColor() === 'red',
+                                             }"
+                                             :style="'width:' + qualityPercent() + '%'">
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Mini metrics grid -->
+                                <div class="grid grid-cols-3 gap-2 mb-2" x-show="qualityResult && qualityResult.metrics">
+                                    <div class="bg-white/60 dark:bg-gray-800/40 rounded px-2 py-1 text-center">
+                                        <div class="text-[10px] text-gray-500 dark:text-gray-400 uppercase tracking-wide">Контраст</div>
+                                        <div class="text-xs font-semibold text-gray-800 dark:text-gray-200" x-text="qualityResult && qualityResult.metrics ? qualityResult.metrics.contrast.toFixed(1) : ''"></div>
+                                    </div>
+                                    <div class="bg-white/60 dark:bg-gray-800/40 rounded px-2 py-1 text-center">
+                                        <div class="text-[10px] text-gray-500 dark:text-gray-400 uppercase tracking-wide">Резкость</div>
+                                        <div class="text-xs font-semibold text-gray-800 dark:text-gray-200" x-text="qualityResult && qualityResult.metrics ? qualityResult.metrics.sharpness.toFixed(1) : ''"></div>
+                                    </div>
+                                    <div class="bg-white/60 dark:bg-gray-800/40 rounded px-2 py-1 text-center">
+                                        <div class="text-[10px] text-gray-500 dark:text-gray-400 uppercase tracking-wide">Яркость</div>
+                                        <div class="text-xs font-semibold text-gray-800 dark:text-gray-200" x-text="qualityResult && qualityResult.metrics ? qualityResult.metrics.brightness.toFixed(1) : ''"></div>
+                                    </div>
+                                </div>
+
+                                <!-- Resolution -->
+                                <div class="text-xs text-gray-500 dark:text-gray-400 mb-2" x-show="qualityResult && qualityResult.resolution">
+                                    <span x-text="qualityResult && qualityResult.resolution ? qualityResult.resolution.width + ' x ' + qualityResult.resolution.height + ' px' : ''"></span>
+                                </div>
+
+                                <!-- Recommendations -->
+                                <template x-if="qualityResult && qualityResult.recommendations && qualityResult.quality_level !== 'good'">
+                                    <div class="space-y-1 border-t pt-2 mt-1"
+                                         :class="{
+                                             'border-yellow-200 dark:border-yellow-800': qualityColor() === 'yellow',
+                                             'border-red-200 dark:border-red-800': qualityColor() === 'red',
+                                         }">
+                                        <template x-for="rec in qualityResult.recommendations" :key="rec">
+                                            <div class="flex items-start gap-1.5 text-xs"
+                                                 :class="{
+                                                     'text-yellow-700 dark:text-yellow-300': qualityColor() === 'yellow',
+                                                     'text-red-700 dark:text-red-300': qualityColor() === 'red',
+                                                 }">
+                                                <span class="material-icons text-xs mt-0.5 shrink-0">info</span>
+                                                <span x-text="rec"></span>
+                                            </div>
+                                        </template>
+                                    </div>
+                                </template>
                             </div>
                         </div>
                     </div>
@@ -580,25 +683,28 @@ function photoUploader() {
         previewUrl: null,
         uploading: false,
         dragOver: false,
-        
+
+        // Quality analysis state
+        analyzing: false,
+        qualityResult: null,
+
         init() {
-            // Initialize with existing photo if editing
             if (this.$root.arContent && this.$root.arContent.photo_url) {
                 this.previewUrl = this.$root.arContent.photo_url;
             }
         },
-        
+
         triggerFileInput() {
             this.$refs.fileInput.click();
         },
-        
+
         handleFileSelect(event) {
             const file = event.target.files[0];
             if (file) {
                 this.processFile(file);
             }
         },
-        
+
         handleDrop(event) {
             this.dragOver = false;
             const files = event.dataTransfer.files;
@@ -606,33 +712,56 @@ function photoUploader() {
                 this.processFile(files[0]);
             }
         },
-        
+
         processFile(file) {
-            // Validate file type
             if (!file.type.startsWith('image/')) {
                 this.$dispatch('photo-selected', false);
                 this.showToast('Пожалуйста, выберите изображение', 'error');
                 return;
             }
-            
-            // Validate file size (10MB)
             if (file.size > 10 * 1024 * 1024) {
                 this.$dispatch('photo-selected', false);
                 this.showToast('Размер файла не должен превышать 10MB', 'error');
                 return;
             }
-            
+
             this.selectedFile = file;
             this.previewUrl = URL.createObjectURL(file);
             this.$dispatch('photo-selected', true);
+            this.analyzeQuality(file);
         },
-        
+
+        async analyzeQuality(file) {
+            this.analyzing = true;
+            this.qualityResult = null;
+            try {
+                const formData = new FormData();
+                formData.append('photo_file', file);
+                const resp = await fetch('/api/ar-content/photo/analyze', {
+                    method: 'POST',
+                    body: formData,
+                });
+                if (!resp.ok) {
+                    const err = await resp.json().catch(() => ({}));
+                    console.warn('Quality analysis failed:', err);
+                    return;
+                }
+                this.qualityResult = await resp.json();
+            } catch (e) {
+                console.warn('Quality analysis error:', e);
+            } finally {
+                this.analyzing = false;
+            }
+        },
+
         removeFile() {
             const existingUrl = (this.$root.arContent && this.$root.arContent.photo_url)
                 ? this.$root.arContent.photo_url
                 : null;
 
             this.selectedFile = null;
+            this.qualityResult = null;
+            this.analyzing = false;
             if (this.previewUrl && this.previewUrl.startsWith('blob:')) {
                 URL.revokeObjectURL(this.previewUrl);
             }
@@ -640,7 +769,26 @@ function photoUploader() {
             this.$refs.fileInput.value = '';
             this.$dispatch('photo-selected', false);
         },
-        
+
+        qualityLabel() {
+            if (!this.qualityResult) return '';
+            const lvl = this.qualityResult.quality_level;
+            if (lvl === 'good') return 'Отличное качество для AR-трекинга';
+            if (lvl === 'fair') return 'Среднее качество — трекинг может быть нестабильным';
+            return 'Низкое качество — высокий риск ошибки распознавания';
+        },
+        qualityColor() {
+            if (!this.qualityResult) return 'gray';
+            const lvl = this.qualityResult.quality_level;
+            if (lvl === 'good') return 'green';
+            if (lvl === 'fair') return 'yellow';
+            return 'red';
+        },
+        qualityPercent() {
+            if (!this.qualityResult || this.qualityResult.recognition_probability == null) return 0;
+            return Math.round(this.qualityResult.recognition_probability * 100);
+        },
+
         formatFileSize(bytes) {
             if (bytes === 0) return '0 Bytes';
             const k = 1024;
@@ -648,7 +796,7 @@ function photoUploader() {
             const i = Math.floor(Math.log(bytes) / Math.log(k));
             return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
         },
-        
+
         showToast(message, type = 'info') {
             if (this.$root.showToast) {
                 this.$root.showToast(message, type);

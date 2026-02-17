@@ -25,6 +25,7 @@
     <string name="error_camera_required">Для AR нужен доступ к камере. Разрешите в настройках приложения.</string>
     <string name="error_arcore_required">Требуется ARCore. Установите из Play Маркета.</string>
     <string name="error_arcore_session">Не удалось запустить AR-сессию. Попробуйте перезапустить приложение.</string>
+    <string name="error_marker_quality">Изображение маркера не подходит для AR-распознавания.\n\nАвтоматическое отслеживание работает лучше с фотографиями, содержащими чёткие детали и контрастные элементы.\n\nПопробуйте загрузить другое фото в личном кабинете.</string>
     <string name="error_video_playback">Ошибка воспроизведения видео: %1$s</string>
     <string name="error_microphone_required">Для записи со звуком нужен доступ к микрофону</string>
 

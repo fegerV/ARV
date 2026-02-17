@@ -1710,7 +1710,7 @@ document.addEventListener('alpine:init', function() {
     <!-- БЛОК 6: МАРКЕР И КАЧЕСТВО (скрыт, если нет реальных метрик) -->
     <!-- ============================================ -->
     <div class="card p-5 mb-6"
-         x-show="markerMetrics.file_size_bytes || markerMetrics.features_count || (markerMetrics.image_quality && markerMetrics.image_quality.recognition_probability != null)">
+         x-show="markerMetrics.file_size_bytes || markerMetrics.features_count || (markerMetrics.image_quality && markerMetrics.image_quality.recognition_probability != null) || (markerMetrics.quality_level && markerMetrics.quality_level !== 'unknown')">
         <div class="flex items-center justify-between mb-4 pb-3 border-b border-gray-200 dark:border-gray-700">
             <div class="flex items-center gap-2">
                 <span class="material-icons text-teal-600 dark:text-teal-400">qr_code_2</span>
@@ -1731,6 +1731,82 @@ document.addEventListener('alpine:init', function() {
             </div>
         </div>
 
+        <!-- Quality level indicator -->
+        <div x-show="markerMetrics.quality_level && markerMetrics.quality_level !== 'unknown'" class="mb-4">
+            <div class="rounded-lg border p-4"
+                 :class="{
+                     'border-green-300 bg-green-50 dark:border-green-700 dark:bg-green-900/20': markerMetrics.quality_level === 'good',
+                     'border-yellow-300 bg-yellow-50 dark:border-yellow-700 dark:bg-yellow-900/20': markerMetrics.quality_level === 'fair',
+                     'border-red-300 bg-red-50 dark:border-red-700 dark:bg-red-900/20': markerMetrics.quality_level === 'poor',
+                 }">
+
+                <!-- Header -->
+                <div class="flex items-center gap-2 mb-3">
+                    <span class="material-icons text-xl"
+                          :class="{
+                              'text-green-600 dark:text-green-400': markerMetrics.quality_level === 'good',
+                              'text-yellow-600 dark:text-yellow-400': markerMetrics.quality_level === 'fair',
+                              'text-red-600 dark:text-red-400': markerMetrics.quality_level === 'poor',
+                          }"
+                          x-text="markerMetrics.quality_level === 'good' ? 'check_circle' : markerMetrics.quality_level === 'fair' ? 'warning' : 'error'">
+                    </span>
+                    <span class="font-semibold text-sm"
+                          :class="{
+                              'text-green-800 dark:text-green-300': markerMetrics.quality_level === 'good',
+                              'text-yellow-800 dark:text-yellow-300': markerMetrics.quality_level === 'fair',
+                              'text-red-800 dark:text-red-300': markerMetrics.quality_level === 'poor',
+                          }"
+                          x-text="markerMetrics.quality_level === 'good' ? 'Отличное качество для AR-трекинга' : markerMetrics.quality_level === 'fair' ? 'Среднее качество — трекинг может быть нестабильным' : 'Низкое качество — высокий риск ошибки распознавания'">
+                    </span>
+                </div>
+
+                <!-- Progress bar -->
+                <div class="mb-3" x-show="markerMetrics.image_quality?.recognition_probability != null">
+                    <div class="flex items-center justify-between text-xs mb-1">
+                        <span class="text-gray-600 dark:text-gray-400">Вероятность распознавания</span>
+                        <span class="font-semibold"
+                              :class="{
+                                  'text-green-700 dark:text-green-300': markerMetrics.quality_level === 'good',
+                                  'text-yellow-700 dark:text-yellow-300': markerMetrics.quality_level === 'fair',
+                                  'text-red-700 dark:text-red-300': markerMetrics.quality_level === 'poor',
+                              }"
+                              x-text="formatPercent(markerMetrics.image_quality?.recognition_probability)">
+                        </span>
+                    </div>
+                    <div class="w-full h-2.5 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+                        <div class="h-full rounded-full transition-all duration-500"
+                             :class="{
+                                 'bg-green-500': markerMetrics.quality_level === 'good',
+                                 'bg-yellow-500': markerMetrics.quality_level === 'fair',
+                                 'bg-red-500': markerMetrics.quality_level === 'poor',
+                             }"
+                             :style="'width:' + Math.round((markerMetrics.image_quality?.recognition_probability || 0) * 100) + '%'">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Recommendations -->
+                <template x-if="markerMetrics.recommendations && markerMetrics.recommendations.length > 0 && markerMetrics.quality_level !== 'good'">
+                    <div class="space-y-1 border-t pt-2"
+                         :class="{
+                             'border-yellow-200 dark:border-yellow-800': markerMetrics.quality_level === 'fair',
+                             'border-red-200 dark:border-red-800': markerMetrics.quality_level === 'poor',
+                         }">
+                        <template x-for="rec in markerMetrics.recommendations" :key="rec">
+                            <div class="flex items-start gap-1.5 text-xs"
+                                 :class="{
+                                     'text-yellow-700 dark:text-yellow-300': markerMetrics.quality_level === 'fair',
+                                     'text-red-700 dark:text-red-300': markerMetrics.quality_level === 'poor',
+                                 }">
+                                <span class="material-icons text-xs mt-0.5 shrink-0">info</span>
+                                <span x-text="rec"></span>
+                            </div>
+                        </template>
+                    </div>
+                </template>
+            </div>
+        </div>
+
         <!-- Предупреждения -->
         <template x-if="markerMetrics.validation_warnings && markerMetrics.validation_warnings.length > 0">
             <div class="mb-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-3">
@@ -1745,8 +1821,24 @@ document.addEventListener('alpine:init', function() {
 
         <!-- Метрики маркера — показываются только заполненные -->
         <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+            <div class="bg-gray-50 dark:bg-gray-700/50 p-3 rounded-lg" x-show="markerMetrics.image_quality?.contrast != null">
+                <div class="text-xs font-medium text-gray-500 dark:text-gray-400 mb-0.5">Контраст</div>
+                <div class="text-sm font-semibold text-gray-900 dark:text-white" x-text="formatScore(markerMetrics.image_quality?.contrast)"></div>
+            </div>
+            <div class="bg-gray-50 dark:bg-gray-700/50 p-3 rounded-lg" x-show="markerMetrics.image_quality?.sharpness != null">
+                <div class="text-xs font-medium text-gray-500 dark:text-gray-400 mb-0.5">Резкость</div>
+                <div class="text-sm font-semibold text-gray-900 dark:text-white" x-text="formatScore(markerMetrics.image_quality?.sharpness)"></div>
+            </div>
+            <div class="bg-gray-50 dark:bg-gray-700/50 p-3 rounded-lg" x-show="markerMetrics.image_quality?.brightness != null">
+                <div class="text-xs font-medium text-gray-500 dark:text-gray-400 mb-0.5">Яркость</div>
+                <div class="text-sm font-semibold text-gray-900 dark:text-white" x-text="formatScore(markerMetrics.image_quality?.brightness)"></div>
+            </div>
+            <div class="bg-gray-50 dark:bg-gray-700/50 p-3 rounded-lg" x-show="markerMetrics.image_quality?.edge_density != null">
+                <div class="text-xs font-medium text-gray-500 dark:text-gray-400 mb-0.5">Плотность границ</div>
+                <div class="text-sm font-semibold text-gray-900 dark:text-white" x-text="formatScore(markerMetrics.image_quality?.edge_density)"></div>
+            </div>
             <div class="bg-gray-50 dark:bg-gray-700/50 p-3 rounded-lg" x-show="markerMetrics.file_size_bytes">
-                <div class="text-xs font-medium text-gray-500 dark:text-gray-400 mb-0.5">Размер</div>
+                <div class="text-xs font-medium text-gray-500 dark:text-gray-400 mb-0.5">Размер файла</div>
                 <div class="text-sm font-semibold text-gray-900 dark:text-white" x-text="formatBytes(markerMetrics.file_size_bytes)"></div>
             </div>
             <div class="bg-gray-50 dark:bg-gray-700/50 p-3 rounded-lg" x-show="markerMetrics.generation_time_seconds">
@@ -1757,25 +1849,9 @@ document.addEventListener('alpine:init', function() {
                 <div class="text-xs font-medium text-gray-500 dark:text-gray-400 mb-0.5">Features</div>
                 <div class="text-sm font-semibold text-gray-900 dark:text-white" x-text="markerMetrics.features_count"></div>
             </div>
-            <div class="bg-gray-50 dark:bg-gray-700/50 p-3 rounded-lg" x-show="markerMetrics.image_quality?.recognition_probability != null">
-                <div class="text-xs font-medium text-gray-500 dark:text-gray-400 mb-0.5">Распознавание</div>
-                <div class="text-sm font-semibold text-gray-900 dark:text-white" x-text="formatPercent(markerMetrics.image_quality?.recognition_probability)"></div>
-            </div>
-            <div class="bg-gray-50 dark:bg-gray-700/50 p-3 rounded-lg" x-show="markerMetrics.image_quality?.contrast != null">
-                <div class="text-xs font-medium text-gray-500 dark:text-gray-400 mb-0.5">Контраст</div>
-                <div class="text-sm font-semibold text-gray-900 dark:text-white" x-text="formatScore(markerMetrics.image_quality?.contrast)"></div>
-            </div>
-            <div class="bg-gray-50 dark:bg-gray-700/50 p-3 rounded-lg" x-show="markerMetrics.image_quality?.sharpness != null">
-                <div class="text-xs font-medium text-gray-500 dark:text-gray-400 mb-0.5">Резкость</div>
-                <div class="text-sm font-semibold text-gray-900 dark:text-white" x-text="formatScore(markerMetrics.image_quality?.sharpness)"></div>
-            </div>
             <div class="bg-gray-50 dark:bg-gray-700/50 p-3 rounded-lg" x-show="markerMetrics.features_density">
-                <div class="text-xs font-medium text-gray-500 dark:text-gray-400 mb-0.5">Плотность</div>
+                <div class="text-xs font-medium text-gray-500 dark:text-gray-400 mb-0.5">Плотность features</div>
                 <div class="text-sm font-semibold text-gray-900 dark:text-white" x-text="formatDensity(markerMetrics.features_density)"></div>
-            </div>
-            <div class="bg-gray-50 dark:bg-gray-700/50 p-3 rounded-lg" x-show="markerMetrics.image_quality?.brightness != null">
-                <div class="text-xs font-medium text-gray-500 dark:text-gray-400 mb-0.5">Яркость</div>
-                <div class="text-sm font-semibold text-gray-900 dark:text-white" x-text="formatScore(markerMetrics.image_quality?.brightness)"></div>
             </div>
         </div>
 

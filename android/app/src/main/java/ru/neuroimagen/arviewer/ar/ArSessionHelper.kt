@@ -8,6 +8,7 @@ import com.google.ar.core.ArCoreApk
 import com.google.ar.core.AugmentedImageDatabase
 import com.google.ar.core.Config
 import com.google.ar.core.Session
+import com.google.ar.core.exceptions.ImageInsufficientQualityException
 import com.google.ar.core.exceptions.UnavailableArcoreNotInstalledException
 import com.google.ar.core.exceptions.UnavailableDeviceNotCompatibleException
 import com.google.ar.core.exceptions.UnavailableException
@@ -63,6 +64,9 @@ sealed class ArSessionResult {
 
     /** SDK is too old for this version of ARCore. */
     data object SdkTooOld : ArSessionResult()
+
+    /** Marker image quality is too low for ARCore tracking. */
+    data class ImageQualityInsufficient(val message: String) : ArSessionResult()
 
     /** Unexpected error during session creation. */
     data class Failed(val message: String) : ArSessionResult()
@@ -147,12 +151,18 @@ object ArSessionHelper {
     /**
      * Creates a Session with Augmented Image mode and the marker from the manifest.
      *
-     * Must be called on main thread.  Bitmap is not recycled by this method.
+     * **Must be called on the main thread** — [Session] constructor requires it.
+     * Bitmap is not recycled by this method.
      * Returns a granular [ArSessionResult] for proper error handling.
      */
     fun createSession(activity: Activity, bitmap: Bitmap, manifest: ViewerManifest): ArSessionResult {
         return try {
             val t0 = System.currentTimeMillis()
+            Log.d(
+                TAG,
+                "createSession start: bitmap=${bitmap.width}×${bitmap.height}, " +
+                    "uniqueId=${manifest.uniqueId}, thread=${Thread.currentThread().name}",
+            )
             val session = Session(activity)
             val t1 = System.currentTimeMillis()
             val config = Config(session)
@@ -171,6 +181,16 @@ object ArSessionHelper {
                     "configure=${t4 - t3}ms)",
             )
             ArSessionResult.Success(session)
+        } catch (e: ImageInsufficientQualityException) {
+            Log.e(
+                TAG,
+                "Marker image quality insufficient for ARCore tracking " +
+                    "[${bitmap.width}×${bitmap.height}]",
+                e,
+            )
+            ArSessionResult.ImageQualityInsufficient(
+                e.message ?: "Marker image quality insufficient",
+            )
         } catch (e: UnavailableDeviceNotCompatibleException) {
             Log.e(TAG, "Device not compatible", e)
             ArSessionResult.DeviceNotCompatible
@@ -184,11 +204,15 @@ object ArSessionHelper {
             Log.e(TAG, "SDK too old", e)
             ArSessionResult.SdkTooOld
         } catch (e: UnavailableException) {
-            Log.e(TAG, "ARCore session creation failed", e)
+            Log.e(TAG, "ARCore session creation failed [${e.javaClass.simpleName}]", e)
             ArSessionResult.Failed(e.message ?: "Unknown ARCore error")
         } catch (e: Throwable) {
-            Log.e(TAG, "Unexpected error creating AR session", e)
-            ArSessionResult.Failed(e.message ?: "Unexpected error")
+            Log.e(
+                TAG,
+                "Unexpected error creating AR session [${e.javaClass.simpleName}]: ${e.message}",
+                e,
+            )
+            ArSessionResult.Failed("${e.javaClass.simpleName}: ${e.message}")
         }
     }
 }

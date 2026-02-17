@@ -242,9 +242,9 @@ class ArViewerActivity : AppCompatActivity() {
      * Uses granular [ArCoreCheckResult] and [ArSessionResult] to provide
      * clear, device-specific error messages instead of generic Toasts.
      *
-     * ARCore session creation (augmented image DB) is offloaded to
-     * [Dispatchers.Default] so the main-thread Handler can keep cycling
-     * loading tips while the heavy work runs in the background.
+     * Both ARCore check and session creation run on the **main thread**
+     * as required by the ARCore SDK.  The `addImage` call typically takes
+     * ~300 ms for a 1024 px marker, which is fast enough to avoid ANR.
      */
     private fun startArWithPermission(manifest: ViewerManifest, bitmap: Bitmap) {
         if (isDestroyed) return
@@ -277,47 +277,46 @@ class ArViewerActivity : AppCompatActivity() {
 
         if (isDestroyed) return
 
-        // ── Step 2: Create session on background thread ─────────────
-        // This keeps the main-thread message queue free so loading tips
-        // continue to rotate while the augmented image DB is built.
-        lifecycleScope.launch {
-            val sessionResult = withContext(Dispatchers.Default) {
-                ArSessionHelper.createSession(this@ArViewerActivity, bitmap, manifest)
+        // ── Step 2: Create session on main thread (ARCore requirement) ──
+        val sessionResult = ArSessionHelper.createSession(this, bitmap, manifest)
+
+        if (isDestroyed) return
+
+        val session = when (sessionResult) {
+            is ArSessionResult.Success -> sessionResult.session
+            is ArSessionResult.DeviceNotCompatible -> {
+                showArError(getString(R.string.error_device_not_supported))
+                return
             }
-
-            if (isDestroyed) return@launch
-
-            val session = when (sessionResult) {
-                is ArSessionResult.Success -> sessionResult.session
-                is ArSessionResult.DeviceNotCompatible -> {
-                    showArError(getString(R.string.error_device_not_supported))
-                    return@launch
-                }
-                is ArSessionResult.ArCoreNotInstalled -> {
-                    showArError(getString(R.string.error_arcore_install_requested))
-                    return@launch
-                }
-                is ArSessionResult.UserDeclined -> {
-                    showArError(getString(R.string.error_arcore_user_declined))
-                    return@launch
-                }
-                is ArSessionResult.SdkTooOld -> {
-                    showArError(getString(R.string.error_arcore_sdk_too_old))
-                    return@launch
-                }
-                is ArSessionResult.Failed -> {
-                    showArError(getString(R.string.error_arcore_session))
-                    return@launch
-                }
+            is ArSessionResult.ArCoreNotInstalled -> {
+                showArError(getString(R.string.error_arcore_install_requested))
+                return
             }
-
-            arSession = session
-            Log.d(TAG, "⏱ AR session ready at +${System.currentTimeMillis() - activityCreateTime}ms — loading complete")
-
-            stopLoadingTipsCycle()
-
-            setupArScene(session, manifest)
+            is ArSessionResult.UserDeclined -> {
+                showArError(getString(R.string.error_arcore_user_declined))
+                return
+            }
+            is ArSessionResult.SdkTooOld -> {
+                showArError(getString(R.string.error_arcore_sdk_too_old))
+                return
+            }
+            is ArSessionResult.ImageQualityInsufficient -> {
+                showArError(getString(R.string.error_marker_quality))
+                return
+            }
+            is ArSessionResult.Failed -> {
+                Log.e(TAG, "AR session failed: ${sessionResult.message}")
+                showArError(getString(R.string.error_arcore_session))
+                return
+            }
         }
+
+        arSession = session
+        Log.d(TAG, "⏱ AR session ready at +${System.currentTimeMillis() - activityCreateTime}ms — loading complete")
+
+        stopLoadingTipsCycle()
+
+        setupArScene(session, manifest)
     }
 
     /**

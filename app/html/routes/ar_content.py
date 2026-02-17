@@ -923,6 +923,8 @@ async def ar_content_detail(
             if not marker_path.is_absolute():
                 marker_path = Path(settings.LOCAL_STORAGE_PATH) / marker_path_value
             ar_content["marker_url"] = build_public_url(marker_path)
+        iq = marker_metadata.get("image_quality") or {}
+        rec_prob = iq.get("recognition_probability")
         marker_metrics = {
             "file_size_kb": marker_metadata.get("file_size_kb"),
             "file_size_bytes": marker_metadata.get("file_size_bytes"),
@@ -931,7 +933,9 @@ async def ar_content_detail(
             "features_density": marker_metadata.get("features_density"),
             "width": marker_metadata.get("width"),
             "height": marker_metadata.get("height"),
-            "image_quality": marker_metadata.get("image_quality") or {},
+            "image_quality": iq,
+            "quality_level": marker_service.get_quality_level(rec_prob),
+            "recommendations": marker_service.build_image_recommendations(iq) if iq else [],
             "is_valid": marker_metadata.get("is_valid", None),
             "validation_warnings": marker_metadata.get("validation_warnings", []),
         }
@@ -1116,6 +1120,8 @@ async def ar_content_detail(
         videos, active_video_info = [], None
         rotation_schedule_js = None  # Ensure it's set even in fallback
         marker_metadata = ar_content.get("marker_metadata") or {}
+        iq_fb = marker_metadata.get("image_quality") or {}
+        rec_prob_fb = iq_fb.get("recognition_probability")
         marker_metrics = {
             "file_size_kb": marker_metadata.get("file_size_kb"),
             "file_size_bytes": marker_metadata.get("file_size_bytes"),
@@ -1124,7 +1130,9 @@ async def ar_content_detail(
             "features_density": marker_metadata.get("features_density"),
             "width": marker_metadata.get("width"),
             "height": marker_metadata.get("height"),
-            "image_quality": marker_metadata.get("image_quality") or {},
+            "image_quality": iq_fb,
+            "quality_level": marker_service.get_quality_level(rec_prob_fb),
+            "recommendations": marker_service.build_image_recommendations(iq_fb) if iq_fb else [],
             "is_valid": marker_metadata.get("is_valid", None),
             "validation_warnings": marker_metadata.get("validation_warnings", []),
         }
