@@ -13,6 +13,19 @@ from app.models.video_rotation_schedule import VideoRotationSchedule
 logger = structlog.get_logger()
 
 
+def _ensure_utc(dt: Optional[datetime]) -> Optional[datetime]:
+    """Ensure datetime is timezone-aware (UTC).
+
+    Database columns that store naive datetimes are treated as UTC.
+    Returns ``None`` unchanged.
+    """
+    if dt is None:
+        return None
+    if dt.tzinfo is None:
+        return dt.replace(tzinfo=timezone.utc)
+    return dt
+
+
 def compute_video_status(video: Video, now: datetime = None) -> str:
     """Compute video status based on subscription and active state."""
     if now is None:
@@ -21,11 +34,12 @@ def compute_video_status(video: Video, now: datetime = None) -> str:
     if not video.is_active:
         return "inactive"
     
-    if video.subscription_end and video.subscription_end <= now:
+    sub_end = _ensure_utc(video.subscription_end)
+    if sub_end and sub_end <= now:
         return "expired"
     
-    if video.subscription_end:
-        days_remaining = (video.subscription_end - now).days
+    if sub_end:
+        days_remaining = (sub_end - now).days
         if days_remaining <= 7:
             return "expiring"
     
@@ -37,13 +51,14 @@ def compute_days_remaining(video: Video, now: datetime = None) -> Optional[int]:
     if now is None:
         now = datetime.now(timezone.utc)
     
-    if not video.subscription_end:
+    sub_end = _ensure_utc(video.subscription_end)
+    if not sub_end:
         return None
     
-    if video.subscription_end <= now:
+    if sub_end <= now:
         return 0
     
-    return (video.subscription_end - now).days
+    return (sub_end - now).days
 
 
 async def get_active_video_schedule(video_id: int, db: AsyncSession, now: datetime = None) -> Optional[VideoSchedule]:
@@ -119,7 +134,7 @@ async def check_date_rules(rule: VideoRotationSchedule, check_date: date, db: As
                         if video and video.is_active:
                             # Check subscription
                             now = datetime.now(timezone.utc)
-                            if not video.subscription_end or video.subscription_end > now:
+                            if not video.subscription_end or _ensure_utc(video.subscription_end) > now:
                                 return video
             else:
                 # Exact date match
@@ -129,7 +144,7 @@ async def check_date_rules(rule: VideoRotationSchedule, check_date: date, db: As
                         video = await db.get(Video, video_id)
                         if video and video.is_active:
                             now = datetime.now(timezone.utc)
-                            if not video.subscription_end or video.subscription_end > now:
+                            if not video.subscription_end or _ensure_utc(video.subscription_end) > now:
                                 return video
         except (ValueError, TypeError) as e:
             logger.warning("invalid_date_rule", error=str(e), date_rule=date_rule)
@@ -152,7 +167,7 @@ async def get_daily_cycle_video(rule: VideoRotationSchedule, check_date: date, d
         video = await db.get(Video, video_id)
         if video and video.is_active:
             now = datetime.now(timezone.utc)
-            if not video.subscription_end or video.subscription_end > now:
+            if not video.subscription_end or _ensure_utc(video.subscription_end) > now:
                 return video
     
     return None
@@ -172,7 +187,7 @@ async def get_weekly_cycle_video(rule: VideoRotationSchedule, check_date: date, 
         video = await db.get(Video, video_id)
         if video and video.is_active:
             now = datetime.now(timezone.utc)
-            if not video.subscription_end or video.subscription_end > now:
+            if not video.subscription_end or _ensure_utc(video.subscription_end) > now:
                 return video
     
     return None
@@ -189,7 +204,7 @@ async def get_random_daily_video(rule: VideoRotationSchedule, check_date: date, 
         video = await db.get(Video, video_id)
         if video and video.is_active:
             now = datetime.now(timezone.utc)
-            if not video.subscription_end or video.subscription_end > now:
+            if not video.subscription_end or _ensure_utc(video.subscription_end) > now:
                 videos.append(video)
     
     if not videos:
@@ -228,7 +243,7 @@ async def get_default_video(ar_content: ARContent, db: AsyncSession, now: dateti
     if ar_content.active_video_id:
         video = await db.get(Video, ar_content.active_video_id)
         if video and video.is_active:
-            if not video.subscription_end or video.subscription_end > now:
+            if not video.subscription_end or _ensure_utc(video.subscription_end) > now:
                 return video
     
     # Fallback to first active video
@@ -243,7 +258,7 @@ async def get_default_video(ar_content: ARContent, db: AsyncSession, now: dateti
     videos = list(result.scalars().all())
     
     for video in videos:
-        if not video.subscription_end or video.subscription_end > now:
+        if not video.subscription_end or _ensure_utc(video.subscription_end) > now:
             return video
     
     return None
@@ -270,8 +285,8 @@ async def get_next_rotation_video(ar_content: ARContent, db: AsyncSession, now: 
     
     # Filter out expired subscriptions
     active_videos = [
-        v for v in videos 
-        if not v.subscription_end or v.subscription_end > now
+        v for v in videos
+        if not v.subscription_end or _ensure_utc(v.subscription_end) > now
     ]
     
     if not active_videos:
@@ -383,7 +398,7 @@ async def get_active_video(ar_content_id: int, db: AsyncSession, override_date: 
         
         if video and video.is_active:
             now_check = datetime.now(timezone.utc)
-            if not video.subscription_end or video.subscription_end > now_check:
+            if not video.subscription_end or _ensure_utc(video.subscription_end) > now_check:
                 expires_in = compute_days_remaining(video, now)
                 return {
                     "video": video,
@@ -396,7 +411,7 @@ async def get_active_video(ar_content_id: int, db: AsyncSession, override_date: 
     if ar_content.active_video_id:
         video = await db.get(Video, ar_content.active_video_id)
         if video and video.is_active:
-            if not video.subscription_end or video.subscription_end > now:
+            if not video.subscription_end or _ensure_utc(video.subscription_end) > now:
                 expires_in = compute_days_remaining(video, now)
                 return {
                     "video": video,
@@ -428,7 +443,7 @@ async def get_active_video(ar_content_id: int, db: AsyncSession, override_date: 
     fallback_video = result_any.scalar_one_or_none()
     
     if fallback_video:
-        if not fallback_video.subscription_end or fallback_video.subscription_end > now:
+        if not fallback_video.subscription_end or _ensure_utc(fallback_video.subscription_end) > now:
             expires_in = compute_days_remaining(fallback_video, now)
             return {
                 "video": fallback_video,
