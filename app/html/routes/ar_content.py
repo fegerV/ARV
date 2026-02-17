@@ -903,20 +903,58 @@ async def ar_content_detail(
 
         marker_metadata = ar_content.get("marker_metadata") or {}
         if ar_content.get("photo_path") and not marker_metadata.get("image_quality"):
-            image_quality = marker_service.analyze_image_quality(ar_content.get("photo_path"))
-            if image_quality:
-                marker_metadata = {**marker_metadata, "image_quality": image_quality}
+            photo_path_raw = ar_content.get("photo_path")
+            local_analysis_path: str | None = None
+            tmp_file_to_delete: str | None = None
+
+            if str(photo_path_raw).startswith("yadisk://"):
+                # Download from Yandex Disk to a temporary file for analysis
                 try:
-                    ar_content_row = await db.get(ARContent, int(ar_content_id))
-                    if ar_content_row:
-                        ar_content_row.marker_metadata = {
-                            **(ar_content_row.marker_metadata or {}),
-                            "image_quality": image_quality,
-                        }
-                        await db.commit()
+                    from app.core.storage_providers import get_provider_for_company
+                    from app.models.company import Company
+                    import tempfile as _tmpmod
+
+                    company_row = await db.get(Company, ar_content.get("company_id"))
+                    if company_row:
+                        provider = await get_provider_for_company(company_row)
+                        relative = str(photo_path_raw)[len("yadisk://"):]
+                        suffix = Path(relative).suffix or ".jpg"
+                        fd, tmp_path = _tmpmod.mkstemp(suffix=suffix)
+                        import os
+                        os.close(fd)
+                        downloaded = await provider.get_file(relative, tmp_path)
+                        if downloaded:
+                            local_analysis_path = tmp_path
+                            tmp_file_to_delete = tmp_path
+                        else:
+                            os.unlink(tmp_path)
                 except Exception as exc:
-                    await db.rollback()
-                    logger.warning("marker_quality_persist_failed", error=str(exc))
+                    logger.warning("yadisk_download_for_analysis_failed", error=str(exc))
+            else:
+                local_analysis_path = photo_path_raw
+
+            if local_analysis_path:
+                image_quality = marker_service.analyze_image_quality(local_analysis_path)
+                if image_quality:
+                    marker_metadata = {**marker_metadata, "image_quality": image_quality}
+                    try:
+                        ar_content_row = await db.get(ARContent, int(ar_content_id))
+                        if ar_content_row:
+                            ar_content_row.marker_metadata = {
+                                **(ar_content_row.marker_metadata or {}),
+                                "image_quality": image_quality,
+                            }
+                            await db.commit()
+                    except Exception as exc:
+                        await db.rollback()
+                        logger.warning("marker_quality_persist_failed", error=str(exc))
+
+            if tmp_file_to_delete:
+                try:
+                    import os
+                    os.unlink(tmp_file_to_delete)
+                except OSError:
+                    pass
         if not ar_content.get("marker_url") and ar_content.get("marker_path"):
             marker_path_value = ar_content.get("marker_path")
             marker_path = Path(marker_path_value)
