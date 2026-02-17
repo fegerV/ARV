@@ -13,7 +13,7 @@
 
     <!-- SplashScreen API theme -->
     <style name="Theme.ArViewer.Splash" parent="Theme.SplashScreen">
-        <item name="windowSplashScreenBackground">@color/primary_dark</item>
+        <item name="windowSplashScreenBackground">@color/ic_launcher_background</item>
         <item name="windowSplashScreenAnimatedIcon">@drawable/ic_launcher</item>
         <item name="postSplashScreenTheme">@style/Theme.ArViewer</item>
     </style>

@@ -5,39 +5,57 @@
     android:background="@color/ar_background">
 
     <LinearLayout
-        android:layout_width="wrap_content"
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_gravity="center"
         android:gravity="center_horizontal"
         android:orientation="vertical"
-        android:padding="32dp">
+        android:paddingHorizontal="48dp"
+        android:paddingVertical="32dp">
 
+        <!-- App icon -->
+        <ImageView
+            android:layout_width="88dp"
+            android:layout_height="88dp"
+            android:src="@drawable/portal_ar_icon"
+            android:scaleType="fitCenter"
+            android:contentDescription="@string/app_name"
+            android:layout_marginBottom="40dp" />
+
+        <!-- Loading spinner -->
         <ProgressBar
             android:id="@+id/loading_spinner"
             style="?android:attr/progressBarStyleLarge"
-            android:layout_width="72dp"
-            android:layout_height="72dp"
+            android:layout_width="56dp"
+            android:layout_height="56dp"
             android:indeterminateTint="@color/ar_accent" />
 
+        <!-- Title: centered text -->
         <TextView
             android:id="@+id/text_loading_title"
-            android:layout_width="wrap_content"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="24dp"
+            android:layout_marginTop="28dp"
+            android:gravity="center"
+            android:textAlignment="center"
             android:text="@string/ar_loading_title"
             android:textColor="@color/ar_text_primary"
             android:textSize="20sp"
-            android:textStyle="bold" />
+            android:textStyle="bold"
+            android:lineSpacingMultiplier="1.2" />
 
+        <!-- Tip: centered, with constrained width -->
         <TextView
             android:id="@+id/text_loading_tip"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="16dp"
             android:gravity="center"
-            android:maxWidth="280dp"
+            android:textAlignment="center"
+            android:maxWidth="300dp"
             android:textColor="@color/ar_text_secondary"
-            android:textSize="14sp" />
+            android:textSize="14sp"
+            android:lineSpacingMultiplier="1.3" />
 
     </LinearLayout>
 
