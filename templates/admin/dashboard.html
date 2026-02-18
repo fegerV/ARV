@@ -1,8 +1,8 @@
 {% extends "base.html" %}
 
-{% block title %}Admin Dashboard - Vertex AR{% endblock %}
+{% block title %}Главная - Vertex AR Admin{% endblock %}
 
-{% block page_title %}Dashboard{% endblock %}
+{% block page_title %}Главная{% endblock %}
 
 {% block body %}
 <div class="p-6">
@@ -18,9 +18,9 @@
                         </svg>
                     </div>
                     <div class="flex-1">
-                        <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Companies</p>
+                        <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Компании</p>
                         <p class="text-2xl font-semibold text-gray-900 dark:text-white">{{ total_companies }}</p>
-                        <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">{{ active_companies }} active</p>
+                        <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">{{ active_companies }} активных</p>
                     </div>
                 </div>
             </a>
@@ -34,9 +34,9 @@
                         </svg>
                     </div>
                     <div class="flex-1">
-                        <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Projects</p>
+                        <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Проекты</p>
                         <p class="text-2xl font-semibold text-gray-900 dark:text-white">{{ total_projects }}</p>
-                        <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">{{ active_projects }} active</p>
+                        <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">{{ active_projects }} активных</p>
                     </div>
                 </div>
             </a>
@@ -50,9 +50,9 @@
                         </svg>
                     </div>
                     <div class="flex-1">
-                        <p class="text-sm font-medium text-gray-500 dark:text-gray-400">AR Content</p>
+                        <p class="text-sm font-medium text-gray-500 dark:text-gray-400">AR-контент</p>
                         <p class="text-2xl font-semibold text-gray-900 dark:text-white">{{ total_ar_content }}</p>
-                        <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">{{ active_ar_content }} active</p>
+                        <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">{{ active_ar_content }} активных</p>
                     </div>
                 </div>
             </a>
@@ -135,8 +135,8 @@
             <!-- Recent AR Content -->
             <div class="bg-white dark:bg-gray-900 rounded-lg shadow p-6">
                 <div class="flex items-center justify-between mb-4">
-                    <h2 class="text-lg font-semibold text-gray-900 dark:text-white">Recent AR Content</h2>
-                    <a href="/ar-content" class="text-sm text-indigo-600 hover:text-indigo-900 dark:text-indigo-400">View All</a>
+                    <h2 class="text-lg font-semibold text-gray-900 dark:text-white">Недавний AR-контент</h2>
+                    <a href="/ar-content" class="text-sm text-indigo-600 hover:text-indigo-900 dark:text-indigo-400">Все</a>
                 </div>
                 {% if recent_content|length > 0 %}
                 <div class="space-y-3">

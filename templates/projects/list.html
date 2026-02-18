@@ -54,7 +54,7 @@
                     x-model="filters.company"
                     @change="applyFilters"
                     class="form-select w-full">
-                    <option value="">All Companies</option>
+                    <option value="">Все компании</option>
                     {% for company in companies %}
                     <option value="{{ company.id }}">{{ company.name }}</option>
                     {% endfor %}

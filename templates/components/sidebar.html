@@ -77,14 +77,6 @@
                 </a>
             </li>
             <li>
-                <a href="/help" class="nav-item flex items-center p-2 rounded hover:bg-gray-700 dark:hover:bg-gray-700 group"
-                   :class="{'bg-gray-700': window.location.pathname === '/help'}"
-                   @click="$store.sidebar.closeMobile()">
-                    <span class="material-icons mr-3">help</span>
-                    <span class="sidebar-text">Справка</span>
-                </a>
-            </li>
-            <li>
                 <a href="/notifications" class="nav-item flex items-center p-2 rounded hover:bg-gray-700 dark:hover:bg-gray-700 group"
                    :class="{'bg-gray-700': window.location.pathname === '/notifications' || window.location.pathname.startsWith('/notifications/')}"
                    @click="$store.sidebar.closeMobile()">
@@ -98,6 +90,14 @@
                    @click="$store.sidebar.closeMobile()">
                     <span class="material-icons mr-3">settings</span>
                     <span class="sidebar-text">Настройки</span>
+                </a>
+            </li>
+            <li>
+                <a href="/help" class="nav-item flex items-center p-2 rounded hover:bg-gray-700 dark:hover:bg-gray-700 group"
+                   :class="{'bg-gray-700': window.location.pathname === '/help'}"
+                   @click="$store.sidebar.closeMobile()">
+                    <span class="material-icons mr-3">help</span>
+                    <span class="sidebar-text">Справка</span>
                 </a>
             </li>
         </ul>
