@@ -136,8 +136,16 @@ async def login_form(
         user.last_login_at = datetime.now(timezone.utc)
         await db.commit()
 
-        # Create JWT token with configured expiry
-        access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+        # Read session_timeout from DB settings (minutes); fallback to config
+        from app.services.settings_service import SettingsService
+        try:
+            _svc = SettingsService(db)
+            _all = await _svc.get_all_settings()
+            timeout_minutes = _all.security.session_timeout or settings.ACCESS_TOKEN_EXPIRE_MINUTES
+        except Exception:
+            timeout_minutes = settings.ACCESS_TOKEN_EXPIRE_MINUTES
+
+        access_token_expires = timedelta(minutes=timeout_minutes)
         access_token = create_access_token(
             data={"sub": user.email, "user_id": user.id},
             expires_delta=access_token_expires
@@ -145,7 +153,7 @@ async def login_form(
 
         logger.info("User login successful", user_id=user.id, email=user.email)
 
-        # Create response and set cookie (expires: max_age in seconds; omit expires for compatibility)
+        # Create response and set cookie
         response = RedirectResponse(url="/admin", status_code=303)
         response.set_cookie(
             key="access_token",

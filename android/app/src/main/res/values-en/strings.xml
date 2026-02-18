@@ -1,33 +1,72 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Portal AR</string>
+    <string name="app_description">Augmented reality viewer app.\nScan a QR code on a marker or enter the identifier manually.</string>
     <string name="splash_loading">Loading…</string>
-    <string name="unique_id_hint">Enter unique_id or open link</string>
+    <string name="unique_id_hint">Enter unique_id or paste a link</string>
     <string name="open">Open</string>
     <string name="enter_unique_id">Enter unique_id</string>
     <string name="loading_content">Loading content: %1$s</string>
     <string name="loading_content_short">Loading…</string>
     <string name="retry">Retry</string>
     <string name="error_invalid_unique_id">Invalid identifier</string>
+    <string name="error_invalid_link_format">Invalid link format.\nExpected: ar.neuroimagen.ru/view/ID</string>
+    <string name="error_qr_not_recognized">QR code does not contain an AR link</string>
     <string name="error_not_found">Content not found</string>
     <string name="error_subscription_expired">Subscription expired</string>
     <string name="error_content_not_active">Content unavailable</string>
     <string name="error_marker_not_available">Marker image unavailable</string>
     <string name="error_marker_still_generating">Marker is still being generated, try again later</string>
     <string name="error_no_playable_video">No playable video</string>
-    <string name="error_network">Network error. Check connection.</string>
-    <string name="error_network_hint">Open in phone browser: https://ar.neuroimagen.ru — if it does not load, the server is unreachable (different network or server down).</string>
+    <string name="error_network">Network error. Check your connection.</string>
+    <string name="error_network_hint">Open in your phone\'s browser: https://ar.neuroimagen.ru — if it doesn\'t load, the server is unreachable (different Wi‑Fi, no internet, or server is down).</string>
     <string name="error_server">Server error (%1$d)</string>
     <string name="error_unknown">Unknown error</string>
+    <string name="error_camera_required">Camera access is required for AR. Grant permission in app settings.</string>
+    <string name="error_arcore_required">ARCore is required. Install it from the Play Store.</string>
+    <string name="error_arcore_session">Failed to start AR session. Try restarting the app.</string>
+    <string name="error_marker_quality">Marker image is not suitable for AR tracking.\n\nAutomatic recognition works best with photos containing sharp details and high contrast.\n\nTry uploading a different photo in your account.</string>
+    <string name="error_video_playback">Video playback error: %1$s</string>
+    <string name="error_microphone_required">Microphone access is required for recording with sound</string>
+
+    <!-- Device compatibility errors -->
+    <string name="error_device_not_supported">Your device does not support augmented reality (ARCore).\n\nA device from the Google ARCore supported list is required:\nhttps://developers.google.com/ar/devices</string>
+    <string name="error_arcore_install_requested">Google Play Services for AR is required.\n\nThe installation page will open — after installing, return to the app and try again.</string>
+    <string name="error_arcore_user_declined">You declined the ARCore installation.\n\nGoogle Play Services for AR is required for augmented reality. Install it from the Play Store and try again.</string>
+    <string name="error_arcore_sdk_too_old">Your Android version is too old for ARCore.\n\nUpdate your system to Android 7.0 (Nougat) or newer in device settings.</string>
+    <string name="error_ar_title">Failed to launch AR</string>
+    <string name="ar_error_go_back">Back</string>
+
+    <!-- AR loading screen -->
     <string name="ar_scene_placeholder">Portal to AR (loading…)</string>
     <string name="ar_loading_title">Opening the portal to augmented reality…</string>
-    <string name="error_camera_required">Camera access is required for AR. Grant it in app settings.</string>
-    <string name="error_arcore_required">ARCore required. Install from Play Store.</string>
-    <string name="error_arcore_session">Failed to start AR. Check device support.</string>
-    <string name="error_marker_quality">Marker image is not suitable for AR tracking.\n\nAutomatic recognition works best with photos containing sharp details and high contrast.\n\nTry uploading a different photo in your account.</string>
-    <string name="capture_photo">Photo</string>
+    <string-array name="ar_loading_tips">
+        <item>Ensure good lighting</item>
+        <item>Hold the camera steady</item>
+        <item>Point at the marker from 20–40 cm away</item>
+        <item>Avoid glare on the image</item>
+        <item>The marker must be fully visible</item>
+        <item>Don\'t shake the phone while aiming</item>
+    </string-array>
+
+    <!-- Photo / Video -->
+    <string name="capture_photo">Capture</string>
     <string name="photo_saved">Photo saved</string>
     <string name="photo_save_failed">Failed to save photo</string>
-    <string name="record_video">Record video</string>
-    <string name="record_video_coming_soon">Video recording coming in next version</string>
+    <string name="record_video">Record</string>
+    <string name="record_video_coming_soon">Video recording will be available in the next version</string>
+    <string name="stop_recording">Stop</string>
+    <string name="video_saved">Video saved to gallery</string>
+    <string name="video_save_failed">Failed to save video</string>
+
+    <!-- Main screen -->
+    <string name="open_from_file">Load QR from gallery</string>
+    <string name="qr_not_found_in_image">QR code not found in the image</string>
+
+    <!-- QR Scanner -->
+    <string name="scan_qr">Scan QR</string>
+    <string name="qr_scan_hint">Point your camera at the QR code</string>
+    <string name="close">Close</string>
+    <string name="camera_permission_required">Camera access is required to scan QR codes</string>
+    <string name="camera_error">Failed to start the camera</string>
 </resources>

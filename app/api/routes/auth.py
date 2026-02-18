@@ -248,9 +248,17 @@ async def login(
     user.last_login_at = datetime.utcnow()
     await db.commit()
     
-    # Create JWT token with configured expiry
+    # Read session_timeout from DB settings (minutes); fallback to config
     settings = get_settings()
-    access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+    try:
+        from app.services.settings_service import SettingsService
+        _svc = SettingsService(db)
+        _all = await _svc.get_all_settings()
+        timeout_minutes = _all.security.session_timeout or settings.ACCESS_TOKEN_EXPIRE_MINUTES
+    except Exception:
+        timeout_minutes = settings.ACCESS_TOKEN_EXPIRE_MINUTES
+
+    access_token_expires = timedelta(minutes=timeout_minutes)
     access_token = create_access_token(
         data={"sub": user.email, "user_id": user.id},
         expires_delta=access_token_expires
@@ -350,9 +358,17 @@ async def login_form(
     user.last_login_at = datetime.utcnow()
     await db.commit()
     
-    # Create JWT token with configured expiry
+    # Read session_timeout from DB settings (minutes); fallback to config
     settings = get_settings()
-    access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+    try:
+        from app.services.settings_service import SettingsService
+        _svc = SettingsService(db)
+        _all = await _svc.get_all_settings()
+        _timeout = _all.security.session_timeout or settings.ACCESS_TOKEN_EXPIRE_MINUTES
+    except Exception:
+        _timeout = settings.ACCESS_TOKEN_EXPIRE_MINUTES
+
+    access_token_expires = timedelta(minutes=_timeout)
     access_token = create_access_token(
         data={"sub": user.email, "user_id": user.id},
         expires_delta=access_token_expires

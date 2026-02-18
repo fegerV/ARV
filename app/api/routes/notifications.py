@@ -249,3 +249,40 @@ async def test_notification(email: str, chat_id: str, background_tasks: Backgrou
             "Vertex AR test message",
         )
     return {"status": "queued"}
+
+
+@router.post("/test-telegram")
+async def test_telegram_from_settings(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """Send a test Telegram message using bot token and chat ID from DB settings."""
+    from app.services.settings_service import SettingsService
+
+    svc = SettingsService(db)
+    all_settings = await svc.get_all_settings()
+    bot_token = all_settings.notifications.telegram_bot_token
+    chat_id = all_settings.notifications.telegram_admin_chat_id
+
+    if not bot_token or not chat_id:
+        raise HTTPException(status_code=400, detail="Bot Token и Chat ID должны быть заполнены")
+
+    try:
+        async with httpx.AsyncClient(timeout=10) as client:
+            resp = await client.post(
+                f"https://api.telegram.org/bot{bot_token}/sendMessage",
+                json={
+                    "chat_id": chat_id,
+                    "text": "✅ <b>Vertex AR</b> — тестовое сообщение.\nУведомления работают!",
+                    "parse_mode": "HTML",
+                },
+            )
+        if resp.status_code == 200:
+            return {"status": "ok", "detail": "Сообщение отправлено"}
+        body = resp.json()
+        raise HTTPException(
+            status_code=502,
+            detail=body.get("description", f"Telegram API вернул {resp.status_code}"),
+        )
+    except httpx.HTTPError as exc:
+        raise HTTPException(status_code=502, detail=f"Ошибка подключения к Telegram: {exc}")

@@ -47,6 +47,22 @@
             <span class="material-icons text-lg">view_in_ar</span>
             AR-контент
         </button>
+        <button @click="activeTab = 'notifications'"
+                :class="activeTab === 'notifications'
+                    ? 'bg-blue-600 text-white shadow-sm'
+                    : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700'"
+                class="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium whitespace-nowrap transition-all">
+            <span class="material-icons text-lg">notifications</span>
+            Уведомления
+        </button>
+        <button @click="activeTab = 'storage'"
+                :class="activeTab === 'storage'
+                    ? 'bg-blue-600 text-white shadow-sm'
+                    : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700'"
+                class="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium whitespace-nowrap transition-all">
+            <span class="material-icons text-lg">cloud</span>
+            Хранение
+        </button>
         <button @click="activeTab = 'backup'"
                 :class="activeTab === 'backup'
                     ? 'bg-blue-600 text-white shadow-sm'
@@ -266,6 +282,164 @@
         </div>
     </div>
 
+    <!-- ===================== УВЕДОМЛЕНИЯ ===================== -->
+    <div x-show="activeTab === 'notifications'" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0 translate-y-1" x-transition:enter-end="opacity-100 translate-y-0">
+        <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
+            <div class="px-6 py-5 border-b border-gray-200 dark:border-gray-700">
+                <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Уведомления</h3>
+                <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">Email и Telegram-уведомления о событиях платформы</p>
+            </div>
+
+            <form method="post" action="/settings/notifications" class="p-6 space-y-6">
+                <!-- Email section -->
+                <div class="space-y-4">
+                    <div class="flex items-center gap-3 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-xl border border-blue-200 dark:border-blue-800">
+                        <input id="email_enabled" name="email_enabled" type="checkbox"
+                               {% if settings.notifications.email_enabled %}checked{% endif %}
+                               value="on"
+                               class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
+                        <label for="email_enabled" class="text-sm">
+                            <span class="font-medium text-gray-900 dark:text-white">Email-уведомления</span>
+                            <span class="text-gray-500 dark:text-gray-400 block text-xs mt-0.5">Отправка уведомлений по электронной почте</span>
+                        </label>
+                    </div>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                        <div>
+                            <label for="smtp_host" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">SMTP-сервер</label>
+                            <input type="text" name="smtp_host" id="smtp_host"
+                                   value="{{ settings.notifications.smtp_host or '' }}"
+                                   class="form-input" placeholder="smtp.gmail.com">
+                        </div>
+                        <div>
+                            <label for="smtp_port" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">SMTP-порт</label>
+                            <input type="number" name="smtp_port" id="smtp_port"
+                                   value="{{ settings.notifications.smtp_port|default(587) }}"
+                                   min="1" max="65535" class="form-input">
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                        <div>
+                            <label for="smtp_username" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">SMTP логин</label>
+                            <input type="text" name="smtp_username" id="smtp_username"
+                                   value="{{ settings.notifications.smtp_username or '' }}"
+                                   class="form-input" placeholder="user@gmail.com">
+                        </div>
+                        <div>
+                            <label for="smtp_from_email" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Email отправителя</label>
+                            <input type="email" name="smtp_from_email" id="smtp_from_email"
+                                   value="{{ settings.notifications.smtp_from_email|default('noreply@vertexar.com') }}"
+                                   class="form-input">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Divider -->
+                <div class="border-t border-gray-200 dark:border-gray-700"></div>
+
+                <!-- Telegram section -->
+                <div class="space-y-4">
+                    <div class="flex items-center gap-3 p-4 bg-sky-50 dark:bg-sky-900/20 rounded-xl border border-sky-200 dark:border-sky-800">
+                        <input id="telegram_enabled" name="telegram_enabled" type="checkbox"
+                               {% if settings.notifications.telegram_enabled %}checked{% endif %}
+                               value="on"
+                               class="h-4 w-4 text-sky-600 focus:ring-sky-500 border-gray-300 rounded">
+                        <label for="telegram_enabled" class="text-sm">
+                            <span class="font-medium text-gray-900 dark:text-white">Telegram-уведомления</span>
+                            <span class="text-gray-500 dark:text-gray-400 block text-xs mt-0.5">Отправка уведомлений через Telegram-бота</span>
+                        </label>
+                    </div>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                        <div>
+                            <label for="telegram_bot_token" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Bot Token</label>
+                            <input type="text" name="telegram_bot_token" id="telegram_bot_token"
+                                   value="{{ settings.notifications.telegram_bot_token or '' }}"
+                                   class="form-input font-mono text-sm" placeholder="123456:ABC-DEF...">
+                            <p class="text-xs text-gray-400 dark:text-gray-500 mt-1">Получите у <a href="https://t.me/BotFather" target="_blank" class="text-blue-500 hover:underline">@BotFather</a></p>
+                        </div>
+                        <div>
+                            <label for="telegram_admin_chat_id" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Chat ID администратора</label>
+                            <input type="text" name="telegram_admin_chat_id" id="telegram_admin_chat_id"
+                                   value="{{ settings.notifications.telegram_admin_chat_id or '' }}"
+                                   class="form-input font-mono text-sm" placeholder="-1001234567890">
+                            <p class="text-xs text-gray-400 dark:text-gray-500 mt-1">Узнайте через <a href="https://t.me/userinfobot" target="_blank" class="text-blue-500 hover:underline">@userinfobot</a></p>
+                        </div>
+                    </div>
+
+                    <button type="button" @click="testTelegram()" :disabled="telegramTesting"
+                            class="inline-flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-lg border border-sky-300 dark:border-sky-700 text-sky-700 dark:text-sky-300 hover:bg-sky-50 dark:hover:bg-sky-900/30 transition-colors">
+                        <span class="material-icons text-base" :class="telegramTesting && 'animate-spin'"
+                              x-text="telegramTesting ? 'refresh' : 'send'"></span>
+                        <span x-text="telegramTesting ? 'Отправка...' : 'Отправить тестовое сообщение'"></span>
+                    </button>
+                </div>
+
+                <div class="flex flex-col sm:flex-row justify-end gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
+                    <button type="button" onclick="window.location.reload()" class="btn btn-secondary w-full sm:w-auto">Отмена</button>
+                    <button type="submit" class="btn btn-primary w-full sm:w-auto">
+                        <span class="material-icons text-sm mr-1">save</span>Сохранить
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- ===================== ХРАНЕНИЕ ===================== -->
+    <div x-show="activeTab === 'storage'" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0 translate-y-1" x-transition:enter-end="opacity-100 translate-y-0">
+        <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
+            <div class="px-6 py-5 border-b border-gray-200 dark:border-gray-700">
+                <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Хранение файлов</h3>
+                <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">Настройки хранилища, лимиты файлов и CDN</p>
+            </div>
+
+            <form method="post" action="/settings/storage" class="p-6 space-y-6">
+                <div>
+                    <label for="default_storage" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Хранилище по умолчанию</label>
+                    <select id="default_storage" name="default_storage" class="form-select">
+                        <option value="local" {% if settings.storage.default_storage == 'local' %}selected{% endif %}>Локальное</option>
+                        <option value="yandex_disk" {% if settings.storage.default_storage == 'yandex_disk' %}selected{% endif %}>Яндекс Диск</option>
+                    </select>
+                    <p class="text-xs text-gray-400 dark:text-gray-500 mt-1">Яндекс Диск настраивается через профиль компании</p>
+                </div>
+
+                <div>
+                    <label for="max_file_size" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Макс. размер файла (МБ)</label>
+                    <input type="number" name="max_file_size" id="max_file_size"
+                           value="{{ settings.storage.max_file_size|default(100) }}"
+                           min="1" max="500" class="form-input">
+                    <p class="text-xs text-gray-400 dark:text-gray-500 mt-1">Применяется к фото и видео при загрузке</p>
+                </div>
+
+                <div class="flex items-center gap-3 p-4 bg-purple-50 dark:bg-purple-900/20 rounded-xl border border-purple-200 dark:border-purple-800">
+                    <input id="cdn_enabled" name="cdn_enabled" type="checkbox"
+                           {% if settings.storage.cdn_enabled %}checked{% endif %}
+                           value="on"
+                           class="h-4 w-4 text-purple-600 focus:ring-purple-500 border-gray-300 rounded">
+                    <label for="cdn_enabled" class="text-sm">
+                        <span class="font-medium text-gray-900 dark:text-white">CDN</span>
+                        <span class="text-gray-500 dark:text-gray-400 block text-xs mt-0.5">Раздача статических файлов через CDN</span>
+                    </label>
+                </div>
+
+                <div>
+                    <label for="cdn_url" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">URL CDN</label>
+                    <input type="url" name="cdn_url" id="cdn_url"
+                           value="{{ settings.storage.cdn_url or '' }}"
+                           class="form-input" placeholder="https://cdn.example.com">
+                </div>
+
+                <div class="flex flex-col sm:flex-row justify-end gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
+                    <button type="button" onclick="window.location.reload()" class="btn btn-secondary w-full sm:w-auto">Отмена</button>
+                    <button type="submit" class="btn btn-primary w-full sm:w-auto">
+                        <span class="material-icons text-sm mr-1">save</span>Сохранить
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <!-- ===================== БЭКАПЫ ===================== -->
     <div x-show="activeTab === 'backup'" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0 translate-y-1" x-transition:enter-end="opacity-100 translate-y-0">
 
@@ -441,9 +615,10 @@ function settingsPage() {
         activeTab: '{{ active_section|default("general") }}',
         backupSchedule: '{{ settings.backup.backup_schedule|default("daily") }}',
         backupRunning: false,
+        telegramTesting: false,
         init() {
             const hash = window.location.hash.substring(1);
-            if (['general', 'security', 'ar', 'backup'].includes(hash)) {
+            if (['general', 'security', 'ar', 'notifications', 'storage', 'backup'].includes(hash)) {
                 this.activeTab = hash;
             }
             this.$watch('activeTab', (val) => {
@@ -474,6 +649,23 @@ function settingsPage() {
                 if (window.showToast) window.showToast('Ошибка сети', 'error');
             } finally {
                 setTimeout(() => { this.backupRunning = false; }, 3000);
+            }
+        },
+        async testTelegram() {
+            if (this.telegramTesting) return;
+            this.telegramTesting = true;
+            try {
+                const resp = await (window.csrfFetch || fetch)('/api/notifications/test-telegram', { method: 'POST' });
+                const data = await resp.json();
+                if (resp.ok) {
+                    if (window.showToast) window.showToast('Тестовое сообщение отправлено', 'success');
+                } else {
+                    if (window.showToast) window.showToast(data.detail || 'Ошибка отправки', 'error');
+                }
+            } catch (err) {
+                if (window.showToast) window.showToast('Ошибка сети', 'error');
+            } finally {
+                setTimeout(() => { this.telegramTesting = false; }, 2000);
             }
         }
     };

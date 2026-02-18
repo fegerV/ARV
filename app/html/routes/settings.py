@@ -1,6 +1,6 @@
 """HTML routes for the Settings page.
 
-Sections: general, security, ar, backup.
+Sections: general, security, ar, notifications, storage, backup.
 """
 
 from typing import Optional
@@ -15,7 +15,10 @@ from app.api.routes.auth import get_current_user_optional
 from app.html.deps import get_html_db
 from app.html.filters import datetime_format
 from app.models.company import Company
-from app.schemas.settings import ARSettings, BackupSettings, GeneralSettings, SecuritySettings
+from app.schemas.settings import (
+    ARSettings, BackupSettings, GeneralSettings, NotificationSettings,
+    SecuritySettings, StorageSettings,
+)
 from app.services.backup_service import BackupService
 from app.services.settings_service import SettingsService
 
@@ -338,4 +341,101 @@ async def update_backup_settings(
             request, db, current_user,
             active_section="backup",
             error_message="Не удалось сохранить настройки бэкапов",
+        )
+
+
+# ---------------------------------------------------------------------------
+# POST  /settings/notifications
+# ---------------------------------------------------------------------------
+
+@router.post("/settings/notifications")
+async def update_notification_settings(
+    request: Request,
+    current_user=Depends(get_current_user_optional),
+    db: AsyncSession = Depends(get_html_db),
+    email_enabled: str = Form("off"),
+    smtp_host: str = Form(""),
+    smtp_port: int = Form(587),
+    smtp_username: str = Form(""),
+    smtp_from_email: str = Form("noreply@vertexar.com"),
+    telegram_enabled: str = Form("off"),
+    telegram_bot_token: str = Form(""),
+    telegram_admin_chat_id: str = Form(""),
+):
+    """Save notification settings."""
+    redirect = _require_active_user(current_user)
+    if redirect:
+        return redirect
+
+    settings_service = SettingsService(db)
+    try:
+        await settings_service.update_notification_settings(
+            NotificationSettings(
+                email_enabled=(email_enabled == "on"),
+                smtp_host=smtp_host.strip() or None,
+                smtp_port=smtp_port,
+                smtp_username=smtp_username.strip() or None,
+                smtp_from_email=smtp_from_email.strip(),
+                telegram_enabled=(telegram_enabled == "on"),
+                telegram_bot_token=telegram_bot_token.strip() or None,
+                telegram_admin_chat_id=telegram_admin_chat_id.strip() or None,
+            )
+        )
+        return await _render_settings(
+            request, db, current_user,
+            active_section="notifications",
+            success_message="Настройки уведомлений сохранены",
+        )
+    except Exception as exc:
+        logger.error("Error updating notification settings: %s", exc)
+        return await _render_settings(
+            request, db, current_user,
+            active_section="notifications",
+            error_message="Не удалось сохранить настройки уведомлений",
+        )
+
+
+# ---------------------------------------------------------------------------
+# POST  /settings/storage
+# ---------------------------------------------------------------------------
+
+@router.post("/settings/storage")
+async def update_storage_settings(
+    request: Request,
+    current_user=Depends(get_current_user_optional),
+    db: AsyncSession = Depends(get_html_db),
+    default_storage: str = Form("local"),
+    max_file_size: int = Form(100),
+    cdn_enabled: str = Form("off"),
+    cdn_url: str = Form(""),
+):
+    """Save storage settings."""
+    redirect = _require_active_user(current_user)
+    if redirect:
+        return redirect
+
+    settings_service = SettingsService(db)
+    try:
+        current = await settings_service.get_all_settings()
+        await settings_service.update_storage_settings(
+            StorageSettings(
+                default_storage=default_storage,
+                max_file_size=max(1, max_file_size),
+                cdn_enabled=(cdn_enabled == "on"),
+                cdn_url=cdn_url.strip() or None,
+                backup_enabled=current.storage.backup_enabled,
+                backup_retention_days=current.storage.backup_retention_days,
+            )
+        )
+        return await _render_settings(
+            request, db, current_user,
+            active_section="storage",
+            success_message="Настройки хранения сохранены",
+        )
+    except Exception as exc:
+        logger.error("Error updating storage settings: %s", exc)
+        return await _render_settings(
+            request, db, current_user,
+            active_section="storage",
+            error_message="Не удалось сохранить настройки хранения",
         )

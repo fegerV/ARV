@@ -17,7 +17,9 @@ from uuid import UUID
 
 from app.core.config import settings
 from app.core.database import seed_defaults
+from app.middleware.maintenance import MaintenanceModeMiddleware
 from app.middleware.rate_limiter import setup_rate_limiting
+from app.middleware.site_context import SiteContextMiddleware
 
 
 # Configure structured logging
@@ -185,6 +187,12 @@ app.add_middleware(
     GZipMiddleware,
     minimum_size=500,
 )
+
+# Maintenance mode — returns 503 for public routes when enabled in settings
+app.add_middleware(MaintenanceModeMiddleware)
+
+# Inject site_title from DB settings into request.state for templates
+app.add_middleware(SiteContextMiddleware)
 
 
 # ── X-Request-ID middleware (request tracing) ────────────────────────
