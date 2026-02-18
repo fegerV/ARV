@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 
-{% block title %}Analytics - Vertex AR Admin{% endblock %}
-{% block page_title %}Analytics{% endblock %}
+{% block title %}Аналитика - Vertex AR Admin{% endblock %}
+{% block page_title %}Аналитика{% endblock %}
 
 {% block content %}
 <script src="https://cdn.jsdelivr.net/npm/apexcharts@3.49.0/dist/apexcharts.min.js"></script>
@@ -15,9 +15,9 @@
 
     {# ── Period filter ─────────────────────────────────────────────────── #}
     <div class="flex flex-wrap items-center gap-2 mb-6">
-        <span class="text-sm text-gray-500 dark:text-gray-400 mr-1">Period:</span>
+        <span class="text-sm text-gray-500 dark:text-gray-400 mr-1">Период:</span>
         {% set period = analytics_data.period|default(30) %}
-        {% for p, label in [(7,'7 days'),(30,'30 days'),(90,'90 days'),(0,'All time')] %}
+        {% for p, label in [(7,'7 дней'),(30,'30 дней'),(90,'90 дней'),(0,'Всё время')] %}
         <a href="/analytics?period={{ p }}"
            class="px-3 py-1.5 rounded-lg text-sm font-medium transition-colors
                   {% if period == p %}
@@ -39,7 +39,7 @@
                     <span class="material-icons text-lg">visibility</span>
                 </div>
                 <div class="min-w-0">
-                    <p class="text-xs text-gray-500 dark:text-gray-400 truncate">Total Views</p>
+                    <p class="text-xs text-gray-500 dark:text-gray-400 truncate">Всего просмотров</p>
                     <p class="text-lg font-bold text-gray-900 dark:text-white">{{ analytics_data.total_views|default(0) }}</p>
                 </div>
             </div>
@@ -51,7 +51,7 @@
                     <span class="material-icons text-lg">people</span>
                 </div>
                 <div class="min-w-0">
-                    <p class="text-xs text-gray-500 dark:text-gray-400 truncate">Unique Sessions</p>
+                    <p class="text-xs text-gray-500 dark:text-gray-400 truncate">Уникальных сессий</p>
                     <p class="text-lg font-bold text-gray-900 dark:text-white">{{ analytics_data.unique_sessions|default(0) }}</p>
                 </div>
             </div>
@@ -63,7 +63,7 @@
                     <span class="material-icons text-lg">view_in_ar</span>
                 </div>
                 <div class="min-w-0">
-                    <p class="text-xs text-gray-500 dark:text-gray-400 truncate">Active Content</p>
+                    <p class="text-xs text-gray-500 dark:text-gray-400 truncate">Активный контент</p>
                     <p class="text-lg font-bold text-gray-900 dark:text-white">{{ analytics_data.active_content|default(0) }}</p>
                 </div>
             </div>
@@ -75,7 +75,7 @@
                     <span class="material-icons text-lg">timer</span>
                 </div>
                 <div class="min-w-0">
-                    <p class="text-xs text-gray-500 dark:text-gray-400 truncate">Avg Duration</p>
+                    <p class="text-xs text-gray-500 dark:text-gray-400 truncate">Средняя длительность</p>
                     <p class="text-lg font-bold text-gray-900 dark:text-white">{{ analytics_data.avg_duration|default(0) }} s</p>
                 </div>
             </div>
@@ -87,7 +87,7 @@
                     <span class="material-icons text-lg">play_circle</span>
                 </div>
                 <div class="min-w-0">
-                    <p class="text-xs text-gray-500 dark:text-gray-400 truncate">Video Play Rate</p>
+                    <p class="text-xs text-gray-500 dark:text-gray-400 truncate">Доля просмотра видео</p>
                     <p class="text-lg font-bold text-gray-900 dark:text-white">{{ analytics_data.video_play_rate|default(0) }}%</p>
                 </div>
             </div>
@@ -99,7 +99,7 @@
                     <span class="material-icons text-lg">inventory</span>
                 </div>
                 <div class="min-w-0">
-                    <p class="text-xs text-gray-500 dark:text-gray-400 truncate">Total Content</p>
+                    <p class="text-xs text-gray-500 dark:text-gray-400 truncate">Всего контента</p>
                     <p class="text-lg font-bold text-gray-900 dark:text-white">{{ analytics_data.total_content|default(0) }}</p>
                 </div>
             </div>
@@ -110,7 +110,7 @@
     <div class="card mb-6">
         <h3 class="text-base font-semibold text-gray-900 dark:text-white mb-4">
             <span class="material-icons text-sm align-middle mr-1">show_chart</span>
-            Views over time
+            Просмотры по дням
         </h3>
         <div id="chart-views" class="w-full" style="min-height:280px"></div>
     </div>
@@ -123,21 +123,21 @@
             <div class="card">
                 <h3 class="text-base font-semibold text-gray-900 dark:text-white mb-4">
                     <span class="material-icons text-sm align-middle mr-1">devices</span>
-                    Devices
+                    Устройства
                 </h3>
                 <div id="chart-devices" class="w-full" style="min-height:250px"></div>
                 {% if not analytics_data.device_stats %}
-                <p class="text-gray-400 dark:text-gray-500 text-center text-sm py-4">No data</p>
+                <p class="text-gray-400 dark:text-gray-500 text-center text-sm py-4">Нет данных</p>
                 {% endif %}
             </div>
             <div class="card">
                 <h3 class="text-base font-semibold text-gray-900 dark:text-white mb-4">
                     <span class="material-icons text-sm align-middle mr-1">public</span>
-                    Browsers
+                    Браузеры
                 </h3>
                 <div id="chart-browsers" class="w-full" style="min-height:250px"></div>
                 {% if not analytics_data.browser_stats %}
-                <p class="text-gray-400 dark:text-gray-500 text-center text-sm py-4">No data</p>
+                <p class="text-gray-400 dark:text-gray-500 text-center text-sm py-4">Нет данных</p>
                 {% endif %}
             </div>
         </div>
@@ -146,7 +146,7 @@
         <div class="card">
             <h3 class="text-base font-semibold text-gray-900 dark:text-white mb-4">
                 <span class="material-icons text-sm align-middle mr-1">star</span>
-                Top Content
+                Топ контента
             </h3>
             {% if analytics_data.top_content %}
             <div class="overflow-x-auto">
@@ -154,9 +154,9 @@
                     <thead>
                         <tr>
                             <th class="text-left">#</th>
-                            <th class="text-left">Order</th>
-                            <th class="text-left">Company</th>
-                            <th class="text-right">Views</th>
+                            <th class="text-left">Заказ</th>
+                            <th class="text-left">Компания</th>
+                            <th class="text-right">Просмотры</th>
                             <th></th>
                         </tr>
                     </thead>
@@ -170,7 +170,7 @@
                             <td>
                                 <a href="/ar-content/{{ item.id }}"
                                    class="text-indigo-600 hover:text-indigo-800 dark:text-indigo-400 text-xs">
-                                    View
+                                    Открыть
                                 </a>
                             </td>
                         </tr>
@@ -179,7 +179,7 @@
                 </table>
             </div>
             {% else %}
-            <p class="text-gray-400 dark:text-gray-500 text-center py-8">No view data yet</p>
+            <p class="text-gray-400 dark:text-gray-500 text-center py-8">Пока нет данных о просмотрах</p>
             {% endif %}
         </div>
     </div>
@@ -188,18 +188,18 @@
     <div class="card">
         <h3 class="text-base font-semibold text-gray-900 dark:text-white mb-4">
             <span class="material-icons text-sm align-middle mr-1">business</span>
-            Stats by Company
+            Статистика по компаниям
         </h3>
         {% if analytics_data.company_stats %}
         <div class="overflow-x-auto">
             <table class="table text-sm">
                 <thead>
                     <tr>
-                        <th class="text-left">Company</th>
-                        <th class="text-right">Views</th>
-                        <th class="text-right">Sessions</th>
-                        <th class="text-right">Avg Duration</th>
-                        <th class="text-right">Video Rate</th>
+                        <th class="text-left">Компания</th>
+                        <th class="text-right">Просмотры</th>
+                        <th class="text-right">Сессии</th>
+                        <th class="text-right">Сред. длительность</th>
+                        <th class="text-right">Видео %</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -232,7 +232,7 @@
             </table>
         </div>
         {% else %}
-        <p class="text-gray-400 dark:text-gray-500 text-center py-8">No company data yet</p>
+        <p class="text-gray-400 dark:text-gray-500 text-center py-8">Пока нет данных по компаниям</p>
         {% endif %}
     </div>
 </div>
@@ -270,7 +270,7 @@ function analyticsPage() {
                     fontFamily: 'inherit',
                     foreColor: fg,
                 },
-                series: [{ name: 'Views', data: series }],
+                series: [{ name: 'Просмотры', data: series }],
                 xaxis: {
                     categories,
                     labels: {
@@ -349,7 +349,7 @@ function analyticsPage() {
                                 show: true,
                                 total: {
                                     show: true,
-                                    label: 'Total',
+                                    label: 'Всего',
                                     color: fg,
                                 },
                             },

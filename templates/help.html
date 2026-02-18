@@ -1,0 +1,123 @@
+{% extends "base.html" %}
+
+{% block title %}Справка - Vertex AR Admin{% endblock %}
+{% block page_title %}Справка{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto px-4">
+    <p class="text-gray-500 dark:text-gray-400 mb-8">
+        Документация по работе с платформой Vertex AR: как создавать AR-контент, настраивать компании и проекты, просматривать аналитику.
+    </p>
+
+    {# ── Навигация по разделам ───────────────────────────────────────── #}
+    <nav class="mb-10 p-4 bg-gray-50 dark:bg-gray-800/50 rounded-xl border border-gray-200 dark:border-gray-700">
+        <h2 class="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">Содержание</h2>
+        <ul class="space-y-1.5 text-sm">
+            <li><a href="#how-it-works" class="text-indigo-600 dark:text-indigo-400 hover:underline">Как работает платформа</a></li>
+            <li><a href="#getting-started" class="text-indigo-600 dark:text-indigo-400 hover:underline">С чего начать</a></li>
+            <li><a href="#ar-content" class="text-indigo-600 dark:text-indigo-400 hover:underline">Создание AR-контента</a></li>
+            <li><a href="#tips" class="text-indigo-600 dark:text-indigo-400 hover:underline">Советы по маркерам и видео</a></li>
+            <li><a href="#faq" class="text-indigo-600 dark:text-indigo-400 hover:underline">Частые вопросы (FAQ)</a></li>
+        </ul>
+    </nav>
+
+    {# ── Как работает платформа ─────────────────────────────────────── #}
+    <section id="how-it-works" class="mb-10">
+        <h2 class="text-xl font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+            <span class="material-icons text-indigo-500">info</span>
+            Как работает платформа
+        </h2>
+        <div class="prose dark:prose-invert max-w-none text-gray-700 dark:text-gray-300 space-y-3">
+            <p>
+                Платформа позволяет создавать <strong>AR-контент</strong>: пользователь наводит камеру телефона на печатное изображение (маркер), и на нём воспроизводится видео в дополненной реальности.
+            </p>
+            <p>
+                <strong>Структура:</strong> Компании → Проекты → AR-контент. У каждой компании могут быть проекты, в каждом проекте — несколько единиц AR-контента (заказов). Для каждого заказа загружаются фото (маркер) и видео; система генерирует AR-маркер и QR-код для открытия в мобильном приложении.
+            </p>
+            <p>
+                Просмотр происходит через мобильное приложение <strong>Portal AR</strong>: пользователь сканирует QR-код или переходит по ссылке, наводит камеру на маркер — и видит видео поверх изображения.
+            </p>
+        </div>
+    </section>
+
+    {# ── С чего начать ───────────────────────────────────────────────── #}
+    <section id="getting-started" class="mb-10">
+        <h2 class="text-xl font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+            <span class="material-icons text-green-500">play_circle</span>
+            С чего начать
+        </h2>
+        <ol class="list-decimal list-inside space-y-3 text-gray-700 dark:text-gray-300">
+            <li><strong>Создайте компанию</strong> (раздел «Компании» → «Создать»). Укажите название и при необходимости подключите Яндекс.Диск для хранения файлов.</li>
+            <li><strong>Создайте проект</strong> в этой компании (раздел «Проекты»). Проект группирует AR-контент (например, одна рекламная кампания или один заказчик).</li>
+            <li><strong>Добавьте AR-контент</strong> (раздел «AR Content» → «Создать»): выберите компанию и проект, укажите данные заказчика, загрузите фото (будущий маркер) и видео. После сохранения система сгенерирует маркер и QR-код.</li>
+            <li>Распечатайте маркер и QR-код, раздайте клиентам. Они открывают ссылку в приложении Portal AR и наводят камеру на маркер.</li>
+        </ol>
+    </section>
+
+    {# ── Создание AR-контента ────────────────────────────────────────── #}
+    <section id="ar-content" class="mb-10">
+        <h2 class="text-xl font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+            <span class="material-icons text-purple-500">view_in_ar</span>
+            Создание AR-контента
+        </h2>
+        <div class="space-y-3 text-gray-700 dark:text-gray-300">
+            <p>В форме создания/редактирования AR-контента:</p>
+            <ul class="list-disc list-inside space-y-1">
+                <li><strong>Фото маркера</strong> — изображение, которое пользователь будет наводить камерой. Чем чётче детали и контраст, тем стабильнее распознавание. После загрузки отображаются метрики качества (рекомендации по улучшению при необходимости).</li>
+                <li><strong>Видео</strong> — воспроизводится поверх маркера в AR. Поддерживаются форматы MP4, WebM.</li>
+                <li>После сохранения создаётся <strong>уникальная ссылка</strong> и <strong>QR-код</strong>. Их можно скачать и печатать на материалах.</li>
+                <li>В разделе <strong>«Аналитика»</strong> можно смотреть просмотры по контенту и по компаниям.</li>
+            </ul>
+        </div>
+    </section>
+
+    {# ── Советы ──────────────────────────────────────────────────────── #}
+    <section id="tips" class="mb-10">
+        <h2 class="text-xl font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+            <span class="material-icons text-amber-500">lightbulb</span>
+            Советы по маркерам и видео
+        </h2>
+        <ul class="space-y-2 text-gray-700 dark:text-gray-300">
+            <li>• Используйте фото с <strong>чёткими границами и контрастом</strong> (избегайте размытых или однотонных картинок).</li>
+            <li>• Хорошее освещение при съёмке маркера улучшает распознавание.</li>
+            <li>• Размещайте маркер на ровной поверхности; пользователь должен держать телефон на расстоянии 20–40 см.</li>
+            <li>• Видео лучше сжимать до разумного размера — быстрее загрузка в приложении.</li>
+            <li>• Если приложение пишет «изображение маркера не подходит» — загрузите другое фото с большим количеством деталей.</li>
+        </ul>
+    </section>
+
+    {# ── FAQ ──────────────────────────────────────────────────────────── #}
+    <section id="faq" class="mb-10">
+        <h2 class="text-xl font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+            <span class="material-icons text-blue-500">help</span>
+            Частые вопросы (FAQ)
+        </h2>
+        <div class="space-y-6">
+            <div class="border-l-4 border-indigo-500 pl-4">
+                <h3 class="font-medium text-gray-900 dark:text-white">Как пользователь открывает AR?</h3>
+                <p class="text-sm text-gray-600 dark:text-gray-400 mt-1">По ссылке из QR-кода или введённой вручную. Нужно приложение Portal AR (Android). После открытия ссылки приложение загружает контент; затем пользователь наводит камеру на распечатанный маркер.</p>
+            </div>
+            <div class="border-l-4 border-indigo-500 pl-4">
+                <h3 class="font-medium text-gray-900 dark:text-white">Почему AR не запускается на телефоне?</h3>
+                <p class="text-sm text-gray-600 dark:text-gray-400 mt-1">Устройство должно поддерживать ARCore (список на сайте Google). Если приложение пишет, что «изображение маркера не подходит» — замените фото маркера на более контрастное и детализированное.</p>
+            </div>
+            <div class="border-l-4 border-indigo-500 pl-4">
+                <h3 class="font-medium text-gray-900 dark:text-white">Где хранятся файлы?</h3>
+                <p class="text-sm text-gray-600 dark:text-gray-400 mt-1">По умолчанию — на сервере платформы. Для компании можно включить хранение на Яндекс.Диске (настраивается в профиле компании).</p>
+            </div>
+            <div class="border-l-4 border-indigo-500 pl-4">
+                <h3 class="font-medium text-gray-900 dark:text-white">Что такое «режим обслуживания»?</h3>
+                <p class="text-sm text-gray-600 dark:text-gray-400 mt-1">В настройках можно включить режим обслуживания — тогда публичные страницы (просмотр AR) будут возвращать сообщение «Платформа на обслуживании». Вход в админку и настройки остаётся доступным.</p>
+            </div>
+            <div class="border-l-4 border-indigo-500 pl-4">
+                <h3 class="font-medium text-gray-900 dark:text-white">Куда приходят уведомления?</h3>
+                <p class="text-sm text-gray-600 dark:text-gray-400 mt-1">В разделе «Настройки» → «Уведомления» можно настроить Email (SMTP) и Telegram-бота. После настройки тестовое сообщение в Telegram можно отправить кнопкой «Отправить тестовое сообщение». Критические алерты (проблемы со здоровьем сервиса) приходят в указанный чат.</p>
+            </div>
+        </div>
+    </section>
+
+    <p class="text-sm text-gray-500 dark:text-gray-400 pt-4 border-t border-gray-200 dark:border-gray-700">
+        По вопросам работы платформы: support@neuroimagen.ru
+    </p>
+</div>
+{% endblock %}

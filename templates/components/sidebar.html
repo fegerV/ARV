@@ -33,7 +33,7 @@
                    :class="{'bg-gray-700': window.location.pathname === '/admin' || window.location.pathname.startsWith('/admin/')}"
                    @click="$store.sidebar.closeMobile()">
                     <span class="material-icons mr-3">dashboard</span>
-                    <span class="sidebar-text">Dashboard</span>
+                    <span class="sidebar-text">Главная</span>
                 </a>
             </li>
             <li>
@@ -41,7 +41,7 @@
                    :class="{'bg-gray-700': window.location.pathname === '/companies' || window.location.pathname.startsWith('/companies/')}"
                    @click="$store.sidebar.closeMobile()">
                     <span class="material-icons mr-3">business</span>
-                    <span class="sidebar-text">Companies</span>
+                    <span class="sidebar-text">Компании</span>
                 </a>
             </li>
             <li>
@@ -49,7 +49,7 @@
                    :class="{'bg-gray-700': window.location.pathname === '/projects' || window.location.pathname.startsWith('/projects/')}"
                    @click="$store.sidebar.closeMobile()">
                     <span class="material-icons mr-3">folder</span>
-                    <span class="sidebar-text">Projects</span>
+                    <span class="sidebar-text">Проекты</span>
                 </a>
             </li>
             <li>
@@ -57,7 +57,7 @@
                    :class="{'bg-gray-700': window.location.pathname === '/ar-content' || window.location.pathname.startsWith('/ar-content/')}"
                    @click="$store.sidebar.closeMobile()">
                     <span class="material-icons mr-3">view_in_ar</span>
-                    <span class="sidebar-text">AR Content</span>
+                    <span class="sidebar-text">AR-контент</span>
                 </a>
             </li>
             <li>
@@ -65,7 +65,7 @@
                    :class="{'bg-gray-700': window.location.pathname === '/storage' || window.location.pathname.startsWith('/storage/')}"
                    @click="$store.sidebar.closeMobile()">
                     <span class="material-icons mr-3">storage</span>
-                    <span class="sidebar-text">Storage</span>
+                    <span class="sidebar-text">Хранилище</span>
                 </a>
             </li>
             <li>
@@ -73,7 +73,15 @@
                    :class="{'bg-gray-700': window.location.pathname === '/analytics' || window.location.pathname.startsWith('/analytics/')}"
                    @click="$store.sidebar.closeMobile()">
                     <span class="material-icons mr-3">analytics</span>
-                    <span class="sidebar-text">Analytics</span>
+                    <span class="sidebar-text">Аналитика</span>
+                </a>
+            </li>
+            <li>
+                <a href="/help" class="nav-item flex items-center p-2 rounded hover:bg-gray-700 dark:hover:bg-gray-700 group"
+                   :class="{'bg-gray-700': window.location.pathname === '/help'}"
+                   @click="$store.sidebar.closeMobile()">
+                    <span class="material-icons mr-3">help</span>
+                    <span class="sidebar-text">Справка</span>
                 </a>
             </li>
             <li>
@@ -81,7 +89,7 @@
                    :class="{'bg-gray-700': window.location.pathname === '/notifications' || window.location.pathname.startsWith('/notifications/')}"
                    @click="$store.sidebar.closeMobile()">
                     <span class="material-icons mr-3">notifications</span>
-                    <span class="sidebar-text">Notifications</span>
+                    <span class="sidebar-text">Уведомления</span>
                 </a>
             </li>
             <li>
@@ -89,7 +97,7 @@
                    :class="{'bg-gray-700': window.location.pathname === '/settings' || window.location.pathname.startsWith('/settings/')}"
                    @click="$store.sidebar.closeMobile()">
                     <span class="material-icons mr-3">settings</span>
-                    <span class="sidebar-text">Settings</span>
+                    <span class="sidebar-text">Настройки</span>
                 </a>
             </li>
         </ul>
