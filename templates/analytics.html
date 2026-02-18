@@ -3,8 +3,12 @@
 {% block title %}Аналитика - Vertex AR Admin{% endblock %}
 {% block page_title %}Аналитика{% endblock %}
 
+{% block extra_head %}
+{# ApexCharts без defer, чтобы к моменту x-init Alpine он был уже определён #}
+<script src="https://cdn.jsdelivr.net/npm/apexcharts@3.49.0/dist/apexcharts.min.js"></script>
+{% endblock %}
+
 {% block content %}
-<script defer src="https://cdn.jsdelivr.net/npm/apexcharts@3.49.0/dist/apexcharts.min.js"></script>
 
 {# --- JSON data blocks for JS ------------------------------------------ #}
 <script type="application/json" id="views-by-day">{{ analytics_data.views_by_day | tojson }}</script>
@@ -233,6 +237,10 @@ function analyticsPage() {
         charts: [],
 
         initCharts() {
+            if (typeof ApexCharts === 'undefined') {
+                setTimeout(() => this.initCharts(), 150);
+                return;
+            }
             const isDark = document.documentElement.classList.contains('dark');
             const fg = isDark ? '#e5e7eb' : '#374151';
             const grid = isDark ? '#374151' : '#e5e7eb';
