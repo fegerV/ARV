@@ -21,6 +21,27 @@
             </div>
             {% endif %}
 
+            {% if step_2fa %}
+            <p class="mb-4 text-sm text-gray-600 dark:text-gray-400">Код из 6 цифр отправлен в Telegram. Введите его ниже.</p>
+            <form class="space-y-6" action="/admin/login-2fa" method="post">
+                <input type="hidden" name="pending_2fa_token" value="{{ pending_2fa_token }}">
+                <div>
+                    <label for="code" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Код</label>
+                    <input id="code" name="code" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="6" autocomplete="one-time-code"
+                           placeholder="000000"
+                           class="block w-full px-4 py-3 text-center text-xl tracking-[0.5em] border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent sm:text-sm dark:bg-gray-700 dark:text-white">
+                </div>
+                <div class="pt-2">
+                    <button type="submit"
+                            class="w-full flex justify-center items-center py-3 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors">
+                        Подтвердить
+                    </button>
+                </div>
+                <p class="text-center">
+                    <a href="/admin/login" class="text-sm text-indigo-600 hover:text-indigo-500 dark:text-indigo-400">Вернуться к вводу пароля</a>
+                </p>
+            </form>
+            {% else %}
             <form class="space-y-6" action="/admin/login-form" method="post">
                 <div>
                     <label for="email" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
@@ -67,6 +88,7 @@
                     </button>
                 </div>
             </form>
+            {% endif %}
         </div>
     </div>
 </div>

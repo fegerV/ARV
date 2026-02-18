@@ -256,19 +256,23 @@ async def test_telegram_from_settings(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
 ):
-    """Send a test Telegram message using bot token and chat ID from DB settings."""
+    """Send a test Telegram message using bot token and chat ID from DB settings.
+    Always returns 200 with status/detail so the UI can show the result without 502."""
     from app.services.settings_service import SettingsService
 
-    svc = SettingsService(db)
-    all_settings = await svc.get_all_settings()
-    bot_token = all_settings.notifications.telegram_bot_token
-    chat_id = all_settings.notifications.telegram_admin_chat_id
+    try:
+        svc = SettingsService(db)
+        all_settings = await svc.get_all_settings()
+        bot_token = (all_settings.notifications.telegram_bot_token or "").strip()
+        chat_id = (all_settings.notifications.telegram_admin_chat_id or "").strip()
+    except Exception as e:
+        return {"status": "error", "detail": f"Ошибка загрузки настроек: {e}"}
 
     if not bot_token or not chat_id:
-        raise HTTPException(status_code=400, detail="Bot Token и Chat ID должны быть заполнены")
+        return {"status": "error", "detail": "Заполните Bot Token и Chat ID в настройках уведомлений"}
 
     try:
-        async with httpx.AsyncClient(timeout=10) as client:
+        async with httpx.AsyncClient(timeout=15.0) as client:
             resp = await client.post(
                 f"https://api.telegram.org/bot{bot_token}/sendMessage",
                 json={
@@ -279,10 +283,15 @@ async def test_telegram_from_settings(
             )
         if resp.status_code == 200:
             return {"status": "ok", "detail": "Сообщение отправлено"}
-        body = resp.json()
-        raise HTTPException(
-            status_code=502,
-            detail=body.get("description", f"Telegram API вернул {resp.status_code}"),
-        )
+        try:
+            body = resp.json()
+            msg = body.get("description", f"Код {resp.status_code}")
+        except Exception:
+            msg = f"Telegram API вернул {resp.status_code}"
+        return {"status": "error", "detail": msg}
+    except httpx.TimeoutException:
+        return {"status": "error", "detail": "Таймаут при обращении к Telegram"}
     except httpx.HTTPError as exc:
-        raise HTTPException(status_code=502, detail=f"Ошибка подключения к Telegram: {exc}")
+        return {"status": "error", "detail": f"Ошибка подключения: {exc!s}"}
+    except Exception as exc:
+        return {"status": "error", "detail": str(exc)}

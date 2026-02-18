@@ -130,20 +130,60 @@ async def login_form(
         return templates.TemplateResponse("admin/login.html", context)
     
     try:
-        # Reset login attempts on successful login
+        # Reset login attempts on successful password check
         user.login_attempts = 0
         user.locked_until = None
         user.last_login_at = datetime.now(timezone.utc)
         await db.commit()
 
-        # Read session_timeout from DB settings (minutes); fallback to config
         from app.services.settings_service import SettingsService
+        _all = None
         try:
             _svc = SettingsService(db)
             _all = await _svc.get_all_settings()
             timeout_minutes = _all.security.session_timeout or settings.ACCESS_TOKEN_EXPIRE_MINUTES
         except Exception:
-            timeout_minutes = settings.ACCESS_TOKEN_EXPIRE_MINUTES
+            timeout_minutes = getattr(settings, "ACCESS_TOKEN_EXPIRE_MINUTES", 60)
+
+        # Если включена 2FA — генерируем код, шлём в Telegram, показываем форму ввода кода
+        if getattr(_all.security, "require_2fa", False):
+            import uuid
+            import json
+            from app.core.redis import redis_client
+            code = f"{__import__('secrets').randbelow(10**6):06d}"
+            pending_token = str(uuid.uuid4())
+            redis_key = f"2fa:pending:{pending_token}"
+            await redis_client.set(
+                redis_key,
+                json.dumps({"user_id": user.id, "email": user.email, "code": code}),
+                ex=300,
+            )
+            chat_id = (getattr(_all.security, "telegram_2fa_chat_id", None) or "455847500").strip()
+            bot_token = getattr(_all.notifications, "telegram_bot_token", None) or getattr(settings, "TELEGRAM_BOT_TOKEN", None)
+            if bot_token and chat_id:
+                try:
+                    import httpx
+                    async with httpx.AsyncClient() as client:
+                        await client.post(
+                            f"https://api.telegram.org/bot{bot_token}/sendMessage",
+                            json={
+                                "chat_id": chat_id,
+                                "text": f"🔐 Код для входа в Vertex AR Admin: {code}\nДействует 5 минут.",
+                                "disable_web_page_preview": True,
+                            },
+                            timeout=10.0,
+                        )
+                except Exception as send_err:
+                    logger.warning("2fa_telegram_send_failed", error=str(send_err))
+            return templates.TemplateResponse(
+                "admin/login.html",
+                {
+                    "request": request,
+                    "error": None,
+                    "step_2fa": True,
+                    "pending_2fa_token": pending_token,
+                },
+            )
 
         access_token_expires = timedelta(minutes=timeout_minutes)
         access_token = create_access_token(
@@ -153,12 +193,12 @@ async def login_form(
 
         logger.info("User login successful", user_id=user.id, email=user.email)
 
-        # Create response and set cookie
+        # Create response and set cookie (max_age в секундах = длительность сессии в минутах * 60)
         response = RedirectResponse(url="/admin", status_code=303)
         response.set_cookie(
             key="access_token",
             value=access_token,
-            max_age=3600,
+            max_age=timeout_minutes * 60,
             path="/",
             secure=settings.is_production,
             httponly=True,
@@ -171,6 +211,110 @@ async def login_form(
             "admin/login.html",
             {"request": request, "error": f"Ошибка при входе: {e!s}"},
         )
+
+
+@router.post("/admin/login-2fa", response_class=HTMLResponse)
+async def login_2fa_verify(
+    request: Request,
+    pending_2fa_token: str = Form(...),
+    code: str = Form(...),
+    db: AsyncSession = Depends(get_db),
+):
+    """Проверка кода 2FA и установка сессии."""
+    from app.api.routes.auth import create_access_token
+    from datetime import timedelta, timezone
+    from sqlalchemy import select
+    from app.models.user import User
+    from app.core.redis import redis_client
+    from app.services.settings_service import SettingsService
+    import json
+    import structlog
+
+    logger = structlog.get_logger()
+    code = (code or "").strip().replace(" ", "")
+    if len(code) != 6 or not code.isdigit():
+        return templates.TemplateResponse(
+            "admin/login.html",
+            {
+                "request": request,
+                "error": "Введите 6 цифр кода",
+                "step_2fa": True,
+                "pending_2fa_token": pending_2fa_token,
+            },
+        )
+
+    redis_key = f"2fa:pending:{pending_2fa_token}"
+    try:
+        raw = await redis_client.get(redis_key)
+    except Exception as e:
+        logger.warning("2fa_redis_get_error", error=str(e))
+        return templates.TemplateResponse(
+            "admin/login.html",
+            {"request": request, "error": "Ошибка проверки кода. Попробуйте войти снова."},
+        )
+
+    if not raw:
+        return templates.TemplateResponse(
+            "admin/login.html",
+            {"request": request, "error": "Код истёк или неверен. Выполните вход заново."},
+        )
+
+    try:
+        data = json.loads(raw)
+    except (json.JSONDecodeError, TypeError):
+        await redis_client.delete(redis_key)
+        return templates.TemplateResponse(
+            "admin/login.html",
+            {"request": request, "error": "Ошибка данных. Выполните вход заново."},
+        )
+
+    if data.get("code") != code:
+        return templates.TemplateResponse(
+            "admin/login.html",
+            {
+                "request": request,
+                "error": "Неверный код",
+                "step_2fa": True,
+                "pending_2fa_token": pending_2fa_token,
+            },
+        )
+
+    user_id = data.get("user_id")
+    result = await db.execute(select(User).where(User.id == user_id))
+    user = result.scalar_one_or_none()
+    if not user or not user.is_active:
+        await redis_client.delete(redis_key)
+        return templates.TemplateResponse(
+            "admin/login.html",
+            {"request": request, "error": "Пользователь не найден или заблокирован."},
+        )
+
+    await redis_client.delete(redis_key)
+
+    try:
+        _svc = SettingsService(db)
+        _all = await _svc.get_all_settings()
+        timeout_minutes = _all.security.session_timeout or getattr(settings, "ACCESS_TOKEN_EXPIRE_MINUTES", 60)
+    except Exception:
+        timeout_minutes = getattr(settings, "ACCESS_TOKEN_EXPIRE_MINUTES", 60)
+
+    access_token = create_access_token(
+        data={"sub": user.email, "user_id": user.id},
+        expires_delta=timedelta(minutes=timeout_minutes),
+    )
+    logger.info("User login successful (2FA)", user_id=user.id, email=user.email)
+
+    response = RedirectResponse(url="/admin", status_code=303)
+    response.set_cookie(
+        key="access_token",
+        value=access_token,
+        max_age=timeout_minutes * 60,
+        path="/",
+        secure=settings.is_production,
+        httponly=True,
+        samesite="lax",
+    )
+    return response
 
 
 @router.get("/", response_class=RedirectResponse)

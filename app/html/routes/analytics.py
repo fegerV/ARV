@@ -8,6 +8,7 @@ duration and video play rate.  All queries accept a configurable
 
 from __future__ import annotations
 
+import asyncio
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
@@ -83,94 +84,159 @@ async def get_analytics_data(db: AsyncSession, period: int = _DEFAULT_PERIOD) ->
                 return stmt.where(ARViewSession.created_at >= since)
             return stmt
 
-        # --- Summary counts ---------------------------------------------------
-
+        # --- Summary counts (total_views first — fallback depends on it) -------
         total_views = (
             await db.execute(
                 _time_filter(select(func.count()).select_from(ARViewSession))
             )
         ).scalar() or 0
-
-        # Fallback: if no ARViewSession records exist, use SUM(views_count) from ARContent
         if total_views == 0:
-            fallback_views = (
+            total_views = (
                 await db.execute(
                     select(func.coalesce(func.sum(ARContent.views_count), 0))
                 )
             ).scalar() or 0
-            total_views = fallback_views
 
-        try:
-            unique_sessions = (
-                await db.execute(
-                    _time_filter(
-                        select(func.count(distinct(ARViewSession.session_id))).select_from(ARViewSession)
-                    )
+        async def _scalar(stmt):
+            r = await db.execute(stmt)
+            return r.scalar() or 0
+
+        async def _scalar_float(stmt):
+            r = await db.execute(stmt)
+            v = r.scalar()
+            return round(float(v), 1) if v is not None else 0
+
+        # Параллельный запуск всех независимых запросов
+        (
+            unique_sessions,
+            active_content,
+            total_content,
+            active_companies,
+            active_projects,
+            avg_duration,
+            video_total,
+            video_played,
+            views_day_rows,
+            top_rows,
+            company_rows,
+            device_rows,
+            browser_rows,
+        ) = await asyncio.gather(
+            _scalar(
+                _time_filter(
+                    select(func.count(distinct(ARViewSession.session_id))).select_from(ARViewSession)
                 )
-            ).scalar() or 0
-        except Exception:
-            unique_sessions = int(total_views * 0.7) if total_views else 0
-
-        # Fallback for unique sessions
-        if unique_sessions == 0 and total_views > 0:
-            unique_sessions = total_views
-
-        active_content = (
-            await db.execute(
+            ),
+            _scalar(
                 select(func.count()).select_from(ARContent).where(
                     ARContent.status.in_(["ready", "active"])
                 )
-            )
-        ).scalar() or 0
-
-        total_content = (
-            await db.execute(select(func.count()).select_from(ARContent))
-        ).scalar() or 0
-
-        active_companies = (
-            await db.execute(
+            ),
+            _scalar(select(func.count()).select_from(ARContent)),
+            _scalar(
                 select(func.count()).select_from(Company).where(Company.status == "active")
-            )
-        ).scalar() or 0
-
-        active_projects = (
-            await db.execute(
+            ),
+            _scalar(
                 select(func.count()).select_from(Project).where(Project.status == "active")
-            )
-        ).scalar() or 0
-
-        # --- Average duration & video play rate --------------------------------
-
-        duration_q = _time_filter(
-            select(func.avg(ARViewSession.duration_seconds)).select_from(ARViewSession)
+            ),
+            _scalar_float(
+                _time_filter(
+                    select(func.avg(ARViewSession.duration_seconds)).select_from(ARViewSession)
+                )
+            ),
+            _scalar(_time_filter(select(func.count()).select_from(ARViewSession))),
+            _scalar(
+                _time_filter(
+                    select(func.count()).select_from(ARViewSession).where(
+                        ARViewSession.video_played.is_(True)
+                    )
+                )
+            ),
+            db.execute(
+                _time_filter(
+                    select(
+                        cast(ARViewSession.created_at, Date).label("day"),
+                        func.count().label("cnt"),
+                    )
+                    .select_from(ARViewSession)
+                    .group_by(cast(ARViewSession.created_at, Date))
+                    .order_by(cast(ARViewSession.created_at, Date))
+                )
+            ),
+            db.execute(
+                _time_filter(
+                    select(
+                        ARViewSession.ar_content_id,
+                        func.count().label("views"),
+                    )
+                    .select_from(ARViewSession)
+                    .group_by(ARViewSession.ar_content_id)
+                    .order_by(func.count().desc())
+                    .limit(10)
+                )
+            ),
+            db.execute(
+                _time_filter(
+                    select(
+                        ARViewSession.company_id,
+                        func.count().label("views"),
+                        func.count(distinct(ARViewSession.session_id)).label("sessions"),
+                        func.avg(ARViewSession.duration_seconds).label("avg_dur"),
+                        func.sum(
+                            case(
+                                (ARViewSession.video_played.is_(True), 1),
+                                else_=0,
+                            )
+                        ).label("vp_count"),
+                    )
+                    .select_from(ARViewSession)
+                    .group_by(ARViewSession.company_id)
+                    .order_by(func.count().desc())
+                )
+            ),
+            db.execute(
+                _time_filter(
+                    select(
+                        func.coalesce(ARViewSession.device_type, literal_column("'unknown'")).label("dtype"),
+                        func.count().label("cnt"),
+                    )
+                    .select_from(ARViewSession)
+                    .group_by(func.coalesce(ARViewSession.device_type, literal_column("'unknown'")))
+                    .order_by(func.count().desc())
+                )
+            ),
+            db.execute(
+                _time_filter(
+                    select(
+                        func.coalesce(ARViewSession.browser, literal_column("'unknown'")).label("bname"),
+                        func.count().label("cnt"),
+                    )
+                    .select_from(ARViewSession)
+                    .group_by(func.coalesce(ARViewSession.browser, literal_column("'unknown'")))
+                    .order_by(func.count().desc())
+                    .limit(8)
+                )
+            ),
         )
-        avg_duration = (await db.execute(duration_q)).scalar()
-        avg_duration = round(float(avg_duration), 1) if avg_duration else 0
 
-        video_total_q = _time_filter(
-            select(func.count()).select_from(ARViewSession)
+        try:
+            unique_sessions = int(unique_sessions)
+        except (TypeError, ValueError):
+            unique_sessions = int(total_views * 0.7) if total_views else 0
+        if unique_sessions == 0 and total_views > 0:
+            unique_sessions = total_views
+
+        video_play_rate = (
+            round(int(video_played) / int(video_total) * 100, 1) if video_total and int(video_total) > 0 else 0
         )
-        video_played_q = _time_filter(
-            select(func.count()).select_from(ARViewSession).where(
-                ARViewSession.video_played.is_(True)
-            )
-        )
-        video_total = (await db.execute(video_total_q)).scalar() or 0
-        video_played = (await db.execute(video_played_q)).scalar() or 0
-        video_play_rate = round(video_played / video_total * 100, 1) if video_total > 0 else 0
 
-        # --- Views by day (time-series) ----------------------------------------
+        views_day_rows = views_day_rows.all()
+        top_rows = top_rows.all()
+        company_rows = company_rows.all()
+        device_rows = device_rows.all()
+        browser_rows = browser_rows.all()
 
-        day_col = cast(ARViewSession.created_at, Date).label("day")
-        views_day_q = (
-            _time_filter(
-                select(day_col, func.count().label("cnt")).select_from(ARViewSession)
-            )
-            .group_by(day_col)
-            .order_by(day_col)
-        )
-        views_day_rows = (await db.execute(views_day_q)).all()
-
+        # --- Views by day (time-series, from parallel result) ------------------
         # Build a continuous date range so the chart has no gaps
         days_count = period if period > 0 else (
             (now.date() - views_day_rows[0][0]).days + 1 if views_day_rows else 30
@@ -181,22 +247,7 @@ async def get_analytics_data(db: AsyncSession, period: int = _DEFAULT_PERIOD) ->
             d = (now - timedelta(days=days_count - 1 - i)).date()
             views_by_day.append({"date": str(d), "views": date_map.get(str(d), 0)})
 
-        # --- Top-10 content ----------------------------------------------------
-
-        top_q = (
-            _time_filter(
-                select(
-                    ARViewSession.ar_content_id,
-                    func.count().label("views"),
-                )
-                .select_from(ARViewSession)
-            )
-            .group_by(ARViewSession.ar_content_id)
-            .order_by(func.count().desc())
-            .limit(10)
-        )
-        top_rows = (await db.execute(top_q)).all()
-
+        # --- Top-10 content (from parallel result) -----------------------------
         top_content: list[dict[str, Any]] = []
         if top_rows:
             content_ids = [r[0] for r in top_rows]
@@ -242,29 +293,7 @@ async def get_analytics_data(db: AsyncSession, period: int = _DEFAULT_PERIOD) ->
                     "views": row[2] or 0,
                 })
 
-        # --- Company stats -----------------------------------------------------
-
-        company_q = (
-            _time_filter(
-                select(
-                    ARViewSession.company_id,
-                    func.count().label("views"),
-                    func.count(distinct(ARViewSession.session_id)).label("sessions"),
-                    func.avg(ARViewSession.duration_seconds).label("avg_dur"),
-                    func.sum(
-                        case(
-                            (ARViewSession.video_played.is_(True), 1),
-                            else_=0,
-                        )
-                    ).label("vp_count"),
-                )
-                .select_from(ARViewSession)
-            )
-            .group_by(ARViewSession.company_id)
-            .order_by(func.count().desc())
-        )
-        company_rows = (await db.execute(company_q)).all()
-
+        # --- Company stats (from parallel result) ------------------------------
         company_stats: list[dict[str, Any]] = []
         if company_rows:
             cids = [r[0] for r in company_rows]
@@ -305,31 +334,8 @@ async def get_analytics_data(db: AsyncSession, period: int = _DEFAULT_PERIOD) ->
                     "video_rate": 0,
                 })
 
-        # --- Device type distribution ------------------------------------------
-
-        dtype_col = func.coalesce(ARViewSession.device_type, literal_column("'unknown'")).label("dtype")
-        device_q = (
-            _time_filter(
-                select(dtype_col, func.count().label("cnt")).select_from(ARViewSession)
-            )
-            .group_by(dtype_col)
-            .order_by(func.count().desc())
-        )
-        device_rows = (await db.execute(device_q)).all()
+        # --- Device & browser (from parallel result) ---------------------------
         device_stats = [{"label": r[0] or "unknown", "value": r[1]} for r in device_rows]
-
-        # --- Browser distribution ----------------------------------------------
-
-        bname_col = func.coalesce(ARViewSession.browser, literal_column("'unknown'")).label("bname")
-        browser_q = (
-            _time_filter(
-                select(bname_col, func.count().label("cnt")).select_from(ARViewSession)
-            )
-            .group_by(bname_col)
-            .order_by(func.count().desc())
-            .limit(8)
-        )
-        browser_rows = (await db.execute(browser_q)).all()
         browser_stats = [{"label": r[0] or "unknown", "value": r[1]} for r in browser_rows]
 
         return {

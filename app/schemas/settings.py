@@ -58,6 +58,7 @@ class SecuritySettings(BaseModel):
     password_min_length: int = 8
     session_timeout: int = 60
     require_2fa: bool = False
+    telegram_2fa_chat_id: Optional[str] = "455847500"
     max_login_attempts: int = 5
     lockout_duration: int = 300
     api_rate_limit: int = 100

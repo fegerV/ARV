@@ -199,8 +199,16 @@
                            class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
                     <label for="require_2fa" class="text-sm">
                         <span class="font-medium text-gray-900 dark:text-white">Двухфакторная аутентификация</span>
-                        <span class="text-gray-500 dark:text-gray-400 block text-xs mt-0.5">Обязательная 2FA для всех администраторов</span>
+                        <span class="text-gray-500 dark:text-gray-400 block text-xs mt-0.5">Код из 6 цифр отправляется в Telegram админа</span>
                     </label>
+                </div>
+                <div>
+                    <label for="telegram_2fa_chat_id" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Telegram ID для кодов 2FA</label>
+                    <input type="text" name="telegram_2fa_chat_id" id="telegram_2fa_chat_id"
+                           value="{{ settings.security.telegram_2fa_chat_id|default('455847500') }}"
+                           placeholder="455847500"
+                           class="form-input max-w-xs">
+                    <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Числовой ID чата Telegram, куда присылать одноразовый код</p>
                 </div>
 
                 <div class="flex flex-col sm:flex-row justify-end gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
@@ -364,7 +372,7 @@
                             <input type="text" name="telegram_admin_chat_id" id="telegram_admin_chat_id"
                                    value="{{ settings.notifications.telegram_admin_chat_id or '' }}"
                                    class="form-input font-mono text-sm" placeholder="-1001234567890">
-                            <p class="text-xs text-gray-400 dark:text-gray-500 mt-1">Узнайте через <a href="https://t.me/userinfobot" target="_blank" class="text-blue-500 hover:underline">@userinfobot</a></p>
+                            <p class="text-xs text-gray-400 dark:text-gray-500 mt-1">Узнайте через <a href="https://t.me/userinfobot" target="_blank" class="text-blue-500 hover:underline">@userinfobot</a>. Если тест вернёт «chat not found» — сначала напишите боту в Telegram команду /start.</p>
                         </div>
                     </div>
 
@@ -657,8 +665,8 @@ function settingsPage() {
             try {
                 const resp = await (window.csrfFetch || fetch)('/api/notifications/test-telegram', { method: 'POST' });
                 const data = await resp.json();
-                if (resp.ok) {
-                    if (window.showToast) window.showToast('Тестовое сообщение отправлено', 'success');
+                if (resp.ok && data.status === 'ok') {
+                    if (window.showToast) window.showToast(data.detail || 'Тестовое сообщение отправлено', 'success');
                 } else {
                     if (window.showToast) window.showToast(data.detail || 'Ошибка отправки', 'error');
                 }

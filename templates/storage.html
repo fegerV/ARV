@@ -86,42 +86,66 @@
     {% endif %}
 
     <!-- Хранилище по компаниям -->
-    <div class="card">
-        <h3 class="text-lg font-semibold mb-5 text-gray-900 dark:text-white">Хранилище по компаниям</h3>
+    <div class="card overflow-hidden">
+        <h3 class="text-lg font-semibold mb-5 text-gray-900 dark:text-white flex items-center gap-2">
+            <span class="material-icons text-xl text-gray-600 dark:text-gray-400">business</span>
+            Хранилище по компаниям
+        </h3>
         {% if storage_info.companies|default([])|length > 0 %}
-        <div class="overflow-x-auto -mx-1">
-            <table class="table">
-                <thead>
+        <div class="overflow-x-auto rounded-xl border border-gray-200 dark:border-gray-600">
+            <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-600">
+                <thead class="bg-gray-50 dark:bg-gray-700/60">
                     <tr>
-                        <th class="pl-4">Компания</th>
-                        <th>Хранилище</th>
-                        <th>Занято</th>
-                        <th>Файлы</th>
-                        <th>Проекты</th>
-                        <th class="pr-4">Действия</th>
+                        <th scope="col" class="py-3.5 pl-5 pr-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wider">
+                            Компания
+                        </th>
+                        <th scope="col" class="py-3.5 px-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wider">
+                            Хранилище
+                        </th>
+                        <th scope="col" class="py-3.5 px-3 text-right text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wider">
+                            Занято
+                        </th>
+                        <th scope="col" class="py-3.5 px-3 text-right text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wider">
+                            Файлы
+                        </th>
+                        <th scope="col" class="py-3.5 px-3 text-right text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wider">
+                            Проекты
+                        </th>
+                        <th scope="col" class="py-3.5 pl-3 pr-5 text-right text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wider">
+                            Действия
+                        </th>
                     </tr>
                 </thead>
-                <tbody>
+                <tbody class="divide-y divide-gray-200 dark:divide-gray-600 bg-white dark:bg-gray-800">
                     {% for company in storage_info.companies %}
-                    <tr>
-                        <td class="font-medium text-gray-900 dark:text-white pl-4">{{ company.name }}</td>
-                        <td>
+                    <tr class="hover:bg-gray-50 dark:hover:bg-gray-700/40 transition-colors">
+                        <td class="py-4 pl-5 pr-3">
+                            <span class="font-semibold text-gray-900 dark:text-white">{{ company.name }}</span>
+                        </td>
+                        <td class="py-4 px-3">
                             {% if company.storage_type == 'yandex_disk' %}
-                            <span class="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300">
+                            <span class="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-medium bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-200 border border-amber-200 dark:border-amber-700">
                                 Яндекс.Диск
                             </span>
                             {% else %}
-                            <span class="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300">
+                            <span class="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-medium bg-slate-100 text-slate-700 dark:bg-slate-600 dark:text-slate-200 border border-slate-200 dark:border-slate-500">
                                 Локальное
                             </span>
                             {% endif %}
                         </td>
-                        <td class="text-gray-700 dark:text-gray-300">{{ company.storage_used }}</td>
-                        <td class="text-gray-500 dark:text-gray-400">{{ company.files_count }}</td>
-                        <td class="text-gray-500 dark:text-gray-400">{{ company.projects_count }}</td>
-                        <td class="pr-4">
+                        <td class="py-4 px-3 text-right text-sm tabular-nums text-gray-700 dark:text-gray-300">
+                            {{ company.storage_used|default('—') }}
+                        </td>
+                        <td class="py-4 px-3 text-right text-sm tabular-nums text-gray-600 dark:text-gray-400">
+                            {{ company.files_count|default(0) }}
+                        </td>
+                        <td class="py-4 px-3 text-right text-sm tabular-nums text-gray-600 dark:text-gray-400">
+                            {{ company.projects_count|default(0) }}
+                        </td>
+                        <td class="py-4 pl-3 pr-5 text-right">
                             <a href="/companies/{{ company.id }}"
-                               class="text-indigo-600 hover:text-indigo-800 dark:text-indigo-400 dark:hover:text-indigo-300 font-medium">
+                               class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 dark:text-indigo-400 dark:hover:text-indigo-300 dark:hover:bg-indigo-900/30 transition-colors">
+                                <span class="material-icons text-base">open_in_new</span>
                                 Открыть
                             </a>
                         </td>
@@ -131,7 +155,10 @@
             </table>
         </div>
         {% else %}
-        <p class="text-gray-500 dark:text-gray-400 text-center py-12">Компании не найдены</p>
+        <div class="text-center py-16 px-4">
+            <span class="material-icons text-4xl text-gray-300 dark:text-gray-600 mb-3 block">business</span>
+            <p class="text-gray-500 dark:text-gray-400">Компании не найдены</p>
+        </div>
         {% endif %}
     </div>
 </div>

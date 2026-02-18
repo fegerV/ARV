@@ -151,6 +151,8 @@ server {
 sudo -u arv bash -c 'cd /opt/arv/app && git pull'
 sudo -u arv bash -c 'cd /opt/arv/app && source /opt/arv/venv/bin/activate && pip install -r requirements.txt'
 sudo -u arv bash -c 'cd /opt/arv/app && source /opt/arv/venv/bin/activate && alembic upgrade head'
+# Сборка CSS (Tailwind) — если менялись шаблоны или styles/
+sudo -u arv bash -c 'cd /opt/arv/app && npm ci && npm run build:css'
 sudo systemctl restart arv
 ```
 

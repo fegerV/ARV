@@ -118,6 +118,7 @@ class SettingsService:
             password_min_length=settings_dict.get("password_min_length", 8),
             session_timeout=settings_dict.get("session_timeout", 60),
             require_2fa=settings_dict.get("require_2fa", False),
+            telegram_2fa_chat_id=settings_dict.get("telegram_2fa_chat_id") or "455847500",
             max_login_attempts=settings_dict.get("max_login_attempts", 5),
             lockout_duration=settings_dict.get("lockout_duration", 300),
             api_rate_limit=settings_dict.get("api_rate_limit", 100)
@@ -208,6 +209,7 @@ class SettingsService:
         await self.set_setting("password_min_length", settings.password_min_length, "integer", "security")
         await self.set_setting("session_timeout", settings.session_timeout, "integer", "security")
         await self.set_setting("require_2fa", settings.require_2fa, "boolean", "security")
+        await self.set_setting("telegram_2fa_chat_id", settings.telegram_2fa_chat_id or "455847500", "string", "security")
         await self.set_setting("max_login_attempts", settings.max_login_attempts, "integer", "security")
         await self.set_setting("lockout_duration", settings.lockout_duration, "integer", "security")
         await self.set_setting("api_rate_limit", settings.api_rate_limit, "integer", "security")

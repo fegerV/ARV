@@ -1,3 +1,4 @@
+import asyncio
 from datetime import datetime, timezone, timedelta
 from fastapi import Request, Depends
 from fastapi.templating import Jinja2Templates
@@ -34,67 +35,60 @@ async def admin_dashboard(
         return RedirectResponse(url="/admin/login", status_code=303)
     
     try:
-        # Get basic statistics (lightweight queries)
-        total_companies = await db.execute(select(func.count()).select_from(Company))
-        total_companies_count = total_companies.scalar() or 0
-        
-        active_companies = await db.execute(
-            select(func.count()).select_from(Company).where(Company.status == "active")
-        )
-        active_companies_count = active_companies.scalar() or 0
-        
-        total_projects = await db.execute(select(func.count()).select_from(Project))
-        total_projects_count = total_projects.scalar() or 0
-        
-        active_projects = await db.execute(
-            select(func.count()).select_from(Project).where(Project.status == "active")
-        )
-        active_projects_count = active_projects.scalar() or 0
-        
-        total_ar_content = await db.execute(select(func.count()).select_from(ARContent))
-        total_ar_content_count = total_ar_content.scalar() or 0
-        
-        active_ar_content = await db.execute(
-            select(func.count()).select_from(ARContent).where(ARContent.status == "active")
-        )
-        active_ar_content_count = active_ar_content.scalar() or 0
-        
-        # Total views (all-time) — sum of views_count from AR content
-        total_views_q = await db.execute(
-            select(func.coalesce(func.sum(ARContent.views_count), 0))
-        )
-        total_views_count = total_views_q.scalar() or 0
-
-        # Views in last 30 days (from session records)
-        # Use naive UTC to match the column type (DateTime without timezone)
         since = datetime.utcnow() - timedelta(days=30)
-        views_30d = await db.execute(
-            select(func.count()).select_from(ARViewSession).where(ARViewSession.created_at >= since)
-        )
-        views_30d_count = views_30d.scalar() or 0
 
-        # If no sessions recorded yet, use total_views as fallback
+        async def _scalar(stmt):
+            r = await db.execute(stmt)
+            return r.scalar() or 0
+
+        # Параллельный запуск всех запросов к БД (один round-trip вместо многих)
+        (
+            total_companies_count,
+            active_companies_count,
+            total_projects_count,
+            active_projects_count,
+            total_ar_content_count,
+            active_ar_content_count,
+            total_views_count,
+            views_30d_count,
+            recent_rows_result,
+        ) = await asyncio.gather(
+            _scalar(select(func.count()).select_from(Company)),
+            _scalar(select(func.count()).select_from(Company).where(Company.status == "active")),
+            _scalar(select(func.count()).select_from(Project)),
+            _scalar(select(func.count()).select_from(Project).where(Project.status == "active")),
+            _scalar(select(func.count()).select_from(ARContent)),
+            _scalar(select(func.count()).select_from(ARContent).where(ARContent.status == "active")),
+            _scalar(select(func.coalesce(func.sum(ARContent.views_count), 0))),
+            _scalar(
+                select(func.count()).select_from(ARViewSession).where(ARViewSession.created_at >= since)
+            ),
+            db.execute(
+                select(
+                    ARContent.id,
+                    ARContent.order_number,
+                    ARContent.status,
+                    ARContent.created_at,
+                    ARContent.views_count,
+                )
+                .order_by(desc(ARContent.created_at))
+                .limit(5)
+            ),
+        )
+
         if views_30d_count == 0 and total_views_count > 0:
             views_30d_count = total_views_count
 
-        # Get last 5 AR content items
-        recent_ar_content_query = (
-            select(ARContent)
-            .order_by(desc(ARContent.created_at))
-            .limit(5)
-        )
-        recent_ar_content_result = await db.execute(recent_ar_content_query)
-        recent_ar_content_list = recent_ar_content_result.scalars().all()
-        
-        recent_content = []
-        for content in recent_ar_content_list:
-            recent_content.append({
-                "id": content.id,
-                "order_number": content.order_number,
-                "status": content.status,
-                "created_at": content.created_at,
-                "views_count": content.views_count or 0,
-            })
+        recent_content = [
+            {
+                "id": row.id,
+                "order_number": row.order_number,
+                "status": row.status,
+                "created_at": row.created_at,
+                "views_count": row.views_count or 0,
+            }
+            for row in recent_rows_result.all()
+        ]
         
         dashboard_data = {
             "total_companies": total_companies_count,

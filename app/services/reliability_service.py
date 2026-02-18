@@ -484,11 +484,68 @@ class HealthChecker:
         }
     
     async def _monitoring_loop(self):
-        """Background monitoring loop."""
+        """Background monitoring loop. Sends critical alerts to Telegram/Email when health fails."""
+        last_alert_at: float = 0
+        alert_cooldown_seconds = 300  # 5 min
+
         while True:
             try:
                 await asyncio.sleep(60)  # Check every minute
                 await self.check_health()
+                overall = await self.get_overall_health()
+                status = overall.get("status", HealthStatus.UNKNOWN.value)
+
+                if status not in (HealthStatus.UNHEALTHY.value, HealthStatus.DEGRADED.value):
+                    continue
+
+                if time.time() - last_alert_at < alert_cooldown_seconds:
+                    continue
+
+                from app.services.alert_service import Alert, send_critical_alerts
+
+                # Build alerts from failed/degraded checks
+                alerts: List[Alert] = []
+                for name, result in self.last_results.items():
+                    s = result.get("status")
+                    if s == HealthStatus.UNHEALTHY.value:
+                        msg = result.get("error") or result.get("message", "failed")
+                        alerts.append(
+                            Alert(
+                                severity="critical",
+                                title=name,
+                                message=str(msg),
+                                metrics={},
+                                affected_services=[name],
+                            )
+                        )
+                    elif s == HealthStatus.DEGRADED.value:
+                        msg = result.get("message", "degraded")
+                        alerts.append(
+                            Alert(
+                                severity="warning",
+                                title=name,
+                                message=str(msg),
+                                metrics=result.get("details", {}),
+                                affected_services=[name],
+                            )
+                        )
+
+                if not alerts:
+                    continue
+
+                try:
+                    import psutil
+                    metrics = {
+                        "cpu_percent": psutil.cpu_percent(interval=0.1),
+                        "memory_percent": psutil.virtual_memory().percent,
+                        "api_health": status,
+                    }
+                except Exception:
+                    metrics = {"cpu_percent": "n/a", "memory_percent": "n/a", "api_health": status}
+
+                await send_critical_alerts(alerts, metrics)
+                last_alert_at = time.time()
+                logger.info("critical_alerts_sent", count=len(alerts), status=status)
             except Exception as e:
                 logger.error("health_monitoring_loop_error", error=str(e))
 

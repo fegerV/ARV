@@ -85,9 +85,28 @@ async def send_admin_email(alerts: List[Alert], metrics: dict) -> None:
 
 
 async def send_telegram_alerts(alerts: List[Alert], metrics: dict) -> None:
-    """Telegram уведомления (админ-чат)."""
-    admin_chat_id = settings.TELEGRAM_ADMIN_CHAT_ID
-    if not settings.TELEGRAM_BOT_TOKEN or not admin_chat_id:
+    """Telegram уведомления (админ-чат). Использует настройки из БД, иначе из env."""
+    bot_token: str | None = None
+    admin_chat_id: str | None = None
+
+    try:
+        from app.core.database import AsyncSessionLocal
+        from app.services.settings_service import SettingsService
+        async with AsyncSessionLocal() as session:
+            svc = SettingsService(session)
+            all_settings = await svc.get_all_settings()
+            n = all_settings.notifications
+            if n.telegram_enabled and n.telegram_bot_token and n.telegram_admin_chat_id:
+                bot_token = n.telegram_bot_token
+                admin_chat_id = n.telegram_admin_chat_id
+    except Exception as e:
+        logger.warning("alert_telegram_settings_load_failed", error=str(e))
+
+    if not bot_token or not admin_chat_id:
+        bot_token = settings.TELEGRAM_BOT_TOKEN
+        admin_chat_id = settings.TELEGRAM_ADMIN_CHAT_ID
+
+    if not bot_token or not admin_chat_id:
         logger.warning("telegram_not_configured")
         return
 
@@ -105,14 +124,18 @@ API: {metrics.get('api_health', 'n/a')}
 <a href="{settings.ADMIN_FRONTEND_URL}">📊 Dashboard</a>
 """
 
-    await send_telegram_message(admin_chat_id, message)
+    await send_telegram_message(chat_id=admin_chat_id, message=message, bot_token=bot_token)
 
 
-async def send_telegram_message(chat_id: str, message: str) -> None:
+async def send_telegram_message(chat_id: str, message: str, bot_token: str | None = None) -> None:
+    token = bot_token or settings.TELEGRAM_BOT_TOKEN
+    if not token:
+        logger.warning("telegram_bot_token_missing")
+        return
     try:
         async with httpx.AsyncClient() as client:
             resp = await client.post(
-                f"https://api.telegram.org/bot{settings.TELEGRAM_BOT_TOKEN}/sendMessage",
+                f"https://api.telegram.org/bot{token}/sendMessage",
                 json={
                     "chat_id": chat_id,
                     "text": message,
