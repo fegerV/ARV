@@ -1,83 +1,83 @@
 {% extends "base.html" %}
 
-{% block title %}Storage - Vertex AR Admin{% endblock %}
+{% block title %}Хранилище — Vertex AR Admin{% endblock %}
 
-{% block page_title %}Storage{% endblock %}
+{% block page_title %}Хранилище{% endblock %}
 
 {% block content %}
 <div class="page-container">
-    <!-- Local Disk Usage Summary -->
-    <div class="card mb-6">
-        <h3 class="text-lg font-semibold mb-4 text-gray-900 dark:text-white">
-            <span class="material-icons text-base align-middle mr-1">storage</span>
-            Server Disk
+    <!-- Локальный диск сервера -->
+    <div class="card mb-8">
+        <h3 class="text-lg font-semibold mb-5 text-gray-900 dark:text-white flex items-center gap-2">
+            <span class="material-icons text-xl text-gray-600 dark:text-gray-400">storage</span>
+            Диск сервера
         </h3>
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-            <div>
-                <p class="text-sm text-gray-500 dark:text-gray-400">Total</p>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-5">
+            <div class="p-3 rounded-lg bg-gray-50 dark:bg-gray-700/50">
+                <p class="text-sm text-gray-500 dark:text-gray-400 mb-1">Всего</p>
                 <p class="text-xl font-bold text-gray-900 dark:text-white">{{ storage_info.total_storage|default('—') }}</p>
             </div>
-            <div>
-                <p class="text-sm text-gray-500 dark:text-gray-400">Used</p>
+            <div class="p-3 rounded-lg bg-gray-50 dark:bg-gray-700/50">
+                <p class="text-sm text-gray-500 dark:text-gray-400 mb-1">Занято</p>
                 <p class="text-xl font-bold text-gray-900 dark:text-white">{{ storage_info.used_storage|default('—') }}</p>
             </div>
-            <div>
-                <p class="text-sm text-gray-500 dark:text-gray-400">Available</p>
+            <div class="p-3 rounded-lg bg-gray-50 dark:bg-gray-700/50">
+                <p class="text-sm text-gray-500 dark:text-gray-400 mb-1">Свободно</p>
                 <p class="text-xl font-bold text-gray-900 dark:text-white">{{ storage_info.available_storage|default('—') }}</p>
             </div>
         </div>
         {% if storage_info.storage_usage_percent is defined and storage_info.storage_usage_percent > 0 %}
-        <div class="mb-2">
-            <div class="flex justify-between items-center mb-1">
-                <span class="text-sm text-gray-600 dark:text-gray-400">Usage</span>
+        <div class="mt-4 pt-4 border-t border-gray-200 dark:border-gray-600">
+            <div class="flex justify-between items-center mb-2">
+                <span class="text-sm text-gray-600 dark:text-gray-400">Занято</span>
                 <span class="text-sm font-medium text-gray-900 dark:text-white">{{ storage_info.storage_usage_percent }}%</span>
             </div>
-            <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
-                <div class="h-2 rounded-full 
+            <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2.5">
+                <div class="h-2.5 rounded-full
                     {% if storage_info.storage_usage_percent >= 90 %}bg-red-500
                     {% elif storage_info.storage_usage_percent >= 75 %}bg-yellow-500
-                    {% else %}bg-blue-500{% endif %}" 
+                    {% else %}bg-blue-500{% endif %}"
                     style="width: {{ storage_info.storage_usage_percent }}%"></div>
             </div>
         </div>
         {% endif %}
     </div>
 
-    <!-- Yandex Disk Quota (shown only if at least one company uses YD) -->
+    <!-- Квота Яндекс.Диска -->
     {% if storage_info.yd_quota is defined and storage_info.yd_quota %}
-    <div class="card mb-6">
-        <h3 class="text-lg font-semibold mb-4 text-gray-900 dark:text-white">
-            <svg class="inline-block w-5 h-5 mr-1 align-middle" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <div class="card mb-8">
+        <h3 class="text-lg font-semibold mb-5 text-gray-900 dark:text-white flex items-center gap-2">
+            <svg class="w-5 h-5 flex-shrink-0" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                 <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z" fill="#FFCC00"/>
                 <path d="M8 7h3.5L8 17h3l3.5-10H18L14 17h-3L8 7z" fill="#000"/>
             </svg>
-            Yandex Disk
+            Яндекс.Диск
         </h3>
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-            <div>
-                <p class="text-sm text-gray-500 dark:text-gray-400">Total</p>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-5">
+            <div class="p-3 rounded-lg bg-gray-50 dark:bg-gray-700/50">
+                <p class="text-sm text-gray-500 dark:text-gray-400 mb-1">Всего</p>
                 <p class="text-xl font-bold text-gray-900 dark:text-white">{{ storage_info.yd_quota.total }}</p>
             </div>
-            <div>
-                <p class="text-sm text-gray-500 dark:text-gray-400">Used</p>
+            <div class="p-3 rounded-lg bg-gray-50 dark:bg-gray-700/50">
+                <p class="text-sm text-gray-500 dark:text-gray-400 mb-1">Занято</p>
                 <p class="text-xl font-bold text-gray-900 dark:text-white">{{ storage_info.yd_quota.used }}</p>
             </div>
-            <div>
-                <p class="text-sm text-gray-500 dark:text-gray-400">Available</p>
+            <div class="p-3 rounded-lg bg-gray-50 dark:bg-gray-700/50">
+                <p class="text-sm text-gray-500 dark:text-gray-400 mb-1">Свободно</p>
                 <p class="text-xl font-bold text-gray-900 dark:text-white">{{ storage_info.yd_quota.free }}</p>
             </div>
         </div>
         {% if storage_info.yd_quota.percent > 0 %}
-        <div class="mb-2">
-            <div class="flex justify-between items-center mb-1">
-                <span class="text-sm text-gray-600 dark:text-gray-400">Usage</span>
+        <div class="mt-4 pt-4 border-t border-gray-200 dark:border-gray-600">
+            <div class="flex justify-between items-center mb-2">
+                <span class="text-sm text-gray-600 dark:text-gray-400">Занято</span>
                 <span class="text-sm font-medium text-gray-900 dark:text-white">{{ storage_info.yd_quota.percent }}%</span>
             </div>
-            <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
-                <div class="h-2 rounded-full 
+            <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2.5">
+                <div class="h-2.5 rounded-full
                     {% if storage_info.yd_quota.percent >= 90 %}bg-red-500
                     {% elif storage_info.yd_quota.percent >= 75 %}bg-yellow-500
-                    {% else %}bg-indigo-500{% endif %}" 
+                    {% else %}bg-indigo-500{% endif %}"
                     style="width: {{ storage_info.yd_quota.percent }}%"></div>
             </div>
         </div>
@@ -85,46 +85,44 @@
     </div>
     {% endif %}
 
-    <!-- Companies Storage -->
+    <!-- Хранилище по компаниям -->
     <div class="card">
-        <h3 class="text-lg font-semibold mb-4 text-gray-900 dark:text-white">Storage by Company</h3>
+        <h3 class="text-lg font-semibold mb-5 text-gray-900 dark:text-white">Хранилище по компаниям</h3>
         {% if storage_info.companies|default([])|length > 0 %}
-        <div class="overflow-x-auto">
+        <div class="overflow-x-auto -mx-1">
             <table class="table">
                 <thead>
                     <tr>
-                        <th>Company</th>
-                        <th>Storage</th>
-                        <th>Used</th>
-                        <th>Files</th>
-                        <th>Projects</th>
-                        <th>Actions</th>
+                        <th class="pl-4">Компания</th>
+                        <th>Хранилище</th>
+                        <th>Занято</th>
+                        <th>Файлы</th>
+                        <th>Проекты</th>
+                        <th class="pr-4">Действия</th>
                     </tr>
                 </thead>
                 <tbody>
                     {% for company in storage_info.companies %}
                     <tr>
-                        <td class="font-medium text-gray-900 dark:text-white">{{ company.name }}</td>
+                        <td class="font-medium text-gray-900 dark:text-white pl-4">{{ company.name }}</td>
                         <td>
                             {% if company.storage_type == 'yandex_disk' %}
-                            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300">
-                                Yandex Disk
+                            <span class="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300">
+                                Яндекс.Диск
                             </span>
                             {% else %}
-                            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300">
-                                Local
+                            <span class="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300">
+                                Локальное
                             </span>
                             {% endif %}
                         </td>
-                        <td class="text-gray-700 dark:text-gray-300">
-                            {{ company.storage_used }}
-                        </td>
+                        <td class="text-gray-700 dark:text-gray-300">{{ company.storage_used }}</td>
                         <td class="text-gray-500 dark:text-gray-400">{{ company.files_count }}</td>
                         <td class="text-gray-500 dark:text-gray-400">{{ company.projects_count }}</td>
-                        <td>
-                            <a href="/companies/{{ company.id }}" 
-                               class="text-indigo-600 hover:text-indigo-900 dark:text-indigo-400">
-                                View
+                        <td class="pr-4">
+                            <a href="/companies/{{ company.id }}"
+                               class="text-indigo-600 hover:text-indigo-800 dark:text-indigo-400 dark:hover:text-indigo-300 font-medium">
+                                Открыть
                             </a>
                         </td>
                     </tr>
@@ -133,7 +131,7 @@
             </table>
         </div>
         {% else %}
-        <p class="text-gray-500 dark:text-gray-400 text-center py-8">No companies found</p>
+        <p class="text-gray-500 dark:text-gray-400 text-center py-12">Компании не найдены</p>
         {% endif %}
     </div>
 </div>

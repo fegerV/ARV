@@ -1,59 +1,69 @@
 {% extends "base_auth.html" %}
 
-{% block title %}Login - Vertex AR Admin{% endblock %}
+{% block title %}Вход — Vertex AR Admin{% endblock %}
 
 {% block body %}
-<div x-data class="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 py-12 px-4 sm:px-6 lg:px-8">
-    <div class="max-w-md w-full space-y-8">
-        <div>
-            <h2 class="mt-6 text-center text-3xl font-extrabold text-gray-900 dark:text-white">
-                Sign in to your account
-            </h2>
-            <p class="mt-2 text-center text-sm text-gray-600 dark:text-gray-400">
-                Enter your credentials to access the admin panel
+<div x-data class="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 py-16 px-4 sm:px-6 lg:px-8">
+    <div class="max-w-md w-full">
+        <div class="text-center mb-10">
+            <h1 class="text-3xl font-extrabold text-gray-900 dark:text-white tracking-tight">
+                Вход в аккаунт
+            </h1>
+            <p class="mt-3 text-base text-gray-600 dark:text-gray-400 leading-relaxed">
+                Введите учётные данные для доступа в панель администратора
             </p>
         </div>
-        <div class="mt-8 bg-white dark:bg-gray-800 py-8 px-4 shadow rounded-lg sm:px-10">
+
+        <div class="bg-white dark:bg-gray-800 shadow-xl rounded-xl py-10 px-6 sm:px-12">
             {% if error %}
-            <div class="mb-4 p-3 rounded-md bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300 text-sm">
+            <div class="mb-6 p-4 rounded-lg bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300 text-sm">
                 {{ error }}
             </div>
             {% endif %}
+
             <form class="space-y-6" action="/admin/login-form" method="post">
                 <div>
-                    <label for="email" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Email address</label>
-                    <div class="mt-1">
-                        <input id="email" name="username" type="email" autocomplete="email" required class="appearance-none block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm dark:bg-gray-700 dark:text-white">
-                    </div>
+                    <label for="email" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        Email
+                    </label>
+                    <input id="email" name="username" type="email" autocomplete="email" required
+                           class="block w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent sm:text-sm dark:bg-gray-700 dark:text-white"
+                           placeholder="example@mail.ru">
                 </div>
 
                 <div>
-                    <label for="password" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Password</label>
-                    <div class="mt-1">
-                        <input id="password" name="password" type="password" autocomplete="current-password" required class="appearance-none block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm dark:bg-gray-700 dark:text-white">
-                    </div>
+                    <label for="password" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        Пароль
+                    </label>
+                    <input id="password" name="password" type="password" autocomplete="current-password" required
+                           class="block w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent sm:text-sm dark:bg-gray-700 dark:text-white"
+                           placeholder="••••••••">
                 </div>
 
-                <div class="flex items-center justify-between">
+                <div class="flex items-center justify-between gap-4 pt-1">
                     <div class="flex items-center">
-                        <input id="remember-me" name="remember-me" type="checkbox" class="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded">
-                        <label for="remember-me" class="ml-2 block text-sm text-gray-900 dark:text-gray-300">Remember me</label>
+                        <input id="remember-me" name="remember-me" type="checkbox"
+                               class="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 dark:border-gray-600 rounded">
+                        <label for="remember-me" class="ml-2 text-sm text-gray-700 dark:text-gray-300">
+                            Запомнить меня
+                        </label>
                     </div>
-
-                    <div class="text-sm flex items-center space-x-2">
-                        <!-- Theme toggle -->
-                        <button type="button" @click="$store.darkMode.toggle()" class="p-2 rounded-md bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600">
-                            <span class="material-icons" x-text="$store.darkMode.darkMode ? 'light_mode' : 'dark_mode'"></span>
+                    <div class="flex items-center gap-2">
+                        <button type="button" @click="$store.darkMode.toggle()"
+                                class="p-2 rounded-lg bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
+                                title="Сменить тему">
+                            <span class="material-icons text-lg" x-text="$store.darkMode.darkMode ? 'light_mode' : 'dark_mode'"></span>
                         </button>
-                        <a href="#" class="font-medium text-indigo-600 hover:text-indigo-500 dark:text-indigo-400 dark:hover:text-indigo-300">
-                            Forgot your password?
+                        <a href="#" class="text-sm font-medium text-indigo-600 hover:text-indigo-500 dark:text-indigo-400 dark:hover:text-indigo-300">
+                            Забыли пароль?
                         </a>
                     </div>
                 </div>
 
-                <div>
-                    <button type="submit" class="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
-                        Sign in
+                <div class="pt-2">
+                    <button type="submit"
+                            class="w-full flex justify-center items-center py-3 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors">
+                        Войти
                     </button>
                 </div>
             </form>
