@@ -72,7 +72,7 @@ Base = declarative_base(metadata=MetaData(naming_convention=_naming_convention))
 async def get_db() -> AsyncGenerator[AsyncSession, None]:
     """
     Dependency to get async database session.
-    
+
     Yields:
         AsyncSession: Database session
     """
@@ -83,8 +83,9 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
             logger.exception("database_session_failed")
             await session.rollback()
             raise
-        finally:
-            await session.close()
+        # Явный session.close() не вызываем: при выходе из async with
+        # сессия закрывается контекстным менеджером; иначе возможен
+        # IllegalStateChangeError при одновременном _connection_for_bind().
 
 
 def init_db_sync() -> None:

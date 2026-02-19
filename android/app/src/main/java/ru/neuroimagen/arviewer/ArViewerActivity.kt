@@ -2,7 +2,9 @@ package ru.neuroimagen.arviewer
 
 import android.Manifest
 import android.content.ContentValues
+import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.graphics.Bitmap
 import android.opengl.GLSurfaceView
 import android.os.Build
@@ -15,6 +17,7 @@ import android.view.MotionEvent
 import android.view.PixelCopy
 import android.view.ScaleGestureDetector
 import android.view.Surface
+import android.view.View
 import android.widget.Button
 import android.widget.TextView
 import android.widget.Toast
@@ -254,7 +257,7 @@ class ArViewerActivity : AppCompatActivity() {
             is ArCoreCheckResult.Ready -> { /* proceed */ }
 
             is ArCoreCheckResult.DeviceNotSupported -> {
-                showArError(getString(R.string.error_device_not_supported))
+                showArError(getString(R.string.error_device_not_supported), showDeviceListButton = true)
                 return
             }
             is ArCoreCheckResult.InstallRequested -> {
@@ -285,7 +288,7 @@ class ArViewerActivity : AppCompatActivity() {
         val session = when (sessionResult) {
             is ArSessionResult.Success -> sessionResult.session
             is ArSessionResult.DeviceNotCompatible -> {
-                showArError(getString(R.string.error_device_not_supported))
+                showArError(getString(R.string.error_device_not_supported), showDeviceListButton = true)
                 return
             }
             is ArSessionResult.ArCoreNotInstalled -> {
@@ -617,12 +620,19 @@ class ArViewerActivity : AppCompatActivity() {
      * Show a full-screen error message with a "Back" button instead of
      * a transient Toast.  The user can read the message at their own pace.
      */
-    private fun showArError(message: String) {
+    private fun showArError(message: String, showDeviceListButton: Boolean = false) {
         CrashReporter.log("AR error displayed: $message")
         stopLoadingTipsCycle()
         val errorView = layoutInflater.inflate(R.layout.layout_ar_error, null)
         errorView.findViewById<TextView>(R.id.text_ar_error).text = message
         errorView.findViewById<Button>(R.id.button_ar_error_back).setOnClickListener { finish() }
+        val deviceListButton = errorView.findViewById<Button>(R.id.button_ar_error_device_list)
+        if (showDeviceListButton) {
+            deviceListButton.visibility = View.VISIBLE
+            deviceListButton.setOnClickListener {
+                startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://developers.google.com/ar/devices")))
+            }
+        }
         setContentView(errorView)
     }
 

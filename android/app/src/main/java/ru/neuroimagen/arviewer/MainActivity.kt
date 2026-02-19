@@ -233,11 +233,32 @@ class MainActivity : AppCompatActivity() {
     private fun openViewer(uniqueId: String) {
         // Pre-flight: check ARCore support BEFORE heavy network loading
         if (!ArSessionHelper.isArCoreSupported(this)) {
-            viewModel.resetToInput()
-            Toast.makeText(this, R.string.error_device_not_supported, Toast.LENGTH_LONG).show()
+            showDeviceNotSupportedPanel(uniqueId)
             return
         }
         viewModel.loadManifest(uniqueId)
+    }
+
+    private fun showDeviceNotSupportedPanel(uniqueId: String) {
+        viewModel.resetToInput()
+        binding.panelMain.visibility = View.GONE
+        binding.panelLoading.visibility = View.GONE
+        binding.panelError.visibility = View.VISIBLE
+        binding.textError.text = getString(R.string.error_device_not_supported)
+        binding.buttonRetry.text = getString(R.string.button_check_arcore_again)
+        binding.buttonRetry.visibility = View.VISIBLE
+        binding.buttonOpenDeviceList.visibility = View.VISIBLE
+        binding.buttonRetry.setOnClickListener {
+            if (ArSessionHelper.isArCoreSupported(this)) {
+                binding.buttonOpenDeviceList.visibility = View.GONE
+                viewModel.loadManifest(uniqueId)
+            }
+        }
+        binding.buttonOpenDeviceList.setOnClickListener { openArCoreDeviceListUrl() }
+    }
+
+    private fun openArCoreDeviceListUrl() {
+        startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://developers.google.com/ar/devices")))
     }
 
     private fun navigateToArViewer(manifestJson: String, uniqueId: String) {
@@ -291,7 +312,10 @@ class MainActivity : AppCompatActivity() {
         binding.panelLoading.visibility = View.GONE
         binding.panelError.visibility = View.VISIBLE
         binding.textError.text = message
+        binding.buttonRetry.text = getString(R.string.retry)
         binding.buttonRetry.visibility = if (retryable) View.VISIBLE else View.GONE
+        binding.buttonRetry.setOnClickListener { viewModel.retry() }
+        binding.buttonOpenDeviceList.visibility = View.GONE
     }
 
     companion object {

@@ -6,12 +6,15 @@
 
 | Компонент | Версия |
 |---|---|
-| Kotlin | 2.0 |
+| Kotlin | 2.0.21 |
 | minSdk / targetSdk | 24 / 35 |
-| ARCore | 1.52 |
+| ARCore | 1.52.0 |
 | Media3 (ExoPlayer) | 1.7.1 |
+| CameraX | 1.4.0 |
+| ML Kit Barcode | 17.3.0 |
 | Hilt DI | 2.51.1 |
 | Firebase BOM | 33.6.0 |
+| OkHttp / Retrofit | 4.12.0 / 2.12.0 |
 
 ## API бэкенда
 
@@ -35,9 +38,9 @@ MainActivity                   ArViewerActivity
   │         └─ ManifestCache      ├─ ArRenderer (OpenGL)
   │              (disk, 7 дней)   │    ├─ BackgroundRenderer (камера)
   │                               │    └─ VideoQuadRenderer (видео на маркере)
-  │                               │
-  │                               ├─ ExoPlayer + VideoCache (256 MB LRU)
-  │                               └─ ArRecorder (запись MP4)
+  QrScannerActivity               │
+    └─ CameraX + ML Kit           ├─ ExoPlayer + VideoCache (256 MB LRU)
+                                  └─ ArRecorder (запись MP4, recording/)
 ```
 
 **Ключевые решения:**
@@ -52,43 +55,52 @@ MainActivity                   ArViewerActivity
 
 ```
 app/src/main/java/ru/neuroimagen/arviewer/
-├── ArViewerApp.kt              # @HiltAndroidApp, Firebase init
-├── MainActivity.kt             # Ввод ID / QR / deep link → загрузка манифеста → AR
-├── QrScannerActivity.kt        # CameraX + ML Kit Barcode
-├── ArViewerActivity.kt         # ARCore + ExoPlayer + фото/видео запись
+├── ArViewerApp.kt                  # @HiltAndroidApp, Firebase init
+├── MainActivity.kt                 # Ввод ID / QR / deep link → загрузка манифеста → AR
+├── QrScannerActivity.kt            # CameraX + ML Kit Barcode
+├── ArViewerActivity.kt             # ARCore + ExoPlayer + фото/видео запись
 ├── ar/
-│   ├── ArRenderer.kt           # GLSurfaceView.Renderer, видео + камера + запись
-│   ├── ArSessionHelper.kt      # Создание ARCore Session, Augmented Image DB
-│   ├── BackgroundRenderer.kt   # Отрисовка камеры (OpenGL)
-│   ├── VideoQuadRenderer.kt    # Видео-квад на AR-маркере (OES texture)
-│   ├── ArRecorder.kt           # Запись AR-сцены в MP4
-│   └── ShaderUtil.kt           # Загрузка GLSL шейдеров
+│   ├── ArRenderer.kt               # GLSurfaceView.Renderer, видео + камера + запись
+│   ├── ArSessionHelper.kt          # Создание ARCore Session, Augmented Image DB
+│   ├── BackgroundRenderer.kt       # Отрисовка камеры (OpenGL)
+│   ├── VideoQuadRenderer.kt        # Видео-квад на AR-маркере (OES texture)
+│   ├── RecordableEGLConfigChooser.kt # EGL-конфигурация для записи
+│   └── ShaderUtil.kt               # Загрузка GLSL шейдеров
+├── recording/
+│   └── ArRecorder.kt               # Запись AR-сцены в MP4
 ├── data/
-│   ├── api/ViewerApi.kt        # Retrofit интерфейс
+│   ├── api/ViewerApi.kt            # Retrofit интерфейс
 │   ├── cache/
-│   │   ├── ManifestCache.kt    # Диск-кеш манифестов (по uniqueId, 7 дней)
-│   │   ├── MarkerCache.kt      # Диск-кеш маркеров (по uniqueId, 7 дней)
-│   │   └── VideoCache.kt       # Media3 SimpleCache (LRU, 256 MB)
-│   ├── model/                  # ViewerManifest, ViewerError, ContentCheckResponse
+│   │   ├── ManifestCache.kt        # Диск-кеш манифестов (по uniqueId, 7 дней)
+│   │   ├── MarkerCache.kt          # Диск-кеш маркеров (по uniqueId, 7 дней)
+│   │   └── VideoCache.kt           # Media3 SimpleCache (LRU, 256 MB)
+│   ├── model/
+│   │   ├── ViewerManifest.kt       # Модель манифеста AR-контента
+│   │   ├── ViewerManifestVideo.kt  # Модель видео в манифесте
+│   │   ├── ViewerError.kt          # Ошибки + ContentUnavailableReason
+│   │   └── ContentCheckResponse.kt # Ответ проверки доступности контента
 │   └── repository/
-│       └── ViewerRepository.kt # Cache-first загрузка + фоновый refresh
+│       └── ViewerRepository.kt     # Cache-first загрузка + фоновый refresh
 ├── di/
-│   └── NetworkModule.kt        # OkHttp, Retrofit, Gson (Hilt @Module)
+│   └── NetworkModule.kt            # OkHttp, Retrofit, Gson (Hilt @Module)
 ├── ui/
-│   ├── MainViewModel.kt        # Загрузка манифеста, навигация
-│   └── ArViewerViewModel.kt    # Загрузка маркера (bitmap)
+│   ├── MainViewModel.kt            # Загрузка манифеста, навигация
+│   ├── ArViewerViewModel.kt        # Загрузка маркера (bitmap)
+│   └── ViewerErrorMessages.kt      # Локализованные сообщения об ошибках
 └── util/
-    ├── UniqueIdParser.kt       # Парсинг UUID из URL / строки
-    └── CrashReporter.kt        # Обёртка Firebase Crashlytics
+    ├── UniqueIdParser.kt            # Парсинг UUID из URL / строки
+    ├── CrashReporter.kt             # Обёртка Firebase Crashlytics
+    └── CrashReporting.kt            # Фасад логирования ошибок (Logcat / Crashlytics)
 ```
 
 ## Быстрый старт
 
 ### Требования
 
-- Android Studio (Ladybug+)
-- Android SDK: API 34+, Build-Tools, Platform-Tools
-- Устройство из [списка ARCore](https://developers.google.com/ar/devices)
+- Android Studio (Ladybug+ / Meerkat+)
+- Android SDK: API 35+, Build-Tools, Platform-Tools
+- JDK 17 (встроен в Android Studio)
+- Для полноценного AR: устройство из [списка ARCore](https://developers.google.com/ar/devices). Приложение можно устанавливать на любом Android — на неподдерживаемых при открытии AR показывается экран с пояснением и кнопками «Проверить снова» и «Список поддерживаемых устройств».
 
 ### Настройка
 
@@ -173,17 +185,17 @@ cd android
 
 После добавления секретов перезапустите workflow (Actions → Android (Portal AR) → Re-run all jobs) или сделайте пуш в `android/`.
 
-Windows:
+**Windows (PowerShell):**
 
 ```powershell
 cd android
 .\gradlew.bat assembleDebug
 ```
 
-При первой сборке из терминала — принять лицензии:
+При первой сборке из терминала может потребоваться принять лицензии SDK:
 
 ```powershell
-.\scripts\android_accept_licenses.ps1
+& "$env:LOCALAPPDATA\Android\Sdk\cmdline-tools\latest\bin\sdkmanager.bat" --licenses
 ```
 
 ### Запуск
@@ -217,11 +229,13 @@ cd android
    - Deep link: `https://ar.neuroimagen.ru/view/{id}` и `arv://view/{id}`
    - Наведение на маркер → воспроизведение видео
    - Кнопка «Снимок» (PixelCopy → MediaStore)
-   - Ошибки: неверный ID, истёкшая подписка, нет видео, нет ARCore
-3. Логи по тегам: `ArViewerActivity`, `ArRenderer`, `VideoQuadRenderer`, `ArSessionHelper`, `ViewerRepository`.
+   - Ошибки: неверный ID, истёкшая подписка, нет видео, нет ARCore. На устройствах без AR Core — экран с кнопками «Проверить снова» и «Список поддерживаемых устройств».
+3. **Google Play:** чтобы приложение было доступно на всех устройствах (а не только с AR Core), в консоли разработчика не следует ограничивать установку по «AR Core supported devices». Тогда пользователи смогут установить приложение на любой телефон; AR будет работать только на устройствах из списка Google.
+4. Логи по тегам: `ArViewerActivity`, `ArRenderer`, `VideoQuadRenderer`, `ArSessionHelper`, `ViewerRepository`.
 
 ## Версионирование
 
 - `versionName` и `versionCode` в `app/build.gradle.kts`
 - Формат: **MAJOR.MINOR.PATCH** (semver)
 - При каждом релизе: увеличить `versionCode`, обновить `versionName`
+- Текущая версия: **1.0.1** (`versionCode = 2`)

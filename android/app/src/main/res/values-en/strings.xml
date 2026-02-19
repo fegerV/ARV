@@ -30,7 +30,9 @@
     <string name="error_microphone_required">Microphone access is required for recording with sound</string>
 
     <!-- Device compatibility errors -->
-    <string name="error_device_not_supported">Your device does not support augmented reality (ARCore).\n\nA device from the Google ARCore supported list is required:\nhttps://developers.google.com/ar/devices</string>
+    <string name="error_device_not_supported">Your device does not support augmented reality (ARCore).\n\nGoogle maintains the list of supported devices — not all modern phones are included. You can open the current list below and optionally check again (Google sometimes adds new models).</string>
+    <string name="button_check_arcore_again">Check again</string>
+    <string name="button_open_device_list">List of supported devices</string>
     <string name="error_arcore_install_requested">Google Play Services for AR is required.\n\nThe installation page will open — after installing, return to the app and try again.</string>
     <string name="error_arcore_user_declined">You declined the ARCore installation.\n\nGoogle Play Services for AR is required for augmented reality. Install it from the Play Store and try again.</string>
     <string name="error_arcore_sdk_too_old">Your Android version is too old for ARCore.\n\nUpdate your system to Android 7.0 (Nougat) or newer in device settings.</string>

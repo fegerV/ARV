@@ -13,8 +13,10 @@ async def get_html_db() -> AsyncGenerator[AsyncSession, None]:
         except Exception:
             await session.rollback()
             raise
-        finally:
-            await session.close()
+        # Не вызываем session.close() явно: при выходе из async with
+        # сессия закрывается контекстным менеджером. Явный close() здесь
+        # может вызвать IllegalStateChangeError, если в этот момент ещё
+        # выполняется _connection_for_bind() (ленивая загрузка и т.п.).
 
 # для страниц, где нужен авторизованный пользователь
 CurrentActiveUser = Depends(get_current_active_user)

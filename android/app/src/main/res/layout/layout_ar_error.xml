@@ -59,9 +59,24 @@
         android:layout_marginTop="32dp"
         android:minWidth="160dp"
         android:text="@string/ar_error_go_back"
-        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintBottom_toTopOf="@id/button_ar_error_device_list"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@id/text_ar_error" />
+
+    <!-- Optional: open ARCore devices list (shown for device-not-supported) -->
+    <Button
+        android:id="@+id/button_ar_error_device_list"
+        android:layout_width="wrap_content"
+        android:layout_height="48dp"
+        android:layout_marginTop="12dp"
+        android:minWidth="160dp"
+        android:visibility="gone"
+        android:text="@string/button_open_device_list"
+        style="?attr/materialButtonOutlinedStyle"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/button_ar_error_back" />
 
 </androidx.constraintlayout.widget.ConstraintLayout>
