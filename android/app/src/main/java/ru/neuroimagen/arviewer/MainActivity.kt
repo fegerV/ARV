@@ -63,7 +63,7 @@ class MainActivity : AppCompatActivity() {
             val uniqueId = result.data?.getStringExtra(QrScannerActivity.EXTRA_UNIQUE_ID)
             if (!uniqueId.isNullOrBlank()) {
                 binding.editUniqueId.setText(uniqueId)
-                openViewer(uniqueId)
+                openViewer(uniqueId, fromQrScan = true)
             }
         }
     }
@@ -157,7 +157,7 @@ class MainActivity : AppCompatActivity() {
             }
             if (uniqueId != null) {
                 binding.editUniqueId.setText(uniqueId)
-                viewModel.loadManifest(uniqueId)
+                viewModel.loadManifest(uniqueId, forceRefresh = true)
             } else {
                 viewModel.resetToInput()
                 Toast.makeText(
@@ -230,13 +230,16 @@ class MainActivity : AppCompatActivity() {
         openViewer(uniqueId)
     }
 
-    private fun openViewer(uniqueId: String) {
+    /**
+     * @param fromQrScan true when user just scanned a QR (camera or gallery) — skips manifest cache so the correct content loads.
+     */
+    private fun openViewer(uniqueId: String, fromQrScan: Boolean = false) {
         // Pre-flight: check ARCore support BEFORE heavy network loading
         if (!ArSessionHelper.isArCoreSupported(this)) {
             showDeviceNotSupportedPanel(uniqueId)
             return
         }
-        viewModel.loadManifest(uniqueId)
+        viewModel.loadManifest(uniqueId, forceRefresh = fromQrScan)
     }
 
     private fun showDeviceNotSupportedPanel(uniqueId: String) {

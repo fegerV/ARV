@@ -60,15 +60,16 @@ class MainViewModel @Inject constructor(
     /**
      * Load manifest for the given [uniqueId].
      *
+     * @param forceRefresh if true, skip cache and fetch from network (use when user just scanned a new QR).
      * Transitions state: Input → Loading → NavigateToAr | Error.
      */
-    fun loadManifest(uniqueId: String) {
+    fun loadManifest(uniqueId: String, forceRefresh: Boolean = false) {
         lastAttemptedUniqueId = uniqueId
         _uiState.value = UiState.Loading
 
         viewModelScope.launch {
             val result = withContext(Dispatchers.IO) {
-                repository.loadManifest(uniqueId)
+                repository.loadManifest(uniqueId, forceRefresh)
             }
             result.fold(
                 onSuccess = { manifest ->

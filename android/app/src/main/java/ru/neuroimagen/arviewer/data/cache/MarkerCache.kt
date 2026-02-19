@@ -21,7 +21,7 @@ object MarkerCache {
 
     private const val TAG = "MarkerCache"
     private const val CACHE_DIR_NAME = "marker_cache"
-    private const val MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000L // 7 days
+    private const val MAX_AGE_MS = 24 * 60 * 60 * 1000L // 1 day
 
     private val lock = ReentrantReadWriteLock()
 

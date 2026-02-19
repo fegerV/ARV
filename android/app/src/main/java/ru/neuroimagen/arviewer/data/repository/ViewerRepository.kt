@@ -36,28 +36,33 @@ class ViewerRepository @Inject constructor(
     private val backgroundScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     /**
-     * Loads manifest with cache-first strategy:
+     * Loads manifest with cache-first strategy (unless [forceRefresh]):
      *
-     * 1. If a cached manifest exists → return it **instantly** and refresh
-     *    the cache in the background (stale-while-revalidate).
-     * 2. If no cache → full network fetch (check + manifest).
+     * 1. If [forceRefresh] or no cache: full network fetch, then store in cache.
+     * 2. If a cached manifest exists and not expired → return it and refresh in background.
      * 3. On network failure without cache → propagate error.
+     *
+     * Use [forceRefresh] = true when user just scanned a new QR so the correct content loads.
      *
      * @return Result with [ViewerManifest] on success, or [ViewerError] on failure.
      */
-    suspend fun loadManifest(uniqueId: String): Result<ViewerManifest> {
+    suspend fun loadManifest(uniqueId: String, forceRefresh: Boolean = false): Result<ViewerManifest> {
         val start = System.currentTimeMillis()
         val trimmed = uniqueId.trim()
         if (trimmed.isBlank()) {
             return Result.failure(ViewerError.Unavailable(ContentUnavailableReason.INVALID_UNIQUE_ID))
         }
 
-        val cached = ManifestCache.get(context, trimmed)
-        if (cached != null) {
-            val elapsed = System.currentTimeMillis() - start
-            Log.d(TAG, "⚡ Manifest cache HIT for $trimmed — returning in ${elapsed}ms")
-            backgroundScope.launch { refreshManifest(trimmed) }
-            return Result.success(cached)
+        if (!forceRefresh) {
+            val cached = ManifestCache.get(context, trimmed)
+            if (cached != null) {
+                val elapsed = System.currentTimeMillis() - start
+                Log.d(TAG, "⚡ Manifest cache HIT for $trimmed — returning in ${elapsed}ms")
+                backgroundScope.launch { refreshManifest(trimmed) }
+                return Result.success(cached)
+            }
+        } else {
+            Log.d(TAG, "Manifest force refresh for $trimmed (e.g. new QR scan)")
         }
 
         Log.d(TAG, "Manifest cache MISS for $trimmed — full network fetch")

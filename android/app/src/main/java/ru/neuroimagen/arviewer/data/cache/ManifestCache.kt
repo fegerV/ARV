@@ -17,7 +17,7 @@ object ManifestCache {
 
     private const val TAG = "ManifestCache"
     private const val CACHE_DIR_NAME = "manifest_cache"
-    private const val MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000L // 7 days
+    private const val MAX_AGE_MS = 24 * 60 * 60 * 1000L // 1 day
 
     private val gson = Gson()
     private val lock = ReentrantReadWriteLock()
