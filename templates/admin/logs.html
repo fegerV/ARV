@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+
+{% block title %}Логи сервера - Vertex AR Admin{% endblock %}
+
+{% block page_title %}Логи сервера{% endblock %}
+
+{% block body %}
+<div class="p-6" x-data="logsPage()">
+    <div class="max-w-7xl mx-auto">
+        <div class="mb-4 flex flex-wrap items-center gap-3">
+            <span class="text-sm text-gray-500 dark:text-gray-400">
+                Источник:
+                <span x-show="source === 'file'" x-text="'файл'"></span>
+                <span x-show="source === 'journalctl'" x-text="'journalctl'"></span>
+                <span x-show="source === '' && !error" x-text="'—'"></span>
+            </span>
+            <select x-model="lines" @change="refresh()"
+                    class="rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-sm py-1.5 px-2">
+                <option value="100">100 строк</option>
+                <option value="300">300 строк</option>
+                <option value="500">500 строк</option>
+                <option value="1000">1000 строк</option>
+            </select>
+            <button @click="refresh()" :disabled="loading"
+                    class="inline-flex items-center px-3 py-1.5 border border-gray-300 dark:border-gray-600 rounded-md text-sm font-medium text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50">
+                <span class="material-icons text-lg mr-1" :class="{ 'animate-spin': loading }">refresh</span>
+                Обновить
+            </button>
+        </div>
+
+        <div x-show="error" class="mb-4 p-4 rounded-lg bg-amber-50 dark:bg-amber-900/20 text-amber-800 dark:text-amber-200 text-sm"
+             x-text="error"></div>
+
+        <div class="rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 overflow-hidden">
+            <pre id="log-content" class="p-4 text-xs font-mono text-gray-800 dark:text-gray-200 overflow-x-auto overflow-y-auto max-h-[70vh] whitespace-pre-wrap break-all">{{ log_lines | join('\n') }}</pre>
+        </div>
+
+        <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
+            Чтобы читать логи из файла, задайте <code class="bg-gray-200 dark:bg-gray-700 px-1 rounded">LOG_FILE</code> в .env.
+            Иначе используется <code class="bg-gray-200 dark:bg-gray-700 px-1 rounded">journalctl -u {{ log_source }}</code> (нужны права на чтение journal).
+        </p>
+    </div>
+</div>
+
+<script>
+function logsPage() {
+    return {
+        lines: {{ max_lines }},
+        source: '{{ log_source }}',
+        error: {{ (log_error or '') | tojson }},
+        loading: false,
+        refresh() {
+            this.loading = true;
+            fetch('/api/admin/logs?lines=' + this.lines, { credentials: 'same-origin' })
+                .then(r => {
+                    if (!r.ok) throw new Error('Ошибка загрузки');
+                    return r.json();
+                })
+                .then(data => {
+                    this.source = data.source || '';
+                    this.error = data.error || '';
+                    const el = document.getElementById('log-content');
+                    if (el) el.textContent = (data.lines || []).join('\n');
+                })
+                .catch(e => { this.error = e.message || 'Ошибка запроса'; })
+                .finally(() => { this.loading = false; });
+        }
+    };
+}
+</script>
+{% endblock %}

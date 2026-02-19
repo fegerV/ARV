@@ -1,7 +1,7 @@
 from fastapi import APIRouter
 from .routes import (
     auth, dashboard, companies, projects, ar_content,
-    storage, analytics, notifications, settings, help_routes, htmx, debug
+    storage, analytics, notifications, settings, help_routes, htmx, debug, logs
 )
 
 html_router = APIRouter(prefix="", tags=["HTML"])
@@ -16,6 +16,7 @@ html_router.include_router(storage.router)
 html_router.include_router(analytics.router)
 html_router.include_router(notifications.router)
 html_router.include_router(settings.router)
+html_router.include_router(logs.router)
 html_router.include_router(help_routes.router)
 html_router.include_router(debug.router)
 html_router.include_router(htmx.router)

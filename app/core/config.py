@@ -126,6 +126,13 @@ class Settings(BaseSettings):
     # Monitoring
     SENTRY_DSN: str = ""
     PROMETHEUS_MULTIPROC_DIR: str = "/tmp/prometheus_multiproc"
+
+    # Admin: просмотр логов (страница /admin/logs)
+    # LOG_FILE — путь к файлу логов (если задан и файл есть, читаем из него)
+    # Иначе пробуем journalctl -u LOG_JOURNALCTL_UNIT (нужны права на чтение journal)
+    LOG_FILE: str = ""
+    LOG_JOURNALCTL_UNIT: str = "arv"
+    LOG_MAX_LINES: int = 500
     
     # Android App Links (for /.well-known/assetlinks.json)
     ANDROID_APP_PACKAGE: str = "ru.neuroimagen.arviewer"
