@@ -1,6 +1,7 @@
 """Страница просмотра логов сервера в админке."""
 
 import asyncio
+import re
 from pathlib import Path
 
 import structlog
@@ -16,6 +17,45 @@ router = APIRouter()
 logger = structlog.get_logger()
 templates = Jinja2Templates(directory="templates")
 templates.env.filters["tojson"] = tojson_filter
+
+# Паттерны для определения уровня по строке (JSON structlog, journalctl, traceback)
+_LEVEL_ERROR = re.compile(
+    r'"level"\s*:\s*"error"|"event"\s*:\s*"[^"]*error[^"]*"|'
+    r'\b(?:error|Error|ERROR|Exception|Traceback|Fatal|SAWarning)\b|'
+    r'Traceback \(most recent|File ".*", line \d+',
+    re.IGNORECASE,
+)
+_LEVEL_WARNING = re.compile(
+    r'"level"\s*:\s*"warning"|"event"\s*:\s*"[^"]*warn[^"]*"|'
+    r'\b(?:warning|Warning|WARNING)\b',
+    re.IGNORECASE,
+)
+_LEVEL_DEBUG = re.compile(
+    r'"level"\s*:\s*"debug"|\bDEBUG\b',
+)
+
+
+def _classify_log_line(line: str) -> str:
+    """
+    Определяет уровень строки лога для подсветки.
+    Возвращает: "error", "warning", "info", "debug", "default".
+    """
+    if not line or not line.strip():
+        return "default"
+    if _LEVEL_ERROR.search(line):
+        return "error"
+    if _LEVEL_WARNING.search(line):
+        return "warning"
+    if _LEVEL_DEBUG.search(line):
+        return "debug"
+    if '"level": "info"' in line or '"level" : "info"' in line:
+        return "info"
+    return "default"
+
+
+def classify_log_lines(lines: list[str]) -> list[dict[str, str]]:
+    """Превращает список строк в список { "text", "level" } для цветного вывода."""
+    return [{"text": line, "level": _classify_log_line(line)} for line in lines]
 
 
 def _read_log_lines_from_file(path: str, max_lines: int) -> tuple[list[str], str | None]:
@@ -108,10 +148,11 @@ async def admin_logs_page(
         return RedirectResponse(url="/admin/login", status_code=303)
 
     lines, source, error = await get_log_content(None)
+    log_entries = classify_log_lines(lines)
     context = {
         "request": request,
         "current_user": current_user,
-        "log_lines": lines,
+        "log_entries": log_entries,
         "log_source": source,
         "log_error": error,
         "max_lines": settings.LOG_MAX_LINES,
@@ -131,9 +172,10 @@ async def api_admin_logs(
             content={"detail": "Unauthorized"},
         )
     log_lines, source, error = await get_log_content(lines)
+    items = classify_log_lines(log_lines)
     return {
-        "lines": log_lines,
+        "items": items,
         "source": source,
         "error": error or None,
-        "count": len(log_lines),
+        "count": len(items),
     }

@@ -31,9 +31,20 @@
         <div x-show="error" class="mb-4 p-4 rounded-lg bg-amber-50 dark:bg-amber-900/20 text-amber-800 dark:text-amber-200 text-sm"
              x-text="error"></div>
 
-        <div class="rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 overflow-hidden">
-            <pre id="log-content" class="p-4 text-xs font-mono text-gray-800 dark:text-gray-200 overflow-x-auto overflow-y-auto max-h-[70vh] whitespace-pre-wrap break-all">{{ log_lines | join('\n') }}</pre>
+        <div class="rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-900 overflow-hidden">
+            <div id="log-content" class="p-4 text-xs font-mono overflow-x-auto overflow-y-auto max-h-[70vh] space-y-0">
+                {% for entry in log_entries %}
+                <div class="log-line log-{{ entry.level }} whitespace-pre-wrap break-all border-l-2 border-transparent pl-2 py-0.5" data-level="{{ entry.level }}">{{ entry.text }}</div>
+                {% endfor %}
+            </div>
         </div>
+        <style>
+            #log-content .log-error { color: #f87171; background: rgba(248, 113, 113, 0.08); border-left-color: #dc2626 !important; }
+            #log-content .log-warning { color: #fbbf24; background: rgba(251, 191, 36, 0.06); border-left-color: #d97706 !important; }
+            #log-content .log-info { color: #86efac; }
+            #log-content .log-debug { color: #9ca3af; }
+            #log-content .log-default { color: #e5e7eb; }
+        </style>
 
         <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
             Чтобы читать логи из файла, задайте <code class="bg-gray-200 dark:bg-gray-700 px-1 rounded">LOG_FILE</code> в .env.
@@ -60,7 +71,14 @@ function logsPage() {
                     this.source = data.source || '';
                     this.error = data.error || '';
                     const el = document.getElementById('log-content');
-                    if (el) el.textContent = (data.lines || []).join('\n');
+                    if (!el) return;
+                    el.innerHTML = '';
+                    (data.items || []).forEach(function (item) {
+                        const div = document.createElement('div');
+                        div.className = 'log-line log-' + (item.level || 'default') + ' whitespace-pre-wrap break-all border-l-2 border-transparent pl-2 py-0.5';
+                        div.textContent = item.text || '';
+                        el.appendChild(div);
+                    });
                 })
                 .catch(e => { this.error = e.message || 'Ошибка запроса'; })
                 .finally(() => { this.loading = false; });
