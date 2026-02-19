@@ -8,7 +8,6 @@ duration and video play rate.  All queries accept a configurable
 
 from __future__ import annotations
 
-import asyncio
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
@@ -97,126 +96,110 @@ async def get_analytics_data(db: AsyncSession, period: int = _DEFAULT_PERIOD) ->
                 )
             ).scalar() or 0
 
-        async def _scalar(stmt):
-            r = await db.execute(stmt)
-            return r.scalar() or 0
-
-        async def _scalar_float(stmt):
-            r = await db.execute(stmt)
-            v = r.scalar()
-            return round(float(v), 1) if v is not None else 0
-
-        # Параллельный запуск всех независимых запросов
-        (
-            unique_sessions,
-            active_content,
-            total_content,
-            active_companies,
-            active_projects,
-            avg_duration,
-            video_total,
-            video_played,
-            views_day_rows,
-            top_rows,
-            company_rows,
-            device_rows,
-            browser_rows,
-        ) = await asyncio.gather(
-            _scalar(
-                _time_filter(
-                    select(func.count(distinct(ARViewSession.session_id))).select_from(ARViewSession)
+        # AsyncSession не поддерживает параллельные операции — выполняем запросы последовательно.
+        _r = await db.execute(
+            _time_filter(
+                select(func.count(distinct(ARViewSession.session_id))).select_from(ARViewSession)
+            )
+        )
+        unique_sessions = _r.scalar() or 0
+        _r = await db.execute(
+            select(func.count()).select_from(ARContent).where(
+                ARContent.status.in_(["ready", "active"])
+            )
+        )
+        active_content = _r.scalar() or 0
+        _r = await db.execute(select(func.count()).select_from(ARContent))
+        total_content = _r.scalar() or 0
+        _r = await db.execute(
+            select(func.count()).select_from(Company).where(Company.status == "active")
+        )
+        active_companies = _r.scalar() or 0
+        _r = await db.execute(
+            select(func.count()).select_from(Project).where(Project.status == "active")
+        )
+        active_projects = _r.scalar() or 0
+        _r = await db.execute(
+            _time_filter(
+                select(func.avg(ARViewSession.duration_seconds)).select_from(ARViewSession)
+            )
+        )
+        v = _r.scalar()
+        avg_duration = round(float(v), 1) if v is not None else 0
+        _r = await db.execute(_time_filter(select(func.count()).select_from(ARViewSession)))
+        video_total = _r.scalar() or 0
+        _r = await db.execute(
+            _time_filter(
+                select(func.count()).select_from(ARViewSession).where(
+                    ARViewSession.video_played.is_(True)
                 )
-            ),
-            _scalar(
-                select(func.count()).select_from(ARContent).where(
-                    ARContent.status.in_(["ready", "active"])
+            )
+        )
+        video_played = _r.scalar() or 0
+        views_day_rows = await db.execute(
+            _time_filter(
+                select(
+                    cast(ARViewSession.created_at, Date).label("day"),
+                    func.count().label("cnt"),
                 )
-            ),
-            _scalar(select(func.count()).select_from(ARContent)),
-            _scalar(
-                select(func.count()).select_from(Company).where(Company.status == "active")
-            ),
-            _scalar(
-                select(func.count()).select_from(Project).where(Project.status == "active")
-            ),
-            _scalar_float(
-                _time_filter(
-                    select(func.avg(ARViewSession.duration_seconds)).select_from(ARViewSession)
+                .select_from(ARViewSession)
+                .group_by(cast(ARViewSession.created_at, Date))
+                .order_by(cast(ARViewSession.created_at, Date))
+            )
+        )
+        top_rows = await db.execute(
+            _time_filter(
+                select(
+                    ARViewSession.ar_content_id,
+                    func.count().label("views"),
                 )
-            ),
-            _scalar(_time_filter(select(func.count()).select_from(ARViewSession))),
-            _scalar(
-                _time_filter(
-                    select(func.count()).select_from(ARViewSession).where(
-                        ARViewSession.video_played.is_(True)
-                    )
+                .select_from(ARViewSession)
+                .group_by(ARViewSession.ar_content_id)
+                .order_by(func.count().desc())
+                .limit(10)
+            )
+        )
+        company_rows = await db.execute(
+            _time_filter(
+                select(
+                    ARViewSession.company_id,
+                    func.count().label("views"),
+                    func.count(distinct(ARViewSession.session_id)).label("sessions"),
+                    func.avg(ARViewSession.duration_seconds).label("avg_dur"),
+                    func.sum(
+                        case(
+                            (ARViewSession.video_played.is_(True), 1),
+                            else_=0,
+                        )
+                    ).label("vp_count"),
                 )
-            ),
-            db.execute(
-                _time_filter(
-                    select(
-                        cast(ARViewSession.created_at, Date).label("day"),
-                        func.count().label("cnt"),
-                    )
-                    .select_from(ARViewSession)
-                    .group_by(cast(ARViewSession.created_at, Date))
-                    .order_by(cast(ARViewSession.created_at, Date))
+                .select_from(ARViewSession)
+                .group_by(ARViewSession.company_id)
+                .order_by(func.count().desc())
+            )
+        )
+        device_rows = await db.execute(
+            _time_filter(
+                select(
+                    func.coalesce(ARViewSession.device_type, literal_column("'unknown'")).label("dtype"),
+                    func.count().label("cnt"),
                 )
-            ),
-            db.execute(
-                _time_filter(
-                    select(
-                        ARViewSession.ar_content_id,
-                        func.count().label("views"),
-                    )
-                    .select_from(ARViewSession)
-                    .group_by(ARViewSession.ar_content_id)
-                    .order_by(func.count().desc())
-                    .limit(10)
+                .select_from(ARViewSession)
+                .group_by(func.coalesce(ARViewSession.device_type, literal_column("'unknown'")))
+                .order_by(func.count().desc())
+            )
+        )
+        browser_rows = await db.execute(
+            _time_filter(
+                select(
+                    func.coalesce(ARViewSession.browser, literal_column("'unknown'")).label("bname"),
+                    func.count().label("cnt"),
                 )
-            ),
-            db.execute(
-                _time_filter(
-                    select(
-                        ARViewSession.company_id,
-                        func.count().label("views"),
-                        func.count(distinct(ARViewSession.session_id)).label("sessions"),
-                        func.avg(ARViewSession.duration_seconds).label("avg_dur"),
-                        func.sum(
-                            case(
-                                (ARViewSession.video_played.is_(True), 1),
-                                else_=0,
-                            )
-                        ).label("vp_count"),
-                    )
-                    .select_from(ARViewSession)
-                    .group_by(ARViewSession.company_id)
-                    .order_by(func.count().desc())
-                )
-            ),
-            db.execute(
-                _time_filter(
-                    select(
-                        func.coalesce(ARViewSession.device_type, literal_column("'unknown'")).label("dtype"),
-                        func.count().label("cnt"),
-                    )
-                    .select_from(ARViewSession)
-                    .group_by(func.coalesce(ARViewSession.device_type, literal_column("'unknown'")))
-                    .order_by(func.count().desc())
-                )
-            ),
-            db.execute(
-                _time_filter(
-                    select(
-                        func.coalesce(ARViewSession.browser, literal_column("'unknown'")).label("bname"),
-                        func.count().label("cnt"),
-                    )
-                    .select_from(ARViewSession)
-                    .group_by(func.coalesce(ARViewSession.browser, literal_column("'unknown'")))
-                    .order_by(func.count().desc())
-                    .limit(8)
-                )
-            ),
+                .select_from(ARViewSession)
+                .group_by(func.coalesce(ARViewSession.browser, literal_column("'unknown'")))
+                .order_by(func.count().desc())
+                .limit(8)
+            )
         )
 
         try:

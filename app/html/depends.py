@@ -1,6 +1,5 @@
 """HTML route dependencies and data retrieval functions."""
 
-import asyncio
 from typing import List, Dict, Any, Optional
 from fastapi import Depends
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -34,27 +33,18 @@ def _raise_or_use_mock(error: Exception) -> None:
 
 
 async def get_dashboard_data(db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_active_user)) -> Dict[str, Any]:
-    """Get dashboard data with fallback to mock data."""
+    """Get dashboard data with fallback to mock data.
+    Запросы выполняются последовательно: AsyncSession не поддерживает параллельное использование.
+    """
     try:
-        analytics_task = analytics_summary(db=db)
-        companies_task = list_companies(page=1, page_size=100, db=db, current_user=current_user)
-        ar_content_task = list_all_ar_content(page=1, page_size=100, db=db)
-        
-        analytics_result, companies_result, ar_content_result = await asyncio.gather(
-            analytics_task, companies_task, ar_content_task, return_exceptions=True
-        )
-        
-        if isinstance(analytics_result, Exception):
-            raise analytics_result
-        if isinstance(companies_result, Exception):
-            raise companies_result
-        if isinstance(ar_content_result, Exception):
-            raise ar_content_result
-            
+        analytics_result = await analytics_summary(db=db)
+        companies_result = await list_companies(page=1, page_size=100, db=db, current_user=current_user)
+        ar_content_result = await list_all_ar_content(page=1, page_size=100, db=db)
+
         dashboard_data = dict(analytics_result)
         companies = [dict(item) for item in companies_result.items]
         ar_content = [dict(item) for item in ar_content_result.items]
-        
+
         return {
             "dashboard_data": dashboard_data,
             "companies": companies,
@@ -133,23 +123,16 @@ async def get_ar_content_detail(ar_content_id: int, db: AsyncSession = Depends(g
 
 
 async def get_ar_content_create_data(db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_active_user)) -> Dict[str, Any]:
-    """Get data for AR content creation page with fallback to mock data."""
+    """Get data for AR content creation page with fallback to mock data.
+    Запросы последовательно: AsyncSession не поддерживает параллельное использование.
+    """
     try:
-        companies_task = list_companies(page=1, page_size=100, db=db, current_user=current_user)
-        projects_task = list_projects(page=1, page_size=100, db=db, current_user=current_user)
-        
-        companies_result, projects_result = await asyncio.gather(
-            companies_task, projects_task, return_exceptions=True
-        )
-        
-        if isinstance(companies_result, Exception):
-            raise companies_result
-        if isinstance(projects_result, Exception):
-            raise projects_result
-            
+        companies_result = await list_companies(page=1, page_size=100, db=db, current_user=current_user)
+        projects_result = await list_projects(page=1, page_size=100, db=db, current_user=current_user)
+
         companies = [dict(item) for item in companies_result.items]
         projects = [dict(item) for item in projects_result.items]
-        
+
         return {
             "companies": companies,
             "projects": projects
