@@ -3,6 +3,7 @@ package ru.neuroimagen.arviewer.ui
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.os.Build
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -16,6 +17,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import ru.neuroimagen.arviewer.BuildConfig
+import ru.neuroimagen.arviewer.data.api.AnalyticsApi
 import ru.neuroimagen.arviewer.data.api.ViewerApi
 import ru.neuroimagen.arviewer.data.cache.MarkerCache
 import ru.neuroimagen.arviewer.data.model.ViewerManifest
@@ -35,6 +37,7 @@ class ArViewerViewModel @Inject constructor(
     @ApplicationContext private val appContext: Context,
     private val viewerRepository: ViewerRepository,
     private val viewerApi: ViewerApi,
+    private val analyticsApi: AnalyticsApi,
     private val gson: Gson,
 ) : ViewModel() {
 

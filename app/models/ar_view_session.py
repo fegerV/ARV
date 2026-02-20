@@ -32,6 +32,7 @@ class ARViewSession(Base):
 
     user_agent = Column(String)
     device_type = Column(String(50))
+    device_model = Column(String(120), nullable=True)  # e.g. "Samsung SM-G960", "iPhone14,2"
     browser = Column(String(100))
     os = Column(String(100))
 

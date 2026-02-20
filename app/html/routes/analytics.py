@@ -58,6 +58,7 @@ def _empty_analytics() -> dict[str, Any]:
         "top_content": [],
         "company_stats": [],
         "device_stats": [],
+        "device_model_stats": [],
         "browser_stats": [],
     }
 
@@ -178,6 +179,7 @@ async def get_analytics_data(db: AsyncSession, period: int = _DEFAULT_PERIOD) ->
                 .order_by(func.count().desc())
             )
         )
+        # Только мобильные платформы (Android, iOS); desktop не учитываем
         device_rows = await db.execute(
             _time_filter(
                 select(
@@ -185,6 +187,7 @@ async def get_analytics_data(db: AsyncSession, period: int = _DEFAULT_PERIOD) ->
                     func.count().label("cnt"),
                 )
                 .select_from(ARViewSession)
+                .where(func.lower(func.coalesce(ARViewSession.device_type, "")) != "desktop")
                 .group_by(func.coalesce(ARViewSession.device_type, literal_column("'unknown'")))
                 .order_by(func.count().desc())
             )
@@ -199,6 +202,22 @@ async def get_analytics_data(db: AsyncSession, period: int = _DEFAULT_PERIOD) ->
                 .group_by(func.coalesce(ARViewSession.browser, literal_column("'unknown'")))
                 .order_by(func.count().desc())
                 .limit(8)
+            )
+        )
+        # Модели устройств (Android/iOS): только сессии с заполненным device_model
+        device_model_rows = await db.execute(
+            _time_filter(
+                select(
+                    ARViewSession.device_model,
+                    func.coalesce(ARViewSession.os, literal_column("''")).label("os"),
+                    func.count().label("cnt"),
+                )
+                .select_from(ARViewSession)
+                .where(ARViewSession.device_model.isnot(None))
+                .where(ARViewSession.device_model != "")
+                .group_by(ARViewSession.device_model, ARViewSession.os)
+                .order_by(func.count().desc())
+                .limit(15)
             )
         )
 
@@ -218,6 +237,7 @@ async def get_analytics_data(db: AsyncSession, period: int = _DEFAULT_PERIOD) ->
         company_rows = company_rows.all()
         device_rows = device_rows.all()
         browser_rows = browser_rows.all()
+        device_model_rows = device_model_rows.all()
 
         # --- Views by day (time-series, from parallel result) ------------------
         # Build a continuous date range so the chart has no gaps
@@ -318,8 +338,14 @@ async def get_analytics_data(db: AsyncSession, period: int = _DEFAULT_PERIOD) ->
                 })
 
         # --- Device & browser (from parallel result) ---------------------------
-        device_stats = [{"label": r[0] or "unknown", "value": r[1]} for r in device_rows]
+        # device_stats уже без desktop (отфильтровано в запросе)
+        device_stats = [{"label": (r[0] or "unknown"), "value": r[1]} for r in device_rows]
         browser_stats = [{"label": r[0] or "unknown", "value": r[1]} for r in browser_rows]
+        # Модели устройств: label "Модель (OS)" для отображения в таблице
+        device_model_stats = [
+            {"label": f"{r[0]} ({r[1]})" if r[1] else (r[0] or "—"), "value": r[2]}
+            for r in device_model_rows
+        ]
 
         return {
             "period": period,
@@ -335,6 +361,7 @@ async def get_analytics_data(db: AsyncSession, period: int = _DEFAULT_PERIOD) ->
             "top_content": top_content,
             "company_stats": company_stats,
             "device_stats": device_stats,
+            "device_model_stats": device_model_stats,
             "browser_stats": browser_stats,
         }
     except Exception as exc:

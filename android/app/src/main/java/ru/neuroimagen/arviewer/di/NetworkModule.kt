@@ -9,6 +9,7 @@ import okhttp3.OkHttpClient
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 import ru.neuroimagen.arviewer.BuildConfig
+import ru.neuroimagen.arviewer.data.api.AnalyticsApi
 import ru.neuroimagen.arviewer.data.api.ViewerApi
 import java.util.concurrent.TimeUnit
 import javax.inject.Singleton
@@ -49,4 +50,9 @@ object NetworkModule {
     @Singleton
     fun provideViewerApi(retrofit: Retrofit): ViewerApi =
         retrofit.create(ViewerApi::class.java)
+
+    @Provides
+    @Singleton
+    fun provideAnalyticsApi(retrofit: Retrofit): AnalyticsApi =
+        retrofit.create(AnalyticsApi::class.java)
 }

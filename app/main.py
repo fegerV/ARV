@@ -3,17 +3,41 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 from fastapi import FastAPI, Request, status
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, ORJSONResponse
+from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, ORJSONResponse, Response
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.requests import Request
+import logging
 import structlog
 import os
 import sys
 from typing import AsyncGenerator
 from uuid import UUID
+
+# Подстроки путей типичных сканеров/эксплойтов — не логируем 404/405 по ним (не засоряем журнал)
+_ACCESS_LOG_PROBE_PATTERNS = (
+    "phpunit",
+    "eval-stdin.php",
+    "think/app",
+    "invokefunction",
+    "pearcmd",
+    "config-create",
+    "/containers/json",
+    ".php",
+    "wp-",
+    "wp_content",
+    "xmlrpc",
+    ".env",
+    "phpinfo",
+    "shell.",
+    "cmd.",
+    "PROPFIND",  # WebDAV-пробы, часто 405
+    "allow_url_include",
+    "auto_prepend_file",
+    "php://input",
+)
 
 from app.core.config import settings
 from app.core.database import seed_defaults
@@ -22,7 +46,22 @@ from app.middleware.rate_limiter import setup_rate_limiting
 from app.middleware.site_context import SiteContextMiddleware
 
 
-# Configure structured logging
+class _AccessLogProbeFilter(logging.Filter):
+    """Не пропускать в access-лог запросы 404/405 по известным путям сканеров (PHP, Docker и т.д.)."""
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        try:
+            msg = record.getMessage()
+        except Exception:
+            return True
+        if " 404 " not in msg and " 405 " not in msg:
+            return True
+        msg_lower = msg.lower()
+        if any(p.lower() in msg_lower for p in _ACCESS_LOG_PROBE_PATTERNS):
+            return False
+        return True
+
+
 def configure_logging() -> None:
     """Configure structured logging with structlog."""
     structlog.configure(
@@ -41,6 +80,9 @@ def configure_logging() -> None:
         logger_factory=structlog.PrintLoggerFactory(),
         cache_logger_on_first_use=False,
     )
+    # Уменьшаем шум от сканеров в access-логе uvicorn (404/405 по путям PHP/Docker и т.д.)
+    uvicorn_access = logging.getLogger("uvicorn.access")
+    uvicorn_access.addFilter(_AccessLogProbeFilter())
 
 
 # Application lifespan
@@ -384,17 +426,29 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 
 logger.info("storage_mounted", storage_dir=storage_dir)
 
-# Favicon endpoint (used when Nginx proxies /favicon.ico to backend)
-@app.get("/favicon.ico")
-async def favicon():
-    """Serve favicon from static or templates."""
-    import os
+# Favicon: один ответ для /favicon.ico и /admin/favicon.ico (браузер запрашивает по пути страницы)
+def _favicon_response() -> FileResponse | Response:
+    """Возвращает favicon из static/templates или дефолтную иконку."""
     for path in ("static/favicon.ico", "static/favicon.png", "templates/favicon.png"):
         if os.path.exists(path):
             return FileResponse(path, media_type="image/png" if path.endswith(".png") else "image/x-icon")
-    from fastapi.responses import Response
-    default_favicon = b'\x00\x00\x01\x00\x01\x00\x10\x10\x00\x00\x01\x00\x04\x00\x86\x00\x00\x00(\x00\x00\x00\x10\x00\x00\x00 \x00\x00\x00\x01\x00\x04\x00'
+    default_favicon = (
+        b'\x00\x00\x01\x00\x01\x00\x10\x10\x00\x00\x01\x00\x04\x00\x86\x00\x00\x00'
+        b'(\x00\x00\x00\x10\x00\x00\x00 \x00\x00\x00\x01\x00\x04\x00'
+    )
     return Response(content=default_favicon, media_type="image/x-icon")
+
+
+@app.get("/favicon.ico")
+async def favicon():
+    """Favicon для корня сайта."""
+    return _favicon_response()
+
+
+@app.get("/admin/favicon.ico")
+async def admin_favicon():
+    """Favicon для страниц /admin/* (убирает 404 в логах при открытии /admin/login)."""
+    return _favicon_response()
 
 
 if __name__ == "__main__":
