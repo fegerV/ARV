@@ -1,11 +1,10 @@
 import asyncio
 from typing import AsyncGenerator
-from fastapi import Request, Depends
+from fastapi import Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.exc import IllegalStateChangeError
-from app.core.database import get_db, AsyncSessionLocal
+from app.core.database import AsyncSessionLocal
 from app.api.routes.auth import get_current_active_user, get_current_user_optional
-from app.models.user import User
 import structlog
 
 logger = structlog.get_logger(__name__)

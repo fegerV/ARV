@@ -8,7 +8,7 @@ duration and video play rate.  All queries accept a configurable
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 from typing import Any
 
 import structlog

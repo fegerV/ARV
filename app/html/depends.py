@@ -1,6 +1,6 @@
 """HTML route dependencies and data retrieval functions."""
 
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any
 from fastapi import Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
