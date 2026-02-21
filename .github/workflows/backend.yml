@@ -7,6 +7,7 @@ on:
       - "app/**"
       - "tests/**"
       - "alembic/**"
+      - "pytest.ini"
       - "requirements*.txt"
       - ".github/workflows/backend.yml"
   pull_request:
@@ -15,6 +16,7 @@ on:
       - "app/**"
       - "tests/**"
       - "alembic/**"
+      - "pytest.ini"
       - "requirements*.txt"
       - ".github/workflows/backend.yml"
 
@@ -55,6 +57,7 @@ jobs:
         env:
           DATABASE_URL: "sqlite+aiosqlite:///./test_vertex_ar.db"
           SECRET_KEY: "test-secret-key-min-32-chars-long"
+          PYTHONPATH: .
 
   lint:
     runs-on: ubuntu-latest
