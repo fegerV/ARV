@@ -84,10 +84,10 @@ class Settings(BaseSettings):
         from pathlib import Path
         return Path(self.SSL_KEYFILE).exists() and Path(self.SSL_CERTFILE).exists()
 
-    # Media
-    MEDIA_ROOT: str = "/app/storage/content"
-    TEMPLATES_DIR: str = "/app/templates"
-    STATIC_DIR: str = "/app/static"
+    # Media (относительные пути для CI/локальной разработки; в Docker задаются через env)
+    MEDIA_ROOT: str = "./storage/content"
+    TEMPLATES_DIR: str = "./templates"
+    STATIC_DIR: str = "./static"
     
     # Storage
     # Default to ./storage relative to project root, or /tmp/storage if running in container

@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 from typing import Optional, List
 from datetime import datetime
 from app.enums import ProjectStatus
@@ -6,33 +6,35 @@ from app.enums import ProjectStatus
 
 class ProjectCreate(BaseModel):
     """Schema for creating a new project"""
+
+    model_config = ConfigDict(from_attributes=True)
+
     company_id: int = Field(..., description="Company ID")
     name: str = Field(..., min_length=1, max_length=255, description="Project name")
     status: Optional[ProjectStatus] = Field(default=ProjectStatus.ACTIVE, description="Project status")
 
-    @validator('status')
+    @field_validator("status")
+    @classmethod
     def validate_status(cls, v):
         if v is None:
             return ProjectStatus.ACTIVE
         return v
 
-    class Config:
-        from_attributes = True
-
 
 class ProjectUpdate(BaseModel):
     """Schema for updating an existing project"""
+
+    model_config = ConfigDict(from_attributes=True)
+
     name: Optional[str] = Field(None, min_length=1, max_length=255, description="Project name")
     status: Optional[ProjectStatus] = Field(None, description="Project status")
 
-    @validator('status')
+    @field_validator("status")
+    @classmethod
     def validate_status(cls, v):
         if v is not None and not isinstance(v, ProjectStatus):
-            raise ValueError('Status must be a valid ProjectStatus enum value')
+            raise ValueError("Status must be a valid ProjectStatus enum value")
         return v
-
-    class Config:
-        from_attributes = True
 
 
 class ProjectLinks(BaseModel):
@@ -44,6 +46,9 @@ class ProjectLinks(BaseModel):
 
 class ProjectListItem(BaseModel):
     """Schema for project list item response"""
+
+    model_config = ConfigDict(from_attributes=True)
+
     id: str
     name: str
     status: ProjectStatus
@@ -52,12 +57,12 @@ class ProjectListItem(BaseModel):
     created_at: datetime
     _links: ProjectLinks
 
-    class Config:
-        from_attributes = True
-
 
 class ProjectDetail(BaseModel):
     """Schema for detailed project response"""
+
+    model_config = ConfigDict(from_attributes=True)
+
     id: str
     name: str
     status: ProjectStatus
@@ -65,9 +70,6 @@ class ProjectDetail(BaseModel):
     ar_content_count: int = Field(..., description="Number of AR content items for this project")
     created_at: datetime
     _links: ProjectLinks
-
-    class Config:
-        from_attributes = True
 
 
 class PaginatedProjectsResponse(BaseModel):

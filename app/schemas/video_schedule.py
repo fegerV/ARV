@@ -1,6 +1,6 @@
 from datetime import datetime
 from typing import Optional, List
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class VideoScheduleBase(BaseModel):
@@ -20,14 +20,13 @@ class VideoScheduleUpdate(BaseModel):
 
 
 class VideoScheduleInDBBase(VideoScheduleBase):
+    model_config = ConfigDict(from_attributes=True)
+
     id: int
     video_id: int
     status: str
     created_at: datetime
     updated_at: datetime
-
-    class Config:
-        from_attributes = True
 
 
 class VideoSchedule(VideoScheduleInDBBase):

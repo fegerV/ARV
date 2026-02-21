@@ -1,17 +1,16 @@
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, ConfigDict, EmailStr, Field
 from datetime import datetime
 from typing import Optional
 
 
 class UserResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: int
     email: str
     full_name: str
     role: str
     last_login_at: Optional[datetime] = None
-    
-    class Config:
-        from_attributes = True
 
 
 class Token(BaseModel):

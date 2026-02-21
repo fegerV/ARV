@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 from typing import Optional, Dict, Any, Literal
 from datetime import datetime
 
@@ -20,6 +20,8 @@ class StorageConnectionUpdate(BaseModel):
     metadata: Optional[Dict[str, Any]] = None
 
 class StorageConnection(StorageConnectionBase):
+    model_config = ConfigDict(from_attributes=True)
+
     id: int
     is_active: bool
     base_path: str
@@ -30,9 +32,6 @@ class StorageConnection(StorageConnectionBase):
     created_at: datetime
     updated_at: datetime
 
-    class Config:
-        from_attributes = True
-
 # ============ Storage Folders ============
 
 class StorageFolderCreate(BaseModel):
@@ -41,6 +40,8 @@ class StorageFolderCreate(BaseModel):
     folder_type: Literal["ar_content", "videos", "markers", "thumbnails", "qr-codes"]
 
 class StorageFolderResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: int
     company_id: int
     name: str
@@ -49,9 +50,6 @@ class StorageFolderResponse(BaseModel):
     files_count: int
     total_size_bytes: int
     created_at: datetime
-
-    class Config:
-        from_attributes = True
 
 # ============ Company Storage Settings ============
 

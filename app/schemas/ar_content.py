@@ -1,32 +1,32 @@
 from typing import Optional, Dict, Any, List
 from datetime import datetime
-from pydantic import BaseModel, Field, EmailStr
+from pydantic import BaseModel, ConfigDict, Field, EmailStr
 from app.enums import ArContentStatus
 
 
 class ArContentCreate(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     project_id: int
     customer_name: Optional[str] = None
     customer_phone: Optional[str] = None
     customer_email: Optional[EmailStr] = None
     duration_years: int = Field(default=30)
-    
-    class Config:
-        from_attributes = True
 
 
 class ArContentUpdate(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     customer_name: Optional[str] = None
     customer_phone: Optional[str] = None
     customer_email: Optional[EmailStr] = None
     status: Optional[ArContentStatus] = None
     duration_years: Optional[int] = None
-    
-    class Config:
-        from_attributes = True
 
 
 class VideoResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: int
     ar_content_id: int
     filename: str
@@ -35,12 +35,11 @@ class VideoResponse(BaseModel):
     status: str
     is_active: bool
     created_at: datetime
-    
-    class Config:
-        from_attributes = True
 
 
 class ArContentResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: int
     order_number: str
     project_id: int
@@ -59,47 +58,47 @@ class ArContentResponse(BaseModel):
     video_url: Optional[str] = None
     created_at: datetime
     updated_at: datetime
-    
-    class Config:
-        from_attributes = True
 
 
 class ArContentDetailResponse(ArContentResponse):
+    model_config = ConfigDict(from_attributes=True)
+
     videos: List[VideoResponse] = []
     active_video: Optional[VideoResponse] = None
-    
-    class Config:
-        from_attributes = True
 
 
 # Additional schemas for API compatibility
 class ARContent(ArContentResponse):
-    """Alias for ArContentResponse for backward compatibility"""
+    """Alias for ArContentResponse for backward compatibility."""
+
     pass
 
 
 class ARContentVideoUpdate(BaseModel):
-    """Schema for updating the active video of AR content"""
+    """Schema for updating the active video of AR content."""
+
+    model_config = ConfigDict(from_attributes=True)
+
     active_video_id: int
-    
-    class Config:
-        from_attributes = True
 
 
 class ARContentList(BaseModel):
-    """Schema for AR content list response"""
+    """Schema for AR content list response."""
+
+    model_config = ConfigDict(from_attributes=True)
+
     items: List[ArContentResponse]
     total: int = Field(..., description="Total number of AR content items")
     page: int = Field(..., description="Current page number")
     page_size: int = Field(..., description="Number of items per page")
     total_pages: int = Field(..., description="Total number of pages")
-    
-    class Config:
-        from_attributes = True
 
 
 class ARContentCreateResponse(BaseModel):
-    """Schema for AR content creation response"""
+    """Schema for AR content creation response."""
+
+    model_config = ConfigDict(from_attributes=True)
+
     id: int
     order_number: str
     public_link: str
@@ -107,9 +106,6 @@ class ARContentCreateResponse(BaseModel):
     photo_url: str
     video_url: str
     photo_analysis: Optional[Dict[str, Any]] = None
-    
-    class Config:
-        from_attributes = True
 
 
 class ARContentWithLinks(BaseModel):
@@ -145,8 +141,7 @@ class ARContentWithLinks(BaseModel):
     videos: List[VideoResponse] = []
     active_video: Optional[VideoResponse] = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 # Aliases for backward compatibility with existing API routes
