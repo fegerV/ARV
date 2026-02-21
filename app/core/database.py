@@ -1,7 +1,6 @@
 """Database configuration and session management."""
 
 import asyncio
-import sys
 from sqlalchemy import MetaData
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 from sqlalchemy.orm import declarative_base
@@ -92,9 +91,7 @@ def init_db_sync() -> None:
     """Initialize database by running Alembic migrations"""
     from alembic.config import Config
     from alembic import command
-    import os
-    from pathlib import Path
-    
+
     try:
         # Create alembic config
         alembic_cfg = Config("alembic.ini")

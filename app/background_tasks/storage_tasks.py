@@ -10,7 +10,6 @@ from typing import BinaryIO, Optional, Union
 from fastapi import BackgroundTasks, UploadFile
 
 from app.core.config import settings
-from app.core.storage import get_storage_provider
 from . import run_background_task
 
 logger = logging.getLogger(__name__)
@@ -76,8 +75,6 @@ def _save_file_content(
     Returns:
         The path where the file was saved
     """
-    storage = get_storage_provider()
-    
     # Ensure the destination directory exists
     dest_path = Path(settings.LOCAL_STORAGE_PATH) / destination
     dest_path.parent.mkdir(parents=True, exist_ok=True)

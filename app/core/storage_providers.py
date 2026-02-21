@@ -6,7 +6,6 @@ currently supporting local file system storage with the ability to
 extend to other providers in the future.
 """
 
-import os
 import shutil
 from abc import ABC, abstractmethod
 from pathlib import Path

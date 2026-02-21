@@ -6,7 +6,7 @@ storage provider abstraction. The old MinIO-specific functionality has been
 removed in favor of a simplified local storage provider.
 """
 
-from app.core.storage_providers import get_storage_provider, StorageProvider, LocalStorageProvider
+from app.core.storage_providers import get_storage_provider, StorageProvider
 
 # Re-export the main functions for backward compatibility
 def get_storage_provider_instance() -> StorageProvider:

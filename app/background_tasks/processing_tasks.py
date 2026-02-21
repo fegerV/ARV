@@ -4,15 +4,13 @@ CPU-intensive processing tasks.
 
 import logging
 import os
-from typing import Any, Dict, List, Tuple, Union
+from typing import Any, Dict, List, Tuple
 
 import cv2
 import numpy as np
 from fastapi import BackgroundTasks
 
-from app.core.config import settings
-from app.core.storage import get_storage_provider
-from . import run_background_task, run_in_threadpool
+from . import run_background_task
 
 logger = logging.getLogger(__name__)
 
