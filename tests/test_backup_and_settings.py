@@ -1,11 +1,6 @@
 """Tests for backup system, settings schemas, and common fixes."""
 
 import pytest
-from datetime import datetime
-from unittest.mock import AsyncMock, MagicMock, patch
-
-from fastapi import FastAPI
-from fastapi.testclient import TestClient
 
 
 # ---------------------------------------------------------------------------
