@@ -5,7 +5,7 @@ This module contains background tasks that were previously handled by Celery.
 """
 
 from fastapi import BackgroundTasks
-from typing import Any, Callable, Dict, List, Optional, Union
+from typing import Any, Callable
 import asyncio
 import logging
 from concurrent.futures import ThreadPoolExecutor

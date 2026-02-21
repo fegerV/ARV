@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import List, Optional
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, UploadFile, File, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, and_, or_
@@ -16,7 +16,6 @@ from app.schemas.video_schedule import (
 )
 from app.services.video_scheduler import (
     compute_video_status, compute_days_remaining,
-    get_active_video_schedule, update_rotation_state
 )
 from app.utils.ar_content import build_ar_content_storage_path, build_public_url
 from app.utils.video_utils import (

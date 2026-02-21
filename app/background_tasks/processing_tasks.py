@@ -4,7 +4,7 @@ CPU-intensive processing tasks.
 
 import logging
 import os
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Tuple, Union
 
 import cv2
 import numpy as np
