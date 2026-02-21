@@ -53,11 +53,10 @@ jobs:
           SECRET_KEY: "test-secret-key-min-32-chars-long"
 
       - name: Run tests
-        run: pytest tests/ -v --tb=short
+        run: PYTHONPATH=${{ github.workspace }} pytest tests/ -v --tb=short
         env:
           DATABASE_URL: "sqlite+aiosqlite:///./test_vertex_ar.db"
           SECRET_KEY: "test-secret-key-min-32-chars-long"
-          PYTHONPATH: .
 
   lint:
     runs-on: ubuntu-latest

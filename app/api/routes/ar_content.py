@@ -15,6 +15,8 @@ from datetime import datetime
 
 from app.services.thumbnail_service import thumbnail_service
 
+# marker_service — ленивый импорт (cv2/numpy), не грузить при старте приложения
+
 from app.core.config import settings
 from app.core.database import get_db
 from app.models.ar_content import ARContent
@@ -35,7 +37,6 @@ from app.utils.ar_content import (
     generate_qr_code,
     save_uploaded_file,
 )
-from app.services.marker_service import marker_service
 from app.core.storage_providers import get_provider_for_company
 
 import json
@@ -340,6 +341,7 @@ async def _create_ar_content(
     )
 
     # Analyze photo quality and build recommendations (always uses local file)
+    from app.services.marker_service import marker_service
     image_quality = marker_service.analyze_image_quality(str(photo_path))
     recommendations = marker_service.build_image_recommendations(image_quality)
     photo_analysis: dict = {
@@ -1350,6 +1352,7 @@ async def analyze_photo_quality(
             tmp.write(contents)
 
         import cv2
+        from app.services.marker_service import marker_service
 
         img = cv2.imread(tmp_path)
         if img is None:

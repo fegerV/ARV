@@ -17,7 +17,7 @@ from app.models.video import Video
 from app.models.video_schedule import VideoSchedule as VideoScheduleModel
 from app.models.video_rotation_schedule import VideoRotationSchedule
 from app.services.video_scheduler import compute_video_status, compute_days_remaining, get_active_video
-from app.services.marker_service import marker_service
+# marker_service — ленивый импорт (cv2/numpy)
 from app.models.ar_content import ARContent
 from app.utils.ar_content import build_public_url
 from app.html.deps import get_html_db
@@ -927,6 +927,7 @@ async def ar_content_detail(
                 local_analysis_path = photo_path_raw
 
             if local_analysis_path:
+                from app.services.marker_service import marker_service
                 image_quality = marker_service.analyze_image_quality(local_analysis_path)
                 if image_quality:
                     marker_metadata = {**marker_metadata, "image_quality": image_quality}
@@ -956,6 +957,7 @@ async def ar_content_detail(
             if not marker_path.is_absolute():
                 marker_path = Path(settings.LOCAL_STORAGE_PATH) / marker_path_value
             ar_content["marker_url"] = build_public_url(marker_path)
+        from app.services.marker_service import marker_service
         iq = marker_metadata.get("image_quality") or {}
         rec_prob = iq.get("recognition_probability")
         marker_metrics = {
@@ -1152,6 +1154,7 @@ async def ar_content_detail(
             }
         videos, active_video_info = [], None
         rotation_schedule_js = None  # Ensure it's set even in fallback
+        from app.services.marker_service import marker_service
         marker_metadata = ar_content.get("marker_metadata") or {}
         iq_fb = marker_metadata.get("image_quality") or {}
         rec_prob_fb = iq_fb.get("recognition_probability")
