@@ -11,7 +11,10 @@ router = APIRouter()
 @router.get("/ar/{unique_id}/content")
 async def get_public_ar_content(unique_id: str, db: AsyncSession = Depends(get_db)):
     """Get public AR content data for the viewer template."""
-    stmt = select(ARContent).where(ARContent.unique_id == unique_id, ARContent.is_active == True)
+    stmt = select(ARContent).where(
+        ARContent.unique_id == unique_id,
+        ARContent.status.in_(["active", "ready"]),
+    )
     res = await db.execute(stmt)
     ac = res.scalar_one_or_none()
     

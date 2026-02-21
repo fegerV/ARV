@@ -1,4 +1,4 @@
-from typing import Dict, List, Optional, Sequence
+from typing import Dict, Optional, Sequence
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
@@ -307,8 +307,6 @@ async def get_project_general(
    current_user: User = Depends(get_current_active_user)
 ):
    """Get detailed project information"""
-   logger = structlog.get_logger()
-   
    # Get project
    project = await db.get(Project, project_id)
    if not project:
@@ -452,8 +450,6 @@ async def get_project(
     current_user: User = Depends(get_current_active_user)
 ):
     """Get detailed project information within a specific company"""
-    logger = structlog.get_logger()
-    
     # Get project
     project = await db.get(Project, project_id)
     if not project:

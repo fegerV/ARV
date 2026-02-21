@@ -13,7 +13,7 @@ from app.core.storage import get_storage_provider_instance
 from app.core.storage_providers import get_provider_for_company
 from app.models.storage import StorageConnection
 from app.models.company import Company
-from app.schemas.storage import StorageConnectionCreate, StorageConnectionUpdate, StorageUsageStats
+from app.schemas.storage import StorageConnectionCreate, StorageUsageStats
 
 logger = structlog.get_logger()
 router = APIRouter()
