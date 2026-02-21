@@ -1,0 +1,46 @@
+# AR Viewer iOS: сборка для симулятора (проверка компиляции).
+# Артефакт: .app в архиве. Для подписанной сборки под устройство нужны сертификаты и профили.
+name: iOS (AR Viewer)
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - "ios/**"
+      - ".github/workflows/ios.yml"
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - "ios/**"
+      - ".github/workflows/ios.yml"
+  workflow_dispatch:
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  build:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build for iOS Simulator
+        run: |
+          xcodebuild -project ios/ARViewer.xcodeproj \
+            -target ARViewer \
+            -sdk iphonesimulator \
+            -destination 'generic/platform=iOS Simulator' \
+            -configuration Debug \
+            -derivedDataPath ios/build/DerivedData \
+            build \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO
+
+      - name: Upload app artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ARViewer-Simulator
+          path: ios/build/DerivedData/Build/Products/Debug-iphonesimulator/ARViewer.app
+          retention-days: 14

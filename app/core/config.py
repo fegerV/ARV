@@ -138,6 +138,8 @@ class Settings(BaseSettings):
     ANDROID_APP_PACKAGE: str = "ru.neuroimagen.arviewer"
     # SHA-256 cert fingerprints (comma-separated), e.g. from Play Console App Signing
     ANDROID_APP_SHA256_FINGERPRINTS: str = ""
+    # iOS: ссылка на приложение в App Store (для страницы /view/; если пусто — кнопка не показывается)
+    APP_STORE_URL: str = ""
 
     # Yandex OAuth (for Yandex Disk storage)
     YANDEX_OAUTH_CLIENT_ID: str = ""

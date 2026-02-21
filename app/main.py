@@ -351,7 +351,10 @@ async def ar_viewer_landing(unique_id: str):
         app_link = f"{base_url}/view/{unique_id}" if base_url else f"/view/{unique_id}"
         deep_link = f"arv://view/{unique_id}"
         play_store_url = "https://play.google.com/store/apps/details?id=ru.neuroimagen.arviewer"
+        app_store_url = (settings.APP_STORE_URL or "").strip()
         order_esc = html_escape.escape(ar_content.order_number or "AR")
+
+        app_store_html = f'<a class="bs" href="{html_escape.escape(app_store_url)}">Скачать в App Store</a>' if app_store_url else ""
 
         page = f"""<!DOCTYPE html>
 <html lang="ru"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
@@ -359,11 +362,12 @@ async def ar_viewer_landing(unique_id: str):
 <style>*{{margin:0;padding:0;box-sizing:border-box}}body{{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#1a1a1a;color:#eee;min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px}}h1{{font-size:1.5rem;margin-bottom:.5rem}}p{{font-size:.95rem;opacity:.9;margin-bottom:1.5rem;text-align:center;max-width:320px}}a{{display:inline-block;margin:8px;padding:14px 24px;border-radius:8px;font-size:1rem;text-decoration:none;font-weight:500}}.ba{{background:#1a73e8;color:#fff}}.bs{{background:#0d652d;color:#fff}}</style>
 </head><body>
 <h1>AR Viewer</h1>
-<p>Просмотр AR доступен в приложении. Откройте ссылку в приложении или установите его из Google Play.</p>
+<p>Просмотр AR доступен в приложении. Откройте ссылку в приложении или установите его из магазина.</p>
 <a class="ba" href="{html_escape.escape(deep_link)}">Открыть в приложении</a>
 <a class="ba" href="{html_escape.escape(app_link)}">Открыть по ссылке</a>
 <a class="bs" href="{html_escape.escape(play_store_url)}">Скачать в Google Play</a>
-<p style="margin-top:1.5rem;font-size:.85rem;opacity:.6">AR-контент отображается только в приложении AR Viewer (Android, ARCore).</p>
+{app_store_html}
+<p style="margin-top:1.5rem;font-size:.85rem;opacity:.6">AR-контент отображается в приложении AR Viewer (Android или iPhone).</p>
 </body></html>"""
         return HTMLResponse(content=page)
     except Exception as exc:
