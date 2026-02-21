@@ -3,7 +3,6 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
-from sqlalchemy.orm import selectinload
 from pathlib import Path
 from typing import Tuple
 import shutil
@@ -15,9 +14,7 @@ from app.api.routes.auth import get_current_user_optional
 from app.html.filters import datetime_format
 from app.models.company import Company
 from app.models.project import Project
-from app.models.ar_content import ARContent
 from app.core.config import settings
-from app.utils.ar_content import build_ar_content_storage_path
 
 router = APIRouter()
 logger = structlog.get_logger()

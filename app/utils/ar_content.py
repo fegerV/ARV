@@ -13,7 +13,6 @@ from PIL import Image
 import io
 import aiofiles
 import re
-import tempfile
 
 from app.core.config import settings
 from app.core.storage import get_storage_provider_instance

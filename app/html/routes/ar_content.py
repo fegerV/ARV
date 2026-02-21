@@ -1,10 +1,9 @@
 import uuid
-from fastapi import APIRouter, Request, Depends, Form, BackgroundTasks, Query
+from fastapi import APIRouter, Request, Depends, BackgroundTasks
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from fastapi.templating import Jinja2Templates
-from app.models.user import User
 from app.api.routes.ar_content import (
     get_ar_content_by_id, 
     _create_ar_content,
@@ -14,7 +13,6 @@ from app.api.routes.ar_content import (
 from app.schemas.ar_content import ARContentUpdate
 from app.api.routes.analytics import analytics_content
 from app.api.routes.companies import list_companies
-from app.api.routes.projects import list_projects
 from app.models.video import Video
 from app.models.video_schedule import VideoSchedule as VideoScheduleModel
 from app.models.video_rotation_schedule import VideoRotationSchedule
@@ -396,8 +394,7 @@ async def ar_content_create(
     try:
         # Query companies and projects using the API routes to ensure proper access control
         from app.api.routes.companies import list_companies
-        from app.api.routes.projects import list_projects
-        
+
         # Get all companies and projects with proper access control
         # Pass only the required parameters to avoid Query object binding issues
         companies_result = await list_companies(
@@ -452,16 +449,7 @@ async def ar_content_create(
                 }
             }
             projects.append(project_dict)
-        
-        # Create a mock result object similar to PaginatedProjectsResponse
-        projects_result = type('MockResult', (), {
-            'items': projects,
-            'total': len(projects),
-            'page': 1,
-            'page_size': len(projects),
-            'total_pages': 1
-        })()
-        
+
         if settings.DEBUG and not companies:
             data = PROJECT_CREATE_MOCK_DATA
         else:
@@ -751,7 +739,7 @@ async def ar_content_delete(
     try:
         # Call API to delete AR content
         # Use injected BackgroundTasks from FastAPI
-        result = await delete_ar_content_by_id(
+        await delete_ar_content_by_id(
             content_id=int(ar_content_id),
             background_tasks=background_tasks,
             db=db
@@ -1297,8 +1285,7 @@ async def ar_content_create_post(
         # Return to form with error
         try:
             from app.api.routes.companies import list_companies
-            from app.api.routes.projects import list_projects
-            
+
             companies_result = await list_companies(
                 page=1,
                 page_size=100,

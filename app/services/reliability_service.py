@@ -4,16 +4,17 @@ Reliability and Monitoring Service with Circuit Breaker, Retry Logic, and Health
 import asyncio
 import time
 import random
-from typing import Any, Callable, Optional, Dict, List, Union
+from typing import Any, Callable, Optional, Dict, List
 from dataclasses import dataclass, field
 from enum import Enum
 from functools import wraps
 import structlog
-import json
-from datetime import datetime, timedelta
+from datetime import datetime
 import traceback
 
 from prometheus_client import Counter, Histogram, Gauge
+
+from app.core.config import settings
 
 logger = structlog.get_logger()
 

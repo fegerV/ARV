@@ -82,7 +82,7 @@ class ThumbnailService:
             THUMBNAIL_UPLOAD_COUNT.labels(provider=provider_name, status='success').inc()
             
             return url
-        except Exception as e:
+        except Exception:
             # Record failure metrics
             provider_name = provider.__class__.__name__.replace('StorageProvider', '').lower()
             THUMBNAIL_UPLOAD_COUNT.labels(provider=provider_name, status='failure').inc()
@@ -131,7 +131,6 @@ class ThumbnailService:
             generated_thumbnails = {}
             with Image.open(image_path) as img:
                 # Преобразуем в RGB если нужно (для PNG с прозрачностью)
-                original_mode = img.mode
                 if img.mode in ('RGBA', 'LA', 'P'):
                     # Create white background for transparent images
                     background = Image.new('RGB', img.size, (255, 255, 255))
@@ -406,7 +405,7 @@ class ThumbnailService:
                 return False
 
             # Проверяем что файл является изображением
-            with Image.open(path) as img:
+            with Image.open(path):
                 # Размер файла должен быть разумным (меньше 1MB)
                 size = path.stat().st_size
                 return 1000 < size < 1_000_000  # 1KB - 1MB

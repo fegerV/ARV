@@ -1,5 +1,4 @@
 import re
-from typing import Optional
 
 
 # Russian to Latin transliteration table (GOST 7.79-2000 System B)

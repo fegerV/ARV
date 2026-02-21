@@ -5,7 +5,6 @@ This module provides a simplified storage interface with only LocalStorageAdapte
 All MinIO/Yandex Disk functionality has been removed.
 """
 
-import os
 import shutil
 from pathlib import Path
 from typing import Dict, Any, Optional

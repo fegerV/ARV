@@ -1,10 +1,8 @@
 """OAuth state management for Yandex Disk OAuth flow with Redis fallback to memory store."""
 
-import json
 import secrets
 import time
 from typing import Dict, Optional, Any
-from datetime import datetime, timedelta
 from app.core.config import get_settings
 
 settings = get_settings()

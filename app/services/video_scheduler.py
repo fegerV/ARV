@@ -1,4 +1,4 @@
-from datetime import datetime, date, timedelta, timezone
+from datetime import datetime, date, timezone
 from typing import Optional, Dict, Any
 from sqlalchemy import select, and_
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -89,7 +89,7 @@ async def get_videos_with_active_schedules(ar_content_id: int, db: AsyncSession,
     stmt = select(Video).distinct().join(VideoSchedule).where(
         and_(
             Video.ar_content_id == ar_content_id,
-            Video.is_active == True,
+            Video.is_active.is_(True),
             VideoSchedule.start_time.isnot(None),
             VideoSchedule.end_time.isnot(None),
             VideoSchedule.start_time <= now,
@@ -226,7 +226,7 @@ async def get_rotation_rule(ar_content_id: int, db: AsyncSession) -> Optional[Vi
     stmt = select(VideoRotationSchedule).where(
         and_(
             VideoRotationSchedule.ar_content_id == ar_content_id,
-            VideoRotationSchedule.is_active == True
+            VideoRotationSchedule.is_active.is_(True)
         )
     ).order_by(VideoRotationSchedule.created_at.desc())
     
@@ -250,7 +250,7 @@ async def get_default_video(ar_content: ARContent, db: AsyncSession, now: dateti
     stmt = select(Video).where(
         and_(
             Video.ar_content_id == ar_content.id,
-            Video.is_active == True
+            Video.is_active.is_(True)
         )
     ).order_by(Video.rotation_order.asc(), Video.id.asc())
     
@@ -276,7 +276,7 @@ async def get_next_rotation_video(ar_content: ARContent, db: AsyncSession, now: 
     stmt = select(Video).where(
         and_(
             Video.ar_content_id == ar_content.id,
-            Video.is_active == True
+            Video.is_active.is_(True)
         )
     ).order_by(Video.rotation_order.asc(), Video.id.asc())
     
@@ -435,7 +435,7 @@ async def get_active_video(ar_content_id: int, db: AsyncSession, override_date: 
     stmt_any = select(Video).where(
         and_(
             Video.ar_content_id == ar_content_id,
-            Video.is_active == True
+            Video.is_active.is_(True)
         )
     ).order_by(Video.rotation_order.asc(), Video.id.asc())
     
@@ -464,7 +464,7 @@ async def update_rotation_state(ar_content: ARContent, db: AsyncSession) -> None
     stmt = select(Video).where(
         and_(
             Video.ar_content_id == ar_content.id,
-            Video.is_active == True
+            Video.is_active.is_(True)
         )
     ).order_by(Video.rotation_order.asc(), Video.id.asc())
     

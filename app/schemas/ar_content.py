@@ -1,5 +1,4 @@
 from typing import Optional, Dict, Any, List
-from uuid import UUID
 from datetime import datetime
 from pydantic import BaseModel, Field, EmailStr
 from app.enums import ArContentStatus

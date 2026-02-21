@@ -3,9 +3,8 @@ Video processing utilities for validation, metadata extraction, and ffprobe oper
 """
 import asyncio
 import json
-import tempfile
 from pathlib import Path
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, Optional
 import structlog
 from fastapi import UploadFile, HTTPException
 

@@ -3,7 +3,7 @@ Notifications schemas for request/response models.
 """
 from typing import Optional, List
 from datetime import datetime
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 
 class NotificationItem(BaseModel):

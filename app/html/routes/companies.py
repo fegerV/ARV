@@ -1,10 +1,8 @@
 from fastapi import APIRouter, Request, Depends, HTTPException
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
 from fastapi.templating import Jinja2Templates
 import structlog
-from app.models.user import User
 from app.models.company import Company
 from app.api.routes.companies import list_companies, get_company
 from app.html.deps import get_html_db
@@ -374,7 +372,7 @@ async def company_update_post(
             storage_provider=storage_provider,
         )
         
-        updated_company = await update_company(
+        await update_company(
             company_id=int(company_id),
             company_data=company_update_data,
             db=db,

@@ -7,16 +7,13 @@ import pickle
 import time
 import hashlib
 import gzip
-from typing import Any, Optional, Dict, List, Union, Callable
+from typing import Any, Optional, Dict, List, Callable
 from dataclasses import dataclass, asdict
 from enum import Enum
 from pathlib import Path
 import structlog
-import aioredis
-from aioredis import Redis
 from prometheus_client import Counter, Histogram, Gauge
 
-from app.core.config import settings
 from app.core.redis import redis_client
 
 logger = structlog.get_logger()
@@ -199,7 +196,7 @@ class DiskCache:
                 # Remove corrupted file
                 try:
                     path.unlink()
-                except:
+                except OSError:
                     pass
                 return None
     

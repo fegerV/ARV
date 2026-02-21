@@ -1,6 +1,6 @@
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, and_
-from typing import Dict, Any, Optional, List
+from sqlalchemy import select
+from typing import Any, Optional, List
 from app.models.settings import SystemSettings
 from app.schemas.settings import (
     AllSettings, GeneralSettings, SecuritySettings, StorageSettings,

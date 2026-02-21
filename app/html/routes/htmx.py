@@ -3,10 +3,9 @@ HTMX-ручки + Redis-кеш + лёгкий clipboard.
 """
 import io
 import base64
-from datetime import timedelta
 
 from fastapi import APIRouter, Request, Depends, HTTPException
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import HTMLResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 import qrcode
 

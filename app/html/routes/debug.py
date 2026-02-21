@@ -1,7 +1,6 @@
 from fastapi import APIRouter, Request, Depends
 from fastapi.responses import JSONResponse
 from app.api.routes.auth import get_current_user_optional
-from app.html.deps import get_html_db
 
 router = APIRouter()
 

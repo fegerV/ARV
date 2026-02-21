@@ -9,7 +9,6 @@ The setting is cached for a short TTL to avoid a DB query on every request.
 """
 
 import time
-from typing import Optional
 
 from fastapi import Request
 from fastapi.responses import HTMLResponse, JSONResponse

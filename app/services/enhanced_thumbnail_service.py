@@ -13,7 +13,6 @@ from io import BytesIO
 
 import structlog
 from PIL import Image, ImageOps
-import aioredis
 from prometheus_client import Counter, Histogram, Gauge
 
 from app.core.config import settings

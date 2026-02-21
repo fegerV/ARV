@@ -17,7 +17,7 @@ from typing import Optional
 from urllib.parse import urlparse
 
 import structlog
-from sqlalchemy import delete, select
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
@@ -94,7 +94,7 @@ class BackupService:
         try:
             # 1. pg_dump
             tmp_path = await self._run_pg_dump()
-            file_size = os.path.getsize(tmp_path)
+            os.path.getsize(tmp_path)  # ensure file exists before gzip
 
             # 2. gzip
             gz_path = tmp_path + ".gz"

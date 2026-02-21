@@ -1,8 +1,6 @@
 from dataclasses import dataclass
 from typing import List
 from datetime import datetime
-import asyncio
-import json
 
 import httpx
 import smtplib

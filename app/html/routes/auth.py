@@ -222,7 +222,7 @@ async def login_2fa_verify(
 ):
     """Проверка кода 2FA и установка сессии."""
     from app.api.routes.auth import create_access_token
-    from datetime import timedelta, timezone
+    from datetime import timedelta
     from sqlalchemy import select
     from app.models.user import User
     from app.core.redis import redis_client

@@ -2,18 +2,14 @@
 Enhanced Validation Service with deep content analysis, security scanning, and comprehensive validation.
 """
 import asyncio
-import hashlib
 import imghdr
-import mimetypes
-import os
 import magic
 import structlog
 from pathlib import Path
-from typing import Optional, Dict, List, Any, Union, Tuple
+from typing import Optional, Dict, List, Any, Tuple
 from dataclasses import dataclass, field
 from enum import Enum
 import tempfile
-import subprocess
 import json
 from PIL import Image, ExifTags
 import cv2

@@ -1,6 +1,5 @@
 """Pydantic schemas for AR viewer API (manifest for Android ARCore app)."""
 
-from datetime import datetime
 from typing import Optional
 
 from pydantic import BaseModel, ConfigDict

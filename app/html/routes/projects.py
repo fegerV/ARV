@@ -4,11 +4,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import func, select
 from fastapi.templating import Jinja2Templates
 import structlog
-from app.models.user import User
 from app.models.ar_content import ARContent
 from app.models.company import Company
 from app.models.project import Project
-from app.api.routes.projects import list_projects, get_project
+from app.api.routes.projects import get_project
 from app.html.deps import get_html_db
 from app.api.routes.auth import get_current_user_optional
 from app.html.mock import MOCK_PROJECTS, PROJECT_CREATE_MOCK_DATA
@@ -565,7 +564,7 @@ async def project_update_post(
             status=project_status
         )
         
-        updated_project = await update_project_general(
+        await update_project_general(
             project_id=int(project_id),
             project_data=project_update_data,
             db=db,

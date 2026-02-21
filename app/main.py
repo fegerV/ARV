@@ -7,12 +7,9 @@ from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, ORJS
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
-from starlette.exceptions import HTTPException as StarletteHTTPException
-from starlette.requests import Request
 import logging
 import structlog
 import os
-import sys
 from typing import AsyncGenerator
 from uuid import UUID
 
@@ -39,11 +36,11 @@ _ACCESS_LOG_PROBE_PATTERNS = (
     "php://input",
 )
 
-from app.core.config import settings
-from app.core.database import seed_defaults
-from app.middleware.maintenance import MaintenanceModeMiddleware
-from app.middleware.rate_limiter import setup_rate_limiting
-from app.middleware.site_context import SiteContextMiddleware
+from app.core.config import settings  # noqa: E402
+from app.core.database import seed_defaults  # noqa: E402
+from app.middleware.maintenance import MaintenanceModeMiddleware  # noqa: E402
+from app.middleware.rate_limiter import setup_rate_limiting  # noqa: E402
+from app.middleware.site_context import SiteContextMiddleware  # noqa: E402
 
 
 class _AccessLogProbeFilter(logging.Filter):
@@ -162,7 +159,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator:
 
     # Start backup scheduler
     try:
-        from app.core.scheduler import init_scheduler, scheduler as _scheduler
+        from app.core.scheduler import init_scheduler
         await init_scheduler()
     except Exception as exc:
         logger.error("scheduler_startup_failed", error=str(exc))
@@ -253,11 +250,11 @@ async def request_id_middleware(request: Request, call_next):
     return response
 
 # Include HTML routes
-from app.html import html_router
+from app.html import html_router  # noqa: E402
 app.include_router(html_router)
 
 # Include API routers
-from app.api.routes import (
+from app.api.routes import (  # noqa: E402
     auth, companies, projects, ar_content, storage, analytics, notifications,
     rotation, oauth, public, settings as routes_settings, viewer, videos, health, alerts_ws,
     backups,
@@ -318,9 +315,8 @@ async def api_protected_route(request: Request, path: str):
 async def ar_viewer_landing(unique_id: str):
     """Landing page: open in AR Viewer app or download from Play Store."""
     import html as html_escape
-    from datetime import datetime, timedelta, timezone
+    from datetime import datetime, timedelta
     from sqlalchemy import select as sa_select
-    from fastapi import HTTPException
     from fastapi.responses import HTMLResponse
     from app.core.database import AsyncSessionLocal
     from app.models.ar_content import ARContent
