@@ -23,15 +23,22 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
+    conn = op.get_bind()
+    # SQLite: ADD COLUMN does not support ForeignKey; add plain Integer, FK not enforced
+    project_col = (
+        sa.Column("project_id", sa.Integer(), sa.ForeignKey("projects.id"), nullable=True)
+        if conn.dialect.name == "postgresql"
+        else sa.Column("project_id", sa.Integer(), nullable=True)
+    )
+    company_col = (
+        sa.Column("company_id", sa.Integer(), sa.ForeignKey("companies.id"), nullable=True)
+        if conn.dialect.name == "postgresql"
+        else sa.Column("company_id", sa.Integer(), nullable=True)
+    )
+
     # ── 1. Add missing columns ───────────────────────────────────────
-    op.add_column(
-        "ar_view_sessions",
-        sa.Column("project_id", sa.Integer(), sa.ForeignKey("projects.id"), nullable=True),
-    )
-    op.add_column(
-        "ar_view_sessions",
-        sa.Column("company_id", sa.Integer(), sa.ForeignKey("companies.id"), nullable=True),
-    )
+    op.add_column("ar_view_sessions", project_col)
+    op.add_column("ar_view_sessions", company_col)
     op.add_column(
         "ar_view_sessions",
         sa.Column("device_type", sa.String(50), nullable=True),

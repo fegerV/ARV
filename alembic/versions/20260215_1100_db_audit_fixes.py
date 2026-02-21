@@ -74,21 +74,23 @@ def upgrade() -> None:
         "AND ar_content_id NOT IN (SELECT id FROM ar_content)"
     ))
 
-    op.create_foreign_key(
-        "fk_notifications_company_id_companies",
-        "notifications", "companies",
-        ["company_id"], ["id"],
-    )
-    op.create_foreign_key(
-        "fk_notifications_project_id_projects",
-        "notifications", "projects",
-        ["project_id"], ["id"],
-    )
-    op.create_foreign_key(
-        "fk_notifications_ar_content_id_ar_content",
-        "notifications", "ar_content",
-        ["ar_content_id"], ["id"],
-    )
+    conn = op.get_bind()
+    if conn.dialect.name == "postgresql":
+        op.create_foreign_key(
+            "fk_notifications_company_id_companies",
+            "notifications", "companies",
+            ["company_id"], ["id"],
+        )
+        op.create_foreign_key(
+            "fk_notifications_project_id_projects",
+            "notifications", "projects",
+            ["project_id"], ["id"],
+        )
+        op.create_foreign_key(
+            "fk_notifications_ar_content_id_ar_content",
+            "notifications", "ar_content",
+            ["ar_content_id"], ["id"],
+        )
 
     # ── Email queue indexes ───────────────────────────────────────────
     _create_index_if_not_exists("ix_email_queue_status", "email_queue", ["status"])
@@ -98,14 +100,15 @@ def upgrade() -> None:
     # ── System settings index (skip if already exists) ────────────────
     _create_index_if_not_exists("ix_system_settings_category", "system_settings", ["category"])
 
-    # ── Column type changes ───────────────────────────────────────────
-    # video.size_bytes: Integer -> BigInteger
-    op.alter_column(
-        "videos", "size_bytes",
-        type_=sa.BigInteger(),
-        existing_type=sa.Integer(),
-        existing_nullable=True,
-    )
+    # ── Column type changes (PostgreSQL only; SQLite Integer≈BigInteger) ─
+    conn = op.get_bind()
+    if conn.dialect.name == "postgresql":
+        op.alter_column(
+            "videos", "size_bytes",
+            type_=sa.BigInteger(),
+            existing_type=sa.Integer(),
+            existing_nullable=True,
+        )
 
     # clients.is_active: String -> Boolean (data migration)
     op.add_column("clients", sa.Column("is_active_new", sa.Boolean(), server_default="true", nullable=False))
@@ -121,6 +124,7 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
+    conn = op.get_bind()
     # ── Reverse column type changes ───────────────────────────────────
     op.add_column("folders", sa.Column("is_active_old", sa.String(50), server_default="active"))
     op.execute(sa.text("UPDATE folders SET is_active_old = CASE WHEN is_active THEN 'active' ELSE 'inactive' END"))
@@ -132,21 +136,24 @@ def downgrade() -> None:
     op.drop_column("clients", "is_active")
     op.alter_column("clients", "is_active_old", new_column_name="is_active")
 
-    op.alter_column(
-        "videos", "size_bytes",
-        type_=sa.Integer(),
-        existing_type=sa.BigInteger(),
-        existing_nullable=True,
-    )
+    if conn.dialect.name == "postgresql":
+        op.alter_column(
+            "videos", "size_bytes",
+            type_=sa.Integer(),
+            existing_type=sa.BigInteger(),
+            existing_nullable=True,
+        )
 
     # ── Drop new indexes (only those we know we created) ──────────────
     op.drop_index("ix_email_queue_created_at", table_name="email_queue")
     op.drop_index("ix_email_queue_scheduled_at", table_name="email_queue")
     op.drop_index("ix_email_queue_status", table_name="email_queue")
 
-    op.drop_constraint("fk_notifications_ar_content_id_ar_content", "notifications", type_="foreignkey")
-    op.drop_constraint("fk_notifications_project_id_projects", "notifications", type_="foreignkey")
-    op.drop_constraint("fk_notifications_company_id_companies", "notifications", type_="foreignkey")
+    conn = op.get_bind()
+    if conn.dialect.name == "postgresql":
+        op.drop_constraint("fk_notifications_ar_content_id_ar_content", "notifications", type_="foreignkey")
+        op.drop_constraint("fk_notifications_project_id_projects", "notifications", type_="foreignkey")
+        op.drop_constraint("fk_notifications_company_id_companies", "notifications", type_="foreignkey")
 
     op.drop_index("ix_notifications_type", table_name="notifications")
     op.drop_index("ix_notifications_created_at", table_name="notifications")
