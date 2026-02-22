@@ -50,7 +50,9 @@ private struct WebARWebView: UIViewRepresentable {
         config.allowsInlineMediaPlayback = true
         config.mediaTypesRequiringUserActionForPlayback = []
         let webView = WKWebView(frame: .zero, configuration: config)
-        webView.isInspectable = true
+        if #available(iOS 16.4, *) {
+            webView.isInspectable = true
+        }
         webView.load(URLRequest(url: url))
         Task {
             _ = try? await ViewerService.shared.createSession(uniqueId: uniqueId)
