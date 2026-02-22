@@ -45,7 +45,7 @@ enum UniqueIdParser {
     
     private static func parseArvScheme(_ url: URL) -> String? {
         guard url.host?.lowercased() == "view" else { return nil }
-        let path = url.path.trimmingCharacters(in: "/")
+        let path = url.path.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
         let first = path.split(separator: "/").first.flatMap(String.init) ?? path
         return first.isEmpty ? nil : (isValidUUID(first) ? first : nil)
     }

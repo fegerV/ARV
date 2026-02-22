@@ -16,7 +16,7 @@ struct MainView: View {
     @State private var loadedManifest: ViewerManifest?
     
     var body: some View {
-        NavigationStack {
+        NavigationView {
             ZStack {
                 Color(.systemGroupedBackground).ignoresSafeArea()
                 
