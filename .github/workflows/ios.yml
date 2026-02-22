@@ -28,7 +28,7 @@ jobs:
       - name: Build for iOS Simulator
         run: |
           xcodebuild -project ios/ARViewer.xcodeproj \
-            -target ARViewer \
+            -scheme ARViewer \
             -sdk iphonesimulator \
             -destination 'generic/platform=iOS Simulator' \
             -configuration Debug \
