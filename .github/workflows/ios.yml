@@ -30,7 +30,7 @@ jobs:
           xcodebuild -project ios/ARViewer.xcodeproj \
             -scheme ARViewer \
             -sdk iphonesimulator \
-            -destination 'generic/platform=iOS Simulator' \
+            -destination 'platform=iOS Simulator,name=iPhone 15,OS=17.5' \
             -configuration Debug \
             -derivedDataPath ios/build/DerivedData \
             build \
