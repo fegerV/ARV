@@ -19,8 +19,8 @@ from app.core.storage_providers import StorageProvider
 logger = structlog.get_logger()
 
 _DISK_API = "https://cloud-api.yandex.net/v1/disk"
-_DEFAULT_TIMEOUT = 30.0
-_UPLOAD_TIMEOUT = 120.0
+_DEFAULT_TIMEOUT = 60.0
+_UPLOAD_TIMEOUT = 600.0  # 10 min for large video uploads
 
 
 class YandexDiskStorageProvider(StorageProvider):
