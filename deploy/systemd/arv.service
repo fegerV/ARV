@@ -14,8 +14,8 @@ ExecStart=/opt/arv/venv/bin/gunicorn app.main:app \
     --bind 127.0.0.1:8000 \
     --workers 2 \
     --worker-class uvicorn.workers.UvicornWorker \
-    --timeout 600 \
-    --graceful-timeout 60 \
+    --timeout 120 \
+    --graceful-timeout 30 \
     --keep-alive 5 \
     --max-requests 1000 \
     --max-requests-jitter 50 \
