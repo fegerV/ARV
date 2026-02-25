@@ -33,6 +33,7 @@ import androidx.media3.common.MediaItem
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
+import androidx.media3.datasource.DefaultDataSource
 import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.ProgressiveMediaSource
@@ -569,21 +570,37 @@ class ArViewerActivity : AppCompatActivity() {
             }
         })
 
-        val stableCacheKey = "${manifest.uniqueId}_video_${manifest.video.id}"
-        val mediaItem = MediaItem.Builder()
-            .setUri(manifest.video.videoUrl)
-            .setCustomCacheKey(stableCacheKey)
-            .build()
+        val videoUrl = manifest.video.videoUrl
+        val assetUri = when {
+            videoUrl.startsWith("asset://") -> {
+                val path = videoUrl.removePrefix("asset://").trimStart('/')
+                android.net.Uri.parse("asset:///$path")
+            }
+            else -> android.net.Uri.parse(videoUrl)
+        }
 
-        val cacheFactory = VideoCache.getDataSourceFactory(this)
-        val mediaSource = ProgressiveMediaSource.Factory(cacheFactory)
+        val mediaItem = if (videoUrl.startsWith("asset://")) {
+            MediaItem.Builder().setUri(assetUri).build()
+        } else {
+            MediaItem.Builder()
+                .setUri(assetUri)
+                .setCustomCacheKey("${manifest.uniqueId}_video_${manifest.video.id}")
+                .build()
+        }
+
+        val dataSourceFactory = if (videoUrl.startsWith("asset://")) {
+            DefaultDataSource.Factory(this)
+        } else {
+            VideoCache.getDataSourceFactory(this)
+        }
+        val mediaSource = ProgressiveMediaSource.Factory(dataSourceFactory)
             .createMediaSource(mediaItem)
         player.setMediaSource(mediaSource)
         player.setVideoSurface(surface)
         player.volume = 0f
         player.prepare()
         player.playWhenReady = false
-        Log.d(TAG, "Video player prepared (cache key: $stableCacheKey, waiting for marker)")
+        Log.d(TAG, "Video player prepared (source: ${if (videoUrl.startsWith("asset://")) "asset" else "cache"}, waiting for marker)")
     }
 
     /**

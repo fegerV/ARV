@@ -61,5 +61,13 @@
             android:exported="false"
             android:screenOrientation="portrait"
             android:theme="@style/Theme.ArViewer.NoActionBar" />
+        <activity
+            android:name=".DemoIntroActivity"
+            android:exported="false"
+            android:screenOrientation="portrait" />
+        <activity
+            android:name=".HowItWorksActivity"
+            android:exported="false"
+            android:screenOrientation="portrait" />
     </application>
 </manifest>

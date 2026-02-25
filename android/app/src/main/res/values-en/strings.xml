@@ -62,6 +62,8 @@
     <string name="video_save_failed">Failed to save video</string>
 
     <!-- Main screen -->
+    <string name="how_it_works">How it works</string>
+    <string name="check_ar_support">Check AR support</string>
     <string name="open_from_file">Load QR from gallery</string>
     <string name="qr_not_found_in_image">QR code not found in the image</string>
 

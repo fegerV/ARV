@@ -119,4 +119,5 @@ class MainViewModel @Inject constructor(
     fun onNavigated() {
         _uiState.value = UiState.Input
     }
+
 }

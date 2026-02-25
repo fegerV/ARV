@@ -1,5 +1,6 @@
 import asyncio
 import json as _json
+import re
 from pathlib import Path
 from typing import Optional
 from urllib.parse import quote
@@ -25,6 +26,104 @@ from app.core.storage_providers import get_provider_for_company
 
 logger = structlog.get_logger()
 router = APIRouter()
+
+# ── Demo mode (content from server, no DB) ─────────────────────────────
+_DEMO_ID_PATTERN = re.compile(r"^demo_([1-5])$")
+_DEMO_COUNT = 5
+
+
+def _parse_demo_index(unique_id: str) -> Optional[int]:
+    """Return 1..5 if unique_id is demo_1..demo_5, else None."""
+    m = _DEMO_ID_PATTERN.match(unique_id.strip())
+    return int(m.group(1)) if m else None
+
+
+def _demo_storage_dir(index: int) -> Path:
+    """Path to storage/Demo/demo_N/ directory."""
+    return Path(settings.STORAGE_BASE_PATH) / "Demo" / f"demo_{index}"
+
+
+def _demo_file_exists(index: int) -> tuple[bool, bool]:
+    """Return (marker_exists, video_exists)."""
+    d = _demo_storage_dir(index)
+    marker = (d / "marker.jpg").exists() or (d / "marker.png").exists()
+    video = (d / "video.mp4").exists()
+    return marker, video
+
+
+def _demo_marker_path(index: int) -> Optional[Path]:
+    """Path to marker file for demo_N."""
+    d = _demo_storage_dir(index)
+    for name in ("marker.jpg", "marker.png"):
+        p = d / name
+        if p.exists():
+            return p
+    return None
+
+
+def _demo_video_path(index: int) -> Optional[Path]:
+    """Path to video file for demo_N."""
+    p = _demo_storage_dir(index) / "video.mp4"
+    return p if p.exists() else None
+
+
+def _demo_relative_url(path: Path) -> str:
+    """Convert absolute path to /storage/... URL path."""
+    base = Path(settings.STORAGE_BASE_PATH).resolve()
+    try:
+        rel = path.resolve().relative_to(base)
+        return "/storage/" + str(rel).replace("\\", "/")
+    except ValueError:
+        return ""
+
+
+async def _build_demo_manifest(demo_index: int) -> JSONResponse:
+    """Build manifest for demo_N from server storage (no DB, no Redis)."""
+    marker_path = _demo_marker_path(demo_index)
+    video_path = _demo_video_path(demo_index)
+    if not marker_path or not video_path:
+        raise HTTPException(
+            status_code=404,
+            detail="Demo content not found. Upload marker.jpg and video.mp4 to storage/Demo/demo_N/",
+        )
+    base = settings.PUBLIC_URL.rstrip("/")
+    marker_url = base + _demo_relative_url(marker_path)
+    video_url = base + _demo_relative_url(video_path)
+    unique_id = f"demo_{demo_index}"
+    payload = {
+        "manifest_version": VIEWER_MANIFEST_VERSION,
+        "unique_id": unique_id,
+        "order_number": f"Demo {demo_index}",
+        "marker_image_url": marker_url,
+        "photo_url": marker_url,
+        "video": {
+            "id": demo_index,
+            "title": f"Demo {demo_index}",
+            "video_url": video_url,
+            "thumbnail_url": None,
+            "duration": None,
+            "width": None,
+            "height": None,
+            "mime_type": None,
+            "selection_source": "fallback",
+            "schedule_id": None,
+            "expires_in_days": None,
+            "selected_at": datetime.now(timezone.utc).isoformat(),
+        },
+        "expires_at": "2099-12-31T23:59:59Z",
+        "status": "active",
+    }
+    logger.info(
+        "viewer_manifest_demo_served",
+        unique_id=unique_id,
+        marker_url=marker_url,
+        video_url=video_url,
+    )
+    return JSONResponse(
+        content=payload,
+        headers={"X-Manifest-Version": VIEWER_MANIFEST_VERSION, "X-Cache": "DEMO"},
+    )
+
 
 # ── Manifest cache helpers ───────────────────────────────────────────
 _MANIFEST_CACHE_TTL = 30  # seconds
@@ -106,7 +205,23 @@ async def get_viewer_landing_data(
     """Get photo_url and video_url for the /view/{unique_id} landing page (Level 3 fallback).
 
     Lenient: does not require marker_status. Returns None if content not found or invalid.
+    Supports demo_1..demo_5 (content from server storage).
     """
+    demo_index = _parse_demo_index(unique_id)
+    if demo_index is not None:
+        marker_path = _demo_marker_path(demo_index)
+        video_path = _demo_video_path(demo_index)
+        if not marker_path or not video_path:
+            return None
+        base = settings.PUBLIC_URL.rstrip("/")
+        photo_url = base + _demo_relative_url(marker_path)
+        video_url = base + _demo_relative_url(video_path)
+        return {
+            "photo_url": photo_url,
+            "video_url": video_url,
+            "order_number": f"Demo {demo_index}",
+        }
+
     stmt = select(ARContent).where(ARContent.unique_id == unique_id)
     res = await db.execute(stmt)
     ar_content = res.scalar_one_or_none()
@@ -294,6 +409,26 @@ async def get_viewer_active_video_by_unique_id(unique_id: str, db: AsyncSession 
     }
 
 
+@router.get("/demo/list")
+async def get_demo_list():
+    """Return list of 5 demos for the intro screen (unique_id, title, marker_image_url)."""
+    base = settings.PUBLIC_URL.rstrip("/")
+    items = []
+    for i in range(1, _DEMO_COUNT + 1):
+        marker_path = _demo_marker_path(i)
+        if marker_path:
+            url_path = _demo_relative_url(marker_path)
+            marker_url = f"{base}{url_path}" if url_path else None
+        else:
+            marker_url = None
+        items.append({
+            "unique_id": f"demo_{i}",
+            "title": f"Демо {i}",
+            "marker_image_url": marker_url,
+        })
+    return {"demos": items}
+
+
 @router.get("/ar/{unique_id}/check")
 async def get_viewer_content_check(
     unique_id: str,
@@ -303,6 +438,20 @@ async def get_viewer_content_check(
     Check if AR content is available for viewing without incrementing view count.
     Returns content_available and optional reason. Use before showing UI or fetching full manifest.
     """
+    demo_index = _parse_demo_index(unique_id)
+    if demo_index is not None:
+        marker_ok, video_ok = _demo_file_exists(demo_index)
+        if marker_ok and video_ok:
+            logger.info("viewer_check_demo_ok", unique_id=unique_id)
+            return {"content_available": True}
+        logger.info(
+            "viewer_check_demo_files_missing",
+            unique_id=unique_id,
+            marker_ok=marker_ok,
+            video_ok=video_ok,
+        )
+        return {"content_available": False, "reason": "not_found"}
+
     try:
         UUID(unique_id)
     except (ValueError, TypeError):
@@ -369,7 +518,12 @@ async def get_viewer_manifest(
 
     Returns marker image URL (photo), active video, expiry date;
     increments ``views_count`` and creates an ``ARViewSession`` for analytics.
+    Supports demo_1..demo_5 (content from server storage, no DB).
     """
+    demo_index = _parse_demo_index(unique_id)
+    if demo_index is not None:
+        return await _build_demo_manifest(demo_index)
+
     try:
         UUID(unique_id)
     except (ValueError, TypeError):

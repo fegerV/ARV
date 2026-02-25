@@ -47,12 +47,38 @@
             android:layout_marginBottom="12dp" />
 
         <Button
+            android:id="@+id/button_try_demo"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/try_demo"
+            style="?attr/materialButtonOutlinedStyle"
+            android:layout_marginBottom="12dp" />
+
+        <Button
             android:id="@+id/button_open_from_file"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="@string/open_from_file"
             style="?attr/materialButtonOutlinedStyle"
-            android:layout_marginBottom="24dp" />
+            android:layout_marginBottom="12dp" />
+
+        <Button
+            android:id="@+id/button_how_it_works"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/how_it_works"
+            style="@style/Widget.MaterialComponents.Button.TextButton"
+            android:layout_marginBottom="4dp"
+            android:layout_gravity="center_horizontal" />
+
+        <Button
+            android:id="@+id/button_check_ar_support"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/check_ar_support"
+            style="@style/Widget.MaterialComponents.Button.TextButton"
+            android:layout_marginBottom="24dp"
+            android:layout_gravity="center_horizontal" />
 
         <View
             android:layout_width="match_parent"

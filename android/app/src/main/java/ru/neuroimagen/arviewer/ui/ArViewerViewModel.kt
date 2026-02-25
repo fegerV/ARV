@@ -117,11 +117,10 @@ class ArViewerViewModel @Inject constructor(
     }
 
     /**
-     * Load marker bitmap from cache or network.
+     * Load marker bitmap from cache, assets, or network.
      *
-     * Cache is keyed by [uniqueId] (stable) rather than [url] (temporary for
-     * Yandex Disk content), so repeated opens hit the cache instead of
-     * re-downloading the full image every time.
+     * Supports "asset://path" for demo mode (built-in marker).
+     * Cache is keyed by [uniqueId] for network URLs.
      *
      * The bitmap is scaled down to [ARCORE_MAX_IMAGE_DIMENSION] before
      * returning.  ARCore's [AugmentedImageDatabase.addImage] performs feature
@@ -130,18 +129,32 @@ class ArViewerViewModel @Inject constructor(
      * felt as slow as the first.
      */
     private suspend fun fetchBitmap(uniqueId: String, url: String): Bitmap? {
-        val absoluteUrl = absoluteMarkerUrl(url)
-
-        val raw = MarkerCache.get(appContext, uniqueId)
-            ?: run {
-                val response = viewerApi.downloadImage(absoluteUrl)
-                if (!response.isSuccessful) return null
-                val bytes = response.body()?.bytes() ?: return null
-                MarkerCache.put(appContext, uniqueId, bytes)
-                BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+        val raw = when {
+            url.startsWith("asset://") -> loadBitmapFromAssets(url)
+            else -> {
+                val absoluteUrl = absoluteMarkerUrl(url)
+                MarkerCache.get(appContext, uniqueId)
+                    ?: run {
+                        val response = viewerApi.downloadImage(absoluteUrl)
+                        if (!response.isSuccessful) return null
+                        val bytes = response.body()?.bytes() ?: return null
+                        MarkerCache.put(appContext, uniqueId, bytes)
+                        BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+                    }
             }
+        } ?: return null
 
         return scaleForArCore(raw)
+    }
+
+    /** Load bitmap from app assets. URL format: asset://demo/demo_marker.jpg */
+    private fun loadBitmapFromAssets(url: String): Bitmap? {
+        val path = url.removePrefix("asset://").trimStart('/')
+        return runCatching {
+            appContext.assets.open(path).use { stream ->
+                BitmapFactory.decodeStream(stream)
+            }
+        }.getOrNull()
     }
 
     /**

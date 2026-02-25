@@ -88,7 +88,10 @@ class MainActivity : AppCompatActivity() {
 
         binding.buttonOpen.setOnClickListener { onOpenClicked() }
         binding.buttonScanQr.setOnClickListener { openQrScanner() }
+        binding.buttonTryDemo.setOnClickListener { openDemoMode() }
         binding.buttonOpenFromFile.setOnClickListener { pickImageLauncher.launch("image/*") }
+        binding.buttonHowItWorks.setOnClickListener { startActivity(Intent(this, HowItWorksActivity::class.java)) }
+        binding.buttonCheckArSupport.setOnClickListener { openArCorePlayStore() }
         binding.buttonRetry.setOnClickListener { viewModel.retry() }
 
         observeUiState()
@@ -230,6 +233,14 @@ class MainActivity : AppCompatActivity() {
         openViewer(uniqueId)
     }
 
+    private fun openDemoMode() {
+        if (!ArSessionHelper.isArCoreSupported(this)) {
+            showDeviceNotSupportedPanel("demo")
+            return
+        }
+        startActivity(Intent(this, DemoIntroActivity::class.java))
+    }
+
     /**
      * @param fromQrScan true when user just scanned a QR (camera or gallery) — skips manifest cache so the correct content loads.
      */
@@ -254,7 +265,12 @@ class MainActivity : AppCompatActivity() {
         binding.buttonRetry.setOnClickListener {
             if (ArSessionHelper.isArCoreSupported(this)) {
                 binding.buttonOpenDeviceList.visibility = View.GONE
-                viewModel.loadManifest(uniqueId)
+                if (uniqueId == "demo") {
+                    showMainPanel()
+                    openDemoMode()
+                } else {
+                    viewModel.loadManifest(uniqueId)
+                }
             }
         }
         binding.buttonOpenDeviceList.setOnClickListener { openArCoreDeviceListUrl() }
@@ -262,6 +278,20 @@ class MainActivity : AppCompatActivity() {
 
     private fun openArCoreDeviceListUrl() {
         startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://developers.google.com/ar/devices")))
+    }
+
+    /** Open Play Store ARCore page — shows "supported" or "not supported" for the device. */
+    private fun openArCorePlayStore() {
+        val marketUri = Uri.parse("market://details?id=com.google.ar.core")
+        val webUri = Uri.parse("https://play.google.com/store/apps/details?id=com.google.ar.core")
+        val intent = Intent(Intent.ACTION_VIEW, marketUri).apply {
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+        try {
+            startActivity(intent)
+        } catch (_: Exception) {
+            startActivity(Intent(Intent.ACTION_VIEW, webUri))
+        }
     }
 
     private fun navigateToArViewer(manifestJson: String, uniqueId: String) {

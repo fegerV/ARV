@@ -332,10 +332,14 @@ _viewer_templates = Jinja2Templates(directory="templates")
 @app.get("/view/{unique_id}", response_class=HTMLResponse)
 async def ar_viewer_landing(request: Request, unique_id: str):
     """Landing page: photo + video overlay (100% fallback), buttons to open AR app or download."""
-    try:
-        UUID(unique_id)
-    except (ValueError, TypeError):
-        return JSONResponse(status_code=400, content={"detail": "Invalid unique_id format"})
+    from app.api.routes.viewer import _parse_demo_index
+
+    # Allow demo_1..demo_5 in addition to UUID
+    if _parse_demo_index(unique_id) is None:
+        try:
+            UUID(unique_id)
+        except (ValueError, TypeError):
+            return JSONResponse(status_code=400, content={"detail": "Invalid unique_id format"})
 
     try:
         from app.core.database import AsyncSessionLocal
@@ -373,10 +377,13 @@ async def ar_viewer_landing(request: Request, unique_id: str):
 @app.get("/ar/{unique_id}")
 async def legacy_ar_viewer_redirect(unique_id: str):
     """Redirect legacy /ar/{unique_id} (old QR codes) to current /view/{unique_id}."""
-    try:
-        UUID(unique_id)
-    except (ValueError, TypeError):
-        return JSONResponse(status_code=400, content={"detail": "Invalid unique_id format"})
+    from app.api.routes.viewer import _parse_demo_index
+
+    if _parse_demo_index(unique_id) is None:
+        try:
+            UUID(unique_id)
+        except (ValueError, TypeError):
+            return JSONResponse(status_code=400, content={"detail": "Invalid unique_id format"})
     return RedirectResponse(url=f"/view/{unique_id}", status_code=302)
 
 

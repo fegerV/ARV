@@ -62,8 +62,28 @@
     <string name="video_save_failed">Не удалось сохранить видео</string>
 
     <!-- Main screen -->
+    <string name="try_demo">Попробовать демо</string>
+    <string name="how_it_works">Как использовать</string>
+    <string name="check_ar_support">Проверить поддержку AR</string>
     <string name="open_from_file">Загрузить QR из галереи</string>
     <string name="qr_not_found_in_image">QR-код не найден на изображении</string>
+
+    <!-- Demo intro -->
+    <string name="demo_intro_title">Демо-режим</string>
+    <string name="demo_intro_hint">Выберите демо и наведите камеру на маркер (с экрана другого устройства или распечатки)</string>
+    <string name="demo_title_format">Демо %1$d</string>
+    <string name="demo_start">Запустить камеру</string>
+    <string name="demo_load_error">Не удалось загрузить список демо. Проверьте интернет.</string>
+    <string name="demo_load_error_empty">Демо пока недоступны.</string>
+    <string name="demo_download_marker">Скачать маркер</string>
+    <string name="demo_share_marker">Поделиться</string>
+
+    <!-- How it works -->
+    <string name="how_it_works_title">Как использовать</string>
+    <string name="how_it_works_step1">1. Купите подарок с QR-кодом</string>
+    <string name="how_it_works_step2">2. Установите приложение</string>
+    <string name="how_it_works_step3">3. Наведите камеру на QR</string>
+    <string name="how_it_works_step4">4. Фото оживёт</string>
 
     <!-- QR Scanner -->
     <string name="scan_qr">Сканировать QR</string>
