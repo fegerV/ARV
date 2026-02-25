@@ -91,6 +91,52 @@ def _photo_url_from_ar_content(ar_content: ARContent) -> Optional[str]:
     return url
 
 
+async def get_viewer_landing_data(
+    unique_id: str,
+    db: AsyncSession,
+) -> Optional[dict]:
+    """Get photo_url and video_url for the /view/{unique_id} landing page (Level 3 fallback).
+
+    Lenient: does not require marker_status. Returns None if content not found or invalid.
+    """
+    stmt = select(ARContent).where(ARContent.unique_id == unique_id)
+    res = await db.execute(stmt)
+    ar_content = res.scalar_one_or_none()
+    if not ar_content:
+        return None
+    creation = ar_content.created_at.replace(tzinfo=None) if ar_content.created_at.tzinfo else ar_content.created_at
+    expiry_date = creation + timedelta(days=ar_content.duration_years * 365)
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    if now > expiry_date:
+        return None
+    if ar_content.status not in ("active", "ready"):
+        return None
+    photo_url_rel = _photo_url_from_ar_content(ar_content)
+    if not photo_url_rel:
+        return None
+    video_result = await get_active_video(ar_content.id, db)
+    if not video_result:
+        return None
+    video = video_result["video"]
+    resolved_photo = photo_url_rel
+    resolved_video = video.video_url
+    company: Optional[Company] = None
+    if ar_content.company_id:
+        company = await db.get(Company, ar_content.company_id)
+    if company:
+        if _is_yadisk_ref(resolved_photo):
+            resolved_photo = await _resolve_yd_url(resolved_photo, company) or resolved_photo
+        if _is_yadisk_ref(resolved_video):
+            resolved_video = await _resolve_yd_url(resolved_video, company) or resolved_video
+    photo_url_abs = _absolute_url(resolved_photo)
+    video_url_abs = _absolute_url(resolved_video or "") if resolved_video else None
+    return {
+        "photo_url": photo_url_abs,
+        "video_url": video_url_abs,
+        "order_number": ar_content.order_number or "AR",
+    }
+
+
 async def _resolve_yd_url(url_or_path: Optional[str], company: Company) -> Optional[str]:
     """Resolve a ``yadisk://`` reference to a temporary Yandex Disk download URL.
 
@@ -104,6 +150,7 @@ async def _resolve_yd_url(url_or_path: Optional[str], company: Company) -> Optio
     try:
         provider = await get_provider_for_company(company)
         from app.core.yandex_disk_provider import YandexDiskStorageProvider
+
         if isinstance(provider, YandexDiskStorageProvider):
             relative = _yadisk_relative(url_or_path)
             download_url = await provider.get_download_url(relative)
@@ -115,12 +162,9 @@ async def _resolve_yd_url(url_or_path: Optional[str], company: Company) -> Optio
 
 
 @router.get("/viewer/{ar_content_id}/active-video")
-async def get_viewer_active_video(
-    ar_content_id: int,
-    db: AsyncSession = Depends(get_db)
-):
+async def get_viewer_active_video(ar_content_id: int, db: AsyncSession = Depends(get_db)):
     """Get the active video for AR content viewer with metadata.
-    
+
     This endpoint implements the video selection logic with priority:
     1. Date-specific rules (holidays, special dates) - highest priority
     2. Video with active schedule window
@@ -128,37 +172,34 @@ async def get_viewer_active_video(
     4. ARContent.active_video_id (if not expired)
     5. Legacy rotation (sequential/cyclic)
     6. Any active video (fallback)
-    
+
     Skips videos with expired subscriptions.
     """
     # Verify AR content exists and is active
     ar_content = await db.get(ARContent, ar_content_id)
     if not ar_content:
         raise HTTPException(status_code=404, detail="AR content not found")
-    
+
     # Check if AR content is active (status should be "active" or "ready")
     if ar_content.status not in ["active", "ready"]:
         raise HTTPException(status_code=404, detail="AR content is not active")
-    
+
     # Get the active video using the scheduler service
     video_result = await get_active_video(ar_content_id, db)
-    
+
     if not video_result:
-        raise HTTPException(
-            status_code=404, 
-            detail="No playable videos available for this AR content"
-        )
-    
+        raise HTTPException(status_code=404, detail="No playable videos available for this AR content")
+
     video = video_result["video"]
     source = video_result["source"]
     schedule_id = video_result.get("schedule_id")
     expires_in = video_result.get("expires_in")
-    
+
     # Update rotation state if video was selected via legacy rotation (sequential/cyclic)
     # New rotation types (daily_cycle, weekly_cycle, etc.) don't need state updates
-    if source == "rotation" and hasattr(video, 'rotation_type') and video.rotation_type in ["sequential", "cyclic"]:
+    if source == "rotation" and hasattr(video, "rotation_type") and video.rotation_type in ["sequential", "cyclic"]:
         await update_rotation_state(ar_content, db)
-    
+
     # Build response with video metadata and selection info
     response = {
         "id": video.id,
@@ -170,30 +211,24 @@ async def get_viewer_active_video(
         "width": video.width,
         "height": video.height,
         "mime_type": video.mime_type,
-        
         # Selection metadata
         "selection_source": source,  # 'schedule', 'active_default', 'rotation', 'fallback'
         "schedule_id": schedule_id,
         "expires_in_days": expires_in,
-        
         # Video state info
         "is_active": video.is_active,
         "rotation_type": video.rotation_type,
         "subscription_end": video.subscription_end,
-        
         # Timestamps
         "selected_at": datetime.now(timezone.utc).isoformat(),
         "video_created_at": video.created_at.isoformat() if video.created_at else None,
     }
-    
+
     return response
 
 
 @router.get("/ar/{unique_id}/active-video")
-async def get_viewer_active_video_by_unique_id(
-    unique_id: str,
-    db: AsyncSession = Depends(get_db)
-):
+async def get_viewer_active_video_by_unique_id(unique_id: str, db: AsyncSession = Depends(get_db)):
     """Get the active video for AR viewer by ARContent.unique_id."""
     stmt = select(ARContent).where(ARContent.unique_id == unique_id)
     res = await db.execute(stmt)
@@ -210,10 +245,10 @@ async def get_viewer_active_video_by_unique_id(
     source = video_result["source"]
     schedule_id = video_result.get("schedule_id")
     expires_in = video_result.get("expires_in")
-    
+
     # Update rotation state if video was selected via legacy rotation (sequential/cyclic)
     # New rotation types (daily_cycle, weekly_cycle, date_rule, etc.) don't need state updates
-    if source == "rotation" and hasattr(video, 'rotation_type') and video.rotation_type in ["sequential", "cyclic"]:
+    if source == "rotation" and hasattr(video, "rotation_type") and video.rotation_type in ["sequential", "cyclic"]:
         await update_rotation_state(ar_content, db)
 
     return {
@@ -426,10 +461,7 @@ async def _build_manifest(
 
         if yd_tasks:
             results = await asyncio.gather(
-                *(
-                    _resolve_yd_url(ref, company)
-                    for _, ref in yd_tasks
-                ),
+                *(_resolve_yd_url(ref, company) for _, ref in yd_tasks),
             )
             for (field_name, _original), result in zip(yd_tasks, results):
                 if field_name == "photo":

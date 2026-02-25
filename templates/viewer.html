@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Оживший портрет — {{ order_number }}</title>
+    <style>
+        body {
+            margin: 0;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+            background: #000;
+            color: #fff;
+            text-align: center;
+        }
+        .container {
+            max-width: 400px;
+            margin: auto;
+            padding: 20px;
+        }
+        h2 {
+            font-size: 1.25rem;
+            margin-bottom: 16px;
+        }
+        .ar-frame {
+            position: relative;
+            width: 100%;
+            background: #000;
+        }
+        .ar-photo {
+            width: 100%;
+            display: block;
+        }
+        .ar-video {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+        .ar-video.ready {
+            opacity: 1;
+        }
+        .buttons {
+            margin-top: 20px;
+        }
+        .btn {
+            display: block;
+            margin: 10px auto;
+            padding: 15px;
+            width: 100%;
+            max-width: 320px;
+            background: #007AFF;
+            color: #fff;
+            text-decoration: none;
+            border-radius: 10px;
+            font-size: 16px;
+        }
+        .btn.secondary {
+            background: #333;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>Ваш портрет ожил</h2>
+        <div class="ar-frame">
+            <img src="{{ photo_url }}" alt="Портрет" class="ar-photo">
+            {% if video_url %}
+            <video
+                class="ar-video"
+                autoplay
+                loop
+                muted
+                playsinline
+                webkit-playsinline
+            >
+                <source src="{{ video_url }}" type="video/mp4">
+            </video>
+            {% endif %}
+        </div>
+        <div class="buttons">
+            <a href="{{ app_url }}" class="btn">Открыть в AR-приложении</a>
+            <a href="{{ play_url }}" class="btn secondary">Скачать Android-приложение</a>
+            {% if appstore_url %}
+            <a href="{{ appstore_url }}" class="btn secondary">Скачать приложение для iPhone</a>
+            {% endif %}
+        </div>
+    </div>
+    {% if video_url %}
+    <script>
+        document.querySelector('.ar-video').addEventListener('canplay', function() {
+            this.classList.add('ready');
+        });
+    </script>
+    {% endif %}
+</body>
+</html>

@@ -3,7 +3,8 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 from fastapi import FastAPI, Request, status
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, ORJSONResponse, Response
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse, ORJSONResponse, Response
+from fastapi.templating import Jinja2Templates
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
@@ -87,10 +88,10 @@ def configure_logging() -> None:
 async def lifespan(app: FastAPI) -> AsyncGenerator:
     """
     Application lifespan context manager.
-    
+
     Handles startup and shutdown events.
     """
-    
+
     # Startup
     # Suppress ConnectionResetError (WinError 10054) in asyncio callbacks when client closes connection
     def _asyncio_exception_handler(loop: asyncio.AbstractEventLoop, context: dict) -> None:
@@ -134,7 +135,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator:
         debug=settings.DEBUG,
         log_level=settings.LOG_LEVEL,
     )
-    
+
     # Log storage configuration
     logger.info(
         "storage_config",
@@ -149,7 +150,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator:
     except ValueError as exc:
         logger.error("insecure_defaults_detected", error=str(exc))
         raise
-    
+
     # Seed defaults (Vertex AR local storage and company)
     try:
         await seed_defaults()
@@ -160,15 +161,17 @@ async def lifespan(app: FastAPI) -> AsyncGenerator:
     # Start backup scheduler
     try:
         from app.core.scheduler import init_scheduler
+
         await init_scheduler()
     except Exception as exc:
         logger.error("scheduler_startup_failed", error=str(exc))
-    
+
     yield
-    
+
     # Shutdown
     try:
         from app.core.scheduler import scheduler as _sched
+
         if _sched.running:
             _sched.shutdown(wait=False)
             logger.info("scheduler_stopped")
@@ -215,7 +218,7 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.CORS_ORIGINS,
-    allow_origin_regex=r'https?://(localhost|127\.0\.0\.1)(:\d+)?',
+    allow_origin_regex=r"https?://(localhost|127\.0\.0\.1)(:\d+)?",
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["*"],
@@ -249,14 +252,29 @@ async def request_id_middleware(request: Request, call_next):
     response.headers["X-Request-ID"] = request_id
     return response
 
+
 # Include HTML routes
 from app.html import html_router  # noqa: E402
+
 app.include_router(html_router)
 
 # Include API routers
 from app.api.routes import (  # noqa: E402
-    auth, companies, projects, ar_content, storage, analytics, notifications,
-    rotation, oauth, public, settings as routes_settings, viewer, videos, health, alerts_ws,
+    auth,
+    companies,
+    projects,
+    ar_content,
+    storage,
+    analytics,
+    notifications,
+    rotation,
+    oauth,
+    public,
+    settings as routes_settings,
+    viewer,
+    videos,
+    health,
+    alerts_ws,
     backups,
 )
 
@@ -286,86 +304,66 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
     logger = structlog.get_logger()
     # Convert body to string to avoid serialization issues
     body_content = str(exc.body) if exc.body else "No body"
-    logger.error("validation_error",
-                 errors=exc.errors(),
-                 body=body_content,
-                 url=str(request.url),
-                 method=request.method)
+    logger.error(
+        "validation_error", errors=exc.errors(), body=body_content, url=str(request.url), method=request.method
+    )
     return JSONResponse(
         status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
         content={"detail": exc.errors(), "body": body_content},
     )
 
+
 # Setup rate limiting
 setup_rate_limiting(app)
+
 
 # Add specific route handlers for protected API paths BEFORE mounting static files
 # This ensures that API routes return proper 404 JSON responses instead of serving static files
 @app.get("/api/{path:path}")
 async def api_protected_route(request: Request, path: str):
     """Protected API route that returns 404 JSON for any unmatched API paths."""
-    return JSONResponse(
-        status_code=404,
-        content={"detail": "Not Found"}
-    )
+    return JSONResponse(status_code=404, content={"detail": "Not Found"})
 
 
-# AR viewer landing page: /view/{unique_id}
-@app.get("/view/{unique_id}")
-async def ar_viewer_landing(unique_id: str):
-    """Landing page: open in AR Viewer app or download from Play Store."""
-    import html as html_escape
-    from datetime import datetime, timedelta
-    from sqlalchemy import select as sa_select
-    from fastapi.responses import HTMLResponse
-    from app.core.database import AsyncSessionLocal
-    from app.models.ar_content import ARContent
+# AR viewer landing page: /view/{unique_id} — Level 3 fallback (photo + video overlay) + app buttons
+_viewer_templates = Jinja2Templates(directory="templates")
 
+
+@app.get("/view/{unique_id}", response_class=HTMLResponse)
+async def ar_viewer_landing(request: Request, unique_id: str):
+    """Landing page: photo + video overlay (100% fallback), buttons to open AR app or download."""
     try:
         UUID(unique_id)
     except (ValueError, TypeError):
         return JSONResponse(status_code=400, content={"detail": "Invalid unique_id format"})
 
     try:
+        from app.core.database import AsyncSessionLocal
+        from app.api.routes.viewer import get_viewer_landing_data
+
         async with AsyncSessionLocal() as db:
-            stmt = sa_select(ARContent).where(ARContent.unique_id == unique_id)
-            result = await db.execute(stmt)
-            ar_content = result.scalar_one_or_none()
+            data = await get_viewer_landing_data(unique_id, db)
 
-        if not ar_content:
-            return JSONResponse(status_code=404, content={"detail": "AR content not found"})
+        if not data:
+            return JSONResponse(status_code=404, content={"detail": "AR content not found or unavailable"})
 
-        creation_date = ar_content.created_at.replace(tzinfo=None) if ar_content.created_at.tzinfo else ar_content.created_at
-        expiry_date = creation_date + timedelta(days=ar_content.duration_years * 365)
-        if datetime.utcnow() > expiry_date:
-            return JSONResponse(status_code=403, content={"detail": "AR content subscription has expired"})
-
-        if ar_content.status not in ("active", "ready"):
-            return JSONResponse(status_code=400, content={"detail": "AR content is not active"})
-
-        base_url = (settings.PUBLIC_URL or "").rstrip("/")
-        app_link = f"{base_url}/view/{unique_id}" if base_url else f"/view/{unique_id}"
         deep_link = f"arv://view/{unique_id}"
         play_store_url = "https://play.google.com/store/apps/details?id=ru.neuroimagen.arviewer"
         app_store_url = (settings.APP_STORE_URL or "").strip()
-        order_esc = html_escape.escape(ar_content.order_number or "AR")
 
-        app_store_html = f'<a class="bs" href="{html_escape.escape(app_store_url)}">Скачать в App Store</a>' if app_store_url else ""
-
-        page = f"""<!DOCTYPE html>
-<html lang="ru"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>AR Viewer — {order_esc}</title>
-<style>*{{margin:0;padding:0;box-sizing:border-box}}body{{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#1a1a1a;color:#eee;min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px}}h1{{font-size:1.5rem;margin-bottom:.5rem}}p{{font-size:.95rem;opacity:.9;margin-bottom:1.5rem;text-align:center;max-width:320px}}a{{display:inline-block;margin:8px;padding:14px 24px;border-radius:8px;font-size:1rem;text-decoration:none;font-weight:500}}.ba{{background:#1a73e8;color:#fff}}.bs{{background:#0d652d;color:#fff}}</style>
-</head><body>
-<h1>AR Viewer</h1>
-<p>Просмотр AR доступен в приложении. Откройте ссылку в приложении или установите его из магазина.</p>
-<a class="ba" href="{html_escape.escape(deep_link)}">Открыть в приложении</a>
-<a class="ba" href="{html_escape.escape(app_link)}">Открыть по ссылке</a>
-<a class="bs" href="{html_escape.escape(play_store_url)}">Скачать в Google Play</a>
-{app_store_html}
-<p style="margin-top:1.5rem;font-size:.85rem;opacity:.6">AR-контент отображается в приложении AR Viewer (Android или iPhone).</p>
-</body></html>"""
-        return HTMLResponse(content=page)
+        return _viewer_templates.TemplateResponse(
+            "viewer.html",
+            {
+                "request": request,
+                "unique_id": unique_id,
+                "photo_url": data["photo_url"],
+                "video_url": data.get("video_url"),
+                "order_number": data.get("order_number", "AR"),
+                "app_url": deep_link,
+                "play_url": play_store_url,
+                "appstore_url": app_store_url or "",
+            },
+        )
     except Exception as exc:
         logger.error("ar_viewer_landing_error", unique_id=unique_id, error=str(exc))
         return JSONResponse(status_code=500, content={"detail": "Internal server error"})
@@ -389,9 +387,7 @@ async def well_known_assetlinks():
     Serve assetlinks.json for Android App Links verification.
     Set ANDROID_APP_SHA256_FINGERPRINTS (comma-separated) in env to enable.
     """
-    fingerprints = [
-        s.strip() for s in settings.ANDROID_APP_SHA256_FINGERPRINTS.split(",") if s.strip()
-    ]
+    fingerprints = [s.strip() for s in settings.ANDROID_APP_SHA256_FINGERPRINTS.split(",") if s.strip()]
     statements = []
     if fingerprints and settings.ANDROID_APP_PACKAGE:
         statements = [
@@ -426,6 +422,7 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 
 logger.info("storage_mounted", storage_dir=storage_dir)
 
+
 # Favicon: один ответ для /favicon.ico и /admin/favicon.ico (браузер запрашивает по пути страницы)
 def _favicon_response() -> FileResponse | Response:
     """Возвращает favicon из static/templates или дефолтную иконку."""
@@ -433,8 +430,8 @@ def _favicon_response() -> FileResponse | Response:
         if os.path.exists(path):
             return FileResponse(path, media_type="image/png" if path.endswith(".png") else "image/x-icon")
     default_favicon = (
-        b'\x00\x00\x01\x00\x01\x00\x10\x10\x00\x00\x01\x00\x04\x00\x86\x00\x00\x00'
-        b'(\x00\x00\x00\x10\x00\x00\x00 \x00\x00\x00\x01\x00\x04\x00'
+        b"\x00\x00\x01\x00\x01\x00\x10\x10\x00\x00\x01\x00\x04\x00\x86\x00\x00\x00"
+        b"(\x00\x00\x00\x10\x00\x00\x00 \x00\x00\x00\x01\x00\x04\x00"
     )
     return Response(content=default_favicon, media_type="image/x-icon")
 
@@ -453,6 +450,7 @@ async def admin_favicon():
 
 if __name__ == "__main__":
     import uvicorn
+
     # 0.0.0.0 — доступ с других устройств (в т.ч. через ngrok для теста AR на телефоне)
     run_kw: dict = {
         "host": "0.0.0.0",
