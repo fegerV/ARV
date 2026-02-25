@@ -131,15 +131,11 @@ async def get_viewer_landing_data(
     company: Optional[Company] = None
     if ar_content.company_id:
         company = await db.get(Company, ar_content.company_id)
-    if company:
+    if company and company.storage_provider == "yandex_disk":
         if _is_yadisk_ref(resolved_photo):
-            resolved_photo = await _resolve_yd_url(resolved_photo, company) or resolved_photo
-            if _is_yadisk_ref(resolved_photo) and company.storage_provider == "yandex_disk":
-                resolved_photo = _yadisk_proxy_url(resolved_photo, company.id)
+            resolved_photo = _yadisk_proxy_url(resolved_photo, company.id)
         if _is_yadisk_ref(resolved_video):
-            resolved_video = await _resolve_yd_url(resolved_video, company) or resolved_video
-            if _is_yadisk_ref(resolved_video) and company.storage_provider == "yandex_disk":
-                resolved_video = _yadisk_proxy_url(resolved_video, company.id)
+            resolved_video = _yadisk_proxy_url(resolved_video, company.id)
     if _is_yadisk_ref(resolved_photo) or _is_yadisk_ref(resolved_video):
         logger.warning(
             "viewer_yadisk_unresolved",
