@@ -80,16 +80,19 @@ def run_ssh_commands(do_update: bool = True, do_logs: bool = False, do_restart: 
         print("Код обновлён.")
 
     if do_restart:
-        print("Перезапуск arv...")
         pw_esc = SSH_PASSWORD.replace("'", "'\"'\"'")
+        print("Обновление nginx и systemd...")
+        run_cmd(client, f"echo '{pw_esc}' | sudo -S cp {APP_DIR}/deploy/nginx/arv.conf /etc/nginx/sites-available/arv.conf 2>/dev/null || true")
+        run_cmd(client, f"echo '{pw_esc}' | sudo -S nginx -t 2>/dev/null && echo '{pw_esc}' | sudo -S systemctl reload nginx 2>/dev/null || true")
+        run_cmd(client, f"echo '{pw_esc}' | sudo -S cp {APP_DIR}/deploy/systemd/arv.service /etc/systemd/system/arv.service 2>/dev/null || true")
+        run_cmd(client, f"echo '{pw_esc}' | sudo -S systemctl daemon-reload 2>/dev/null || true")
+        print("Перезапуск arv...")
         run_cmd(client, f"echo '{pw_esc}' | sudo -S systemctl restart arv 2>/dev/null || true")
 
     if do_logs:
         print("\n--- Логи приложения arv (последние 80 строк) ---\n")
-        code = run_cmd(client, "journalctl -u arv -n 80 --no-pager -o short-iso 2>/dev/null")
-        if code != 0:
-            pw_esc = SSH_PASSWORD.replace("'", "'\"'\"'")
-            run_cmd(client, f"echo '{pw_esc}' | sudo -S journalctl -u arv -n 80 --no-pager -o short-iso")
+        pw_esc = SSH_PASSWORD.replace("'", "'\"'\"'")
+        run_cmd(client, f"echo '{pw_esc}' | sudo -S journalctl -u arv -n 80 --no-pager -o short-iso 2>/dev/null")
 
     client.close()
     if do_update and not do_restart:
@@ -97,7 +100,7 @@ def run_ssh_commands(do_update: bool = True, do_logs: bool = False, do_restart: 
 
 
 if __name__ == "__main__":
-    do_logs = "--logs" in sys.argv
+    do_logs = "--logs" in sys.argv or "--logs-only" in sys.argv
     do_restart = "--restart" in sys.argv
-    do_update = True  # всегда обновлять при запуске; с --logs дополнительно показываем логи
+    do_update = "--logs-only" not in sys.argv  # с --logs-only только логи, без обновления
     run_ssh_commands(do_update=do_update, do_logs=do_logs, do_restart=do_restart)
