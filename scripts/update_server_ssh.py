@@ -10,6 +10,8 @@
 
 Пароль из переменной окружения ARV_SSH_PASSWORD.
 Опционально: ARV_SSH_HOST (по умолчанию 192.144.12.68), ARV_SSH_USER (aruser).
+
+  --diagnose  — проверить пути gunicorn, app, systemd unit (при 203/EXEC).
 """
 from __future__ import annotations
 
@@ -68,6 +70,7 @@ def run_ssh_commands(do_update: bool = True, do_logs: bool = False, do_restart: 
         commands = [
             f"echo '{pw_esc}' | sudo -S -u arv bash -c 'cd {APP_DIR} && git fetch origin && git reset --hard origin/main'",
             f"echo '{pw_esc}' | sudo -S -u arv bash -c 'cd {APP_DIR} && {VENV_DIR}/bin/pip install -r requirements.txt -q'",
+            f"echo '{pw_esc}' | sudo -S -u arv bash -c '{VENV_DIR}/bin/pip install gunicorn -q'",
             f"echo '{pw_esc}' | sudo -S -u arv bash -c 'cd {APP_DIR} && PYTHONPATH={APP_DIR} {VENV_DIR}/bin/alembic upgrade head'",
             f"echo '{pw_esc}' | sudo -S -u arv bash -c 'cd {APP_DIR} && (command -v npm >/dev/null 2>&1 && npm ci && npm run build:css || true)'",
         ]
@@ -81,11 +84,10 @@ def run_ssh_commands(do_update: bool = True, do_logs: bool = False, do_restart: 
 
     if do_restart:
         pw_esc = SSH_PASSWORD.replace("'", "'\"'\"'")
-        print("Обновление nginx и systemd...")
+        print("Обновление nginx...")
         run_cmd(client, f"echo '{pw_esc}' | sudo -S cp {APP_DIR}/deploy/nginx/arv.conf /etc/nginx/sites-available/arv.conf 2>/dev/null || true")
         run_cmd(client, f"echo '{pw_esc}' | sudo -S nginx -t 2>/dev/null && echo '{pw_esc}' | sudo -S systemctl reload nginx 2>/dev/null || true")
-        run_cmd(client, f"echo '{pw_esc}' | sudo -S cp {APP_DIR}/deploy/systemd/arv.service /etc/systemd/system/arv.service 2>/dev/null || true")
-        run_cmd(client, f"echo '{pw_esc}' | sudo -S systemctl daemon-reload 2>/dev/null || true")
+        # Не перезаписываем systemd — там могут быть серверные пути. Только restart.
         print("Перезапуск arv...")
         run_cmd(client, f"echo '{pw_esc}' | sudo -S systemctl restart arv 2>/dev/null || true")
 
@@ -99,7 +101,47 @@ def run_ssh_commands(do_update: bool = True, do_logs: bool = False, do_restart: 
         print("\nПерезапустите приложение на сервере: sudo systemctl restart arv")
 
 
+def run_diagnose() -> None:
+    """Проверить пути на сервере (203/EXEC)."""
+    if not SSH_PASSWORD:
+        print("Задайте ARV_SSH_PASSWORD", file=sys.stderr)
+        sys.exit(1)
+    client = paramiko.SSHClient()
+    client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+    try:
+        client.connect(
+            hostname=SSH_HOST,
+            username=SSH_USER,
+            password=SSH_PASSWORD,
+            timeout=15,
+            allow_agent=False,
+            look_for_keys=False,
+        )
+    except Exception as e:
+        print(f"Ошибка подключения: {e}", file=sys.stderr)
+        sys.exit(1)
+
+    pw_esc = SSH_PASSWORD.replace("'", "'\"'\"'")
+    cmds = [
+        ("gunicorn (standard)", f"ls -la /opt/arv/venv/bin/gunicorn 2>&1"),
+        ("venv dir", f"ls -la /opt/arv/venv/bin/ 2>&1 | head -15"),
+        ("find gunicorn", f"find /opt/arv -name gunicorn -type f 2>/dev/null"),
+        ("app dir", f"ls -la /opt/arv/app 2>&1 | head -5"),
+        ("systemd unit", f"echo '{pw_esc}' | sudo -S cat /etc/systemd/system/arv.service 2>/dev/null"),
+    ]
+    for name, cmd in cmds:
+        print(f"\n--- {name} ---")
+        stdin, stdout, stderr = client.exec_command(cmd)
+        out = (stdout.read() or b"").decode("utf-8", errors="replace")
+        err = (stderr.read() or b"").decode("utf-8", errors="replace")
+        print(out or err or "(пусто)")
+    client.close()
+
+
 if __name__ == "__main__":
+    if "--diagnose" in sys.argv:
+        run_diagnose()
+        sys.exit(0)
     do_logs = "--logs" in sys.argv or "--logs-only" in sys.argv
     do_restart = "--restart" in sys.argv
     do_update = "--logs-only" not in sys.argv  # с --logs-only только логи, без обновления

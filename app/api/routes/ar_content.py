@@ -12,6 +12,7 @@ from sqlalchemy.orm import selectinload
 import structlog
 import re
 from datetime import datetime
+import time
 
 from app.services.thumbnail_service import thumbnail_service
 
@@ -236,6 +237,9 @@ async def _create_ar_content(
     background_tasks: Optional["BackgroundTasks"] = None,
 ):
     """Внутренняя функция для создания AR-контента"""
+    t0 = time.perf_counter()
+    logger.info("ar_content_create_start", company_id=company_id, project_id=project_id)
+
     # Validate company and project relationship
     company, project = await validate_company_project(company_id, project_id, db)
 
@@ -301,6 +305,8 @@ async def _create_ar_content(
     else:
         await save_uploaded_file(photo_file, photo_path)
         yd_photo_ref = None
+
+    logger.info("ar_content_create_photo_saved", elapsed_s=round(time.perf_counter() - t0, 2))
     
     # Save video
     video_filename = f"video{Path(video_file.filename).suffix}"
@@ -316,6 +322,8 @@ async def _create_ar_content(
         await save_uploaded_file(video_file, video_path)
         yd_video_ref = None
 
+    logger.info("ar_content_create_video_saved", elapsed_s=round(time.perf_counter() - t0, 2))
+
     # Resolve URLs depending on provider
     if is_yd:
         photo_url_val = yd_photo_ref or provider.get_public_url(f"{yd_relative_prefix}/{photo_filename}")
@@ -330,7 +338,8 @@ async def _create_ar_content(
     else:
         qr_code_url = await generate_qr_code(unique_id, storage_path, provider=provider)
     logger.info(
-        "ar_content_storage_paths",
+        "ar_content_create_storage_ready",
+        elapsed_s=round(time.perf_counter() - t0, 2),
         storage_path=str(storage_path),
         photo_path=str(photo_path),
         video_path=str(video_path),
@@ -516,6 +525,9 @@ async def _create_ar_content(
             logger.warning("failed_to_create_notification", error=str(e))
     except Exception as e:
         logger.error("marker_save_exception", error=str(e))
+
+    total_elapsed = round(time.perf_counter() - t0, 2)
+    logger.info("ar_content_create_done", ar_content_id=ar_content.id, total_elapsed_s=total_elapsed)
     
     return ARContentCreateResponse(
         id=ar_content.id,

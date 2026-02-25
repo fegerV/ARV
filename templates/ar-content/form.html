@@ -406,6 +406,37 @@
                     </button>
                 </div>
                 
+                <!-- Full-screen progress overlay (create AR content) -->
+                <div x-show="submitting"
+                     x-transition:enter="transition ease-out duration-200"
+                     x-transition:enter-start="opacity-0"
+                     x-transition:enter-end="opacity-100"
+                     class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 dark:bg-black/70">
+                    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-2xl p-8 max-w-md w-full mx-4">
+                        <div class="flex items-center gap-3 mb-4">
+                            <span class="material-icons text-3xl text-indigo-500 animate-spin">refresh</span>
+                            <h3 class="text-lg font-medium text-gray-900 dark:text-white">
+                                <span x-text="submitPhase === 'upload' ? 'Загрузка файлов...' : 'Обработка на сервере...'"></span>
+                            </h3>
+                        </div>
+                        <p class="text-sm text-gray-500 dark:text-gray-400 mb-4" x-show="submitPhase === 'upload'">
+                            Фото и видео загружаются. Это может занять несколько минут.
+                        </p>
+                        <p class="text-sm text-gray-500 dark:text-gray-400 mb-4" x-show="submitPhase === 'processing'">
+                            Создаём маркер, генерируем QR-код. Не закрывайте страницу.
+                        </p>
+                        <div class="w-full bg-gray-200 dark:bg-gray-600 rounded-full h-3 overflow-hidden">
+                            <div class="h-full bg-indigo-500 transition-all duration-300 ease-out"
+                                 :class="{ 'animate-pulse': submitPhase === 'processing' && submitProgress === null }"
+                                 :style="submitProgress !== null ? `width: ${submitProgress}%` : (submitPhase === 'processing' ? 'width: 100%' : 'width: 30%')"
+                                 x-show="submitPhase"></div>
+                        </div>
+                        <p class="text-sm font-medium text-indigo-600 dark:text-indigo-400 mt-2" x-show="submitPhase === 'upload' && submitProgress !== null">
+                            <span x-text="Math.round(submitProgress || 0)"></span>%
+                        </p>
+                    </div>
+                </div>
+
                 <!-- Debug information -->
                 <div x-show="!isValid" class="mt-4 p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-md">
                     <p class="text-sm text-yellow-800 dark:text-yellow-200 mb-2">
@@ -449,6 +480,10 @@ function arContentForm() {
         hasNewVideo: false,
         loading: false,
         submitting: false,
+        /** 0-100 during upload, null when indeterminate (server processing) */
+        submitProgress: null,
+        /** 'upload' | 'processing' */
+        submitPhase: null,
 
         init() {
             // Initial projects load if company is pre-selected (e.g. in edit mode)
@@ -578,6 +613,8 @@ function arContentForm() {
             }
 
             this.submitting = true;
+            this.submitProgress = null;
+            this.submitPhase = null;
             try {
             const customerName = this.customerName?.trim() || '';
             const customerPhone = this.customerPhone?.trim() || '';
@@ -590,6 +627,7 @@ function arContentForm() {
                 const videoFile = videoInput?.files?.[0] || null;
 
                 if (this.arContent && this.arContent.id) {
+                    this.submitPhase = 'processing';
                     const updateUrl = `/api/companies/${this.selectedCompany}/projects/${this.selectedProject}/ar-content/${this.arContent.id}`;
                     const payload = {
                         customer_name: customerName,
@@ -640,16 +678,48 @@ function arContentForm() {
                     formData.append('video_file', videoFile);
                 }
 
-                const createResponse = await fetch(createUrl, {
-                    method: 'POST',
-                    body: formData,
+                this.submitPhase = 'upload';
+                this.submitProgress = 0;
+
+                const result = await new Promise((resolve, reject) => {
+                    const xhr = new XMLHttpRequest();
+
+                    xhr.upload.addEventListener('progress', (e) => {
+                        if (e.lengthComputable) {
+                            this.submitProgress = Math.round((e.loaded / e.total) * 100);
+                        } else {
+                            this.submitProgress = Math.min(95, (this.submitProgress || 0) + 5);
+                        }
+                    });
+                    xhr.upload.addEventListener('load', () => {
+                        this.submitPhase = 'processing';
+                        this.submitProgress = null;
+                    });
+
+                    xhr.addEventListener('load', () => {
+                        if (xhr.status >= 200 && xhr.status < 300) {
+                            try {
+                                resolve(JSON.parse(xhr.responseText));
+                            } catch (err) {
+                                reject(new Error('Ошибка ответа сервера'));
+                            }
+                        } else {
+                            let detail = 'Ошибка запроса';
+                            try {
+                                const data = JSON.parse(xhr.responseText);
+                                if (typeof data?.detail === 'string') detail = data.detail;
+                                else if (Array.isArray(data?.detail)) detail = 'Ошибка валидации';
+                            } catch (_) {}
+                            reject(new Error(detail));
+                        }
+                    });
+                    xhr.addEventListener('error', () => reject(new Error('Ошибка сети')));
+                    xhr.addEventListener('abort', () => reject(new Error('Запрос отменён')));
+
+                    xhr.open('POST', createUrl);
+                    xhr.send(formData);
                 });
 
-                if (!createResponse.ok) {
-                    throw new Error(await this._readError(createResponse));
-                }
-
-                const result = await createResponse.json();
                 this.showToast('AR контент успешно создан', 'success');
                 window.location.href = `/ar-content/${result.id}`;
             } catch (error) {
@@ -657,6 +727,8 @@ function arContentForm() {
                 this.showToast(error?.message || 'Не удалось сохранить AR контент', 'error');
             } finally {
                 this.submitting = false;
+                this.submitProgress = null;
+                this.submitPhase = null;
             }
         },
 
