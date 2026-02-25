@@ -2,6 +2,7 @@ import asyncio
 import json as _json
 from pathlib import Path
 from typing import Optional
+from urllib.parse import quote
 from uuid import UUID
 
 import structlog
@@ -75,6 +76,13 @@ def _absolute_url(relative_path: str) -> str:
     return f"{base}{path}" if path.startswith("/") else f"{base}/{path}"
 
 
+def _yadisk_proxy_url(yadisk_ref: str, company_id: int) -> str:
+    """Convert yadisk:// ref to proxy URL when direct resolution failed."""
+    relative = _yadisk_relative(yadisk_ref)
+    qs = f"path={quote(relative, safe='/')}&company_id={company_id}"
+    return f"/api/storage/yd-file?{qs}"
+
+
 def _photo_url_from_ar_content(ar_content: ARContent) -> Optional[str]:
     """Get photo URL (relative or yadisk://) from ARContent."""
     url = ar_content.photo_url
@@ -126,10 +134,28 @@ async def get_viewer_landing_data(
     if company:
         if _is_yadisk_ref(resolved_photo):
             resolved_photo = await _resolve_yd_url(resolved_photo, company) or resolved_photo
+            if _is_yadisk_ref(resolved_photo) and company.storage_provider == "yandex_disk":
+                resolved_photo = _yadisk_proxy_url(resolved_photo, company.id)
         if _is_yadisk_ref(resolved_video):
             resolved_video = await _resolve_yd_url(resolved_video, company) or resolved_video
+            if _is_yadisk_ref(resolved_video) and company.storage_provider == "yandex_disk":
+                resolved_video = _yadisk_proxy_url(resolved_video, company.id)
+    if _is_yadisk_ref(resolved_photo) or _is_yadisk_ref(resolved_video):
+        logger.warning(
+            "viewer_yadisk_unresolved",
+            unique_id=unique_id,
+            has_company=company is not None,
+            photo_still_yadisk=_is_yadisk_ref(resolved_photo),
+            video_still_yadisk=_is_yadisk_ref(resolved_video or ""),
+        )
     photo_url_abs = _absolute_url(resolved_photo)
     video_url_abs = _absolute_url(resolved_video or "") if resolved_video else None
+    logger.info(
+        "viewer_landing_data",
+        unique_id=unique_id,
+        photo_url=photo_url_abs,
+        video_url=video_url_abs,
+    )
     return {
         "photo_url": photo_url_abs,
         "video_url": video_url_abs,
