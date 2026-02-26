@@ -84,33 +84,33 @@
     border-radius: 0.375rem;
     box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
     color: white;
-    background-color: #4f46e5;
+    background-color: #00a800;
     transition: background-color 0.2s;
 }
 
 .btn:hover {
-    background-color: #4338ca;
+    background-color: #008000;
 }
 
 .btn:focus {
     outline: none;
-    box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.5);
+    box-shadow: 0 0 0 3px rgba(0, 168, 0, 0.5);
 }
 
 .btn-primary {
-    background-color: #4f46e5;
+    background-color: #00a800;
 }
 
 .btn-primary:hover {
-    background-color: #4338ca;
+    background-color: #008000;
 }
 
 .btn-secondary {
-    background-color: #4b5563;
+    background-color: #212121;
 }
 
 .btn-secondary:hover {
-    background-color: #374151;
+    background-color: #333333;
 }
 
 .btn-danger {
@@ -186,11 +186,11 @@
     }
 
     .form-input {
-        @apply block w-full rounded-md border-gray-300 dark:border-gray-600 shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm dark:bg-gray-700 dark:text-white;
+        @apply block w-full rounded-md border-gray-300 dark:border-gray-600 shadow-sm focus:ring-2 focus:ring-[#00a800] focus:border-[#00a800] sm:text-sm dark:bg-gray-700 dark:text-white;
     }
 
     .form-select {
-        @apply block w-full rounded-md border-gray-300 dark:border-gray-600 shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm dark:bg-gray-700 dark:text-white;
+        @apply block w-full rounded-md border-gray-300 dark:border-gray-600 shadow-sm focus:ring-2 focus:ring-[#00a800] focus:border-[#00a800] sm:text-sm dark:bg-gray-700 dark:text-white;
     }
 
     select.form-input,

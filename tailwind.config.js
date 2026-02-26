@@ -6,7 +6,13 @@ module.exports = {
   ],
   darkMode: "class",
   theme: {
-    extend: {},
+    extend: {
+      colors: {
+        brand: "#212121",
+        accent: "#00a800",
+        "accent-dark": "#008000",
+      },
+    },
   },
   plugins: [
     require("@tailwindcss/forms"),

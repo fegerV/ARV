@@ -69,6 +69,8 @@ android/app/*.keystore
 # Build artifacts
 frontend/dist/
 frontend/build/
+android/app/build/
+ios/build/
 *.tar.gz
 
 # Testing

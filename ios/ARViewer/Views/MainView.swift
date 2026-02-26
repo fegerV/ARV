@@ -103,7 +103,7 @@ struct MainView: View {
                 .padding(.vertical, 16)
         }
         .buttonStyle(.borderedProminent)
-        .tint(.blue)
+        .tint(Color("AccentColor"))
     }
     
     private var manualInputSection: some View {

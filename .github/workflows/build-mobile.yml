@@ -1,0 +1,134 @@
+# Единая сборка Android и iOS приложений Portal AR.
+# Триггер: push в main/develop (при изменении android/**, ios/**) или workflow_dispatch.
+# Артефакты: app-debug.apk, ARViewer-Simulator.app
+name: Build Mobile (Android + iOS)
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - "android/**"
+      - "ios/**"
+      - ".github/workflows/build-mobile.yml"
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - "android/**"
+      - "ios/**"
+      - ".github/workflows/**"
+  workflow_dispatch:
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  android:
+    name: Android (APK)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: "temurin"
+          java-version: "17"
+
+      - name: Cache Gradle
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+            android/.gradle
+          key: gradle-mobile-${{ runner.os }}-${{ hashFiles('android/**/*.gradle.kts', 'android/gradle/wrapper/gradle-wrapper.properties') }}
+          restore-keys: gradle-mobile-${{ runner.os }}-
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: "platform-tools platforms;android-35 build-tools;35.0.0"
+
+      - name: Decode google-services.json
+        env:
+          GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
+        run: |
+          if [ -n "$GOOGLE_SERVICES_JSON" ]; then
+            echo "$GOOGLE_SERVICES_JSON" | base64 -d > android/app/google-services.json
+          else
+            echo '{"project_info":{"project_number":"0","project_id":"placeholder","storage_bucket":""},"client":[{"client_info":{"mobilesdk_app_id":"1:0:android:0","android_client_info":{"package_name":"ru.neuroimagen.arviewer"}},"api_key":[{"current_key":"placeholder"}]}],"configuration_version":"1"}' > android/app/google-services.json
+          fi
+
+      - name: Build debug APK
+        run: |
+          cd android
+          chmod +x gradlew
+          ./gradlew assembleDebug --no-daemon --stacktrace
+
+      - name: Upload debug APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-debug-apk
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+          retention-days: 30
+
+      - name: Check signing secrets
+        id: signing
+        run: |
+          if [ -n "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" ]; then
+            echo "has_signing=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_signing=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Prepare signing
+        if: steps.signing.outputs.has_signing == 'true'
+        run: |
+          cd android/app
+          echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 -d > release.keystore
+          printf "storeFile=release.keystore\nstorePassword=%s\nkeyAlias=%s\nkeyPassword=%s\n" \
+            "${{ secrets.ANDROID_KEYSTORE_PASSWORD }}" \
+            "${{ secrets.ANDROID_KEY_ALIAS }}" \
+            "${{ secrets.ANDROID_KEY_PASSWORD }}" \
+            > keystore.properties
+
+      - name: Build release AAB
+        if: steps.signing.outputs.has_signing == 'true'
+        run: |
+          cd android
+          ./gradlew bundleRelease --no-daemon --info 2>&1 | tail -80
+
+      - name: Upload release AAB
+        if: steps.signing.outputs.has_signing == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-release-aab
+          path: android/app/build/outputs/bundle/release/app-release.aab
+          retention-days: 90
+
+  ios:
+    name: iOS (Simulator)
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build for iOS Simulator
+        run: |
+          xcodebuild -project ios/ARViewer.xcodeproj \
+            -scheme ARViewer \
+            -sdk iphonesimulator \
+            -destination 'platform=iOS Simulator,name=iPhone 15,OS=17.5' \
+            -configuration Debug \
+            -derivedDataPath ios/build/DerivedData \
+            build \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO
+
+      - name: Upload iOS app
+        uses: actions/upload-artifact@v4
+        with:
+          name: ARViewer-Simulator
+          path: ios/build/DerivedData/Build/Products/Debug-iphonesimulator/ARViewer.app
+          retention-days: 14

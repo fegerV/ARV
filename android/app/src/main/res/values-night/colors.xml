@@ -1,13 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Dark-theme overrides for brand colours.
-         AR-specific colours (ar_*) are NOT overridden here: AR overlays
-         are always dark because the camera feed is the background. -->
-    <color name="primary">#4DA3FF</color>
-    <color name="primary_dark">#1565C0</color>
+    <!-- Dark-theme overrides: #212121 dark, #00a800 accent -->
+    <color name="primary">#00a800</color>
+    <color name="primary_dark">#008000</color>
     <color name="on_primary">#FFFFFF</color>
-    <color name="background">#121212</color>
-    <color name="surface">#1E1E1E</color>
+    <color name="background">#212121</color>
+    <color name="surface">#2D2D2D</color>
     <color name="on_background">#E1E1E1</color>
     <color name="on_surface">#E1E1E1</color>
 </resources>

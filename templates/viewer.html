@@ -30,20 +30,6 @@
             width: 100%;
             display: block;
         }
-        .ar-video {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-            pointer-events: none;
-            opacity: 0;
-            transition: opacity 0.3s ease;
-        }
-        .ar-video.ready {
-            opacity: 1;
-        }
         .buttons {
             margin-top: 20px;
         }
@@ -53,14 +39,14 @@
             padding: 15px;
             width: 100%;
             max-width: 320px;
-            background: #007AFF;
+            background: #00a800;
             color: #fff;
             text-decoration: none;
             border-radius: 10px;
             font-size: 16px;
         }
         .btn.secondary {
-            background: #333;
+            background: #212121;
         }
     </style>
 </head>
@@ -69,18 +55,6 @@
         <h2>Ваш портрет ожил</h2>
         <div class="ar-frame">
             <img src="{{ photo_url }}" alt="Портрет" class="ar-photo">
-            {% if video_url %}
-            <video
-                class="ar-video"
-                autoplay
-                loop
-                muted
-                playsinline
-                webkit-playsinline
-            >
-                <source src="{{ video_url }}" type="video/mp4">
-            </video>
-            {% endif %}
         </div>
         <div class="buttons">
             <a href="{{ app_url }}" class="btn">Открыть в AR-приложении</a>
@@ -91,12 +65,5 @@
             {% endif %}
         </div>
     </div>
-    {% if video_url %}
-    <script>
-        document.querySelector('.ar-video').addEventListener('canplay', function() {
-            this.classList.add('ready');
-        });
-    </script>
-    {% endif %}
 </body>
 </html>
