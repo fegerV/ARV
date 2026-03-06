@@ -65,6 +65,11 @@ android/app/google-services.json
 android/app/keystore.properties
 android/app/*.jks
 android/app/*.keystore
+# Large files and artifacts
+android/*.jar
+android/*.pem
+android/*.zip
+android/java_*.hprof
 
 # Build artifacts
 frontend/dist/

@@ -93,6 +93,14 @@
                 </a>
             </li>
             <li>
+                <a href="/backups" class="nav-item flex items-center p-2 rounded hover:bg-gray-700 dark:hover:bg-gray-700 group"
+                   :class="{'bg-gray-700': window.location.pathname === '/backups'}"
+                   @click="$store.sidebar.closeMobile()">
+                    <span class="material-icons mr-3">backup</span>
+                    <span class="sidebar-text">Бэкапы</span>
+                </a>
+            </li>
+            <li>
                 <a href="/admin/logs" class="nav-item flex items-center p-2 rounded hover:bg-gray-700 dark:hover:bg-gray-700 group"
                    :class="{'bg-gray-700': window.location.pathname === '/admin/logs'}"
                    @click="$store.sidebar.closeMobile()">

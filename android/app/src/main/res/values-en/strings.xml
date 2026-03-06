@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">Portal AR</string>
+    <string name="app_name">V-Portal</string>
     <string name="app_description">Augmented reality viewer app.\nScan a QR code on a marker or enter the identifier manually.</string>
     <string name="splash_loading">Loading…</string>
     <string name="unique_id_hint">Enter unique_id or paste a link</string>
