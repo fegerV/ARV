@@ -39,6 +39,8 @@
     <string name="demo_share_marker">Поделиться</string>
     <string name="demo_load_error">Не удалось загрузить список демо. Проверьте интернет.</string>
     <string name="demo_load_error_empty">Демо пока недоступны.</string>
+    <string name="demo_intro_title">Демо-режим</string>
+    <string name="demo_intro_hint">Выберите демо и наведите камеру на маркер (с экрана другого устройства или распечатки)</string>
     
     <!-- How It Works (Simplified) -->
     <string name="how_it_works_title">Как использовать</string>
