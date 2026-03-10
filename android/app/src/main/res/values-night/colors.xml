@@ -5,6 +5,7 @@
     <!-- Primary & Secondary -->
     <color name="primary">#00E676</color>
     <color name="primary_variant">#00C853</color>
+    <color name="primary_dark">#00A800</color>
     <color name="on_primary">#003300</color>
     
     <color name="secondary">#B388FF</color>
