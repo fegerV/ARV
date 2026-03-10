@@ -35,7 +35,7 @@
                     android:adjustViewBounds="true"
                     android:contentDescription="@string/app_name"
                     android:scaleType="fitCenter"
-                    android:src="@drawable/v_portal_logo" />
+                    android:src="@drawable/ic_launcher" />
 
                 <!-- App Name -->
                 <TextView
@@ -74,7 +74,6 @@
     </com.google.android.material.appbar.AppBarLayout>
 
     <androidx.core.widget.NestedScrollView
-        android:id="@+id/panel_main"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:fillViewport="true"

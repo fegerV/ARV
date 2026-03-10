@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/ar_background"
+    android:gravity="center"
+    android:orientation="vertical"
+    android:padding="32dp">
+
+    <!-- Error Icon -->
+    <ImageView
+        android:id="@+id/icon_ar_error"
+        android:layout_width="80dp"
+        android:layout_height="80dp"
+        android:layout_marginBottom="24dp"
+        android:contentDescription="@null"
+        android:src="@drawable/ic_ar_error"
+        app:tint="@color/ar_error" />
+
+    <!-- Title -->
+    <TextView
+        android:id="@+id/text_ar_error_title"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="16dp"
+        android:fontFamily="sans-serif-medium"
+        android:gravity="center"
+        android:text="@string/error_ar_title"
+        android:textColor="@color/ar_text_primary"
+        android:textSize="22sp" />
+
+    <!-- Error Message -->
+    <TextView
+        android:id="@+id/text_ar_error"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="32dp"
+        android:gravity="center"
+        android:lineSpacingMultiplier="1.4"
+        android:textColor="@color/ar_text_secondary"
+        android:textSize="15sp"
+        tools:text="Ваше устройство не поддерживает дополненную реальность" />
+
+    <!-- Back Button -->
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/button_ar_error_back"
+        android:layout_width="wrap_content"
+        android:layout_height="52dp"
+        android:layout_marginBottom="12dp"
+        android:fontFamily="sans-serif-medium"
+        android:paddingHorizontal="32dp"
+        android:text="@string/ar_error_go_back"
+        android:textAllCaps="false"
+        android:textSize="15sp"
+        app:cornerRadius="12dp"
+        style="@style/Widget.VPortal.Button.AR" />
+
+    <!-- Device List Button (Optional) -->
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/button_ar_error_device_list"
+        android:layout_width="wrap_content"
+        android:layout_height="48dp"
+        android:fontFamily="sans-serif-medium"
+        android:paddingHorizontal="24dp"
+        android:text="@string/button_open_device_list"
+        android:textAllCaps="false"
+        android:textSize="14sp"
+        android:visibility="gone"
+        app:cornerRadius="10dp"
+        app:strokeColor="@color/ar_accent"
+        app:strokeWidth="1.5dp"
+        style="@style/Widget.Material3.Button.OutlinedButton" />
+
+</LinearLayout>

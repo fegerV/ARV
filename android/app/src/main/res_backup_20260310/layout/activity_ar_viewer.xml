@@ -1,0 +1,241 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.coordinatorlayout.widget.CoordinatorLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/ar_background">
+
+    <!-- AR Surface View (Camera Preview) -->
+    <androidx.appcompat.widget.AppCompatSurfaceView
+        android:id="@+id/surface_view"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent" />
+
+    <!-- AR Overlay UI -->
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent">
+
+        <!-- Top Bar -->
+        <LinearLayout
+            android:id="@+id/layout_top_bar"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_gravity="top"
+            android:background="@drawable/ar_top_bar_background"
+            android:elevation="4dp"
+            android:orientation="horizontal"
+            android:paddingHorizontal="16dp"
+            android:paddingVertical="12dp">
+
+            <TextView
+                android:id="@+id/text_ar_status"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center_vertical"
+                android:layout_weight="1"
+                android:drawablePadding="8dp"
+                android:fontFamily="sans-serif-medium"
+                android:gravity="center_vertical"
+                android:textColor="@color/ar_text_primary"
+                android:textSize="14sp"
+                app:drawableStartCompat="@drawable/ic_ar_status"
+                app:drawableTint="@color/ar_accent" />
+
+            <ImageView
+                android:id="@+id/button_close_ar"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:background="@drawable/ar_button_small_background"
+                android:contentDescription="@string/close"
+                android:padding="10dp"
+                android:src="@drawable/ic_close"
+                app:tint="@color/ar_text_primary" />
+
+        </LinearLayout>
+
+        <!-- Center Loading State -->
+        <LinearLayout
+            android:id="@+id/layout_ar_loading"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:background="@drawable/ar_button_background"
+            android:elevation="8dp"
+            android:gravity="center"
+            android:orientation="vertical"
+            android:padding="32dp"
+            android:visibility="gone"
+            tools:visibility="visible">
+
+            <!-- Animated Logo/Icon -->
+            <ImageView
+                android:layout_width="80dp"
+                android:layout_height="80dp"
+                android:layout_marginBottom="20dp"
+                android:src="@drawable/ic_launcher"
+                android:contentDescription="@null" />
+
+            <!-- Loading Spinner -->
+            <com.google.android.material.progressindicator.CircularProgressIndicator
+                android:id="@+id/loading_spinner"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:indeterminate="true"
+                app:indicatorColor="@color/ar_accent"
+                app:indicatorSize="48dp"
+                app:trackThickness="3dp" />
+
+            <!-- Loading Title -->
+            <TextView
+                android:id="@+id/text_loading_title"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="20dp"
+                android:fontFamily="sans-serif-medium"
+                android:gravity="center"
+                android:lineSpacingMultiplier="1.2"
+                android:text="@string/ar_loading_title"
+                android:textAlignment="center"
+                android:textColor="@color/ar_text_primary"
+                android:textSize="18sp" />
+
+            <!-- Loading Tip -->
+            <TextView
+                android:id="@+id/text_loading_tip"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:gravity="center"
+                android:lineSpacingMultiplier="1.3"
+                android:maxWidth="280dp"
+                android:textColor="@color/ar_text_secondary"
+                android:textSize="13sp"
+                tools:text="Обеспечьте хорошее освещение" />
+
+        </LinearLayout>
+
+        <!-- AR Active UI (Photo/Video Controls) -->
+        <LinearLayout
+            android:id="@+id/layout_ar_controls"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_gravity="bottom"
+            android:background="@drawable/ar_bottom_controls_background"
+            android:elevation="8dp"
+            android:orientation="vertical"
+            android:padding="20dp"
+            android:visibility="gone"
+            tools:visibility="visible">
+
+            <!-- Content Info -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="16dp"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <ImageView
+                    android:layout_width="24dp"
+                    android:layout_height="24dp"
+                    android:layout_marginEnd="12dp"
+                    android:src="@drawable/ic_info"
+                    android:contentDescription="@null"
+                    app:tint="@color/ar_accent" />
+
+                <TextView
+                    android:id="@+id/text_ar_content_info"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:ellipsize="end"
+                    android:fontFamily="sans-serif-medium"
+                    android:maxLines="1"
+                    android:textColor="@color/ar_text_primary"
+                    android:textSize="14sp"
+                    tools:text="Портрет: ORD-20260211-1004" />
+
+            </LinearLayout>
+
+            <!-- Action Buttons -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center"
+                android:orientation="horizontal">
+
+                <!-- Capture Photo Button -->
+                <com.google.android.material.floatingactionbutton.FloatingActionButton
+                    android:id="@+id/button_capture_photo"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginEnd="24dp"
+                    android:contentDescription="@string/capture_photo"
+                    android:src="@drawable/ic_camera"
+                    app:backgroundTint="@color/ar_surface_elevated"
+                    app:borderWidth="0dp"
+                    app:elevation="4dp"
+                    app:fabCustomSize="56dp"
+                    app:maxImageSize="28dp"
+                    app:tint="@color/ar_accent" />
+
+                <!-- Record Video Button (Large Center) -->
+                <com.google.android.material.floatingactionbutton.FloatingActionButton
+                    android:id="@+id/button_record_video"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:contentDescription="@string/record_video"
+                    android:src="@drawable/ic_videocam"
+                    app:backgroundTint="@color/ar_accent"
+                    app:borderWidth="0dp"
+                    app:elevation="6dp"
+                    app:fabCustomSize="72dp"
+                    app:maxImageSize="32dp"
+                    app:tint="@color/ar_background" />
+
+                <!-- Gallery/Share Button -->
+                <com.google.android.material.floatingactionbutton.FloatingActionButton
+                    android:id="@+id/button_open_gallery"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="24dp"
+                    android:contentDescription="@string/photo_saved"
+                    android:src="@drawable/ic_gallery"
+                    app:backgroundTint="@color/ar_surface_elevated"
+                    app:borderWidth="0dp"
+                    app:elevation="4dp"
+                    app:fabCustomSize="56dp"
+                    app:maxImageSize="28dp"
+                    app:tint="@color/ar_accent" />
+
+            </LinearLayout>
+
+            <!-- Recording Indicator -->
+            <TextView
+                android:id="@+id/text_recording_indicator"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center"
+                android:layout_marginTop="12dp"
+                android:drawablePadding="6dp"
+                android:text="● Запись..."
+                android:textColor="@color/ar_error"
+                android:textSize="13sp"
+                android:visibility="gone"
+                app:drawableStartCompat="@drawable/ic_recording_dot"
+                app:drawableTint="@color/ar_error" />
+
+        </LinearLayout>
+
+        <!-- AR Error State -->
+        <include
+            android:id="@+id/ar_error_view"
+            layout="@layout/layout_ar_error"
+            android:visibility="gone"
+            tools:visibility="visible" />
+
+    </FrameLayout>
+
+</androidx.coordinatorlayout.widget.CoordinatorLayout>
