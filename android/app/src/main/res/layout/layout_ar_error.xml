@@ -1,82 +1,76 @@
 <?xml version="1.0" encoding="utf-8"?>
-<androidx.constraintlayout.widget.ConstraintLayout
-    xmlns:android="http://schemas.android.com/apk/res/android"
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@color/ar_background"
+    android:gravity="center"
+    android:orientation="vertical"
     android:padding="32dp">
 
-    <!-- Error icon -->
+    <!-- Error Icon -->
     <ImageView
         android:id="@+id/icon_ar_error"
         android:layout_width="80dp"
         android:layout_height="80dp"
-        android:src="@android:drawable/ic_dialog_alert"
-        android:contentDescription="@string/error_unknown"
-        app:layout_constraintBottom_toTopOf="@id/text_ar_error_title"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toTopOf="parent"
-        app:layout_constraintVertical_chainStyle="packed"
-        app:tint="@color/ar_error_icon" />
+        android:layout_marginBottom="24dp"
+        android:contentDescription="@null"
+        android:src="@drawable/ic_ar_error"
+        app:tint="@color/ar_error" />
 
     <!-- Title -->
     <TextView
         android:id="@+id/text_ar_error_title"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginTop="24dp"
+        android:layout_marginBottom="16dp"
+        android:fontFamily="sans-serif-medium"
+        android:gravity="center"
         android:text="@string/error_ar_title"
         android:textColor="@color/ar_text_primary"
-        android:textSize="22sp"
-        android:textStyle="bold"
-        app:layout_constraintBottom_toTopOf="@id/text_ar_error"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/icon_ar_error" />
+        android:textSize="22sp" />
 
-    <!-- Error message (dynamic) -->
+    <!-- Error Message -->
     <TextView
         android:id="@+id/text_ar_error"
-        android:layout_width="0dp"
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="16dp"
+        android:layout_marginBottom="32dp"
         android:gravity="center"
-        android:lineSpacingExtra="4dp"
-        android:textColor="@color/ar_text_body"
-        android:textSize="16sp"
-        app:layout_constraintBottom_toTopOf="@id/button_ar_error_back"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/text_ar_error_title" />
+        android:lineSpacingMultiplier="1.4"
+        android:textColor="@color/ar_text_secondary"
+        android:textSize="15sp"
+        tools:text="Ваше устройство не поддерживает дополненную реальность" />
 
-    <!-- Back button -->
-    <Button
+    <!-- Back Button -->
+    <com.google.android.material.button.MaterialButton
         android:id="@+id/button_ar_error_back"
         android:layout_width="wrap_content"
-        android:layout_height="48dp"
-        android:layout_marginTop="32dp"
-        android:minWidth="160dp"
+        android:layout_height="52dp"
+        android:layout_marginBottom="12dp"
+        android:fontFamily="sans-serif-medium"
+        android:paddingHorizontal="32dp"
         android:text="@string/ar_error_go_back"
-        app:layout_constraintBottom_toTopOf="@id/button_ar_error_device_list"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/text_ar_error" />
+        android:textAllCaps="false"
+        android:textSize="15sp"
+        app:cornerRadius="12dp"
+        style="@style/Widget.VPortal.Button.AR" />
 
-    <!-- Optional: open ARCore devices list (shown for device-not-supported) -->
-    <Button
+    <!-- Device List Button (Optional) -->
+    <com.google.android.material.button.MaterialButton
         android:id="@+id/button_ar_error_device_list"
         android:layout_width="wrap_content"
         android:layout_height="48dp"
-        android:layout_marginTop="12dp"
-        android:minWidth="160dp"
-        android:visibility="gone"
+        android:fontFamily="sans-serif-medium"
+        android:paddingHorizontal="24dp"
         android:text="@string/button_open_device_list"
-        style="?attr/materialButtonOutlinedStyle"
-        app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/button_ar_error_back" />
+        android:textAllCaps="false"
+        android:textSize="14sp"
+        android:visibility="gone"
+        app:cornerRadius="10dp"
+        app:strokeColor="@color/ar_accent"
+        app:strokeWidth="1.5dp"
+        style="@style/Widget.Material3.Button.OutlinedButton" />
 
-</androidx.constraintlayout.widget.ConstraintLayout>
+</LinearLayout>

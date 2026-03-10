@@ -1,174 +1,374 @@
 <?xml version="1.0" encoding="utf-8"?>
-<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<androidx.coordinatorlayout.widget.CoordinatorLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
-    android:layout_height="match_parent">
+    android:layout_height="match_parent"
+    android:background="@color/background">
 
-    <ScrollView
+    <com.google.android.material.appbar.AppBarLayout
+        android:id="@+id/app_bar"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="@android:color/transparent"
+        app:elevation="0dp">
+
+        <!-- Hero Section with Gradient -->
+        <FrameLayout
+            android:layout_width="match_parent"
+            android:layout_height="280dp"
+            android:background="@drawable/gradient_background">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:gravity="center"
+                android:orientation="vertical"
+                android:padding="24dp">
+
+                <!-- App Logo/Icon -->
+                <ImageView
+                    android:id="@+id/image_app_logo"
+                    android:layout_width="100dp"
+                    android:layout_height="100dp"
+                    android:layout_marginBottom="16dp"
+                    android:adjustViewBounds="true"
+                    android:contentDescription="@string/app_name"
+                    android:scaleType="fitCenter"
+                    android:src="@drawable/ic_launcher" />
+
+                <!-- App Name -->
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="8dp"
+                    android:fontFamily="sans-serif-medium"
+                    android:text="@string/app_name"
+                    android:textColor="@color/text_on_dark"
+                    android:textSize="28sp"
+                    android:letterSpacing="-0.02" />
+
+                <!-- App Description -->
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:gravity="center"
+                    android:lineSpacingMultiplier="1.3"
+                    android:text="@string/app_description"
+                    android:textAlignment="center"
+                    android:textColor="@color/text_on_dark_secondary"
+                    android:textSize="14sp"
+                    android:maxWidth="320dp" />
+
+            </LinearLayout>
+
+            <!-- Curved Bottom Edge -->
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="24dp"
+                android:layout_gravity="bottom"
+                android:background="@drawable/curve_bottom" />
+
+        </FrameLayout>
+
+    </com.google.android.material.appbar.AppBarLayout>
+
+    <androidx.core.widget.NestedScrollView
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:fillViewport="true">
+        android:fillViewport="true"
+        app:layout_behavior="@string/appbar_scrolling_view_behavior">
 
         <LinearLayout
-            android:id="@+id/panel_main"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
-            android:padding="24dp"
-            android:gravity="center_horizontal"
-            android:minHeight="100dp">
+            android:padding="20dp">
 
-            <ImageView
-                android:layout_width="wrap_content"
-                android:layout_height="120dp"
-                android:contentDescription="@string/app_name"
-                android:src="@drawable/portal_ar_logo"
-                android:scaleType="fitCenter"
-                android:adjustViewBounds="true"
-                android:layout_marginTop="16dp"
-                android:layout_marginBottom="24dp" />
+            <!-- Main Actions Card -->
+            <com.google.android.material.card.MaterialCardView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="16dp"
+                app:cardBackgroundColor="@color/card_background"
+                app:cardCornerRadius="16dp"
+                app:cardElevation="2dp"
+                app:strokeWidth="0dp">
 
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="16dp">
+
+                    <!-- Scan QR Button (Primary) -->
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/button_scan_qr"
+                        android:layout_width="match_parent"
+                        android:layout_height="56dp"
+                        android:layout_marginBottom="12dp"
+                        android:fontFamily="sans-serif-medium"
+                        android:letterSpacing="0.02"
+                        android:text="@string/scan_qr"
+                        android:textAllCaps="false"
+                        android:textSize="15sp"
+                        app:cornerRadius="12dp"
+                        app:icon="@drawable/ic_qr_code_scanner"
+                        app:iconGravity="textStart"
+                        app:iconPadding="8dp"
+                        app:iconTint="@color/on_primary" />
+
+                    <!-- Try Demo Button (Outlined) -->
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/button_try_demo"
+                        android:layout_width="match_parent"
+                        android:layout_height="56dp"
+                        android:layout_marginBottom="12dp"
+                        android:fontFamily="sans-serif-medium"
+                        android:letterSpacing="0.02"
+                        android:text="@string/try_demo"
+                        android:textAllCaps="false"
+                        android:textSize="15sp"
+                        app:cornerRadius="12dp"
+                        app:strokeColor="@color/primary"
+                        app:strokeWidth="2dp"
+                        style="@style/Widget.Material3.Button.OutlinedButton" />
+
+                    <!-- Load QR from Gallery Button (Outlined) -->
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/button_open_from_file"
+                        android:layout_width="match_parent"
+                        android:layout_height="56dp"
+                        android:layout_marginBottom="4dp"
+                        android:fontFamily="sans-serif-medium"
+                        android:letterSpacing="0.02"
+                        android:text="@string/open_from_file"
+                        android:textAllCaps="false"
+                        android:textSize="15sp"
+                        app:cornerRadius="12dp"
+                        app:strokeColor="@color/primary"
+                        app:strokeWidth="2dp"
+                        style="@style/Widget.Material3.Button.OutlinedButton" />
+
+                </LinearLayout>
+
+            </com.google.android.material.card.MaterialCardView>
+
+            <!-- Quick Actions Row -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="16dp"
+                android:orientation="horizontal">
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/button_how_it_works"
+                    android:layout_width="0dp"
+                    android:layout_height="48dp"
+                    android:layout_marginEnd="8dp"
+                    android:layout_weight="1"
+                    android:fontFamily="sans-serif-medium"
+                    android:text="@string/how_it_works"
+                    android:textAllCaps="false"
+                    android:textSize="13sp"
+                    app:cornerRadius="10dp"
+                    style="@style/Widget.Material3.Button.TonalButton" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/button_check_ar_support"
+                    android:layout_width="0dp"
+                    android:layout_height="48dp"
+                    android:layout_marginStart="8dp"
+                    android:layout_weight="1"
+                    android:fontFamily="sans-serif-medium"
+                    android:text="@string/check_ar_support"
+                    android:textAllCaps="false"
+                    android:textSize="13sp"
+                    app:cornerRadius="10dp"
+                    style="@style/Widget.Material3.Button.TonalButton" />
+
+            </LinearLayout>
+
+            <!-- Divider -->
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:layout_marginVertical="16dp"
+                android:background="@color/divider" />
+
+            <!-- Manual Input Section -->
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="@string/app_description"
-                android:textSize="14sp"
-                android:textColor="?android:attr/textColorSecondary"
-                android:gravity="center"
-                android:layout_marginBottom="32dp" />
+                android:layout_marginBottom="12dp"
+                android:fontFamily="sans-serif-medium"
+                android:text="@string/enter_unique_id"
+                android:textColor="@color/text_primary"
+                android:textSize="14sp" />
 
-        <Button
-            android:id="@+id/button_scan_qr"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="@string/scan_qr"
-            android:drawableStart="@drawable/ic_qr_code_scanner"
-            android:drawablePadding="8dp"
-            android:layout_marginBottom="12dp" />
+            <com.google.android.material.textfield.TextInputLayout
+                android:id="@+id/layout_unique_id"
+                style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="12dp"
+                app:boxCornerRadiusBottomEnd="12dp"
+                app:boxCornerRadiusBottomStart="12dp"
+                app:boxCornerRadiusTopEnd="12dp"
+                app:boxCornerRadiusTopStart="12dp"
+                app:boxStrokeColor="@color/primary"
+                app:hintTextColor="@color/primary">
 
-        <Button
-            android:id="@+id/button_try_demo"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="@string/try_demo"
-            style="?attr/materialButtonOutlinedStyle"
-            android:layout_marginBottom="12dp" />
+                <com.google.android.material.textfield.TextInputEditText
+                    android:id="@+id/edit_unique_id"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:hint="@string/unique_id_hint"
+                    android:inputType="text"
+                    android:maxLines="1"
+                    android:singleLine="true"
+                    android:textColor="@color/text_primary"
+                    android:textSize="15sp" />
 
-        <Button
-            android:id="@+id/button_open_from_file"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="@string/open_from_file"
-            style="?attr/materialButtonOutlinedStyle"
-            android:layout_marginBottom="12dp" />
+            </com.google.android.material.textfield.TextInputLayout>
 
-        <Button
-            android:id="@+id/button_how_it_works"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="@string/how_it_works"
-            style="@style/Widget.MaterialComponents.Button.TextButton"
-            android:layout_marginBottom="4dp"
-            android:layout_gravity="center_horizontal" />
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/button_open"
+                android:layout_width="match_parent"
+                android:layout_height="52dp"
+                android:fontFamily="sans-serif-medium"
+                android:letterSpacing="0.02"
+                android:text="@string/open"
+                android:textAllCaps="false"
+                android:textSize="15sp"
+                app:cornerRadius="12dp"
+                style="@style/Widget.Material3.Button.TonalButton" />
 
-        <Button
-            android:id="@+id/button_check_ar_support"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="@string/check_ar_support"
-            style="@style/Widget.MaterialComponents.Button.TextButton"
-            android:layout_marginBottom="24dp"
-            android:layout_gravity="center_horizontal" />
+            <!-- Bottom Spacing -->
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="32dp" />
 
-        <View
-            android:layout_width="match_parent"
-            android:layout_height="1dp"
-            android:background="?android:attr/listDivider"
-            android:layout_marginBottom="24dp" />
+        </LinearLayout>
 
-        <EditText
-            android:id="@+id/edit_unique_id"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:hint="@string/unique_id_hint"
-            android:inputType="text"
-            android:maxLines="1"
-            android:layout_marginBottom="12dp" />
+    </androidx.core.widget.NestedScrollView>
 
-        <Button
-            android:id="@+id/button_open"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="@string/open"
-            style="?attr/materialButtonOutlinedStyle" />
-
-    </LinearLayout>
-
-    </ScrollView>
-
-    <LinearLayout
+    <!-- Loading Panel (Overlay) -->
+    <FrameLayout
         android:id="@+id/panel_loading"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:orientation="vertical"
+        android:background="@color/background"
         android:gravity="center"
-        android:padding="24dp"
+        android:orientation="vertical"
         android:visibility="gone"
         tools:visibility="visible">
 
-        <ProgressBar
+        <LinearLayout
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:indeterminate="true"
-            android:layout_marginBottom="16dp" />
-        <TextView
-            android:id="@+id/text_loading"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="@string/loading_content_short" />
-    </LinearLayout>
+            android:gravity="center"
+            android:orientation="vertical">
 
-    <LinearLayout
+            <com.google.android.material.progressindicator.CircularProgressIndicator
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:indeterminate="true"
+                app:indicatorColor="@color/primary"
+                app:indicatorSize="56dp"
+                app:trackThickness="4dp" />
+
+            <TextView
+                android:id="@+id/text_loading"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="20dp"
+                android:fontFamily="sans-serif-medium"
+                android:text="@string/loading_content_short"
+                android:textColor="@color/text_primary"
+                android:textSize="16sp" />
+
+        </LinearLayout>
+
+    </FrameLayout>
+
+    <!-- Error Panel (Overlay) -->
+    <FrameLayout
         android:id="@+id/panel_error"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:orientation="vertical"
+        android:background="@color/background"
         android:gravity="center"
+        android:orientation="vertical"
         android:padding="24dp"
         android:visibility="gone"
         tools:visibility="visible">
 
-        <ScrollView
+        <LinearLayout
             android:layout_width="match_parent"
-            android:layout_height="0dp"
-            android:layout_weight="1"
-            android:fillViewport="true"
-            android:layout_marginBottom="16dp">
-            <TextView
-                android:id="@+id/text_error"
+            android:layout_height="wrap_content"
+            android:gravity="center"
+            android:orientation="vertical">
+
+            <!-- Error Icon -->
+            <ImageView
+                android:layout_width="80dp"
+                android:layout_height="80dp"
+                android:layout_marginBottom="24dp"
+                android:src="@drawable/ic_error"
+                android:contentDescription="@null"
+                app:tint="@color/error" />
+
+            <!-- Error Message -->
+            <ScrollView
                 android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:gravity="center"
-                android:padding="8dp"
-                android:minLines="2"
-                android:maxLines="10"
-                android:textAppearance="?attr/textAppearanceBodyMedium"
-                tools:text="Ошибка сети. Проверьте подключение.\n\nОткройте в браузере телефона: https://ar.neuroimagen.ru" />
-        </ScrollView>
+                android:layout_height="0dp"
+                android:layout_marginBottom="24dp"
+                android:layout_weight="1"
+                android:fillViewport="true">
 
-        <Button
-            android:id="@+id/button_retry"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="@string/retry" />
+                <TextView
+                    android:id="@+id/text_error"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center"
+                    android:lineSpacingMultiplier="1.4"
+                    android:padding="8dp"
+                    android:textAppearance="?attr/textAppearanceBodyMedium"
+                    android:textColor="@color/text_secondary"
+                    tools:text="Ошибка сети. Проверьте подключение." />
 
-        <Button
-            android:id="@+id/button_open_device_list"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="12dp"
-            android:text="@string/button_open_device_list"
-            android:visibility="gone"
-            style="?attr/materialButtonOutlinedStyle" />
-    </LinearLayout>
-</FrameLayout>
+            </ScrollView>
+
+            <!-- Retry Button -->
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/button_retry"
+                android:layout_width="wrap_content"
+                android:layout_height="52dp"
+                android:layout_marginBottom="12dp"
+                android:fontFamily="sans-serif-medium"
+                android:paddingHorizontal="32dp"
+                android:text="@string/retry"
+                android:textAllCaps="false"
+                android:textSize="15sp"
+                app:cornerRadius="12dp" />
+
+            <!-- Open Device List Button -->
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/button_open_device_list"
+                android:layout_width="wrap_content"
+                android:layout_height="48dp"
+                android:fontFamily="sans-serif-medium"
+                android:paddingHorizontal="24dp"
+                android:text="@string/button_open_device_list"
+                android:textAllCaps="false"
+                android:textSize="14sp"
+                android:visibility="gone"
+                app:cornerRadius="10dp"
+                style="@style/Widget.Material3.Button.TonalButton" />
+
+        </LinearLayout>
+
+    </FrameLayout>
+
+</androidx.coordinatorlayout.widget.CoordinatorLayout>
