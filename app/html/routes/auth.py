@@ -320,7 +320,7 @@ async def login_2fa_verify(
 @router.get("/", response_class=HTMLResponse)
 async def root(request: Request, current_user=Depends(get_current_user_optional)):
     """Root endpoint - landing page for guests, redirect to admin for authenticated users."""
-   if current_user and current_user.is_active:
-     return RedirectResponse("/admin")
+    if current_user and current_user.is_active:
+        return RedirectResponse("/admin")
     # Show landing page for unauthenticated users
-   return templates.TemplateResponse("landing.html", {"request": request})
+    return templates.TemplateResponse("landing.html", {"request": request})
