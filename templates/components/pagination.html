@@ -17,8 +17,8 @@
     <div class="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
         <div>
             <p class="text-sm text-gray-700 dark:text-gray-300">
-                Showing <span class="font-medium">{{ (page - 1) * page_size + 1 }}</span> to 
-                <span class="font-medium">{{ min(page * page_size, total_count) }}</span> of 
+                Showing <span class="font-medium">{{ (page - 1) * page_size + 1 }}</span> to
+                <span class="font-medium">{{ [page * page_size, total_count] | min }}</span> of
                 <span class="font-medium">{{ total_count }}</span> results
             </p>
         </div>
@@ -30,7 +30,9 @@
                     <span>Previous</span>
                 </a>
                 
-                {% for p in range(max(1, page - 2), min(total_pages + 1, page + 3)) %}
+                {% set start_page = [1, page - 2] | max %}
+                {% set end_page = [total_pages + 1, page + 3] | min %}
+                {% for p in range(start_page, end_page) %}
                 <a href="?{% for k, v in current_url_params.items() %}{% if k != 'page' %}{{ k }}={{ v }}&{% endif %}{% endfor %}page={{ p }}" 
                    class="relative inline-flex items-center px-4 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm font-medium {% if p == page %}text-indigo-600 bg-indigo-50 dark:text-indigo-400 dark:bg-indigo-900{% else %}text-gray-500 hover:bg-gray-50 dark:text-gray-400 dark:hover:bg-gray-700{% endif %}">
                     {{ p }}
