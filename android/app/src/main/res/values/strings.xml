@@ -68,6 +68,15 @@
     <string name="ar_tip_no_glare">Избегайте бликов на изображении</string>
     <string name="ar_tip_no_shake">Не трясите телефон при наведении</string>
     
+    <string-array name="ar_loading_tips">
+        <item>Обеспечьте хорошее освещение</item>
+        <item>Держите камеру ровно</item>
+        <item>Наведите на маркер с расстояния 20–40 см</item>
+        <item>Избегайте бликов на изображении</item>
+        <item>Маркер должен быть полностью виден</item>
+        <item>Не трясите телефон при наведении</item>
+    </string-array>
+    
     <!-- AR Controls -->
     <string name="capture_photo">Снимок</string>
     <string name="record_video">Запись</string>

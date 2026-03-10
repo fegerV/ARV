@@ -1,9 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <androidx.coordinatorlayout.widget.CoordinatorLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@color/qr_overlay">
+    android:background="@color/camera_overlay">
 
     <!-- Camera Preview -->
     <androidx.appcompat.widget.AppCompatSurfaceView
@@ -22,38 +23,36 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_gravity="top"
-            android:background="@drawable/scanner_top_gradient"
+            android:background="@drawable/qr_scanner_top_background"
             android:elevation="4dp"
-            android:gravity="center_vertical"
             android:orientation="horizontal"
-            android:paddingHorizontal="20dp"
-            android:paddingTop="56dp"
-            android:paddingBottom="16dp">
+            android:paddingHorizontal="16dp"
+            android:paddingVertical="12dp">
 
             <TextView
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
+                android:layout_gravity="center_vertical"
                 android:layout_weight="1"
                 android:fontFamily="sans-serif-medium"
                 android:gravity="center"
                 android:text="@string/scan_qr"
-                android:textColor="@color/text_primary"
-                android:textSize="18sp"
-                android:letterSpacing="-0.01" />
+                android:textColor="@color/text_on_dark"
+                android:textSize="18sp" />
 
             <ImageView
                 android:id="@+id/button_close_scanner"
                 android:layout_width="40dp"
                 android:layout_height="40dp"
-                android:background="@drawable/scanner_button_background"
+                android:background="@drawable/qr_scanner_button_background"
                 android:contentDescription="@string/close"
                 android:padding="10dp"
                 android:src="@drawable/ic_close"
-                app:tint="@color/text_primary" />
+                app:tint="@color/text_on_dark" />
 
         </LinearLayout>
 
-        <!-- Scan Area -->
+        <!-- QR Scan Area -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="match_parent"
@@ -63,42 +62,43 @@
             <!-- Scan Frame -->
             <FrameLayout
                 android:layout_width="280dp"
-                android:layout_height="280dp">
+                android:layout_height="280dp"
+                android:background="@drawable/qr_scan_frame">
 
                 <!-- Corner Markers -->
                 <ImageView
-                    android:layout_width="32dp"
-                    android:layout_height="32dp"
+                    android:layout_width="40dp"
+                    android:layout_height="40dp"
                     android:layout_gravity="top|start"
-                    android:layout_margin="8dp"
-                    android:src="@drawable/qr_corner_tl"
+                    android:layout_margin="12dp"
+                    android:src="@drawable/qr_corner_top_left"
                     android:contentDescription="@null" />
 
                 <ImageView
-                    android:layout_width="32dp"
-                    android:layout_height="32dp"
+                    android:layout_width="40dp"
+                    android:layout_height="40dp"
                     android:layout_gravity="top|end"
-                    android:layout_margin="8dp"
-                    android:src="@drawable/qr_corner_tr"
+                    android:layout_margin="12dp"
+                    android:src="@drawable/qr_corner_top_right"
                     android:contentDescription="@null" />
 
                 <ImageView
-                    android:layout_width="32dp"
-                    android:layout_height="32dp"
+                    android:layout_width="40dp"
+                    android:layout_height="40dp"
                     android:layout_gravity="bottom|start"
-                    android:layout_margin="8dp"
-                    android:src="@drawable/qr_corner_bl"
+                    android:layout_margin="12dp"
+                    android:src="@drawable/qr_corner_bottom_left"
                     android:contentDescription="@null" />
 
                 <ImageView
-                    android:layout_width="32dp"
-                    android:layout_height="32dp"
+                    android:layout_width="40dp"
+                    android:layout_height="40dp"
                     android:layout_gravity="bottom|end"
-                    android:layout_margin="8dp"
-                    android:src="@drawable/qr_corner_br"
+                    android:layout_margin="12dp"
+                    android:src="@drawable/qr_corner_bottom_right"
                     android:contentDescription="@null" />
 
-                <!-- Scanning Line -->
+                <!-- Scanning Line (Animated) -->
                 <View
                     android:id="@+id/scan_line"
                     android:layout_width="match_parent"
@@ -117,39 +117,38 @@
                 android:lineSpacingMultiplier="1.3"
                 android:paddingHorizontal="32dp"
                 android:text="@string/qr_scan_hint"
-                android:textColor="@color/text_primary"
+                android:textColor="@color/text_on_dark"
                 android:textSize="15sp" />
 
         </LinearLayout>
 
-        <!-- Bottom Bar -->
+        <!-- Bottom Bar with Flash Toggle -->
         <LinearLayout
             android:id="@+id/layout_bottom_bar"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_gravity="bottom"
-            android:background="@drawable/scanner_bottom_gradient"
+            android:background="@drawable/qr_scanner_bottom_background"
             android:elevation="4dp"
             android:gravity="center"
             android:orientation="vertical"
-            android:padding="24dp">
+            android:padding="20dp">
 
             <!-- Flash Toggle -->
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/button_toggle_flash"
                 android:layout_width="wrap_content"
-                android:layout_height="48dp"
+                android:layout_height="44dp"
                 android:drawablePadding="8dp"
                 android:fontFamily="sans-serif-medium"
-                android:paddingHorizontal="24dp"
-                android:text="@string/toggle_flash_on"
+                android:paddingHorizontal="20dp"
+                android:text="Включить фонарик"
                 android:textAllCaps="false"
                 android:textSize="14sp"
-                app:cornerRadius="24dp"
+                app:cornerRadius="20dp"
                 app:icon="@drawable/ic_flash_off"
                 app:iconGravity="textStart"
                 app:iconPadding="8dp"
-                app:iconTint="@color/primary"
                 style="@style/Widget.Material3.Button.TonalButton" />
 
         </LinearLayout>
