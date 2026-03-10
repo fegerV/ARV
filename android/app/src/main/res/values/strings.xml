@@ -12,6 +12,7 @@
     
     <!-- Secondary Actions -->
     <string name="load_qr_gallery">Загрузить QR из галереи</string>
+    <string name="open_from_file">Загрузить QR из галереи</string>
     <string name="how_it_works">Как использовать</string>
     <string name="check_ar_support">Проверить поддержку AR</string>
     

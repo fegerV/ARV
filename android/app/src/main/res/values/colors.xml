@@ -40,6 +40,7 @@
     
     <!-- QR Scanner -->
     <color name="qr_overlay">#000000CC</color>
+    <color name="camera_overlay">#CC000000</color>
     <color name="qr_scan_line">#00A800</color>
     <color name="qr_corner">#00A800</color>
     
