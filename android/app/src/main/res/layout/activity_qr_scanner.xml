@@ -7,8 +7,8 @@
     android:background="@color/camera_overlay">
 
     <!-- Camera Preview -->
-    <androidx.appcompat.widget.AppCompatSurfaceView
-        android:id="@+id/camera_preview"
+    <androidx.camera.view.PreviewView
+        android:id="@+id/previewView"
         android:layout_width="match_parent"
         android:layout_height="match_parent" />
 
@@ -41,7 +41,7 @@
                 android:textSize="18sp" />
 
             <ImageView
-                android:id="@+id/button_close_scanner"
+                android:id="@+id/buttonClose"
                 android:layout_width="40dp"
                 android:layout_height="40dp"
                 android:background="@drawable/qr_scanner_button_background"
@@ -152,6 +152,25 @@
                 style="@style/Widget.Material3.Button.TonalButton" />
 
         </LinearLayout>
+
+    </FrameLayout>
+
+    <!-- Processing Panel -->
+    <FrameLayout
+        android:id="@+id/panelProcessing"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="#80000000"
+        android:clickable="true"
+        android:focusable="true"
+        android:visibility="gone">
+
+        <ProgressBar
+            android:layout_width="64dp"
+            android:layout_height="64dp"
+            android:layout_gravity="center"
+            android:indeterminate="true"
+            android:indeterminateTint="@color/text_primary" />
 
     </FrameLayout>
 
