@@ -51,6 +51,10 @@
     <string name="how_it_works_step2_desc">На QR-код на картине</string>
     <string name="how_it_works_step3_title">Посмотрите</string>
     <string name="how_it_works_step3_desc">Как изображение оживает</string>
+    <string name="how_it_works_step1">1. Купите подарок с QR-кодом</string>
+    <string name="how_it_works_step2">2. Установите приложение</string>
+    <string name="how_it_works_step3">3. Наведите камеру на QR</string>
+    <string name="how_it_works_step4">4. Фото оживёт</string>
     
     <!-- QR Scanner -->
     <string name="qr_scan_hint">Наведите камеру на QR-код</string>

@@ -73,4 +73,10 @@
     <string name="close">Close</string>
     <string name="camera_permission_required">Camera access is required to scan QR codes</string>
     <string name="camera_error">Failed to start the camera</string>
+    
+    <!-- How It Works Steps -->
+    <string name="how_it_works_step1">1. Purchase a gift with QR code</string>
+    <string name="how_it_works_step2">2. Install the app</string>
+    <string name="how_it_works_step3">3. Point camera at QR</string>
+    <string name="how_it_works_step4">4. Photo comes alive</string>
 </resources>
