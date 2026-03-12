@@ -28,6 +28,7 @@
         <!-- Material components -->
         <item name="materialCardViewStyle">@style/Widget.VPortal.Card</item>
         <item name="materialButtonStyle">@style/Widget.VPortal.Button</item>
+        <item name="textInputStyle">@style/Widget.VPortal.TextInputLayout</item>
     </style>
     
     <!-- AR Mode Theme (Pure Black) -->
@@ -35,14 +36,15 @@
         <item name="colorPrimary">@color/ar_accent</item>
         <item name="colorPrimaryVariant">@color/primary_variant</item>
         <item name="colorOnPrimary">@color/ar_background</item>
-        
+
         <item name="android:colorBackground">@color/ar_background</item>
         <item name="colorSurface">@color/ar_surface</item>
         <item name="colorOnSurface">@color/ar_text_primary</item>
-        
+
         <item name="android:statusBarColor">@android:color/transparent</item>
         <item name="android:navigationBarColor">@color/ar_background</item>
         <item name="android:windowLightStatusBar" tools:targetApi="m">false</item>
+        <item name="textInputStyle">@style/Widget.VPortal.TextInputLayout</item>
     </style>
     
     <!-- Splash Screen -->
@@ -59,6 +61,7 @@
         <item name="android:navigationBarColor">@android:color/black</item>
         <item name="android:windowTranslucentStatus">true</item>
         <item name="android:windowLightStatusBar" tools:targetApi="m">false</item>
+        <item name="textInputStyle">@style/Widget.VPortal.TextInputLayout</item>
     </style>
     
     <!-- V-Portal Card (Premium) -->
