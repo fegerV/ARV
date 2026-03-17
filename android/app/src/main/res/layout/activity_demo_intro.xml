@@ -6,12 +6,11 @@
     android:layout_height="match_parent"
     android:background="@color/background">
 
-    <com.google.android.material.appbar.AppBarLayout
+    <FrameLayout
         android:id="@+id/app_bar"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:background="@android:color/transparent"
-        app:elevation="0dp">
+        android:background="@android:color/transparent">
 
         <!-- Header with Gradient -->
         <FrameLayout
@@ -60,7 +59,7 @@
 
         </FrameLayout>
 
-    </com.google.android.material.appbar.AppBarLayout>
+    </FrameLayout>
 
     <androidx.core.widget.NestedScrollView
         android:layout_width="match_parent"
@@ -86,13 +85,11 @@
                 android:visibility="gone"
                 tools:visibility="visible">
 
-                <com.google.android.material.progressindicator.CircularProgressIndicator
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
+                <ProgressBar
+                    android:layout_width="48dp"
+                    android:layout_height="48dp"
                     android:indeterminate="true"
-                    app:indicatorColor="@color/primary"
-                    app:indicatorSize="48dp"
-                    app:trackThickness="4dp" />
+                    android:indeterminateTint="@color/primary" />
 
                 <TextView
                     android:layout_width="wrap_content"

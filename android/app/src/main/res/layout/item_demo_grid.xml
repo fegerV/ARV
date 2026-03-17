@@ -1,14 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
-<com.google.android.material.card.MaterialCardView xmlns:android="http://schemas.android.com/apk/res/android"
+<androidx.cardview.widget.CardView xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     app:cardBackgroundColor="@color/card_background"
     app:cardCornerRadius="16dp"
-    app:cardElevation="0dp"
-    app:strokeWidth="1dp"
-    app:strokeColor="@color/card_border">
+    app:cardElevation="0dp">
 
     <LinearLayout
         android:layout_width="match_parent"
@@ -72,40 +70,40 @@
                 android:orientation="horizontal">
 
                 <!-- Save Button -->
-                <com.google.android.material.button.MaterialButton
+                <Button
                     android:id="@+id/button_save_demo"
                     android:layout_width="0dp"
                     android:layout_height="44dp"
                     android:layout_marginEnd="8dp"
                     android:layout_weight="1"
+                    android:background="@drawable/button_primary_background"
+                    android:drawableStart="@drawable/ic_download"
+                    android:drawablePadding="6dp"
                     android:fontFamily="sans-serif-medium"
+                    android:paddingHorizontal="12dp"
                     android:text="@string/demo_save_image"
                     android:textAllCaps="false"
+                    android:textColor="@color/on_primary"
                     android:textSize="13sp"
-                    app:cornerRadius="10dp"
-                    app:icon="@drawable/ic_download"
-                    app:iconGravity="textStart"
-                    app:iconPadding="6dp"
-                    app:iconTint="@color/on_primary"
-                    style="@style/Widget.VPortal.Button" />
+                    android:drawableTint="@color/on_primary" />
 
                 <!-- Share Button -->
-                <com.google.android.material.button.MaterialButton
+                <Button
                     android:id="@+id/button_share_demo"
                     android:layout_width="0dp"
                     android:layout_height="44dp"
                     android:layout_marginStart="8dp"
                     android:layout_weight="1"
+                    android:background="@drawable/button_primary_background"
+                    android:drawableStart="@drawable/ic_share"
+                    android:drawablePadding="6dp"
                     android:fontFamily="sans-serif-medium"
+                    android:paddingHorizontal="12dp"
                     android:text="@string/demo_share"
                     android:textAllCaps="false"
+                    android:textColor="@color/on_primary"
                     android:textSize="13sp"
-                    app:cornerRadius="10dp"
-                    app:icon="@drawable/ic_share"
-                    app:iconGravity="textStart"
-                    app:iconPadding="6dp"
-                    app:iconTint="@color/on_primary"
-                    style="@style/Widget.VPortal.Button" />
+                    android:drawableTint="@color/on_primary" />
 
             </LinearLayout>
 
@@ -124,4 +122,4 @@
 
     </LinearLayout>
 
-</com.google.android.material.card.MaterialCardView>
+</androidx.cardview.widget.CardView>

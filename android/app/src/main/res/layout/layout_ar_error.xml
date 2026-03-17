@@ -44,33 +44,31 @@
         tools:text="Ваше устройство не поддерживает дополненную реальность" />
 
     <!-- Back Button -->
-    <com.google.android.material.button.MaterialButton
+    <Button
         android:id="@+id/button_ar_error_back"
         android:layout_width="wrap_content"
         android:layout_height="52dp"
         android:layout_marginBottom="12dp"
+        android:background="@drawable/button_primary_background"
         android:fontFamily="sans-serif-medium"
         android:paddingHorizontal="32dp"
         android:text="@string/ar_error_go_back"
         android:textAllCaps="false"
-        android:textSize="15sp"
-        app:cornerRadius="12dp"
-        style="@style/Widget.VPortal.Button.AR" />
+        android:textColor="@color/on_primary"
+        android:textSize="15sp" />
 
     <!-- Device List Button (Optional) -->
-    <com.google.android.material.button.MaterialButton
+    <Button
         android:id="@+id/button_ar_error_device_list"
         android:layout_width="wrap_content"
         android:layout_height="48dp"
+        android:background="@drawable/button_outlined_background"
         android:fontFamily="sans-serif-medium"
         android:paddingHorizontal="24dp"
         android:text="@string/button_open_device_list"
         android:textAllCaps="false"
+        android:textColor="@color/primary"
         android:textSize="14sp"
-        android:visibility="gone"
-        app:cornerRadius="10dp"
-        app:strokeColor="@color/ar_accent"
-        app:strokeWidth="1.5dp"
-        style="@style/Widget.Material3.Button.OutlinedButton" />
+        android:visibility="gone" />
 
 </LinearLayout>
