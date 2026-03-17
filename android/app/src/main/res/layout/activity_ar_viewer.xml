@@ -78,14 +78,12 @@
                 android:contentDescription="@null" />
 
             <!-- Loading Spinner -->
-            <com.google.android.material.progressindicator.CircularProgressIndicator
+            <ProgressBar
                 android:id="@+id/loading_spinner"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
                 android:indeterminate="true"
-                app:indicatorColor="@color/ar_accent"
-                app:indicatorSize="48dp"
-                app:trackThickness="3dp" />
+                android:indeterminateTint="@color/ar_accent" />
 
             <!-- Loading Title -->
             <TextView
@@ -167,47 +165,38 @@
                 android:orientation="horizontal">
 
                 <!-- Capture Photo Button -->
-                <com.google.android.material.floatingactionbutton.FloatingActionButton
+                <ImageButton
                     android:id="@+id/button_capture_photo"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
+                    android:layout_width="56dp"
+                    android:layout_height="56dp"
                     android:layout_marginEnd="24dp"
+                    android:background="@drawable/ar_button_small_background"
                     android:contentDescription="@string/capture_photo"
+                    android:scaleType="centerInside"
                     android:src="@drawable/ic_camera"
-                    app:backgroundTint="@color/ar_surface_elevated"
-                    app:borderWidth="0dp"
-                    app:elevation="4dp"
-                    app:fabCustomSize="56dp"
-                    app:maxImageSize="28dp"
                     app:tint="@color/ar_accent" />
 
                 <!-- Record Video Button (Large Center) -->
-                <com.google.android.material.floatingactionbutton.FloatingActionButton
+                <ImageButton
                     android:id="@+id/button_record_video"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
+                    android:layout_width="72dp"
+                    android:layout_height="72dp"
+                    android:background="@drawable/ar_button_background"
                     android:contentDescription="@string/record_video"
+                    android:scaleType="centerInside"
                     android:src="@drawable/ic_videocam"
-                    app:backgroundTint="@color/ar_accent"
-                    app:borderWidth="0dp"
-                    app:elevation="6dp"
-                    app:fabCustomSize="72dp"
-                    app:maxImageSize="32dp"
-                    app:tint="@color/ar_background" />
+                    app:tint="@color/ar_accent" />
 
                 <!-- Gallery/Share Button -->
-                <com.google.android.material.floatingactionbutton.FloatingActionButton
+                <ImageButton
                     android:id="@+id/button_open_gallery"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
+                    android:layout_width="56dp"
+                    android:layout_height="56dp"
                     android:layout_marginStart="24dp"
+                    android:background="@drawable/ar_button_small_background"
                     android:contentDescription="@string/photo_saved"
+                    android:scaleType="centerInside"
                     android:src="@drawable/ic_gallery"
-                    app:backgroundTint="@color/ar_surface_elevated"
-                    app:borderWidth="0dp"
-                    app:elevation="4dp"
-                    app:fabCustomSize="56dp"
-                    app:maxImageSize="28dp"
                     app:tint="@color/ar_accent" />
 
             </LinearLayout>
