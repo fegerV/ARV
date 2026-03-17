@@ -1,208 +1,228 @@
 <?xml version="1.0" encoding="utf-8"?>
-<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<androidx.coordinatorlayout.widget.CoordinatorLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@color/background">
 
+    <com.google.android.material.appbar.AppBarLayout
+        android:id="@+id/app_bar"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="@android:color/transparent"
+        app:elevation="0dp">
+
+        <!-- Hero Section with Gradient -->
+        <FrameLayout
+            android:layout_width="match_parent"
+            android:layout_height="280dp"
+            android:background="@drawable/gradient_background">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:gravity="center"
+                android:orientation="vertical"
+                android:padding="24dp">
+
+                <!-- App Logo/Icon -->
+                <ImageView
+                    android:id="@+id/image_app_logo"
+                    android:layout_width="100dp"
+                    android:layout_height="100dp"
+                    android:layout_marginBottom="16dp"
+                    android:adjustViewBounds="true"
+                    android:contentDescription="@string/app_name"
+                    android:scaleType="fitCenter"
+                    android:src="@drawable/ic_launcher" />
+
+                <!-- App Name -->
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="8dp"
+                    android:fontFamily="sans-serif-medium"
+                    android:text="@string/app_name"
+                    android:textColor="@color/text_on_dark"
+                    android:textSize="28sp"
+                    android:letterSpacing="-0.02" />
+
+                <!-- App Description -->
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:gravity="center"
+                    android:lineSpacingMultiplier="1.3"
+                    android:text="@string/app_description"
+                    android:textAlignment="center"
+                    android:textColor="@color/text_on_dark_secondary"
+                    android:textSize="14sp"
+                    android:maxWidth="320dp" />
+
+            </LinearLayout>
+
+            <!-- Curved Bottom Edge -->
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="24dp"
+                android:layout_gravity="bottom"
+                android:background="@drawable/curve_bottom" />
+
+        </FrameLayout>
+
+    </com.google.android.material.appbar.AppBarLayout>
+
     <androidx.core.widget.NestedScrollView
-        android:id="@+id/panel_main"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:fillViewport="true">
+        android:fillViewport="true"
+        app:layout_behavior="@string/appbar_scrolling_view_behavior">
 
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="vertical">
+            android:orientation="vertical"
+            android:padding="20dp">
 
-            <!-- Hero Section with Gradient (formerly in AppBarLayout) -->
-            <FrameLayout
+            <!-- Main Actions Card -->
+            <com.google.android.material.card.MaterialCardView
                 android:layout_width="match_parent"
-                android:layout_height="280dp"
-                android:background="@drawable/gradient_background">
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="16dp"
+                app:cardBackgroundColor="@color/card_background"
+                app:cardCornerRadius="16dp"
+                app:cardElevation="2dp"
+                app:strokeWidth="0dp">
 
                 <LinearLayout
                     android:layout_width="match_parent"
-                    android:layout_height="match_parent"
-                    android:gravity="center"
+                    android:layout_height="wrap_content"
                     android:orientation="vertical"
-                    android:padding="24dp">
+                    android:padding="16dp">
 
-                    <!-- App Logo/Icon -->
-                    <ImageView
-                        android:id="@+id/image_app_logo"
-                        android:layout_width="100dp"
-                        android:layout_height="100dp"
-                        android:layout_marginBottom="16dp"
-                        android:adjustViewBounds="true"
-                        android:contentDescription="@string/app_name"
-                        android:scaleType="fitCenter"
-                        android:src="@drawable/v_portal2" />
-
-                    <!-- App Name -->
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_marginBottom="8dp"
+                    <!-- Scan QR Button (Primary) -->
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/button_scan_qr"
+                        android:layout_width="match_parent"
+                        android:layout_height="56dp"
+                        android:layout_marginBottom="12dp"
                         android:fontFamily="sans-serif-medium"
-                        android:text="@string/app_name"
-                        android:textColor="@color/text_on_dark"
-                        android:textSize="28sp"
-                        android:letterSpacing="-0.02" />
+                        android:letterSpacing="0.02"
+                        android:text="@string/scan_qr"
+                        android:textAllCaps="false"
+                        android:textSize="15sp"
+                        app:cornerRadius="12dp"
+                        app:icon="@drawable/ic_qr_code_scanner"
+                        app:iconGravity="textStart"
+                        app:iconPadding="8dp"
+                        app:iconTint="@color/on_primary" />
 
-                    <!-- App Description -->
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:gravity="center"
-                        android:lineSpacingMultiplier="1.3"
-                        android:text="@string/app_description"
-                        android:textAlignment="center"
-                        android:textColor="@color/text_on_dark_secondary"
-                        android:textSize="14sp"
-                        android:maxWidth="320dp" />
+                    <!-- Try Demo Button (Outlined) -->
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/button_try_demo"
+                        android:layout_width="match_parent"
+                        android:layout_height="56dp"
+                        android:layout_marginBottom="12dp"
+                        android:fontFamily="sans-serif-medium"
+                        android:letterSpacing="0.02"
+                        android:text="@string/try_demo"
+                        android:textAllCaps="false"
+                        android:textSize="15sp"
+                        app:cornerRadius="12dp"
+                        app:strokeColor="@color/primary"
+                        app:strokeWidth="2dp"
+                        style="@style/Widget.Material3.Button.OutlinedButton" />
+
+                    <!-- Load QR from Gallery Button (Outlined) -->
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/button_open_from_file"
+                        android:layout_width="match_parent"
+                        android:layout_height="56dp"
+                        android:layout_marginBottom="4dp"
+                        android:fontFamily="sans-serif-medium"
+                        android:letterSpacing="0.02"
+                        android:text="@string/open_from_file"
+                        android:textAllCaps="false"
+                        android:textSize="15sp"
+                        app:cornerRadius="12dp"
+                        app:strokeColor="@color/primary"
+                        app:strokeWidth="2dp"
+                        style="@style/Widget.Material3.Button.OutlinedButton" />
 
                 </LinearLayout>
 
-                <!-- Curved Bottom Edge -->
-                <View
-                    android:layout_width="match_parent"
-                    android:layout_height="24dp"
-                    android:layout_gravity="bottom"
-                    android:background="@drawable/curve_bottom" />
+            </com.google.android.material.card.MaterialCardView>
 
-            </FrameLayout>
-
+            <!-- Quick Actions Row -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:padding="20dp">
+                android:layout_marginBottom="16dp"
+                android:orientation="horizontal">
 
-                <!-- Main Actions Card -->
-                <androidx.cardview.widget.CardView
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginBottom="16dp"
-                    app:cardBackgroundColor="@color/card_background"
-                    app:cardCornerRadius="16dp"
-                    app:cardElevation="2dp">
-
-                    <LinearLayout
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:orientation="vertical"
-                        android:padding="16dp">
-
-                        <!-- Scan QR Button (Primary) -->
-                        <Button
-                            android:id="@+id/button_scan_qr"
-                            android:layout_width="match_parent"
-                            android:layout_height="56dp"
-                            android:layout_marginBottom="12dp"
-                            android:background="@drawable/button_primary_background"
-                            android:fontFamily="sans-serif-medium"
-                            android:text="@string/scan_qr"
-                            android:textAllCaps="false"
-                            android:textColor="@color/on_primary"
-                            android:textSize="15sp"
-                            android:drawableStart="@drawable/ic_qr_code_scanner"
-                            android:drawablePadding="8dp"
-                            android:paddingStart="24dp"
-                            android:paddingEnd="24dp"
-                            android:drawableTint="@color/on_primary" />
-
-                        <!-- Try Demo Button (Outlined) -->
-                        <Button
-                            android:id="@+id/button_try_demo"
-                            android:layout_width="match_parent"
-                            android:layout_height="56dp"
-                            android:layout_marginBottom="12dp"
-                            android:background="@drawable/button_outlined_background"
-                            android:fontFamily="sans-serif-medium"
-                            android:text="@string/try_demo"
-                            android:textAllCaps="false"
-                            android:textColor="@color/primary"
-                            android:textSize="15sp" />
-
-                        <!-- Load QR from Gallery Button (Outlined) -->
-                        <Button
-                            android:id="@+id/button_open_from_file"
-                            android:layout_width="match_parent"
-                            android:layout_height="56dp"
-                            android:layout_marginBottom="4dp"
-                            android:background="@drawable/button_outlined_background"
-                            android:fontFamily="sans-serif-medium"
-                            android:text="@string/open_from_file"
-                            android:textAllCaps="false"
-                            android:textColor="@color/primary"
-                            android:textSize="15sp" />
-
-                    </LinearLayout>
-
-                </androidx.cardview.widget.CardView>
-
-                <!-- Quick Actions Row -->
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginBottom="16dp"
-                    android:orientation="horizontal">
-
-                    <Button
-                        android:id="@+id/button_how_it_works"
-                        android:layout_width="0dp"
-                        android:layout_height="48dp"
-                        android:layout_marginEnd="8dp"
-                        android:layout_weight="1"
-                        android:background="@drawable/button_outlined_background"
-                        android:fontFamily="sans-serif-medium"
-                        android:text="@string/how_it_works"
-                        android:textAllCaps="false"
-                        android:textColor="@color/primary"
-                        android:textSize="13sp" />
-
-                    <Button
-                        android:id="@+id/button_check_ar_support"
-                        android:layout_width="0dp"
-                        android:layout_height="48dp"
-                        android:layout_marginStart="8dp"
-                        android:layout_weight="1"
-                        android:background="@drawable/button_outlined_background"
-                        android:fontFamily="sans-serif-medium"
-                        android:text="@string/check_ar_support"
-                        android:textAllCaps="false"
-                        android:textColor="@color/primary"
-                        android:textSize="13sp" />
-
-                </LinearLayout>
-
-                <!-- Divider -->
-                <View
-                    android:layout_width="match_parent"
-                    android:layout_height="1dp"
-                    android:layout_marginVertical="16dp"
-                    android:background="@color/divider" />
-
-                <!-- Manual Input Section -->
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginBottom="12dp"
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/button_how_it_works"
+                    android:layout_width="0dp"
+                    android:layout_height="48dp"
+                    android:layout_marginEnd="8dp"
+                    android:layout_weight="1"
                     android:fontFamily="sans-serif-medium"
-                    android:text="@string/enter_unique_id"
-                    android:textColor="@color/text_primary"
-                    android:textSize="14sp" />
+                    android:text="@string/how_it_works"
+                    android:textAllCaps="false"
+                    android:textSize="13sp"
+                    app:cornerRadius="10dp"
+                    style="@style/Widget.Material3.Button.TonalButton" />
 
-                <EditText
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/button_check_ar_support"
+                    android:layout_width="0dp"
+                    android:layout_height="48dp"
+                    android:layout_marginStart="8dp"
+                    android:layout_weight="1"
+                    android:fontFamily="sans-serif-medium"
+                    android:text="@string/check_ar_support"
+                    android:textAllCaps="false"
+                    android:textSize="13sp"
+                    app:cornerRadius="10dp"
+                    style="@style/Widget.Material3.Button.TonalButton" />
+
+            </LinearLayout>
+
+            <!-- Divider -->
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:layout_marginVertical="16dp"
+                android:background="@color/divider" />
+
+            <!-- Manual Input Section -->
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="12dp"
+                android:fontFamily="sans-serif-medium"
+                android:text="@string/enter_unique_id"
+                android:textColor="@color/text_primary"
+                android:textSize="14sp" />
+
+            <com.google.android.material.textfield.TextInputLayout
+                android:id="@+id/layout_unique_id"
+                style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="12dp"
+                app:boxCornerRadiusBottomEnd="12dp"
+                app:boxCornerRadiusBottomStart="12dp"
+                app:boxCornerRadiusTopEnd="12dp"
+                app:boxCornerRadiusTopStart="12dp"
+                app:boxStrokeColor="@color/primary"
+                app:hintTextColor="@color/primary">
+
+                <com.google.android.material.textfield.TextInputEditText
                     android:id="@+id/edit_unique_id"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginBottom="12dp"
-                    android:background="@drawable/input_background"
-                    android:padding="12dp"
                     android:hint="@string/unique_id_hint"
                     android:inputType="text"
                     android:maxLines="1"
@@ -210,23 +230,24 @@
                     android:textColor="@color/text_primary"
                     android:textSize="15sp" />
 
-                <Button
-                    android:id="@+id/button_open"
-                    android:layout_width="match_parent"
-                    android:layout_height="52dp"
-                    android:background="@drawable/button_primary_background"
-                    android:fontFamily="sans-serif-medium"
-                    android:text="@string/open"
-                    android:textAllCaps="false"
-                    android:textColor="@color/on_primary"
-                    android:textSize="15sp" />
+            </com.google.android.material.textfield.TextInputLayout>
 
-                <!-- Bottom Spacing -->
-                <View
-                    android:layout_width="match_parent"
-                    android:layout_height="32dp" />
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/button_open"
+                android:layout_width="match_parent"
+                android:layout_height="52dp"
+                android:fontFamily="sans-serif-medium"
+                android:letterSpacing="0.02"
+                android:text="@string/open"
+                android:textAllCaps="false"
+                android:textSize="15sp"
+                app:cornerRadius="12dp"
+                style="@style/Widget.Material3.Button.TonalButton" />
 
-            </LinearLayout>
+            <!-- Bottom Spacing -->
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="32dp" />
 
         </LinearLayout>
 
@@ -238,21 +259,24 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:background="@color/background"
+        android:gravity="center"
+        android:orientation="vertical"
         android:visibility="gone"
         tools:visibility="visible">
 
         <LinearLayout
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_gravity="center"
             android:gravity="center"
             android:orientation="vertical">
 
-            <ProgressBar
+            <com.google.android.material.progressindicator.CircularProgressIndicator
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:indeterminate="true"
-                android:indeterminateTint="@color/primary" />
+                app:indicatorColor="@color/primary"
+                app:indicatorSize="56dp"
+                app:trackThickness="4dp" />
 
             <TextView
                 android:id="@+id/text_loading"
@@ -274,6 +298,8 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:background="@color/background"
+        android:gravity="center"
+        android:orientation="vertical"
         android:padding="24dp"
         android:visibility="gone"
         tools:visibility="visible">
@@ -281,7 +307,6 @@
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_gravity="center"
             android:gravity="center"
             android:orientation="vertical">
 
@@ -297,8 +322,9 @@
             <!-- Error Message -->
             <ScrollView
                 android:layout_width="match_parent"
-                android:layout_height="wrap_content"
+                android:layout_height="0dp"
                 android:layout_marginBottom="24dp"
+                android:layout_weight="1"
                 android:fillViewport="true">
 
                 <TextView
@@ -308,41 +334,41 @@
                     android:gravity="center"
                     android:lineSpacingMultiplier="1.4"
                     android:padding="8dp"
+                    android:textAppearance="?attr/textAppearanceBodyMedium"
                     android:textColor="@color/text_secondary"
                     tools:text="Ошибка сети. Проверьте подключение." />
 
             </ScrollView>
 
             <!-- Retry Button -->
-            <Button
+            <com.google.android.material.button.MaterialButton
                 android:id="@+id/button_retry"
                 android:layout_width="wrap_content"
                 android:layout_height="52dp"
                 android:layout_marginBottom="12dp"
-                android:background="@drawable/button_primary_background"
                 android:fontFamily="sans-serif-medium"
                 android:paddingHorizontal="32dp"
                 android:text="@string/retry"
                 android:textAllCaps="false"
-                android:textColor="@color/on_primary"
-                android:textSize="15sp" />
+                android:textSize="15sp"
+                app:cornerRadius="12dp" />
 
             <!-- Open Device List Button -->
-            <Button
+            <com.google.android.material.button.MaterialButton
                 android:id="@+id/button_open_device_list"
                 android:layout_width="wrap_content"
                 android:layout_height="48dp"
-                android:background="@drawable/button_outlined_background"
                 android:fontFamily="sans-serif-medium"
                 android:paddingHorizontal="24dp"
                 android:text="@string/button_open_device_list"
                 android:textAllCaps="false"
-                android:textColor="@color/primary"
                 android:textSize="14sp"
-                android:visibility="gone" />
+                android:visibility="gone"
+                app:cornerRadius="10dp"
+                style="@style/Widget.Material3.Button.TonalButton" />
 
         </LinearLayout>
 
     </FrameLayout>
 
-</RelativeLayout>
+</androidx.coordinatorlayout.widget.CoordinatorLayout>
