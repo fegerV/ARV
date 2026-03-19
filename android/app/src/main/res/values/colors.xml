@@ -14,8 +14,17 @@
     <color name="background">#F5F7FA</color>
     <color name="surface">#FFFFFF</color>
     <color name="surface_variant">#F0F2F5</color>
+    <color name="surface_elevated">#F5F7FA</color>
     <color name="on_surface">#1A1A2E</color>
     <color name="on_surface_variant">#5A5A6E</color>
+    
+    <!-- Text Colors -->
+    <color name="text_primary">#1A1A2E</color>
+    <color name="text_secondary">#5A5A6E</color>
+    <color name="text_hint">#9E9E9E</color>
+    <color name="text_muted">#9E9E9E</color>
+    <color name="text_on_dark">#FFFFFF</color>
+    <color name="text_on_dark_secondary">#B0BEC5</color>
     
     <!-- Cards & Elevations -->
     <color name="card_background">#FFFFFF</color>
