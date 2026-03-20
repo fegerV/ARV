@@ -6,10 +6,6 @@ name: Build Mobile (Android + iOS)
 on:
   push:
     branches: [main, develop]
-    paths:
-      - "android/**"
-      - "ios/**"
-      - ".github/workflows/build-mobile.yml"
   pull_request:
     branches: [main, develop]
     paths:
