@@ -7,6 +7,8 @@ import android.net.Uri
 import android.os.Bundle
 import android.util.Log
 import android.view.View
+import android.view.animation.AlphaAnimation
+import android.view.animation.LinearInterpolator
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
@@ -94,6 +96,7 @@ class MainActivity : AppCompatActivity() {
         binding.buttonCheckArSupport.setOnClickListener { openArCorePlayStore() }
         binding.buttonRetry.setOnClickListener { viewModel.retry() }
 
+        startHeroStarAnimation()
         observeUiState()
         requestRequiredPermissions()
         handleIntent(intent)
@@ -349,6 +352,20 @@ class MainActivity : AppCompatActivity() {
         binding.buttonRetry.visibility = if (retryable) View.VISIBLE else View.GONE
         binding.buttonRetry.setOnClickListener { viewModel.retry() }
         binding.buttonOpenDeviceList.visibility = View.GONE
+    }
+
+    private fun startHeroStarAnimation() {
+        val stars = listOf(binding.starOne, binding.starTwo, binding.starThree, binding.starFour)
+        stars.forEachIndexed { index, star ->
+            val animation = AlphaAnimation(0.28f, 1f).apply {
+                duration = 3400L + (index * 700L)
+                repeatCount = AlphaAnimation.INFINITE
+                repeatMode = AlphaAnimation.REVERSE
+                interpolator = LinearInterpolator()
+                startOffset = index * 500L
+            }
+            star.startAnimation(animation)
+        }
     }
 
     companion object {
