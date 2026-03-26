@@ -153,6 +153,33 @@
 
         </LinearLayout>
 
+        <!-- Processing Panel (shown when QR is recognized) -->
+        <LinearLayout
+            android:id="@+id/panelProcessing"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:background="@color/camera_overlay"
+            android:gravity="center"
+            android:orientation="vertical"
+            android:visibility="gone"
+            android:clickable="true"
+            android:focusable="true">
+
+            <ProgressBar
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="16dp" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:gravity="center"
+                android:text="@string/loading_content_short"
+                android:textColor="@color/text_on_dark"
+                android:textSize="16sp" />
+
+        </LinearLayout>
+
     </FrameLayout>
 
     <!-- Processing Overlay -->

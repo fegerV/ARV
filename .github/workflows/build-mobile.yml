@@ -50,11 +50,20 @@ jobs:
         env:
           GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
         run: |
-          if [ -n "$GOOGLE_SERVICES_JSON" ]; then
-            echo "$GOOGLE_SERVICES_JSON" | base64 -d > android/app/google-services.json
+          set -euo pipefail
+
+          target_file="android/app/google-services.json"
+          placeholder='{"project_info":{"project_number":"0","project_id":"placeholder","storage_bucket":""},"client":[{"client_info":{"mobilesdk_app_id":"1:0:android:0","android_client_info":{"package_name":"ru.neuroimagen.arviewer"}},"api_key":[{"current_key":"placeholder"}]}],"configuration_version":"1"}'
+
+          if [ -z "${GOOGLE_SERVICES_JSON:-}" ]; then
+            printf '%s' "$placeholder" > "$target_file"
+          elif printf '%s' "$GOOGLE_SERVICES_JSON" | base64 -d > "$target_file" 2>/dev/null; then
+            :
           else
-            echo '{"project_info":{"project_number":"0","project_id":"placeholder","storage_bucket":""},"client":[{"client_info":{"mobilesdk_app_id":"1:0:android:0","android_client_info":{"package_name":"ru.neuroimagen.arviewer"}},"api_key":[{"current_key":"placeholder"}]}],"configuration_version":"1"}' > android/app/google-services.json
+            printf '%s' "$GOOGLE_SERVICES_JSON" > "$target_file"
           fi
+
+          python3 -m json.tool "$target_file" > /dev/null
 
       - name: Build debug APK
         run: |
@@ -92,6 +101,7 @@ jobs:
       - name: Build release AAB
         if: steps.signing.outputs.has_signing == 'true'
         run: |
+          set -o pipefail
           cd android
           ./gradlew bundleRelease --no-daemon --info 2>&1 | tail -80
 
