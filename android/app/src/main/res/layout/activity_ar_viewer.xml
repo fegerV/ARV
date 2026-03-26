@@ -7,7 +7,7 @@
     android:background="@color/ar_background">
 
     <!-- AR Surface View (Camera Preview) -->
-    <androidx.appcompat.widget.AppCompatSurfaceView
+    <SurfaceView
         android:id="@+id/surface_view"
         android:layout_width="match_parent"
         android:layout_height="match_parent" />
