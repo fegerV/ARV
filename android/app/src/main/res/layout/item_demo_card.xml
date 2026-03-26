@@ -4,7 +4,6 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:layout_marginBottom="16dp"
     app:cardBackgroundColor="@color/card_background"
     app:cardCornerRadius="16dp"
     app:cardElevation="3dp">
@@ -23,8 +22,10 @@
                 android:id="@+id/image_demo_marker"
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
-                android:scaleType="centerCrop"
+                android:adjustViewBounds="true"
                 android:contentDescription="@null"
+                android:padding="10dp"
+                android:scaleType="fitCenter"
                 tools:src="@tools:sample/backgrounds/scenic" />
 
             <!-- Gradient Overlay -->
@@ -107,7 +108,7 @@
                     android:drawablePadding="6dp"
                     android:fontFamily="sans-serif-medium"
                     android:paddingHorizontal="12dp"
-                    android:text="@string/demo_download_marker"
+                    android:text="@string/demo_save_image"
                     android:textAllCaps="false"
                     android:textColor="@color/primary"
                     android:textSize="13sp"
@@ -125,7 +126,7 @@
                     android:drawablePadding="6dp"
                     android:fontFamily="sans-serif-medium"
                     android:paddingHorizontal="12dp"
-                    android:text="@string/demo_share_marker"
+                    android:text="@string/demo_share"
                     android:textAllCaps="false"
                     android:textColor="@color/primary"
                     android:textSize="13sp"

@@ -74,7 +74,7 @@
                 android:layout_width="80dp"
                 android:layout_height="80dp"
                 android:layout_marginBottom="20dp"
-                android:src="@drawable/ic_launcher"
+                android:src="@mipmap/ic_launcher"
                 android:contentDescription="@null" />
 
             <!-- Loading Spinner -->
