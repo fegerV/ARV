@@ -97,29 +97,13 @@
                     android:layout_width="match_parent"
                     android:layout_height="8dp" />
 
-                <FrameLayout
-                    android:layout_width="148dp"
-                    android:layout_height="114dp"
-                    android:layout_marginBottom="12dp">
-
-                    <ImageView
-                        android:id="@+id/logo_glow"
-                        android:layout_width="148dp"
-                        android:layout_height="148dp"
-                        android:layout_gravity="center"
-                        android:alpha="0.56"
-                        android:background="@drawable/logo_glow"
-                        android:contentDescription="@null" />
-
-                    <ImageView
-                        android:id="@+id/image_app_logo"
-                        android:layout_width="88dp"
-                        android:layout_height="88dp"
-                        android:layout_gravity="center"
-                        android:contentDescription="@string/app_name"
-                        android:src="@drawable/v_portal2" />
-
-                </FrameLayout>
+                <ImageView
+                    android:id="@+id/image_app_logo"
+                    android:layout_width="88dp"
+                    android:layout_height="88dp"
+                    android:layout_marginBottom="12dp"
+                    android:contentDescription="@string/app_name"
+                    android:src="@drawable/v_portal2" />
 
                 <TextView
                     android:layout_width="wrap_content"

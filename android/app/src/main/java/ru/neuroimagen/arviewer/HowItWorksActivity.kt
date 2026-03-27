@@ -3,10 +3,7 @@ package ru.neuroimagen.arviewer
 import android.os.Bundle
 import android.view.View
 import android.view.animation.AlphaAnimation
-import android.view.animation.Animation
-import android.view.animation.AnimationSet
 import android.view.animation.LinearInterpolator
-import android.view.animation.ScaleAnimation
 import android.widget.ImageView
 import androidx.appcompat.app.AppCompatActivity
 
@@ -44,32 +41,5 @@ class HowItWorksActivity : AppCompatActivity() {
             }
             star.startAnimation(animation)
         }
-
-        findViewById<View>(R.id.logo_glow).startAnimation(
-            AnimationSet(true).apply {
-                interpolator = LinearInterpolator()
-                repeatCount = Animation.INFINITE
-                repeatMode = Animation.REVERSE
-                addAnimation(AlphaAnimation(0.42f, 0.9f).apply {
-                    duration = 4200L
-                    repeatCount = Animation.INFINITE
-                    repeatMode = Animation.REVERSE
-                })
-                addAnimation(ScaleAnimation(
-                    0.94f,
-                    1.08f,
-                    0.94f,
-                    1.08f,
-                    Animation.RELATIVE_TO_SELF,
-                    0.5f,
-                    Animation.RELATIVE_TO_SELF,
-                    0.5f,
-                ).apply {
-                    duration = 4200L
-                    repeatCount = Animation.INFINITE
-                    repeatMode = Animation.REVERSE
-                })
-            },
-        )
     }
 }
