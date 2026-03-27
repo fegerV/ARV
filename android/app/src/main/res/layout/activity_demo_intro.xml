@@ -83,11 +83,36 @@
                 android:paddingBottom="20dp">
 
                 <ImageView
+                    android:id="@+id/button_back"
+                    android:layout_width="40dp"
+                    android:layout_height="40dp"
+                    android:layout_gravity="start"
+                    android:background="@drawable/ar_button_small_background"
+                    android:contentDescription="@string/close"
+                    android:padding="10dp"
+                    android:src="@drawable/ic_arrow_back"
+                    app:tint="@color/text_on_dark" />
+
+                <Space
+                    android:layout_width="match_parent"
+                    android:layout_height="8dp" />
+
+                <ImageView
+                    android:id="@+id/logo_glow"
+                    android:layout_width="148dp"
+                    android:layout_height="148dp"
+                    android:layout_marginBottom="-100dp"
+                    android:alpha="0.72"
+                    android:background="@drawable/logo_glow"
+                    android:contentDescription="@null" />
+
+                <ImageView
+                    android:id="@+id/image_app_logo"
                     android:layout_width="88dp"
                     android:layout_height="88dp"
                     android:layout_marginBottom="14dp"
                     android:contentDescription="@string/app_name"
-                    android:src="@mipmap/ic_launcher" />
+                    android:src="@drawable/v_portal2" />
 
                 <TextView
                     android:layout_width="wrap_content"

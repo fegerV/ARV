@@ -8,7 +8,10 @@ import android.os.Bundle
 import android.util.Log
 import android.view.View
 import android.view.animation.AlphaAnimation
+import android.view.animation.Animation
+import android.view.animation.AnimationSet
 import android.view.animation.LinearInterpolator
+import android.view.animation.ScaleAnimation
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
@@ -366,6 +369,32 @@ class MainActivity : AppCompatActivity() {
             }
             star.startAnimation(animation)
         }
+
+        val glowAnimation = AnimationSet(true).apply {
+            interpolator = LinearInterpolator()
+            repeatCount = Animation.INFINITE
+            repeatMode = Animation.REVERSE
+            addAnimation(AlphaAnimation(0.42f, 0.9f).apply {
+                duration = 4200L
+                repeatCount = Animation.INFINITE
+                repeatMode = Animation.REVERSE
+            })
+            addAnimation(ScaleAnimation(
+                0.94f,
+                1.08f,
+                0.94f,
+                1.08f,
+                Animation.RELATIVE_TO_SELF,
+                0.5f,
+                Animation.RELATIVE_TO_SELF,
+                0.5f,
+            ).apply {
+                duration = 4200L
+                repeatCount = Animation.INFINITE
+                repeatMode = Animation.REVERSE
+            })
+        }
+        binding.logoGlow.startAnimation(glowAnimation)
     }
 
     companion object {

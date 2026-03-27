@@ -77,12 +77,21 @@
                 android:paddingBottom="18dp">
 
                 <ImageView
+                    android:id="@+id/logo_glow"
+                    android:layout_width="148dp"
+                    android:layout_height="148dp"
+                    android:layout_marginBottom="-104dp"
+                    android:alpha="0.72"
+                    android:background="@drawable/logo_glow"
+                    android:contentDescription="@null" />
+
+                <ImageView
                     android:id="@+id/image_app_logo"
                     android:layout_width="92dp"
                     android:layout_height="92dp"
                     android:layout_marginBottom="14dp"
                     android:contentDescription="@string/app_name"
-                    android:src="@mipmap/ic_launcher" />
+                    android:src="@drawable/v_portal2" />
 
                 <TextView
                     android:layout_width="wrap_content"
@@ -128,11 +137,12 @@
                         android:layout_width="match_parent"
                         android:layout_height="56dp"
                         android:layout_marginBottom="12dp"
+                        android:background="@drawable/button_primary_background"
                         android:text="@string/scan_qr"
                         android:textAllCaps="false"
                         android:textColor="@color/on_primary"
                         android:textSize="15sp"
-                        app:backgroundTint="@color/primary"
+                        app:backgroundTint="@null"
                         app:cornerRadius="12dp"
                         app:icon="@drawable/ic_qr_code_scanner"
                         app:iconGravity="textStart"
@@ -145,13 +155,13 @@
                         android:layout_width="match_parent"
                         android:layout_height="56dp"
                         android:layout_marginBottom="12dp"
+                        android:background="@drawable/button_outlined_background"
                         android:text="@string/open_from_file"
                         android:textAllCaps="false"
                         android:textColor="@color/primary"
                         android:textSize="15sp"
-                        app:backgroundTint="@android:color/transparent"
+                        app:backgroundTint="@null"
                         app:cornerRadius="12dp"
-                        app:strokeColor="@color/primary"
                         app:strokeWidth="2dp" />
 
                     <com.google.android.material.button.MaterialButton
@@ -159,13 +169,13 @@
                         style="@style/Widget.Material3.Button.OutlinedButton"
                         android:layout_width="match_parent"
                         android:layout_height="56dp"
+                        android:background="@drawable/button_outlined_background"
                         android:text="@string/try_demo"
                         android:textAllCaps="false"
                         android:textColor="@color/primary"
                         android:textSize="15sp"
-                        app:backgroundTint="@android:color/transparent"
+                        app:backgroundTint="@null"
                         app:cornerRadius="12dp"
-                        app:strokeColor="@color/primary"
                         app:strokeWidth="2dp" />
 
                 </LinearLayout>
@@ -184,14 +194,14 @@
                     android:layout_width="0dp"
                     android:layout_height="48dp"
                     android:layout_marginEnd="8dp"
+                    android:background="@drawable/button_outlined_background"
                     android:layout_weight="1"
                     android:text="@string/how_it_works"
                     android:textAllCaps="false"
                     android:textColor="@color/primary"
                     android:textSize="13sp"
-                    app:backgroundTint="@android:color/transparent"
+                    app:backgroundTint="@null"
                     app:cornerRadius="10dp"
-                    app:strokeColor="@color/primary"
                     app:strokeWidth="2dp" />
 
                 <com.google.android.material.button.MaterialButton
@@ -200,14 +210,14 @@
                     android:layout_width="0dp"
                     android:layout_height="52dp"
                     android:layout_marginStart="8dp"
+                    android:background="@drawable/button_outlined_background"
                     android:layout_weight="1"
                     android:text="Проверить AR"
                     android:textAllCaps="false"
                     android:textColor="@color/primary"
                     android:textSize="13sp"
-                    app:backgroundTint="@android:color/transparent"
+                    app:backgroundTint="@null"
                     app:cornerRadius="10dp"
-                    app:strokeColor="@color/primary"
                     app:strokeWidth="2dp" />
 
             </LinearLayout>
@@ -251,11 +261,12 @@
                 android:id="@+id/button_open"
                 android:layout_width="match_parent"
                 android:layout_height="52dp"
+                android:background="@drawable/button_primary_background"
                 android:text="@string/open"
                 android:textAllCaps="false"
                 android:textColor="@color/on_primary"
                 android:textSize="15sp"
-                app:backgroundTint="@color/primary"
+                app:backgroundTint="@null"
                 app:cornerRadius="12dp" />
 
             <Space
