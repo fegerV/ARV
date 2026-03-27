@@ -10,9 +10,11 @@ import android.os.Bundle
 import android.provider.MediaStore
 import android.view.LayoutInflater
 import android.view.View
-import android.widget.Button
+import android.view.animation.AlphaAnimation
+import android.view.animation.LinearInterpolator
 import android.widget.GridLayout
 import android.widget.ImageView
+import android.widget.ImageButton
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
@@ -45,6 +47,7 @@ class DemoIntroActivity : AppCompatActivity() {
         progressView = findViewById(R.id.progress_demo_loading)
         textError = findViewById(R.id.text_demo_error)
 
+        startHeroStarAnimation()
         displayDemos(buildLocalDemos())
     }
 
@@ -64,17 +67,14 @@ class DemoIntroActivity : AppCompatActivity() {
             val card = inflater.inflate(R.layout.item_demo_card, container, false)
             val imageView = card.findViewById<ImageView>(R.id.image_demo_marker)
             val badgeView = card.findViewById<TextView>(R.id.text_demo_badge)
-            val titleView = card.findViewById<TextView>(R.id.text_demo_title)
-            val buttonStart = card.findViewById<Button>(R.id.button_start_demo)
-            val buttonSave = card.findViewById<Button>(R.id.button_download_marker)
-            val buttonShare = card.findViewById<Button>(R.id.button_share_marker)
+            val buttonSave = card.findViewById<ImageButton>(R.id.button_download_marker)
+            val buttonShare = card.findViewById<ImageButton>(R.id.button_share_marker)
 
             badgeView.text = getString(R.string.demo_title_format, index + 1)
-            titleView.text = demo.title
             imageView.load("file:///android_asset/${demo.markerAssetPath}")
 
-            imageView.setOnClickListener { shareDemoMarker(demo) }
-            buttonStart.setOnClickListener { startDemo(demo) }
+            card.setOnClickListener { startDemo(demo) }
+            imageView.setOnClickListener { startDemo(demo) }
             buttonSave.setOnClickListener { saveDemoMarker(demo) }
             buttonShare.setOnClickListener { shareDemoMarker(demo) }
 
@@ -86,6 +86,24 @@ class DemoIntroActivity : AppCompatActivity() {
             }
             card.layoutParams = params
             container.addView(card)
+        }
+    }
+
+    private fun startHeroStarAnimation() {
+        val stars = listOf(
+            findViewById<View>(R.id.star_one),
+            findViewById<View>(R.id.star_two),
+            findViewById<View>(R.id.star_three),
+        )
+        stars.forEachIndexed { index, star ->
+            val animation = AlphaAnimation(0.28f, 1f).apply {
+                duration = 3300L + (index * 750L)
+                repeatCount = AlphaAnimation.INFINITE
+                repeatMode = AlphaAnimation.REVERSE
+                interpolator = LinearInterpolator()
+                startOffset = index * 420L
+            }
+            star.startAnimation(animation)
         }
     }
 

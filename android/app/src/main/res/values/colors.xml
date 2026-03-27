@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <!-- V-Portal Brand Colors (Modern Green Gradient) -->
-    <color name="primary">#12F05A</color>
-    <color name="primary_variant">#08C845</color>
+    <color name="primary">#00E000</color>
+    <color name="primary_variant">#00B800</color>
     <color name="on_primary">#04110A</color>
     
     <!-- Secondary accent (purple for contrast) -->
@@ -31,15 +31,15 @@
     <color name="card_stroke">#E0E0E0</color>
 
     <!-- Status Colors -->
-    <color name="success">#12F05A</color>
+    <color name="success">#00E000</color>
     <color name="warning">#FFB300</color>
     <color name="error">#FF5252</color>
     <color name="info">#2196F3</color>
     
     <!-- AR Mode (Dark Theme) -->
     <color name="ar_background">#0F0F0F</color>
-    <color name="ar_accent">#12F05A</color>
-    <color name="ar_accent_variant">#08C845</color>
+    <color name="ar_accent">#00E000</color>
+    <color name="ar_accent_variant">#00B800</color>
     <color name="ar_surface">#1A1A1A</color>
     <color name="ar_surface_elevated">#242424</color>
     <color name="ar_text_primary">#FFFFFF</color>
@@ -50,20 +50,20 @@
     
     <!-- QR Scanner Overlay -->
     <color name="camera_overlay">#CC000000</color>
-    <color name="qr_scan_line">#12F05A</color>
-    <color name="qr_corner">#12F05A</color>
+    <color name="qr_scan_line">#00E000</color>
+    <color name="qr_corner">#00E000</color>
     
     <!-- Gradients (referenced in drawables) -->
     <color name="gradient_start">#667eea</color>
     <color name="gradient_middle">#764ba2</color>
-    <color name="gradient_end">#12F05A</color>
+    <color name="gradient_end">#00E000</color>
 
     <!-- Hero Space Background -->
-    <color name="hero_space_top">#08111B</color>
-    <color name="hero_space_bottom">#111B2B</color>
-    <color name="hero_glow_green">#3312F05A</color>
-    <color name="hero_glow_blue">#221F8BFF</color>
-    <color name="hero_glow_violet">#221C3DFF</color>
+    <color name="hero_space_top">#000000</color>
+    <color name="hero_space_bottom">#000000</color>
+    <color name="hero_glow_green">#2200E000</color>
+    <color name="hero_glow_blue">#16008CFF</color>
+    <color name="hero_glow_violet">#140B1B4A</color>
     <color name="star_color">#EAF6FF</color>
     
     <!-- Launcher Icon -->
