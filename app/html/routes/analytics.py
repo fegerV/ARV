@@ -14,13 +14,13 @@ from typing import Any
 import structlog
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
-from fastapi.templating import Jinja2Templates
 from sqlalchemy import cast, Date, case, distinct, func, literal_column, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.routes.auth import get_current_user_optional
 from app.html.deps import get_html_db
-from app.html.filters import datetime_format, tojson_filter
+from app.html.templating import templates
+from app.html.utils import require_active_user
 from app.models.ar_content import ARContent
 from app.models.ar_view_session import ARViewSession
 from app.models.company import Company
@@ -28,10 +28,6 @@ from app.models.project import Project
 
 router = APIRouter()
 logger = structlog.get_logger()
-
-templates = Jinja2Templates(directory="templates")
-templates.env.filters["datetime_format"] = datetime_format
-templates.env.filters["tojson"] = tojson_filter
 
 # Valid period values (days).  0 means "all time".
 _VALID_PERIODS = {7, 30, 90, 0}
@@ -382,10 +378,9 @@ async def analytics_page(
     current_user=Depends(get_current_user_optional),
 ):
     """Analytics dashboard page."""
-    if not current_user:
-        return RedirectResponse(url="/admin/login", status_code=303)
-    if not current_user.is_active:
-        return RedirectResponse(url="/admin/login", status_code=303)
+    redirect = require_active_user(current_user)
+    if redirect:
+        return redirect
 
     # Parse period from query params
     try:

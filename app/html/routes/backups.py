@@ -2,19 +2,16 @@
 
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import HTMLResponse
-from fastapi.templating import Jinja2Templates
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.routes.auth import get_current_active_user
 from app.core.database import get_db
-from app.html.filters import datetime_format
+from app.html.templating import templates
 from app.models.user import User
 from app.services.backup_service import BackupService
 from app.services.settings_service import SettingsService
 
 router = APIRouter()
-templates = Jinja2Templates(directory="templates")
-templates.env.filters["datetime_format"] = datetime_format
 
 
 @router.get("/backups", response_class=HTMLResponse)

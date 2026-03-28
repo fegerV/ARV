@@ -2,13 +2,13 @@
 
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import HTMLResponse, RedirectResponse, PlainTextResponse
-from fastapi.templating import Jinja2Templates
 from pathlib import Path
 
 from app.api.routes.auth import get_current_user_optional
+from app.html.templating import templates
+from app.html.utils import require_active_user
 
 router = APIRouter()
-templates = Jinja2Templates(directory="templates")
 
 
 @router.get("/robots.txt", response_class=PlainTextResponse)
@@ -29,10 +29,9 @@ async def help_page(
     current_user=Depends(get_current_user_optional),
 ):
     """Справка и документация по работе с платформой."""
-    if not current_user:
-        return RedirectResponse(url="/admin/login", status_code=303)
-    if not current_user.is_active:
-        return RedirectResponse(url="/admin/login", status_code=303)
+    redirect = require_active_user(current_user)
+    if redirect:
+        return redirect
 
     return templates.TemplateResponse(
         "help.html",

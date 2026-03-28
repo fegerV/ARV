@@ -1,6 +1,5 @@
 from fastapi import APIRouter, Request, Depends
 from fastapi.responses import HTMLResponse, RedirectResponse
-from fastapi.templating import Jinja2Templates
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from pathlib import Path
@@ -11,17 +10,14 @@ import traceback
 
 from app.html.deps import get_html_db
 from app.api.routes.auth import get_current_user_optional
-from app.html.filters import datetime_format
+from app.html.templating import templates
+from app.html.utils import require_active_user
 from app.models.company import Company
 from app.models.project import Project
 from app.core.config import settings
 
 router = APIRouter()
 logger = structlog.get_logger()
-
-templates = Jinja2Templates(directory="templates")
-# Add datetime filter to templates
-templates.env.filters["datetime_format"] = datetime_format
 
 
 def format_bytes(bytes_value: int) -> str:
@@ -304,13 +300,9 @@ async def storage_page(
 ):
     """Storage page with real data."""
     try:
-        if not current_user:
-            # Redirect to login page if user is not authenticated
-            return RedirectResponse(url="/admin/login", status_code=303)
-        
-        if not current_user.is_active:
-            # Redirect to login page if user is not active
-            return RedirectResponse(url="/admin/login", status_code=303)
+        redirect = require_active_user(current_user)
+        if redirect:
+            return redirect
         
         # Get real storage information
         try:

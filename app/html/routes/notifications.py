@@ -1,23 +1,17 @@
 from fastapi import APIRouter, Request, Depends
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
-from fastapi.templating import Jinja2Templates
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 import structlog
 from app.html.deps import get_html_db
 from app.api.routes.auth import get_current_user_optional
 from app.models.notification import Notification
-from app.html.filters import datetime_format, tojson_filter
+from app.html.templating import templates
+from app.html.utils import require_active_user
 from app.core.config import settings
 
 router = APIRouter()
 logger = structlog.get_logger()
-
-templates = Jinja2Templates(directory="templates")
-# Add datetime filter to templates
-templates.env.filters["datetime_format"] = datetime_format
-# Add custom tojson filter (overrides default if exists)
-templates.env.filters["tojson"] = tojson_filter
 
 
 def _convert_data_for_template(data_dict):
@@ -38,11 +32,9 @@ async def notifications_page(
     db: AsyncSession = Depends(get_html_db)
 ):
     """Notifications list page with pagination."""
-    if not current_user:
-        return RedirectResponse(url="/admin/login", status_code=303)
-    
-    if not current_user.is_active:
-        return RedirectResponse(url="/admin/login", status_code=303)
+    redirect = require_active_user(current_user)
+    if redirect:
+        return redirect
     
     # Get query parameters
     try:

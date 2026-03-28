@@ -7,16 +7,13 @@ from pathlib import Path
 import structlog
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
-from fastapi.templating import Jinja2Templates
 
 from app.api.routes.auth import get_current_user_optional
 from app.core.config import settings
-from app.html.filters import tojson_filter
+from app.html.templating import templates
 
 router = APIRouter()
 logger = structlog.get_logger()
-templates = Jinja2Templates(directory="templates")
-templates.env.filters["tojson"] = tojson_filter
 
 # Паттерны для определения уровня по строке (JSON structlog, journalctl, traceback)
 _LEVEL_ERROR = re.compile(

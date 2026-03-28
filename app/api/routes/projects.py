@@ -95,7 +95,10 @@ async def get_projects_by_company_no_auth(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
 ):
-    """Get projects filtered by company ID for HTML forms."""
+    """Get projects filtered by company ID for legacy HTML forms.
+
+    The historical route name is misleading; authentication is still required.
+    """
     logger = structlog.get_logger()
 
     # Verify company exists

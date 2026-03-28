@@ -3,17 +3,15 @@
 Sections: general, security, ar, notifications, storage, backup.
 """
 
-from typing import Optional
-
 from fastapi import APIRouter, Depends, Form, Request
-from fastapi.responses import HTMLResponse, RedirectResponse
-from fastapi.templating import Jinja2Templates
+from fastapi.responses import HTMLResponse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.routes.auth import get_current_user_optional
 from app.html.deps import get_html_db
-from app.html.filters import datetime_format
+from app.html.templating import templates
+from app.html.utils import require_active_user
 from app.models.company import Company
 from app.schemas.settings import (
     ARSettings, BackupSettings, GeneralSettings, NotificationSettings,
@@ -27,19 +25,11 @@ import logging
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
-templates = Jinja2Templates(directory="templates")
-templates.env.filters["datetime_format"] = datetime_format
 
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
-
-def _require_active_user(current_user) -> Optional[RedirectResponse]:
-    """Return a redirect if the user is missing or inactive, else ``None``."""
-    if not current_user or not current_user.is_active:
-        return RedirectResponse(url="/admin/login", status_code=303)
-    return None
 
 
 async def _yd_companies(db: AsyncSession) -> list[dict]:
@@ -124,7 +114,7 @@ async def settings_page(
     db: AsyncSession = Depends(get_html_db),
 ):
     """Render the settings page."""
-    redirect = _require_active_user(current_user)
+    redirect = require_active_user(current_user)
     if redirect:
         return redirect
     return await _render_settings(request, db, current_user)
@@ -148,7 +138,7 @@ async def update_general_settings(
     default_subscription_years: int = Form(1),
 ):
     """Save general settings."""
-    redirect = _require_active_user(current_user)
+    redirect = require_active_user(current_user)
     if redirect:
         return redirect
 
@@ -197,7 +187,7 @@ async def update_security_settings(
     api_rate_limit: int = Form(100),
 ):
     """Save security settings."""
-    redirect = _require_active_user(current_user)
+    redirect = require_active_user(current_user)
     if redirect:
         return redirect
 
@@ -244,7 +234,7 @@ async def update_ar_settings(
     qr_code_expiration_days: int = Form(365),
 ):
     """Save AR content settings. MindAR max-features preserved from DB."""
-    redirect = _require_active_user(current_user)
+    redirect = require_active_user(current_user)
     if redirect:
         return redirect
 
@@ -302,7 +292,7 @@ async def update_backup_settings(
     backup_max_copies: int = Form(30),
 ):
     """Save backup settings and reschedule the APScheduler job."""
-    redirect = _require_active_user(current_user)
+    redirect = require_active_user(current_user)
     if redirect:
         return redirect
 
@@ -365,7 +355,7 @@ async def update_notification_settings(
     telegram_admin_chat_id: str = Form(""),
 ):
     """Save notification settings."""
-    redirect = _require_active_user(current_user)
+    redirect = require_active_user(current_user)
     if redirect:
         return redirect
 
@@ -412,7 +402,7 @@ async def update_storage_settings(
     cdn_url: str = Form(""),
 ):
     """Save storage settings."""
-    redirect = _require_active_user(current_user)
+    redirect = require_active_user(current_user)
     if redirect:
         return redirect
 

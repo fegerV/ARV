@@ -1,12 +1,18 @@
 from fastapi import APIRouter, HTTPException, Depends, status, Request, Form, Response
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 from app.middleware.rate_limiter import rate_limit
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from datetime import datetime, timedelta
-from app.core.security import verify_password, create_access_token, get_password_hash, decode_token
+from app.core.security import (
+    verify_password,
+    create_access_token,
+    get_password_hash,
+    decode_token,
+    needs_password_rehash,
+)
 from app.core.database import get_db
 from app.models.user import User
 from app.schemas.auth import Token, UserResponse, RegisterRequest, RegisterResponse
@@ -28,39 +34,44 @@ logger = structlog.get_logger()
 MAX_LOGIN_ATTEMPTS = 5
 LOCKOUT_DURATION = timedelta(minutes=15)
 
+
+def _extract_request_token(request: Request, token: str = None) -> str | None:
+    """Read bearer token from explicit arg, Authorization header, or cookie."""
+    if token:
+        return token
+    auth_header = request.headers.get("Authorization")
+    if auth_header and auth_header.startswith("Bearer "):
+        return auth_header[7:]
+    return request.cookies.get("access_token")
+
+
+async def _get_user_from_token(db: AsyncSession, token: str | None) -> User | None:
+    """Resolve a user from a decoded JWT token."""
+    if not token:
+        return None
+    payload = decode_token(token)
+    if payload is None:
+        return None
+    email: str | None = payload.get("sub")
+    if not email:
+        return None
+    result = await db.execute(select(User).where(User.email == email))
+    return result.scalar_one_or_none()
+
 async def get_current_user(
     request: Request,
     token: str = None,
     db: AsyncSession = Depends(get_db)
 ) -> User:
     """Get current authenticated user from either token or cookie"""
-    # First try to get token from header if not provided
-    if not token:
-        token = request.headers.get("Authorization")
-        if token and token.startswith("Bearer "):
-            token = token[7:]
-        elif not token:
-            # If no header token, try to get from cookie
-            token = request.cookies.get("access_token")
-    
-    # If we have a token, try to validate it
-    if token:
-        credentials_exception = HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Could not validate credentials",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-        
-        payload = decode_token(token)
-        if payload is not None:
-            email: str = payload.get("sub")
-            if email:
-                result = await db.execute(select(User).where(User.email == email))
-                user = result.scalar_one_or_none()
-                if user:
-                    return user
-    
-    # If no token or token is invalid, raise exception
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Could not validate credentials",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+    user = await _get_user_from_token(db, _extract_request_token(request, token))
+    if user:
+        return user
     raise credentials_exception
 
 async def get_current_user_from_cookie(
@@ -68,25 +79,7 @@ async def get_current_user_from_cookie(
     db: AsyncSession = Depends(get_db)
 ) -> User:
     """Get current authenticated user from cookie"""
-    access_token = request.cookies.get("access_token")
-    if not access_token:
-        return None
-
-    payload = decode_token(access_token)
-    if payload is None:
-        return None
-    
-    email: str = payload.get("sub")
-    if email is None:
-        return None
-    
-    result = await db.execute(select(User).where(User.email == email))
-    user = result.scalar_one_or_none()
-    
-    if user is None:
-        return None
-    
-    return user
+    return await _get_user_from_token(db, request.cookies.get("access_token"))
 
 async def get_current_user_optional(
     request: Request,
@@ -94,74 +87,55 @@ async def get_current_user_optional(
     db: AsyncSession = Depends(get_db)
 ) -> User:
     """Get current user from either token or cookie, returns None if not authenticated"""
-    # First try to get token from header if not provided
-    if not token:
-        token = request.headers.get("Authorization")
-        if token and token.startswith("Bearer "):
-            token = token[7:]
-        elif not token:
-            # If no header token, try to get from cookie
-            token = request.cookies.get("access_token")
-    
-    # If we have a token, try to validate it
-    if token:
-        payload = decode_token(token)
-        if payload is not None:
-            email: str = payload.get("sub")
-            if email:
-                result = await db.execute(select(User).where(User.email == email))
-                user = result.scalar_one_or_none()
-                if user:
-                    return user
-
-    # If no token or token is invalid, return None
-    return None
+    return await _get_user_from_token(db, _extract_request_token(request, token))
 
 async def get_current_active_user(
     request: Request,
     db: AsyncSession = Depends(get_db)
 ) -> User:
     """Get current active user from either token or cookie"""
-    # First try to get from Authorization header
-    auth_header = request.headers.get("Authorization")
-    if auth_header and auth_header.startswith("Bearer "):
-        token = auth_header[7:]
-        payload = decode_token(token)
-        if payload:
-            email: str = payload.get("sub")
-            if email:
-                result = await db.execute(select(User).where(User.email == email))
-                user = result.scalar_one_or_none()
-                if user and user.is_active:
-                    return user
-    
-    # If no token or token invalid, try to get from cookie
-    token = request.cookies.get("access_token")
-    if token:
-        payload = decode_token(token)
-        if payload:
-            email: str = payload.get("sub")
-            if email:
-                result = await db.execute(select(User).where(User.email == email))
-                user = result.scalar_one_or_none()
-                if user and user.is_active:
-                    return user
-    
+    user = await _get_user_from_token(db, _extract_request_token(request))
+    if user and user.is_active:
+        return user
     raise HTTPException(status_code=401, detail="Inactive user or not authenticated")
 
-def create_access_token_cookie(response: Response, access_token: str):
-    """Set access token in cookie for HTML interface"""
+async def get_session_timeout_minutes(db: AsyncSession) -> int:
+    """Read session timeout from settings with a safe fallback."""
     settings = get_settings()
+    try:
+        from app.services.settings_service import SettingsService
+
+        service = SettingsService(db)
+        timeout = await service.get_int_setting("session_timeout", settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+        return max(timeout, 1)
+    except Exception:
+        return settings.ACCESS_TOKEN_EXPIRE_MINUTES
+
+
+def create_access_token_cookie(response: Response, access_token: str, timeout_minutes: int) -> None:
+    """Set access token in cookie for HTML interface."""
+    settings = get_settings()
+    lifetime_seconds = max(int(timeout_minutes) * 60, 60)
     response.set_cookie(
         key="access_token",
         value=access_token,
-        max_age=3600,
-        expires=3600,
+        max_age=lifetime_seconds,
+        expires=lifetime_seconds,
         path="/",
         secure=settings.is_production,  # Use secure cookies in production
         httponly=True,
         samesite="lax",
     )
+
+
+def clear_access_token_cookie(response: Response) -> None:
+    response.delete_cookie("access_token", path="/", samesite="lax")
+
+
+def clear_auth_cookies(response: Response) -> None:
+    """Clear browser authentication cookies."""
+    clear_access_token_cookie(response)
+    response.delete_cookie("csrf_token", path="/", samesite="lax")
 
 @router.post("/login", response_model=Token)
 @rate_limit("10/minute")
@@ -242,22 +216,16 @@ async def login(
             detail="Аккаунт заблокирован"
         )
     
+    if needs_password_rehash(user.hashed_password):
+        user.hashed_password = get_password_hash(form_data.password)
+
     # Reset login attempts on successful login
     user.login_attempts = 0
     user.locked_until = None
     user.last_login_at = datetime.utcnow()
     await db.commit()
     
-    # Read session_timeout from DB settings (minutes); fallback to config
-    settings = get_settings()
-    try:
-        from app.services.settings_service import SettingsService
-        _svc = SettingsService(db)
-        _all = await _svc.get_all_settings()
-        timeout_minutes = _all.security.session_timeout or settings.ACCESS_TOKEN_EXPIRE_MINUTES
-    except Exception:
-        timeout_minutes = settings.ACCESS_TOKEN_EXPIRE_MINUTES
-
+    timeout_minutes = await get_session_timeout_minutes(db)
     access_token_expires = timedelta(minutes=timeout_minutes)
     access_token = create_access_token(
         data={"sub": user.email, "user_id": user.id},
@@ -352,22 +320,16 @@ async def login_form(
         }
         return templates.TemplateResponse("auth/login.html", context)
     
+    if needs_password_rehash(user.hashed_password):
+        user.hashed_password = get_password_hash(password)
+
     # Reset login attempts on successful login
     user.login_attempts = 0
     user.locked_until = None
     user.last_login_at = datetime.utcnow()
     await db.commit()
     
-    # Read session_timeout from DB settings (minutes); fallback to config
-    settings = get_settings()
-    try:
-        from app.services.settings_service import SettingsService
-        _svc = SettingsService(db)
-        _all = await _svc.get_all_settings()
-        _timeout = _all.security.session_timeout or settings.ACCESS_TOKEN_EXPIRE_MINUTES
-    except Exception:
-        _timeout = settings.ACCESS_TOKEN_EXPIRE_MINUTES
-
+    _timeout = await get_session_timeout_minutes(db)
     access_token_expires = timedelta(minutes=_timeout)
     access_token = create_access_token(
         data={"sub": user.email, "user_id": user.id},
@@ -378,24 +340,16 @@ async def login_form(
     
     # Create response and set cookie
     response = RedirectResponse(url="/admin", status_code=303)
-    settings = get_settings()
-    response.set_cookie(
-        key="access_token",
-        value=access_token,
-        max_age=3600,
-        expires=3600,
-        path="/",
-        secure=settings.is_production,  # Use secure cookies in production
-        httponly=True,
-        samesite="lax",
-    )
+    create_access_token_cookie(response, access_token, _timeout)
     return response
 
 @router.post("/logout")
 async def logout(current_user: User = Depends(get_current_active_user)):
-    """Logout user (JWT is stateless, just log the event)"""
+    """Logout user and clear cookie-based session state."""
     logger.info("User logout", user_id=current_user.id, email=current_user.email)
-    return {"message": "Успешно вышли из системы"}
+    response = JSONResponse({"message": "Успешно вышли из системы"})
+    clear_auth_cookies(response)
+    return response
 
 @router.get("/me", response_model=UserResponse)
 async def read_users_me(current_user: User = Depends(get_current_active_user)):

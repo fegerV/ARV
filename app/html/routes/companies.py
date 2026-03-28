@@ -1,21 +1,17 @@
 from fastapi import APIRouter, Request, Depends, HTTPException
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
-from fastapi.templating import Jinja2Templates
 import structlog
 from app.models.company import Company
 from app.api.routes.companies import list_companies, get_company
 from app.html.deps import get_html_db
 from app.api.routes.auth import get_current_user_optional
 from app.html.mock import MOCK_COMPANIES
-from app.html.filters import datetime_format
+from app.html.templating import templates
+from app.html.utils import require_active_user, serialize_fields
 
 router = APIRouter()
 logger = structlog.get_logger()
-
-templates = Jinja2Templates(directory="templates")
-# Add datetime filter to templates
-templates.env.filters["datetime_format"] = datetime_format
 
 
 def _pydantic_to_dict(item):
@@ -27,13 +23,7 @@ def _pydantic_to_dict(item):
 
 def _convert_data_for_template(data_dict):
     """Convert datetime and status fields for template rendering."""
-    # Convert datetime to ISO string
-    if "created_at" in data_dict and hasattr(data_dict["created_at"], "isoformat"):
-        data_dict["created_at"] = data_dict["created_at"].isoformat()
-    if "updated_at" in data_dict and hasattr(data_dict["updated_at"], "isoformat"):
-        data_dict["updated_at"] = data_dict["updated_at"].isoformat()
-    
-    return data_dict
+    return serialize_fields(data_dict, "created_at", "updated_at")
 
 @router.get("/companies", response_class=HTMLResponse)
 async def companies_list(
@@ -42,11 +32,9 @@ async def companies_list(
     db: AsyncSession = Depends(get_html_db)
 ):
     """Companies list page with filtering and pagination."""
-    if not current_user:
-        return RedirectResponse(url="/admin/login", status_code=303)
-    
-    if not current_user.is_active:
-        return RedirectResponse(url="/admin/login", status_code=303)
+    redirect = require_active_user(current_user)
+    if redirect:
+        return redirect
     
     # Extract query parameters (safe parsing)
     try:
@@ -113,13 +101,9 @@ async def company_create(
     db: AsyncSession = Depends(get_html_db)
 ):
     """Company create page."""
-    if not current_user:
-        # Redirect to login page if user is not authenticated
-        return RedirectResponse(url="/admin/login", status_code=303)
-    
-    if not current_user.is_active:
-        # Redirect to login page if user is not active
-        return RedirectResponse(url="/admin/login", status_code=303)
+    redirect = require_active_user(current_user)
+    if redirect:
+        return redirect
     
     context = {
         "request": request,
@@ -136,11 +120,9 @@ async def company_detail(
     db: AsyncSession = Depends(get_html_db)
 ):
     """Company detail page."""
-    if not current_user:
-        return RedirectResponse(url="/admin/login", status_code=303)
-    
-    if not current_user.is_active:
-        return RedirectResponse(url="/admin/login", status_code=303)
+    redirect = require_active_user(current_user)
+    if redirect:
+        return redirect
     try:
         company_detail_resp = await get_company(int(company_id), db, current_user=current_user)
         company_data = _pydantic_to_dict(company_detail_resp)
@@ -168,11 +150,9 @@ async def company_edit(
     db: AsyncSession = Depends(get_html_db)
 ):
     """Company edit page."""
-    if not current_user:
-        return RedirectResponse(url="/admin/login", status_code=303)
-    
-    if not current_user.is_active:
-        return RedirectResponse(url="/admin/login", status_code=303)
+    redirect = require_active_user(current_user)
+    if redirect:
+        return redirect
     
     try:
         # Load directly from DB to get storage_provider and yandex_disk_token
@@ -206,11 +186,9 @@ async def company_create_post(
     db: AsyncSession = Depends(get_html_db)
 ):
     """Handle company creation form submission."""
-    if not current_user:
-        return RedirectResponse(url="/admin/login", status_code=303)
-    
-    if not current_user.is_active:
-        return RedirectResponse(url="/admin/login", status_code=303)
+    redirect = require_active_user(current_user)
+    if redirect:
+        return redirect
     
     # Get form data
     form_data = await request.form()

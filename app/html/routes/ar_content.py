@@ -3,7 +3,6 @@ from fastapi import APIRouter, Request, Depends, BackgroundTasks
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
-from fastapi.templating import Jinja2Templates
 from app.api.routes.ar_content import (
     get_ar_content_by_id, 
     _create_ar_content,
@@ -23,7 +22,9 @@ from app.utils.ar_content import build_public_url
 from app.html.deps import get_html_db
 from app.api.routes.auth import get_current_user_optional
 from app.html.mock import MOCK_AR_CONTENT, AR_CONTENT_DETAIL_MOCK_DATA, PROJECT_CREATE_MOCK_DATA
-from app.html.filters import datetime_format, storage_url
+from app.html.templating import templates
+from app.html.utils import require_active_user, serialize_datetime
+from app.html.filters import storage_url
 from app.core.config import settings
 import structlog
 from datetime import datetime
@@ -32,11 +33,6 @@ from pathlib import Path
 logger = structlog.get_logger()
 
 router = APIRouter()
-
-templates = Jinja2Templates(directory="templates")
-# Add datetime filter to templates
-templates.env.filters["datetime_format"] = datetime_format
-templates.env.filters["storage_url"] = storage_url
 
 # URL fields that may contain yadisk:// references
 _URL_FIELDS = (
@@ -57,16 +53,6 @@ def _resolve_yadisk_urls(data: dict, company_id=None) -> dict:
         if value and str(value).startswith("yadisk://"):
             data[field] = storage_url(value, company_id)
     return data
-
-
-def _serialize_datetime(value):
-    """Serialize datetime to ISO 8601 string."""
-    if value is None:
-        return None
-    if hasattr(value, "isoformat"):
-        return value.isoformat()
-    return value
-
 
 async def _load_video_details(ar_content_id: int, db: AsyncSession) -> tuple[list[dict], dict | None]:
     """Load videos for AR content with schedules and active video details."""
@@ -157,13 +143,9 @@ async def ar_content_list(
     db: AsyncSession = Depends(get_html_db)
 ):
     """AR Content list page."""
-    if not current_user:
-        # Redirect to login page if user is not authenticated
-        return RedirectResponse(url="/admin/login", status_code=303)
-    
-    if not current_user.is_active:
-        # Redirect to login page if user is not active
-        return RedirectResponse(url="/admin/login", status_code=303)
+    redirect = require_active_user(current_user)
+    if redirect:
+        return redirect
     # Get pagination and filter parameters from query string (safe parsing)
     try:
         page = int(request.query_params.get("page", 1))
@@ -384,13 +366,9 @@ async def ar_content_create(
     db: AsyncSession = Depends(get_html_db)
 ):
     """AR Content create page."""
-    if not current_user:
-        # Redirect to login page if user is not authenticated
-        return RedirectResponse(url="/admin/login", status_code=303)
-    
-    if not current_user.is_active:
-        # Redirect to login page if user is not active
-        return RedirectResponse(url="/admin/login", status_code=303)
+    redirect = require_active_user(current_user)
+    if redirect:
+        return redirect
     try:
         # Query companies and projects using the API routes to ensure proper access control
         from app.api.routes.companies import list_companies
@@ -512,13 +490,9 @@ async def ar_content_edit(
     db: AsyncSession = Depends(get_html_db)
 ):
     """AR Content edit page."""
-    if not current_user:
-        # Redirect to login page if user is not authenticated
-        return RedirectResponse(url="/admin/login", status_code=303)
-
-    if not current_user.is_active:
-        # Redirect to login page if user is not active
-        return RedirectResponse(url="/admin/login", status_code=303)
+    redirect = require_active_user(current_user)
+    if redirect:
+        return redirect
 
     try:
         # Get the AR content
@@ -781,13 +755,9 @@ async def ar_content_detail(
     db: AsyncSession = Depends(get_html_db)
 ):
     """AR Content detail page."""
-    if not current_user:
-        # Redirect to login page if user is not authenticated
-        return RedirectResponse(url="/admin/login", status_code=303)
-    
-    if not current_user.is_active:
-        # Redirect to login page if user is not active
-        return RedirectResponse(url="/admin/login", status_code=303)
+    redirect = require_active_user(current_user)
+    if redirect:
+        return redirect
     try:
         result = await get_ar_content_by_id(int(ar_content_id), db)
         
@@ -1238,11 +1208,9 @@ async def ar_content_create_post(
     db: AsyncSession = Depends(get_html_db)
 ):
     """Handle AR content creation form submission."""
-    if not current_user:
-        return RedirectResponse(url="/admin/login", status_code=303)
-    
-    if not current_user.is_active:
-        return RedirectResponse(url="/admin/login", status_code=303)
+    redirect = require_active_user(current_user)
+    if redirect:
+        return redirect
     
     try:
         # Get form data
@@ -1339,11 +1307,9 @@ async def ar_content_update_post(
     db: AsyncSession = Depends(get_html_db)
 ):
     """Handle AR content update form submission."""
-    if not current_user:
-        return RedirectResponse(url="/admin/login", status_code=303)
-    
-    if not current_user.is_active:
-        return RedirectResponse(url="/admin/login", status_code=303)
+    redirect = require_active_user(current_user)
+    if redirect:
+        return redirect
     
     try:
         # Get AR content to find company_id and project_id

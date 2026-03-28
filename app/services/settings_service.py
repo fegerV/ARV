@@ -31,6 +31,39 @@ class SettingsService:
             select(SystemSettings).where(SystemSettings.category == category)
         )
         return result.scalars().all()
+
+    @staticmethod
+    def _parse_setting_value(setting: Optional[SystemSettings]) -> Any:
+        """Convert DB string value to its declared Python type."""
+        if setting is None or setting.value is None:
+            return None
+        if setting.data_type == "json":
+            try:
+                return json.loads(setting.value)
+            except json.JSONDecodeError:
+                return setting.value
+        if setting.data_type == "boolean":
+            return setting.value.lower() == "true"
+        if setting.data_type == "integer":
+            try:
+                return int(setting.value)
+            except ValueError:
+                return setting.value
+        return setting.value
+
+    async def get_setting_value(self, key: str, default: Any = None) -> Any:
+        """Return one setting already converted to its Python type."""
+        setting = await self.get_setting(key)
+        value = self._parse_setting_value(setting)
+        return default if value is None else value
+
+    async def get_int_setting(self, key: str, default: int) -> int:
+        """Return one integer setting with a safe fallback."""
+        value = await self.get_setting_value(key, default)
+        try:
+            return int(value)
+        except (TypeError, ValueError):
+            return default
     
     async def set_setting(
         self, 
@@ -39,7 +72,8 @@ class SettingsService:
         data_type: str = "string",
         category: str = "general",
         description: Optional[str] = None,
-        is_public: bool = False
+        is_public: bool = False,
+        commit: bool = True,
     ) -> SystemSettings:
         """Set a setting value."""
         # Convert value to string based on data type
@@ -70,8 +104,11 @@ class SettingsService:
             )
             self.db.add(setting)
         
-        await self.db.commit()
-        await self.db.refresh(setting)
+        if commit:
+            await self.db.commit()
+            await self.db.refresh(setting)
+        else:
+            await self.db.flush()
         return setting
     
     async def get_all_settings(self) -> AllSettings:
@@ -83,25 +120,7 @@ class SettingsService:
         # Convert to dict for easy access
         settings_dict = {}
         for setting in all_db_settings:
-            # Parse value based on data type
-            if setting.value is None:
-                parsed_value = None
-            elif setting.data_type == "json":
-                try:
-                    parsed_value = json.loads(setting.value)
-                except json.JSONDecodeError:
-                    parsed_value = setting.value
-            elif setting.data_type == "boolean":
-                parsed_value = setting.value.lower() == "true"
-            elif setting.data_type == "integer":
-                try:
-                    parsed_value = int(setting.value)
-                except ValueError:
-                    parsed_value = setting.value
-            else:
-                parsed_value = setting.value
-            
-            settings_dict[setting.key] = parsed_value
+            settings_dict[setting.key] = self._parse_setting_value(setting)
         
         # Build settings objects
         general = GeneralSettings(
@@ -193,100 +212,100 @@ class SettingsService:
     
     async def update_general_settings(self, settings: GeneralSettings) -> GeneralSettings:
         """Update general settings."""
-        await self.set_setting("site_title", settings.site_title, "string", "general")
-        await self.set_setting("admin_email", settings.admin_email, "string", "general")
-        await self.set_setting("site_description", settings.site_description, "string", "general")
-        await self.set_setting("maintenance_mode", settings.maintenance_mode, "boolean", "general")
-        await self.set_setting("timezone", settings.timezone, "string", "general")
-        await self.set_setting("language", settings.language, "string", "general")
-        await self.set_setting("default_subscription_years", settings.default_subscription_years, "integer", "general")
+        await self.set_setting("site_title", settings.site_title, "string", "general", commit=False)
+        await self.set_setting("admin_email", settings.admin_email, "string", "general", commit=False)
+        await self.set_setting("site_description", settings.site_description, "string", "general", commit=False)
+        await self.set_setting("maintenance_mode", settings.maintenance_mode, "boolean", "general", commit=False)
+        await self.set_setting("timezone", settings.timezone, "string", "general", commit=False)
+        await self.set_setting("language", settings.language, "string", "general", commit=False)
+        await self.set_setting("default_subscription_years", settings.default_subscription_years, "integer", "general", commit=False)
         
         await self.db.commit()
         return settings
     
     async def update_security_settings(self, settings: SecuritySettings) -> SecuritySettings:
         """Update security settings."""
-        await self.set_setting("password_min_length", settings.password_min_length, "integer", "security")
-        await self.set_setting("session_timeout", settings.session_timeout, "integer", "security")
-        await self.set_setting("require_2fa", settings.require_2fa, "boolean", "security")
-        await self.set_setting("telegram_2fa_chat_id", settings.telegram_2fa_chat_id or "455847500", "string", "security")
-        await self.set_setting("max_login_attempts", settings.max_login_attempts, "integer", "security")
-        await self.set_setting("lockout_duration", settings.lockout_duration, "integer", "security")
-        await self.set_setting("api_rate_limit", settings.api_rate_limit, "integer", "security")
+        await self.set_setting("password_min_length", settings.password_min_length, "integer", "security", commit=False)
+        await self.set_setting("session_timeout", settings.session_timeout, "integer", "security", commit=False)
+        await self.set_setting("require_2fa", settings.require_2fa, "boolean", "security", commit=False)
+        await self.set_setting("telegram_2fa_chat_id", settings.telegram_2fa_chat_id or "455847500", "string", "security", commit=False)
+        await self.set_setting("max_login_attempts", settings.max_login_attempts, "integer", "security", commit=False)
+        await self.set_setting("lockout_duration", settings.lockout_duration, "integer", "security", commit=False)
+        await self.set_setting("api_rate_limit", settings.api_rate_limit, "integer", "security", commit=False)
         
         await self.db.commit()
         return settings
     
     async def update_storage_settings(self, settings: StorageSettings) -> StorageSettings:
         """Update storage settings."""
-        await self.set_setting("default_storage", settings.default_storage, "string", "storage")
-        await self.set_setting("max_file_size", settings.max_file_size, "integer", "storage")
-        await self.set_setting("cdn_enabled", settings.cdn_enabled, "boolean", "storage")
-        await self.set_setting("cdn_url", settings.cdn_url, "string", "storage")
-        await self.set_setting("backup_enabled", settings.backup_enabled, "boolean", "storage")
-        await self.set_setting("backup_retention_days", settings.backup_retention_days, "integer", "storage")
+        await self.set_setting("default_storage", settings.default_storage, "string", "storage", commit=False)
+        await self.set_setting("max_file_size", settings.max_file_size, "integer", "storage", commit=False)
+        await self.set_setting("cdn_enabled", settings.cdn_enabled, "boolean", "storage", commit=False)
+        await self.set_setting("cdn_url", settings.cdn_url, "string", "storage", commit=False)
+        await self.set_setting("backup_enabled", settings.backup_enabled, "boolean", "storage", commit=False)
+        await self.set_setting("backup_retention_days", settings.backup_retention_days, "integer", "storage", commit=False)
         
         await self.db.commit()
         return settings
     
     async def update_notification_settings(self, settings: NotificationSettings) -> NotificationSettings:
         """Update notification settings."""
-        await self.set_setting("email_enabled", settings.email_enabled, "boolean", "notifications")
-        await self.set_setting("smtp_host", settings.smtp_host, "string", "notifications")
-        await self.set_setting("smtp_port", settings.smtp_port, "integer", "notifications")
-        await self.set_setting("smtp_username", settings.smtp_username, "string", "notifications")
-        await self.set_setting("smtp_from_email", settings.smtp_from_email, "string", "notifications")
-        await self.set_setting("telegram_enabled", settings.telegram_enabled, "boolean", "notifications")
-        await self.set_setting("telegram_bot_token", settings.telegram_bot_token, "string", "notifications")
-        await self.set_setting("telegram_admin_chat_id", settings.telegram_admin_chat_id, "string", "notifications")
+        await self.set_setting("email_enabled", settings.email_enabled, "boolean", "notifications", commit=False)
+        await self.set_setting("smtp_host", settings.smtp_host, "string", "notifications", commit=False)
+        await self.set_setting("smtp_port", settings.smtp_port, "integer", "notifications", commit=False)
+        await self.set_setting("smtp_username", settings.smtp_username, "string", "notifications", commit=False)
+        await self.set_setting("smtp_from_email", settings.smtp_from_email, "string", "notifications", commit=False)
+        await self.set_setting("telegram_enabled", settings.telegram_enabled, "boolean", "notifications", commit=False)
+        await self.set_setting("telegram_bot_token", settings.telegram_bot_token, "string", "notifications", commit=False)
+        await self.set_setting("telegram_admin_chat_id", settings.telegram_admin_chat_id, "string", "notifications", commit=False)
         
         await self.db.commit()
         return settings
     
     async def update_api_settings(self, settings: APISettings) -> APISettings:
         """Update API settings."""
-        await self.set_setting("api_keys_enabled", settings.api_keys_enabled, "boolean", "api")
-        await self.set_setting("webhook_enabled", settings.webhook_enabled, "boolean", "api")
-        await self.set_setting("webhook_url", settings.webhook_url, "string", "api")
-        await self.set_setting("documentation_public", settings.documentation_public, "boolean", "api")
-        await self.set_setting("cors_origins", settings.cors_origins, "json", "api")
+        await self.set_setting("api_keys_enabled", settings.api_keys_enabled, "boolean", "api", commit=False)
+        await self.set_setting("webhook_enabled", settings.webhook_enabled, "boolean", "api", commit=False)
+        await self.set_setting("webhook_url", settings.webhook_url, "string", "api", commit=False)
+        await self.set_setting("documentation_public", settings.documentation_public, "boolean", "api", commit=False)
+        await self.set_setting("cors_origins", settings.cors_origins, "json", "api", commit=False)
         
         await self.db.commit()
         return settings
     
     async def update_integration_settings(self, settings: IntegrationSettings) -> IntegrationSettings:
         """Update integration settings."""
-        await self.set_setting("google_oauth_enabled", settings.google_oauth_enabled, "boolean", "integrations")
-        await self.set_setting("google_client_id", settings.google_client_id, "string", "integrations")
-        await self.set_setting("payment_provider", settings.payment_provider, "string", "integrations")
-        await self.set_setting("stripe_public_key", settings.stripe_public_key, "string", "integrations")
-        await self.set_setting("analytics_enabled", settings.analytics_enabled, "boolean", "integrations")
-        await self.set_setting("analytics_provider", settings.analytics_provider, "string", "integrations")
+        await self.set_setting("google_oauth_enabled", settings.google_oauth_enabled, "boolean", "integrations", commit=False)
+        await self.set_setting("google_client_id", settings.google_client_id, "string", "integrations", commit=False)
+        await self.set_setting("payment_provider", settings.payment_provider, "string", "integrations", commit=False)
+        await self.set_setting("stripe_public_key", settings.stripe_public_key, "string", "integrations", commit=False)
+        await self.set_setting("analytics_enabled", settings.analytics_enabled, "boolean", "integrations", commit=False)
+        await self.set_setting("analytics_provider", settings.analytics_provider, "string", "integrations", commit=False)
         
         await self.db.commit()
         return settings
     
     async def update_ar_settings(self, settings: ARSettings) -> ARSettings:
         """Update AR settings."""
-        await self.set_setting("mindar_max_features", settings.mindar_max_features, "integer", "ar")
-        await self.set_setting("marker_generation_enabled", settings.marker_generation_enabled, "boolean", "ar")
-        await self.set_setting("thumbnail_quality", settings.thumbnail_quality, "integer", "ar")
-        await self.set_setting("video_processing_enabled", settings.video_processing_enabled, "boolean", "ar")
-        await self.set_setting("default_ar_viewer_theme", settings.default_ar_viewer_theme, "string", "ar")
-        await self.set_setting("qr_code_expiration_days", settings.qr_code_expiration_days, "integer", "ar")
+        await self.set_setting("mindar_max_features", settings.mindar_max_features, "integer", "ar", commit=False)
+        await self.set_setting("marker_generation_enabled", settings.marker_generation_enabled, "boolean", "ar", commit=False)
+        await self.set_setting("thumbnail_quality", settings.thumbnail_quality, "integer", "ar", commit=False)
+        await self.set_setting("video_processing_enabled", settings.video_processing_enabled, "boolean", "ar", commit=False)
+        await self.set_setting("default_ar_viewer_theme", settings.default_ar_viewer_theme, "string", "ar", commit=False)
+        await self.set_setting("qr_code_expiration_days", settings.qr_code_expiration_days, "integer", "ar", commit=False)
         
         await self.db.commit()
         return settings
 
     async def update_backup_settings(self, settings: BackupSettings) -> BackupSettings:
         """Update database backup settings."""
-        await self.set_setting("backup_enabled", settings.backup_enabled, "boolean", "backup")
-        await self.set_setting("backup_company_id", settings.backup_company_id, "integer", "backup")
-        await self.set_setting("backup_yd_folder", settings.backup_yd_folder, "string", "backup")
-        await self.set_setting("backup_schedule", settings.backup_schedule, "string", "backup")
-        await self.set_setting("backup_cron", settings.backup_cron, "string", "backup")
-        await self.set_setting("backup_retention_days", settings.backup_retention_days, "integer", "backup")
-        await self.set_setting("backup_max_copies", settings.backup_max_copies, "integer", "backup")
+        await self.set_setting("backup_enabled", settings.backup_enabled, "boolean", "backup", commit=False)
+        await self.set_setting("backup_company_id", settings.backup_company_id, "integer", "backup", commit=False)
+        await self.set_setting("backup_yd_folder", settings.backup_yd_folder, "string", "backup", commit=False)
+        await self.set_setting("backup_schedule", settings.backup_schedule, "string", "backup", commit=False)
+        await self.set_setting("backup_cron", settings.backup_cron, "string", "backup", commit=False)
+        await self.set_setting("backup_retention_days", settings.backup_retention_days, "integer", "backup", commit=False)
+        await self.set_setting("backup_max_copies", settings.backup_max_copies, "integer", "backup", commit=False)
 
         await self.db.commit()
         return settings

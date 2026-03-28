@@ -39,6 +39,7 @@ _ACCESS_LOG_PROBE_PATTERNS = (
 
 from app.core.config import settings  # noqa: E402
 from app.core.database import seed_defaults  # noqa: E402
+from app.middleware.csrf import CSRFMiddleware  # noqa: E402
 from app.middleware.maintenance import MaintenanceModeMiddleware  # noqa: E402
 from app.middleware.rate_limiter import setup_rate_limiting  # noqa: E402
 from app.middleware.site_context import SiteContextMiddleware  # noqa: E402
@@ -235,6 +236,9 @@ app.add_middleware(MaintenanceModeMiddleware)
 
 # Inject site_title from DB settings into request.state for templates
 app.add_middleware(SiteContextMiddleware)
+
+# CSRF protection for cookie-authenticated browser flows
+app.add_middleware(CSRFMiddleware)
 
 
 # ── X-Request-ID middleware (request tracing) ────────────────────────

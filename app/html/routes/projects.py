@@ -2,7 +2,6 @@ from fastapi import APIRouter, Request, Depends
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import func, select
-from fastapi.templating import Jinja2Templates
 import structlog
 from app.models.ar_content import ARContent
 from app.models.company import Company
@@ -11,14 +10,11 @@ from app.api.routes.projects import get_project
 from app.html.deps import get_html_db
 from app.api.routes.auth import get_current_user_optional
 from app.html.mock import MOCK_PROJECTS, PROJECT_CREATE_MOCK_DATA
-from app.html.filters import datetime_format
+from app.html.templating import templates
+from app.html.utils import require_active_user, serialize_fields
 
 router = APIRouter()
 logger = structlog.get_logger()
-
-templates = Jinja2Templates(directory="templates")
-# Add datetime filter to templates
-templates.env.filters["datetime_format"] = datetime_format
 
 
 def _pydantic_to_dict(item):
@@ -32,14 +28,7 @@ def _convert_enum_to_string(data_dict):
     """Convert enum values to strings in dictionary."""
     if "status" in data_dict and hasattr(data_dict["status"], "value"):
         data_dict["status"] = data_dict["status"].value
-    
-    # Convert datetime to ISO string if present
-    if "created_at" in data_dict and hasattr(data_dict["created_at"], "isoformat"):
-        data_dict["created_at"] = data_dict["created_at"].isoformat()
-    if "updated_at" in data_dict and hasattr(data_dict["updated_at"], "isoformat"):
-        data_dict["updated_at"] = data_dict["updated_at"].isoformat()
-    
-    return data_dict
+    return serialize_fields(data_dict, "created_at", "updated_at")
 
 @router.get("/projects", response_class=HTMLResponse)
 async def projects_list(
@@ -48,11 +37,9 @@ async def projects_list(
     db: AsyncSession = Depends(get_html_db)
 ):
     """Projects list page with filtering and pagination."""
-    if not current_user:
-        return RedirectResponse(url="/admin/login", status_code=303)
-    
-    if not current_user.is_active:
-        return RedirectResponse(url="/admin/login", status_code=303)
+    redirect = require_active_user(current_user)
+    if redirect:
+        return redirect
     
     # Get query parameters (safe parsing)
     try:
@@ -183,11 +170,9 @@ async def project_create(
     db: AsyncSession = Depends(get_html_db)
 ):
     """Project create page."""
-    if not current_user:
-        return RedirectResponse(url="/admin/login", status_code=303)
-    
-    if not current_user.is_active:
-        return RedirectResponse(url="/admin/login", status_code=303)
+    redirect = require_active_user(current_user)
+    if redirect:
+        return redirect
     
     try:
         # Query companies directly from database to avoid dependency issues
@@ -215,8 +200,8 @@ async def project_create(
                 "contact_email": company.contact_email,
                 "status": company.status,
                 "projects_count": project_counts.get(company.id, 0),
-                "created_at": company.created_at.isoformat() if company.created_at and hasattr(company.created_at, "isoformat") else company.created_at,
-                "updated_at": company.updated_at.isoformat() if company.updated_at and hasattr(company.updated_at, "isoformat") else company.updated_at
+                "created_at": company.created_at,
+                "updated_at": company.updated_at
             })
     except Exception as e:
         logger.error("companies_fetch_error", error=str(e), exc_info=True)
@@ -230,8 +215,8 @@ async def project_create(
                     "name": company.name,
                     "contact_email": company.contact_email,
                     "status": company.status,
-                    "created_at": company.created_at.isoformat() if company.created_at and hasattr(company.created_at, "isoformat") else company.created_at,
-                    "updated_at": company.updated_at.isoformat() if company.updated_at and hasattr(company.updated_at, "isoformat") else company.updated_at
+                    "created_at": company.created_at,
+                    "updated_at": company.updated_at
                 })
         except Exception as db_error:
             logger.error("companies_db_error", error=str(db_error), exc_info=True)
@@ -244,10 +229,7 @@ async def project_create(
     # Convert any datetime objects in companies to strings
     for company in companies:
         if isinstance(company, dict):
-            if "created_at" in company and hasattr(company["created_at"], "isoformat"):
-                company["created_at"] = company["created_at"].isoformat()
-            if "updated_at" in company and hasattr(company.get("updated_at"), "isoformat"):
-                company["updated_at"] = company["updated_at"].isoformat()
+            serialize_fields(company, "created_at", "updated_at")
     
     context = {
         "request": request,
