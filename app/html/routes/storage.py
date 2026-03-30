@@ -29,11 +29,14 @@ _STORAGE_INFO_BUILD_TIMEOUT = 4.0
 _STORAGE_INFO_PROVIDER_TIMEOUT = 2.5
 _STORAGE_INFO_LOCAL_SIZE_TIMEOUT = 1.5
 _STORAGE_INFO_PROVIDER_CONCURRENCY = 3
+_YD_FOLDER_CACHE_TTL = 900.0
+_YD_FOLDER_CACHE_TIMEOUT = 12.0
 _STORAGE_INFO_CACHE: dict[str, object] = {
     "value": None,
     "timestamp": 0.0,
     "refresh_task": None,
 }
+_YD_FOLDER_CACHE: dict[int, dict[str, object]] = {}
 
 
 def format_bytes(bytes_value: int) -> str:
@@ -106,6 +109,77 @@ def _default_storage_info() -> dict:
         "providers": [],
         "companies": [],
     }
+
+
+def _get_yd_folder_cache_entry(company_id: int) -> dict[str, object]:
+    """Return the in-memory cache entry for a Yandex Disk company folder."""
+    return _YD_FOLDER_CACHE.setdefault(
+        company_id,
+        {
+            "value": None,
+            "timestamp": 0.0,
+            "refresh_task": None,
+        },
+    )
+
+
+def _yd_folder_cache_is_fresh(entry: dict[str, object], now: float | None = None) -> bool:
+    """Return whether a Yandex folder cache entry is still fresh."""
+    now = time.monotonic() if now is None else now
+    cached_value = entry.get("value")
+    cached_at = entry.get("timestamp", 0.0)
+    return cached_value is not None and (now - float(cached_at)) < _YD_FOLDER_CACHE_TTL
+
+
+async def _refresh_yandex_folder_cache(company_id: int, provider) -> None:
+    """Refresh a cached Yandex Disk folder size snapshot for a company."""
+    entry = _get_yd_folder_cache_entry(company_id)
+    try:
+        folder_info = await asyncio.wait_for(
+            provider.get_folder_size(),
+            timeout=_YD_FOLDER_CACHE_TIMEOUT,
+        )
+        entry["value"] = {
+            "total_bytes": int(folder_info.get("total_bytes", 0) or 0),
+            "file_count": int(folder_info.get("file_count", 0) or 0),
+        }
+        entry["timestamp"] = time.monotonic()
+        logger.info("yd_company_folder_cache_refresh", company_id=company_id)
+    except Exception as exc:
+        logger.warning("yd_company_folder_cache_refresh_failed", company_id=company_id, error=str(exc))
+    finally:
+        entry["refresh_task"] = None
+
+
+def _schedule_yandex_folder_cache_refresh(company_id: int, provider) -> None:
+    """Schedule a background refresh for a Yandex Disk folder size snapshot."""
+    entry = _get_yd_folder_cache_entry(company_id)
+    existing_task = entry.get("refresh_task")
+    if existing_task and not existing_task.done():
+        return
+    try:
+        entry["refresh_task"] = asyncio.create_task(_refresh_yandex_folder_cache(company_id, provider))
+        logger.info("yd_company_folder_cache_refresh_scheduled", company_id=company_id)
+    except RuntimeError:
+        logger.warning("yd_company_folder_cache_schedule_failed", company_id=company_id)
+
+
+async def _get_yandex_folder_snapshot(company_id: int, provider) -> dict[str, int] | None:
+    """Return cached Yandex folder size data and refresh it in the background when stale."""
+    entry = _get_yd_folder_cache_entry(company_id)
+    now = time.monotonic()
+    if _yd_folder_cache_is_fresh(entry, now):
+        logger.info("yd_company_folder_cache_hit", company_id=company_id)
+        return copy.deepcopy(entry["value"])
+
+    _schedule_yandex_folder_cache_refresh(company_id, provider)
+
+    if entry.get("value") is not None:
+        logger.info("yd_company_folder_cache_stale_hit", company_id=company_id)
+        return copy.deepcopy(entry["value"])
+
+    logger.info("yd_company_folder_cache_miss", company_id=company_id)
+    return None
 
 
 async def _build_storage_info(db: AsyncSession) -> dict:
@@ -194,13 +268,11 @@ async def _build_storage_info(db: AsyncSession) -> dict:
                                 timeout=_STORAGE_INFO_PROVIDER_TIMEOUT,
                             )
                             if isinstance(provider, YandexDiskStorageProvider):
-                                folder_info = await asyncio.wait_for(
-                                    provider.get_folder_size(),
-                                    timeout=_STORAGE_INFO_PROVIDER_TIMEOUT,
-                                )
-                                storage_used_bytes = folder_info.get("total_bytes", 0)
-                                files_count = folder_info.get("file_count", 0)
-                                storage_used = format_bytes(storage_used_bytes)
+                                folder_info = await _get_yandex_folder_snapshot(company.id, provider)
+                                if folder_info is not None:
+                                    storage_used_bytes = folder_info.get("total_bytes", 0)
+                                    files_count = folder_info.get("file_count", 0)
+                                    storage_used = format_bytes(storage_used_bytes)
 
                                 if quota_state["value"] is None:
                                     async with quota_lock:
