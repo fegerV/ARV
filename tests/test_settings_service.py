@@ -167,9 +167,11 @@ async def test_get_all_settings_combines_defaults_and_db_values():
     assert result.general.site_title == "Custom title"
     assert result.general.maintenance_mode is True
     assert result.general.default_subscription_years == 3
-    assert result.security.telegram_2fa_chat_id == "455847500"
+    assert result.security.telegram_2fa_chat_id is None
     assert result.security.session_timeout == 60
     assert result.storage.default_storage == "local"
+    assert result.notifications.smtp_password is None
+    assert result.notifications.telegram_alerts_enabled is False
     assert result.api.cors_origins == ["https://app.example.com"]
     assert result.integrations.payment_provider == "paypal"
     assert result.integrations.analytics_enabled is True
@@ -219,7 +221,7 @@ async def test_get_all_settings_combines_defaults_and_db_values():
                 ("password_min_length", 10, "integer", "security"),
                 ("session_timeout", 120, "integer", "security"),
                 ("require_2fa", True, "boolean", "security"),
-                ("telegram_2fa_chat_id", "455847500", "string", "security"),
+                ("telegram_2fa_chat_id", None, "string", "security"),
                 ("max_login_attempts", 4, "integer", "security"),
                 ("lockout_duration", 600, "integer", "security"),
                 ("api_rate_limit", 99, "integer", "security"),
@@ -251,20 +253,34 @@ async def test_get_all_settings_combines_defaults_and_db_values():
                 smtp_host="smtp.example.com",
                 smtp_port=2525,
                 smtp_username="mailer",
+                smtp_password="secret",
                 smtp_from_email="noreply@example.com",
                 telegram_enabled=True,
                 telegram_bot_token="token",
                 telegram_admin_chat_id="123",
+                telegram_alerts_enabled=True,
+                alert_on_critical=True,
+                alert_on_warning=True,
+                alert_on_backup_failed=False,
+                alert_on_storage_failed=False,
+                alert_on_health_degraded=True,
             ),
             [
                 ("email_enabled", False, "boolean", "notifications"),
                 ("smtp_host", "smtp.example.com", "string", "notifications"),
                 ("smtp_port", 2525, "integer", "notifications"),
                 ("smtp_username", "mailer", "string", "notifications"),
+                ("smtp_password", "secret", "string", "notifications"),
                 ("smtp_from_email", "noreply@example.com", "string", "notifications"),
                 ("telegram_enabled", True, "boolean", "notifications"),
                 ("telegram_bot_token", "token", "string", "notifications"),
                 ("telegram_admin_chat_id", "123", "string", "notifications"),
+                ("telegram_alerts_enabled", True, "boolean", "notifications"),
+                ("alert_on_critical", True, "boolean", "notifications"),
+                ("alert_on_warning", True, "boolean", "notifications"),
+                ("alert_on_backup_failed", False, "boolean", "notifications"),
+                ("alert_on_storage_failed", False, "boolean", "notifications"),
+                ("alert_on_health_degraded", True, "boolean", "notifications"),
             ],
         ),
         (

@@ -121,7 +121,7 @@
                         </select>
                     </div>
                 </div>
-                <!-- default_subscription_years hidden, always 30 -->
+                <!-- managed centrally for the current business model -->
                 <input type="hidden" name="default_subscription_years" value="30">
 
                 <div class="flex items-center gap-3 p-4 bg-amber-50 dark:bg-amber-900/20 rounded-xl border border-amber-200 dark:border-amber-800">
@@ -205,10 +205,10 @@
                 <div>
                     <label for="telegram_2fa_chat_id" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Telegram ID для кодов 2FA</label>
                     <input type="text" name="telegram_2fa_chat_id" id="telegram_2fa_chat_id"
-                           value="{{ settings.security.telegram_2fa_chat_id|default('455847500') }}"
-                           placeholder="455847500"
+                           value="{{ settings.security.telegram_2fa_chat_id or '' }}"
+                           placeholder="-1001234567890"
                            class="form-input max-w-xs">
-                    <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Числовой ID чата Telegram, куда присылать одноразовый код</p>
+                    <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Оставьте пустым, пока 2FA выключена. Перед включением укажите реальный Chat ID администратора.</p>
                 </div>
 
                 <div class="flex flex-col sm:flex-row justify-end gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
@@ -298,7 +298,7 @@
                 <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">Email и Telegram-уведомления о событиях платформы</p>
             </div>
 
-            <form method="post" action="/settings/notifications" class="p-6 space-y-6">
+            <form method="post" action="/settings/notifications" class="p-6 space-y-6" x-ref="notificationsForm">
                 <!-- Email section -->
                 <div class="space-y-4">
                     <div class="flex items-center gap-3 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-xl border border-blue-200 dark:border-blue-800">
@@ -335,12 +335,32 @@
                                    class="form-input" placeholder="user@gmail.com">
                         </div>
                         <div>
+                            <label for="smtp_password" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">SMTP пароль</label>
+                            <input type="password" name="smtp_password" id="smtp_password"
+                                   value=""
+                                   class="form-input" placeholder="Оставьте пустым, чтобы не менять сохранённый">
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                        <div>
                             <label for="smtp_from_email" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Email отправителя</label>
                             <input type="email" name="smtp_from_email" id="smtp_from_email"
                                    value="{{ settings.notifications.smtp_from_email|default('noreply@vertexar.com') }}"
                                    class="form-input">
                         </div>
+                        <div class="flex items-end">
+                            <button type="button" @click="testEmail()" :disabled="emailTesting"
+                                    class="inline-flex items-center gap-1.5 text-sm px-3 py-2 rounded-lg border border-blue-300 dark:border-blue-700 text-blue-700 dark:text-blue-300 hover:bg-blue-50 dark:hover:bg-blue-900/30 transition-colors">
+                                <span class="material-icons text-base" :class="emailTesting && 'animate-spin'"
+                                      x-text="emailTesting ? 'refresh' : 'mail'"></span>
+                                <span x-text="emailTesting ? 'Отправка...' : 'Отправить тестовое письмо'"></span>
+                            </button>
+                        </div>
                     </div>
+                    <p class="text-xs text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-700/50 rounded-lg p-3">
+                        Тестовое письмо отправляется на email текущего администратора и использует значения из формы. Если поле пароля пустое, берётся уже сохранённый пароль.
+                    </p>
                 </div>
 
                 <!-- Divider -->
@@ -385,6 +405,47 @@
                               x-text="telegramTesting ? 'refresh' : 'send'"></span>
                         <span x-text="telegramTesting ? 'Отправка...' : 'Отправить тестовое сообщение'"></span>
                     </button>
+                </div>
+
+                <div class="border-t border-gray-200 dark:border-gray-700"></div>
+
+                <div class="space-y-4">
+                    <div class="flex items-center gap-3 p-4 bg-amber-50 dark:bg-amber-900/20 rounded-xl border border-amber-200 dark:border-amber-800">
+                        <input id="telegram_alerts_enabled" name="telegram_alerts_enabled" type="checkbox"
+                               {% if settings.notifications.telegram_alerts_enabled %}checked{% endif %}
+                               value="on"
+                               class="h-4 w-4 text-amber-600 focus:ring-amber-500 border-gray-300 rounded">
+                        <label for="telegram_alerts_enabled" class="text-sm">
+                            <span class="font-medium text-gray-900 dark:text-white">Системные алерты в Telegram</span>
+                            <span class="text-gray-500 dark:text-gray-400 block text-xs mt-0.5">Отправлять алерты администратору через того же Telegram-бота</span>
+                        </label>
+                    </div>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                        <label class="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+                            <input type="checkbox" name="alert_on_critical" value="on" {% if settings.notifications.alert_on_critical %}checked{% endif %} class="h-4 w-4 rounded border-gray-300 text-amber-600 focus:ring-amber-500">
+                            <span>Критические ошибки</span>
+                        </label>
+                        <label class="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+                            <input type="checkbox" name="alert_on_warning" value="on" {% if settings.notifications.alert_on_warning %}checked{% endif %} class="h-4 w-4 rounded border-gray-300 text-amber-600 focus:ring-amber-500">
+                            <span>Warning-события</span>
+                        </label>
+                        <label class="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+                            <input type="checkbox" name="alert_on_backup_failed" value="on" {% if settings.notifications.alert_on_backup_failed %}checked{% endif %} class="h-4 w-4 rounded border-gray-300 text-amber-600 focus:ring-amber-500">
+                            <span>Падение backup</span>
+                        </label>
+                        <label class="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+                            <input type="checkbox" name="alert_on_storage_failed" value="on" {% if settings.notifications.alert_on_storage_failed %}checked{% endif %} class="h-4 w-4 rounded border-gray-300 text-amber-600 focus:ring-amber-500">
+                            <span>Ошибки storage</span>
+                        </label>
+                        <label class="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+                            <input type="checkbox" name="alert_on_health_degraded" value="on" {% if settings.notifications.alert_on_health_degraded %}checked{% endif %} class="h-4 w-4 rounded border-gray-300 text-amber-600 focus:ring-amber-500">
+                            <span>Health degraded</span>
+                        </label>
+                    </div>
+                    <p class="text-xs text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-700/50 rounded-lg p-3">
+                        Эти переключатели управляют системными Telegram-алертами для администратора. Если общий Telegram выключен, алерты тоже отправляться не будут.
+                    </p>
                 </div>
 
                 <div class="flex flex-col sm:flex-row justify-end gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
@@ -626,6 +687,7 @@ function settingsPage() {
         activeTab: '{{ active_section|default("general") }}',
         backupSchedule: '{{ settings.backup.backup_schedule|default("daily") }}',
         backupRunning: false,
+        emailTesting: false,
         telegramTesting: false,
         init() {
             const hash = window.location.hash.substring(1);
@@ -662,11 +724,30 @@ function settingsPage() {
                 setTimeout(() => { this.backupRunning = false; }, 3000);
             }
         },
+        async testEmail() {
+            if (this.emailTesting) return;
+            this.emailTesting = true;
+            try {
+                const formData = new FormData(this.$refs.notificationsForm);
+                const resp = await (window.csrfFetch || fetch)('/api/notifications/test-email', { method: 'POST', body: formData });
+                const data = await resp.json();
+                if (resp.ok && data.status === 'ok') {
+                    if (window.showToast) window.showToast(data.detail || 'Тестовое письмо отправлено', 'success');
+                } else {
+                    if (window.showToast) window.showToast(data.detail || 'Ошибка отправки письма', 'error');
+                }
+            } catch (err) {
+                if (window.showToast) window.showToast('Ошибка сети', 'error');
+            } finally {
+                setTimeout(() => { this.emailTesting = false; }, 2000);
+            }
+        },
         async testTelegram() {
             if (this.telegramTesting) return;
             this.telegramTesting = true;
             try {
-                const resp = await (window.csrfFetch || fetch)('/api/notifications/test-telegram', { method: 'POST' });
+                const formData = new FormData(this.$refs.notificationsForm);
+                const resp = await (window.csrfFetch || fetch)('/api/notifications/test-telegram', { method: 'POST', body: formData });
                 const data = await resp.json();
                 if (resp.ok && data.status === 'ok') {
                     if (window.showToast) window.showToast(data.detail || 'Тестовое сообщение отправлено', 'success');

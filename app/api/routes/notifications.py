@@ -1,5 +1,5 @@
 from datetime import datetime, timezone
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
+from fastapi import APIRouter, BackgroundTasks, Depends, Form, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import func, select, update
 import httpx
@@ -253,6 +253,8 @@ async def test_notification(email: str, chat_id: str, background_tasks: Backgrou
 
 @router.post("/test-telegram")
 async def test_telegram_from_settings(
+    telegram_bot_token: str = Form(""),
+    telegram_admin_chat_id: str = Form(""),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
 ):
@@ -263,8 +265,8 @@ async def test_telegram_from_settings(
     try:
         svc = SettingsService(db)
         all_settings = await svc.get_all_settings()
-        bot_token = (all_settings.notifications.telegram_bot_token or "").strip()
-        chat_id = (all_settings.notifications.telegram_admin_chat_id or "").strip()
+        bot_token = telegram_bot_token.strip() or (all_settings.notifications.telegram_bot_token or "").strip()
+        chat_id = telegram_admin_chat_id.strip() or (all_settings.notifications.telegram_admin_chat_id or "").strip()
     except Exception as e:
         return {"status": "error", "detail": f"Ошибка загрузки настроек: {e}"}
 
@@ -295,3 +297,49 @@ async def test_telegram_from_settings(
         return {"status": "error", "detail": f"Ошибка подключения: {exc!s}"}
     except Exception as exc:
         return {"status": "error", "detail": str(exc)}
+@router.post("/test-email")
+async def test_email_from_settings(
+    smtp_host: str = Form(""),
+    smtp_port: int = Form(587),
+    smtp_username: str = Form(""),
+    smtp_password: str = Form(""),
+    smtp_from_email: str = Form(""),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """Send a test email using current form values, falling back to saved settings."""
+    from app.services.settings_service import SettingsService
+
+    try:
+        svc = SettingsService(db)
+        all_settings = await svc.get_all_settings()
+        notifications = all_settings.notifications
+        host = smtp_host.strip() or (notifications.smtp_host or "").strip()
+        port = smtp_port or notifications.smtp_port
+        username = smtp_username.strip() or (notifications.smtp_username or "").strip()
+        password = smtp_password if smtp_password else (notifications.smtp_password or "")
+        from_email = smtp_from_email.strip() or notifications.smtp_from_email.strip()
+        recipient = (current_user.email or "").strip()
+    except Exception as exc:
+        return {"status": "error", "detail": f"Не удалось загрузить настройки: {exc}"}
+
+    if not host or not from_email or not recipient:
+        return {"status": "error", "detail": "Заполните SMTP-сервер, email отправителя и email пользователя"}
+
+    msg = MIMEMultipart()
+    msg["Subject"] = "Vertex AR: test email"
+    msg["From"] = from_email
+    msg["To"] = recipient
+    msg.attach(MIMEText("Тестовое письмо Vertex AR. Email-настройки работают.", "plain", "utf-8"))
+
+    try:
+        with smtplib.SMTP(host, port, timeout=15) as server:
+            server.starttls()
+            if username and password:
+                server.login(username, password)
+            server.send_message(msg)
+        return {"status": "ok", "detail": f"Тестовое письмо отправлено на {recipient}"}
+    except smtplib.SMTPException as exc:
+        return {"status": "error", "detail": f"SMTP ошибка: {exc}"}
+    except OSError as exc:
+        return {"status": "error", "detail": f"Ошибка подключения: {exc}"}

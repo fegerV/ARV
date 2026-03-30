@@ -11,6 +11,7 @@ This caused UndefinedColumnError on every AR view (500 errors).
 
 Also adds performance indexes for analytics queries.
 """
+
 from typing import Sequence, Union
 
 import sqlalchemy as sa
@@ -22,9 +23,21 @@ branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
 
+def _column_names(conn, table_name: str) -> set[str]:
+    inspector = sa.inspect(conn)
+    return {column["name"] for column in inspector.get_columns(table_name)}
+
+
+def _index_names(conn, table_name: str) -> set[str]:
+    inspector = sa.inspect(conn)
+    return {index["name"] for index in inspector.get_indexes(table_name)}
+
+
 def upgrade() -> None:
     conn = op.get_bind()
-    # SQLite: ADD COLUMN does not support ForeignKey; add plain Integer, FK not enforced
+    existing_columns = _column_names(conn, "ar_view_sessions")
+    existing_indexes = _index_names(conn, "ar_view_sessions")
+
     project_col = (
         sa.Column("project_id", sa.Integer(), sa.ForeignKey("projects.id"), nullable=True)
         if conn.dialect.name == "postgresql"
@@ -36,81 +49,68 @@ def upgrade() -> None:
         else sa.Column("company_id", sa.Integer(), nullable=True)
     )
 
-    # ── 1. Add missing columns ───────────────────────────────────────
-    op.add_column("ar_view_sessions", project_col)
-    op.add_column("ar_view_sessions", company_col)
-    op.add_column(
-        "ar_view_sessions",
-        sa.Column("device_type", sa.String(50), nullable=True),
-    )
-    op.add_column(
-        "ar_view_sessions",
-        sa.Column("browser", sa.String(100), nullable=True),
-    )
-    op.add_column(
-        "ar_view_sessions",
-        sa.Column("os", sa.String(100), nullable=True),
-    )
-    op.add_column(
-        "ar_view_sessions",
-        sa.Column("country", sa.String(100), nullable=True),
-    )
-    op.add_column(
-        "ar_view_sessions",
-        sa.Column("city", sa.String(100), nullable=True),
-    )
-    op.add_column(
-        "ar_view_sessions",
-        sa.Column("tracking_quality", sa.String(50), nullable=True),
-    )
-    op.add_column(
-        "ar_view_sessions",
-        sa.Column("video_played", sa.Boolean(), server_default=sa.text("false"), nullable=False),
-    )
+    columns_to_add = [
+        ("project_id", project_col),
+        ("company_id", company_col),
+        ("device_type", sa.Column("device_type", sa.String(50), nullable=True)),
+        ("browser", sa.Column("browser", sa.String(100), nullable=True)),
+        ("os", sa.Column("os", sa.String(100), nullable=True)),
+        ("country", sa.Column("country", sa.String(100), nullable=True)),
+        ("city", sa.Column("city", sa.String(100), nullable=True)),
+        ("tracking_quality", sa.Column("tracking_quality", sa.String(50), nullable=True)),
+        (
+            "video_played",
+            sa.Column("video_played", sa.Boolean(), server_default=sa.text("false"), nullable=False),
+        ),
+    ]
+    for column_name, column in columns_to_add:
+        if column_name not in existing_columns:
+            op.add_column("ar_view_sessions", column)
 
-    # Drop legacy 'location' column (replaced by country + city)
-    op.drop_column("ar_view_sessions", "location")
+    if "location" in existing_columns:
+        op.drop_column("ar_view_sessions", "location")
 
-    # ── 2. Performance indexes ───────────────────────────────────────
-    op.create_index(
-        "ix_ar_view_sessions_created_at",
-        "ar_view_sessions",
-        ["created_at"],
-    )
-    op.create_index(
-        "ix_ar_view_sessions_company_id",
-        "ar_view_sessions",
-        ["company_id"],
-    )
-    op.create_index(
-        "ix_ar_view_sessions_project_id",
-        "ar_view_sessions",
-        ["project_id"],
-    )
-    op.create_index(
-        "ix_ar_view_sessions_ar_content_id",
-        "ar_view_sessions",
-        ["ar_content_id"],
-    )
+    index_specs = [
+        ("ix_ar_view_sessions_created_at", ["created_at"]),
+        ("ix_ar_view_sessions_company_id", ["company_id"]),
+        ("ix_ar_view_sessions_project_id", ["project_id"]),
+        ("ix_ar_view_sessions_ar_content_id", ["ar_content_id"]),
+    ]
+    for index_name, columns in index_specs:
+        if index_name not in existing_indexes:
+            op.create_index(index_name, "ar_view_sessions", columns)
 
 
 def downgrade() -> None:
-    op.drop_index("ix_ar_view_sessions_ar_content_id", table_name="ar_view_sessions")
-    op.drop_index("ix_ar_view_sessions_project_id", table_name="ar_view_sessions")
-    op.drop_index("ix_ar_view_sessions_company_id", table_name="ar_view_sessions")
-    op.drop_index("ix_ar_view_sessions_created_at", table_name="ar_view_sessions")
+    conn = op.get_bind()
+    existing_columns = _column_names(conn, "ar_view_sessions")
+    existing_indexes = _index_names(conn, "ar_view_sessions")
 
-    op.add_column(
-        "ar_view_sessions",
-        sa.Column("location", sa.String(255), nullable=True),
-    )
+    for index_name in [
+        "ix_ar_view_sessions_ar_content_id",
+        "ix_ar_view_sessions_project_id",
+        "ix_ar_view_sessions_company_id",
+        "ix_ar_view_sessions_created_at",
+    ]:
+        if index_name in existing_indexes:
+            op.drop_index(index_name, table_name="ar_view_sessions")
 
-    op.drop_column("ar_view_sessions", "video_played")
-    op.drop_column("ar_view_sessions", "tracking_quality")
-    op.drop_column("ar_view_sessions", "city")
-    op.drop_column("ar_view_sessions", "country")
-    op.drop_column("ar_view_sessions", "os")
-    op.drop_column("ar_view_sessions", "browser")
-    op.drop_column("ar_view_sessions", "device_type")
-    op.drop_column("ar_view_sessions", "company_id")
-    op.drop_column("ar_view_sessions", "project_id")
+    if "location" not in existing_columns:
+        op.add_column(
+            "ar_view_sessions",
+            sa.Column("location", sa.String(255), nullable=True),
+        )
+
+    for column_name in [
+        "video_played",
+        "tracking_quality",
+        "city",
+        "country",
+        "os",
+        "browser",
+        "device_type",
+        "company_id",
+        "project_id",
+    ]:
+        if column_name in existing_columns:
+            op.drop_column("ar_view_sessions", column_name)

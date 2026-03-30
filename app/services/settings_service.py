@@ -137,7 +137,7 @@ class SettingsService:
             password_min_length=settings_dict.get("password_min_length", 8),
             session_timeout=settings_dict.get("session_timeout", 60),
             require_2fa=settings_dict.get("require_2fa", False),
-            telegram_2fa_chat_id=settings_dict.get("telegram_2fa_chat_id") or "455847500",
+            telegram_2fa_chat_id=settings_dict.get("telegram_2fa_chat_id") or None,
             max_login_attempts=settings_dict.get("max_login_attempts", 5),
             lockout_duration=settings_dict.get("lockout_duration", 300),
             api_rate_limit=settings_dict.get("api_rate_limit", 100)
@@ -157,10 +157,17 @@ class SettingsService:
             smtp_host=settings_dict.get("smtp_host"),
             smtp_port=settings_dict.get("smtp_port", 587),
             smtp_username=settings_dict.get("smtp_username"),
+            smtp_password=settings_dict.get("smtp_password"),
             smtp_from_email=settings_dict.get("smtp_from_email", "noreply@vertexar.com"),
             telegram_enabled=settings_dict.get("telegram_enabled", False),
             telegram_bot_token=settings_dict.get("telegram_bot_token"),
-            telegram_admin_chat_id=settings_dict.get("telegram_admin_chat_id")
+            telegram_admin_chat_id=settings_dict.get("telegram_admin_chat_id"),
+            telegram_alerts_enabled=settings_dict.get("telegram_alerts_enabled", False),
+            alert_on_critical=settings_dict.get("alert_on_critical", True),
+            alert_on_warning=settings_dict.get("alert_on_warning", False),
+            alert_on_backup_failed=settings_dict.get("alert_on_backup_failed", True),
+            alert_on_storage_failed=settings_dict.get("alert_on_storage_failed", True),
+            alert_on_health_degraded=settings_dict.get("alert_on_health_degraded", True),
         )
         
         api = APISettings(
@@ -228,7 +235,7 @@ class SettingsService:
         await self.set_setting("password_min_length", settings.password_min_length, "integer", "security", commit=False)
         await self.set_setting("session_timeout", settings.session_timeout, "integer", "security", commit=False)
         await self.set_setting("require_2fa", settings.require_2fa, "boolean", "security", commit=False)
-        await self.set_setting("telegram_2fa_chat_id", settings.telegram_2fa_chat_id or "455847500", "string", "security", commit=False)
+        await self.set_setting("telegram_2fa_chat_id", settings.telegram_2fa_chat_id, "string", "security", commit=False)
         await self.set_setting("max_login_attempts", settings.max_login_attempts, "integer", "security", commit=False)
         await self.set_setting("lockout_duration", settings.lockout_duration, "integer", "security", commit=False)
         await self.set_setting("api_rate_limit", settings.api_rate_limit, "integer", "security", commit=False)
@@ -254,11 +261,18 @@ class SettingsService:
         await self.set_setting("smtp_host", settings.smtp_host, "string", "notifications", commit=False)
         await self.set_setting("smtp_port", settings.smtp_port, "integer", "notifications", commit=False)
         await self.set_setting("smtp_username", settings.smtp_username, "string", "notifications", commit=False)
+        await self.set_setting("smtp_password", settings.smtp_password, "string", "notifications", commit=False)
         await self.set_setting("smtp_from_email", settings.smtp_from_email, "string", "notifications", commit=False)
         await self.set_setting("telegram_enabled", settings.telegram_enabled, "boolean", "notifications", commit=False)
         await self.set_setting("telegram_bot_token", settings.telegram_bot_token, "string", "notifications", commit=False)
         await self.set_setting("telegram_admin_chat_id", settings.telegram_admin_chat_id, "string", "notifications", commit=False)
-        
+        await self.set_setting("telegram_alerts_enabled", settings.telegram_alerts_enabled, "boolean", "notifications", commit=False)
+        await self.set_setting("alert_on_critical", settings.alert_on_critical, "boolean", "notifications", commit=False)
+        await self.set_setting("alert_on_warning", settings.alert_on_warning, "boolean", "notifications", commit=False)
+        await self.set_setting("alert_on_backup_failed", settings.alert_on_backup_failed, "boolean", "notifications", commit=False)
+        await self.set_setting("alert_on_storage_failed", settings.alert_on_storage_failed, "boolean", "notifications", commit=False)
+        await self.set_setting("alert_on_health_degraded", settings.alert_on_health_degraded, "boolean", "notifications", commit=False)
+
         await self.db.commit()
         return settings
     

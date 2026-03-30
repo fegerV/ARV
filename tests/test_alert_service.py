@@ -147,6 +147,80 @@ async def test_send_admin_email_swallow_errors(monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_send_admin_email_prefers_db_notification_settings(monkeypatch):
+    alert_service = _alert_service_module()
+    sent = {}
+
+    class FakeSettingsService:
+        def __init__(self, _session):
+            pass
+
+        async def get_all_settings(self):
+            return SimpleNamespace(
+                notifications=SimpleNamespace(
+                    email_enabled=True,
+                    smtp_host="db.smtp.example.com",
+                    smtp_port=2025,
+                    smtp_username="db-user",
+                    smtp_password="db-pass",
+                    smtp_from_email="db@example.com",
+                )
+            )
+
+    class FakeSMTP:
+        def __init__(self, host, port):
+            sent["host"] = host
+            sent["port"] = port
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+        def starttls(self):
+            sent["starttls"] = True
+
+        def login(self, username, password):
+            sent["login"] = (username, password)
+
+        def send_message(self, msg):
+            sent["from"] = msg["From"]
+
+    monkeypatch.setitem(
+        __import__("sys").modules,
+        "app.services.settings_service",
+        SimpleNamespace(SettingsService=FakeSettingsService),
+    )
+    monkeypatch.setitem(
+        __import__("sys").modules,
+        "app.core.database",
+        SimpleNamespace(AsyncSessionLocal=lambda: _FakeAsyncSession()),
+    )
+    monkeypatch.setattr(alert_service.smtplib, "SMTP", FakeSMTP)
+    monkeypatch.setattr(
+        alert_service,
+        "settings",
+        SimpleNamespace(
+            SMTP_FROM_EMAIL="env@example.com",
+            ADMIN_EMAIL="admin@example.com",
+            SMTP_HOST="env.smtp.example.com",
+            SMTP_PORT=2525,
+            SMTP_USERNAME="env-user",
+            SMTP_PASSWORD="env-pass",
+            ADMIN_FRONTEND_URL="https://admin.example.com",
+        ),
+    )
+
+    await alert_service.send_admin_email([_sample_alert()], {"cpu_percent": 90})
+
+    assert sent["host"] == "db.smtp.example.com"
+    assert sent["port"] == 2025
+    assert sent["login"] == ("db-user", "db-pass")
+    assert sent["from"] == "db@example.com"
+
+
+@pytest.mark.asyncio
 async def test_send_telegram_alerts_uses_db_settings_when_available(monkeypatch):
     alert_service = _alert_service_module()
     sent = []
@@ -161,6 +235,8 @@ async def test_send_telegram_alerts_uses_db_settings_when_available(monkeypatch)
                     telegram_enabled=True,
                     telegram_bot_token="db-token",
                     telegram_admin_chat_id="db-chat",
+                    telegram_alerts_enabled=True,
+                    alert_on_critical=True,
                 )
             )
 
@@ -195,6 +271,59 @@ async def test_send_telegram_alerts_uses_db_settings_when_available(monkeypatch)
     await alert_service.send_telegram_alerts([_sample_alert()], {"cpu_percent": 90, "memory_percent": 80, "api_health": "ok"})
 
     assert sent == [("db-chat", "db-token", True)]
+
+
+@pytest.mark.asyncio
+async def test_send_telegram_alerts_respects_alert_toggle_settings(monkeypatch):
+    alert_service = _alert_service_module()
+    sent = []
+    infos = []
+
+    class FakeSettingsService:
+        def __init__(self, _session):
+            pass
+
+        async def get_all_settings(self):
+            return SimpleNamespace(
+                notifications=SimpleNamespace(
+                    telegram_enabled=True,
+                    telegram_bot_token="db-token",
+                    telegram_admin_chat_id="db-chat",
+                    telegram_alerts_enabled=True,
+                    alert_on_critical=False,
+                    alert_on_warning=False,
+                    alert_on_backup_failed=False,
+                    alert_on_storage_failed=False,
+                    alert_on_health_degraded=False,
+                )
+            )
+
+    monkeypatch.setitem(
+        __import__("sys").modules,
+        "app.services.settings_service",
+        SimpleNamespace(SettingsService=FakeSettingsService),
+    )
+    monkeypatch.setitem(
+        __import__("sys").modules,
+        "app.core.database",
+        SimpleNamespace(AsyncSessionLocal=lambda: _FakeAsyncSession()),
+    )
+    monkeypatch.setattr(alert_service, "send_telegram_message", _async_capture_telegram(sent))
+    monkeypatch.setattr(alert_service.logger, "info", lambda event, **kwargs: infos.append((event, kwargs)))
+    monkeypatch.setattr(
+        alert_service,
+        "settings",
+        SimpleNamespace(
+            TELEGRAM_BOT_TOKEN="env-token",
+            TELEGRAM_ADMIN_CHAT_ID="env-chat",
+            ADMIN_FRONTEND_URL="https://admin.example.com",
+        ),
+    )
+
+    await alert_service.send_telegram_alerts([_sample_alert()], {"cpu_percent": 90})
+
+    assert sent == []
+    assert infos == [("telegram_alert_skipped_by_settings", {"count": 1})]
 
 
 @pytest.mark.asyncio

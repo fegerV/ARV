@@ -186,7 +186,12 @@ async def test_test_telegram_from_settings_requires_tokens(monkeypatch):
 
     monkeypatch.setitem(__import__("sys").modules, "app.services.settings_service", SimpleNamespace(SettingsService=FakeSettingsService))
 
-    result = await notifications.test_telegram_from_settings(db=_FakeDb(), current_user=SimpleNamespace())
+    result = await notifications.test_telegram_from_settings(
+        db=_FakeDb(),
+        current_user=SimpleNamespace(),
+        telegram_bot_token="",
+        telegram_admin_chat_id="",
+    )
 
     assert result["status"] == "error"
     assert "Bot Token" in result["detail"]
@@ -233,9 +238,129 @@ async def test_test_telegram_from_settings_reports_telegram_error(monkeypatch):
     monkeypatch.setitem(__import__("sys").modules, "app.services.settings_service", SimpleNamespace(SettingsService=FakeSettingsService))
     monkeypatch.setattr(notifications.httpx, "AsyncClient", FakeAsyncClient)
 
-    result = await notifications.test_telegram_from_settings(db=_FakeDb(), current_user=SimpleNamespace())
+    result = await notifications.test_telegram_from_settings(
+        db=_FakeDb(),
+        current_user=SimpleNamespace(),
+        telegram_bot_token="",
+        telegram_admin_chat_id="",
+    )
 
     assert result == {"status": "error", "detail": "chat not found"}
+
+
+@pytest.mark.asyncio
+async def test_test_telegram_from_settings_prefers_current_form_values(monkeypatch):
+    from app.api.routes import notifications
+
+    class FakeSettingsService:
+        def __init__(self, _db):
+            pass
+
+        async def get_all_settings(self):
+            return SimpleNamespace(
+                notifications=SimpleNamespace(
+                    telegram_bot_token="db-token",
+                    telegram_admin_chat_id="db-chat",
+                )
+            )
+
+    class FakeResponse:
+        status_code = 200
+
+    captured = {}
+
+    class FakeAsyncClient:
+        def __init__(self, timeout):
+            self.timeout = timeout
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb):
+            return False
+
+        async def post(self, url, json):
+            captured["url"] = url
+            captured["chat_id"] = json["chat_id"]
+            return FakeResponse()
+
+    monkeypatch.setitem(__import__("sys").modules, "app.services.settings_service", SimpleNamespace(SettingsService=FakeSettingsService))
+    monkeypatch.setattr(notifications.httpx, "AsyncClient", FakeAsyncClient)
+
+    result = await notifications.test_telegram_from_settings(
+        db=_FakeDb(),
+        current_user=SimpleNamespace(),
+        telegram_bot_token="form-token",
+        telegram_admin_chat_id="form-chat",
+    )
+
+    assert result["status"] == "ok"
+    assert "form-token" in captured["url"]
+    assert captured["chat_id"] == "form-chat"
+
+
+@pytest.mark.asyncio
+async def test_test_email_from_settings_uses_form_values(monkeypatch):
+    from app.api.routes import notifications
+
+    class FakeSettingsService:
+        def __init__(self, _db):
+            pass
+
+        async def get_all_settings(self):
+            return SimpleNamespace(
+                notifications=SimpleNamespace(
+                    smtp_host="db.smtp.example.com",
+                    smtp_port=25,
+                    smtp_username="db-user",
+                    smtp_password="db-pass",
+                    smtp_from_email="db@example.com",
+                )
+            )
+
+    sent = {}
+
+    class FakeSMTP:
+        def __init__(self, host, port, timeout):
+            sent["host"] = host
+            sent["port"] = port
+            sent["timeout"] = timeout
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+        def starttls(self):
+            sent["starttls"] = True
+
+        def login(self, username, password):
+            sent["login"] = (username, password)
+
+        def send_message(self, msg):
+            sent["from"] = msg["From"]
+            sent["to"] = msg["To"]
+
+    monkeypatch.setitem(__import__("sys").modules, "app.services.settings_service", SimpleNamespace(SettingsService=FakeSettingsService))
+    monkeypatch.setattr(notifications.smtplib, "SMTP", FakeSMTP)
+
+    result = await notifications.test_email_from_settings(
+        smtp_host="smtp.example.com",
+        smtp_port=2525,
+        smtp_username="mailer",
+        smtp_password="secret",
+        smtp_from_email="noreply@example.com",
+        db=_FakeDb(),
+        current_user=SimpleNamespace(email="admin@example.com"),
+    )
+
+    assert result["status"] == "ok"
+    assert sent["host"] == "smtp.example.com"
+    assert sent["port"] == 2525
+    assert sent["login"] == ("mailer", "secret")
+    assert sent["from"] == "noreply@example.com"
+    assert sent["to"] == "admin@example.com"
 
 
 class _FakeScalarResult:

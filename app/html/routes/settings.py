@@ -136,7 +136,7 @@ async def update_general_settings(
     maintenance_mode: str = Form("off"),
     timezone: str = Form("UTC"),
     language: str = Form("en"),
-    default_subscription_years: int = Form(1),
+    default_subscription_years: int = Form(30),
 ):
     """Save general settings."""
     redirect = require_active_user(current_user)
@@ -182,7 +182,7 @@ async def update_security_settings(
     password_min_length: int = Form(...),
     session_timeout: int = Form(...),
     require_2fa: str = Form("off"),
-    telegram_2fa_chat_id: str = Form("455847500"),
+    telegram_2fa_chat_id: str = Form(""),
     max_login_attempts: int = Form(5),
     lockout_duration: int = Form(300),
     api_rate_limit: int = Form(100),
@@ -194,12 +194,20 @@ async def update_security_settings(
 
     settings_service = SettingsService(db)
     try:
+        normalized_2fa_chat_id = telegram_2fa_chat_id.strip() or None
+        if require_2fa == "on" and not normalized_2fa_chat_id:
+            return await _render_settings(
+                request, db, current_user,
+                active_section="security",
+                error_message="Укажите Telegram Chat ID перед включением 2FA",
+            )
+
         await settings_service.update_security_settings(
             SecuritySettings(
                 password_min_length=password_min_length,
                 session_timeout=session_timeout,
                 require_2fa=(require_2fa == "on"),
-                telegram_2fa_chat_id=telegram_2fa_chat_id.strip() or "455847500",
+                telegram_2fa_chat_id=normalized_2fa_chat_id,
                 max_login_attempts=max_login_attempts,
                 lockout_duration=lockout_duration,
                 api_rate_limit=api_rate_limit,
@@ -350,10 +358,17 @@ async def update_notification_settings(
     smtp_host: str = Form(""),
     smtp_port: int = Form(587),
     smtp_username: str = Form(""),
+    smtp_password: str = Form(""),
     smtp_from_email: str = Form("noreply@vertexar.com"),
     telegram_enabled: str = Form("off"),
     telegram_bot_token: str = Form(""),
     telegram_admin_chat_id: str = Form(""),
+    telegram_alerts_enabled: str = Form("off"),
+    alert_on_critical: str = Form("off"),
+    alert_on_warning: str = Form("off"),
+    alert_on_backup_failed: str = Form("off"),
+    alert_on_storage_failed: str = Form("off"),
+    alert_on_health_degraded: str = Form("off"),
 ):
     """Save notification settings."""
     redirect = require_active_user(current_user)
@@ -362,16 +377,25 @@ async def update_notification_settings(
 
     settings_service = SettingsService(db)
     try:
+        current = await settings_service.get_all_settings()
+        effective_smtp_password = smtp_password if smtp_password.strip() else current.notifications.smtp_password
         await settings_service.update_notification_settings(
             NotificationSettings(
                 email_enabled=(email_enabled == "on"),
                 smtp_host=smtp_host.strip() or None,
                 smtp_port=smtp_port,
                 smtp_username=smtp_username.strip() or None,
+                smtp_password=effective_smtp_password,
                 smtp_from_email=smtp_from_email.strip(),
                 telegram_enabled=(telegram_enabled == "on"),
                 telegram_bot_token=telegram_bot_token.strip() or None,
                 telegram_admin_chat_id=telegram_admin_chat_id.strip() or None,
+                telegram_alerts_enabled=(telegram_alerts_enabled == "on"),
+                alert_on_critical=(alert_on_critical == "on"),
+                alert_on_warning=(alert_on_warning == "on"),
+                alert_on_backup_failed=(alert_on_backup_failed == "on"),
+                alert_on_storage_failed=(alert_on_storage_failed == "on"),
+                alert_on_health_degraded=(alert_on_health_degraded == "on"),
             )
         )
         return await _render_settings(

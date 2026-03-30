@@ -57,7 +57,7 @@ class SecuritySettings(BaseModel):
     password_min_length: int = 8
     session_timeout: int = 60
     require_2fa: bool = False
-    telegram_2fa_chat_id: Optional[str] = "455847500"
+    telegram_2fa_chat_id: Optional[str] = None
     max_login_attempts: int = 5
     lockout_duration: int = 300
     api_rate_limit: int = 100
@@ -75,10 +75,17 @@ class NotificationSettings(BaseModel):
     smtp_host: Optional[str] = None
     smtp_port: int = 587
     smtp_username: Optional[str] = None
+    smtp_password: Optional[str] = None
     smtp_from_email: str = "noreply@vertexar.com"
     telegram_enabled: bool = False
     telegram_bot_token: Optional[str] = None
     telegram_admin_chat_id: Optional[str] = None
+    telegram_alerts_enabled: bool = False
+    alert_on_critical: bool = True
+    alert_on_warning: bool = False
+    alert_on_backup_failed: bool = True
+    alert_on_storage_failed: bool = True
+    alert_on_health_degraded: bool = True
     
 class APISettings(BaseModel):
     api_keys_enabled: bool = True
