@@ -4,8 +4,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from pathlib import Path
 from typing import Tuple
+import copy
 import shutil
 import structlog
+import time
 import traceback
 
 from app.html.deps import get_html_db
@@ -18,6 +20,11 @@ from app.core.config import settings
 
 router = APIRouter()
 logger = structlog.get_logger()
+_STORAGE_INFO_CACHE_TTL = 60.0
+_STORAGE_INFO_CACHE: dict[str, object] = {
+    "value": None,
+    "timestamp": 0.0,
+}
 
 
 def format_bytes(bytes_value: int) -> str:
@@ -91,15 +98,8 @@ def calculate_directory_size(directory: Path, max_depth: int = 10) -> Tuple[int,
     return total_size, file_count
 
 
-async def get_storage_info(db: AsyncSession) -> dict:
-    """Get real storage information from database and filesystem.
-    
-    Args:
-        db: Database session
-        
-    Returns:
-        Dictionary with storage information
-    """
+async def _build_storage_info(db: AsyncSession) -> dict:
+    """Collect real storage information from database and providers."""
     logger.info("get_storage_info_started")
     try:
         import platform
@@ -279,6 +279,28 @@ async def get_storage_info(db: AsyncSession) -> dict:
                     error_type=type(e).__name__,
                     traceback=traceback.format_exc())
         raise
+
+
+def _storage_info_cache_is_fresh(now: float | None = None) -> bool:
+    """Return whether the in-memory storage info cache is still fresh."""
+    now = time.monotonic() if now is None else now
+    cached_value = _STORAGE_INFO_CACHE.get("value")
+    cached_at = _STORAGE_INFO_CACHE.get("timestamp", 0.0)
+    return cached_value is not None and (now - float(cached_at)) < _STORAGE_INFO_CACHE_TTL
+
+
+async def get_storage_info(db: AsyncSession) -> dict:
+    """Get storage information, reusing a short-lived cache for the admin page."""
+    now = time.monotonic()
+    if _storage_info_cache_is_fresh(now):
+        logger.info("get_storage_info_cache_hit")
+        return copy.deepcopy(_STORAGE_INFO_CACHE["value"])
+
+    storage_info = await _build_storage_info(db)
+    _STORAGE_INFO_CACHE["value"] = copy.deepcopy(storage_info)
+    _STORAGE_INFO_CACHE["timestamp"] = now
+    logger.info("get_storage_info_cache_refresh")
+    return storage_info
 
 
 @router.get("/storage/test")
