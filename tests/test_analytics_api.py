@@ -80,6 +80,17 @@ async def test_analytics_content_returns_30_day_views():
 
 
 @pytest.mark.asyncio
+async def test_analytics_content_alias_delegates_to_same_payload():
+    from app.api.routes import analytics
+
+    db = _FakeDb(execute_results=[_FakeScalarResult(9)])
+
+    result = await analytics.analytics_content_alias(21, db)
+
+    assert result == {"ar_content_id": 21, "views_30_days": 9}
+
+
+@pytest.mark.asyncio
 async def test_track_ar_session_requires_valid_uuid_session_id():
     from app.api.routes import analytics
 

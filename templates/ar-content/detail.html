@@ -178,7 +178,12 @@ document.addEventListener('alpine:init', function() {
                 }, 100);
             }
             this.normalizeMarkerMetrics();
-            this.loadVideos();
+            if (Array.isArray(this.videos) && this.videos.length > 0) {
+                this.playbackMode = this.inferPlaybackMode();
+                this.playbackModeInitialized = true;
+            } else {
+                this.loadVideos();
+            }
         },
 
         get fullArUrlComputed() {

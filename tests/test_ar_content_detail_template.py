@@ -18,3 +18,11 @@ def test_ar_content_detail_template_has_quick_order_and_customer_actions():
     assert "Написать" in template
     assert "Номер заказа скопирован" in template
     assert "Открыть AR" in template
+
+
+def test_ar_content_detail_template_reuses_embedded_videos_before_refetch():
+    template = Path("templates/ar-content/detail.html").read_text(encoding="utf-8")
+
+    assert "if (Array.isArray(this.videos) && this.videos.length > 0)" in template
+    assert "this.playbackMode = this.inferPlaybackMode();" in template
+    assert "this.loadVideos();" in template

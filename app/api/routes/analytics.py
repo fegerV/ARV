@@ -96,6 +96,12 @@ async def analytics_content(content_id: int, db: AsyncSession = Depends(get_db))
     return {"ar_content_id": content_id, "views_30_days": views.scalar() or 0}
 
 
+@router.get("/content/{content_id}")
+async def analytics_content_alias(content_id: int, db: AsyncSession = Depends(get_db)):
+    """Backward-compatible alias for older admin/frontend clients."""
+    return await analytics_content(content_id, db)
+
+
 @router.post("/ar-session")
 async def track_ar_session(payload: dict, db: AsyncSession = Depends(get_db)):
     """Legacy endpoint kept for compatibility.
