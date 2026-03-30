@@ -225,6 +225,43 @@ document.addEventListener('alpine:init', function() {
             return url.startsWith('/') ? `${window.location.origin}${url}` : url;
         },
 
+        request(url, options = {}) {
+            const headers = new Headers(options.headers || {});
+            const body = options.body;
+            const csrfToken = window.getCsrfToken ? window.getCsrfToken() : '';
+            if (csrfToken && !headers.has('X-CSRF-Token')) {
+                headers.set('X-CSRF-Token', csrfToken);
+            }
+            if (!(body instanceof FormData) && !headers.has('Content-Type')) {
+                headers.set('Content-Type', 'application/json');
+            }
+            return fetch(url, {
+                ...options,
+                headers,
+                credentials: options.credentials || 'include',
+            });
+        },
+
+        copyText(value, successMessage) {
+            if (!value) {
+                this.showToast('Данные недоступны', 'error');
+                return;
+            }
+            navigator.clipboard.writeText(String(value)).then(() => {
+                this.showToast(successMessage, 'success');
+            }).catch(() => {
+                this.showToast('Не удалось скопировать', 'error');
+            });
+        },
+
+        openArView() {
+            if (!this.fullArUrl) {
+                this.showToast('Ссылка недоступна', 'error');
+                return;
+            }
+            window.open(this.fullArUrl, '_blank', 'noopener');
+        },
+
         isImagePreview(url) {
             if (!url) return false;
             return /\.(webp|png|jpe?g|gif)$/i.test(url);
@@ -338,9 +375,8 @@ document.addEventListener('alpine:init', function() {
                     payload.active_video_ids = activeIds;
                 }
 
-                const response = await fetch(`/api/videos/ar-content/${this.arContent.id}/playback-mode`, {
+                const response = await this.request(`/api/videos/ar-content/${this.arContent.id}/playback-mode`, {
                     method: 'PATCH',
-                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(payload)
                 });
 
@@ -370,9 +406,8 @@ document.addEventListener('alpine:init', function() {
             }
 
             try {
-                const response = await fetch(`/api/videos/ar-content/${this.arContent.id}/videos/${video.id}/active`, {
+                const response = await this.request(`/api/videos/ar-content/${this.arContent.id}/videos/${video.id}/active`, {
                     method: 'PATCH',
-                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ is_active: isActive })
                 });
 
@@ -414,7 +449,7 @@ document.addEventListener('alpine:init', function() {
             video._regenerating = true;
             video._previewFailed = false;
             try {
-                const resp = await csrfFetch(`/api/videos/${video.id}/regenerate-thumbnail`, {
+                const resp = await this.request(`/api/videos/${video.id}/regenerate-thumbnail`, {
                     method: 'POST',
                 });
                 if (!resp.ok) {
@@ -439,7 +474,7 @@ document.addEventListener('alpine:init', function() {
             if (!this.videoToDelete || this.deletingVideo) return;
             this.deletingVideo = true;
             try {
-                const resp = await csrfFetch(`/api/videos/videos/${this.videoToDelete.id}`, {
+                const resp = await this.request(`/api/videos/videos/${this.videoToDelete.id}`, {
                     method: 'DELETE',
                 });
                 if (!resp.ok) {
@@ -463,9 +498,8 @@ document.addEventListener('alpine:init', function() {
 
         async setActiveVideo(videoId) {
             try {
-                const response = await fetch(`/api/videos/ar-content/${this.arContent.id}/playback-mode`, {
+                const response = await this.request(`/api/videos/ar-content/${this.arContent.id}/playback-mode`, {
                     method: 'PATCH',
-                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ mode: 'manual', active_video_id: videoId })
                 });
                 if (!response.ok) {
@@ -489,11 +523,7 @@ document.addEventListener('alpine:init', function() {
                 return;
             }
 
-            navigator.clipboard.writeText(this.fullArUrl).then(() => {
-                this.showToast('Ссылка скопирована в буфер обмена', 'success');
-            }).catch(() => {
-                this.showToast('Не удалось скопировать ссылку', 'error');
-            });
+            this.copyText(this.fullArUrl, 'Ссылка скопирована в буфер обмена');
         },
 
         async downloadQR(format) {
@@ -594,7 +624,7 @@ document.addEventListener('alpine:init', function() {
             if (this.regeneratingMedia) return;
             this.regeneratingMedia = true;
             try {
-                const response = await fetch(`/api/ar-content/${this.arContent.id}/regenerate-media`, {
+                const response = await this.request(`/api/ar-content/${this.arContent.id}/regenerate-media`, {
                     method: 'POST'
                 });
                 const result = await response.json();
@@ -647,7 +677,7 @@ document.addEventListener('alpine:init', function() {
                     formData.append('videos', file);
                 });
 
-                const response = await fetch(`/api/videos/ar-content/${this.arContent.id}/videos`, {
+                const response = await this.request(`/api/videos/ar-content/${this.arContent.id}/videos`, {
                     method: 'POST',
                     body: formData
                 });
@@ -698,7 +728,7 @@ document.addEventListener('alpine:init', function() {
                 const formData = new FormData();
                 formData.append('photo', this.photoFile);
 
-                const response = await fetch(
+                const response = await this.request(
                     `/api/companies/${this.arContent.company_id}/projects/${this.arContent.project_id}/ar-content/${this.arContent.id}/photo`,
                     {
                         method: 'PATCH',
@@ -770,7 +800,7 @@ document.addEventListener('alpine:init', function() {
                 const formData = new FormData();
                 formData.append('photo', this.replacePhotoFile);
 
-                const response = await fetch(
+                const response = await this.request(
                     `/api/companies/${this.arContent.company_id}/projects/${this.arContent.project_id}/ar-content/${this.arContent.id}/photo`,
                     {
                         method: 'PATCH',
@@ -820,7 +850,7 @@ document.addEventListener('alpine:init', function() {
                 const formData = new FormData();
                 formData.append('video', this.replaceVideoFile);
 
-                const response = await fetch(
+                const response = await this.request(
                     `/api/companies/${this.arContent.company_id}/projects/${this.arContent.project_id}/ar-content/${this.arContent.id}/video`,
                     {
                         method: 'PATCH',
@@ -878,7 +908,7 @@ document.addEventListener('alpine:init', function() {
         async handleDelete() {
             this.deleting = true;
             try {
-                const response = await fetch(`/api/ar-content/${this.arContent.id}`, {
+                const response = await this.request(`/api/ar-content/${this.arContent.id}`, {
                     method: 'DELETE'
                 });
 
@@ -1006,9 +1036,8 @@ document.addEventListener('alpine:init', function() {
                 
                 const method = this.rotationSchedule ? 'PUT' : 'POST';
                 
-                const response = await fetch(url, {
+                const response = await this.request(url, {
                     method: method,
-                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(payload),
                 });
                 
@@ -1035,7 +1064,7 @@ document.addEventListener('alpine:init', function() {
             }
             
             try {
-                const response = await fetch(`/api/rotation/${this.rotationSchedule.id}`, {
+                const response = await this.request(`/api/rotation/${this.rotationSchedule.id}`, {
                     method: 'DELETE',
                 });
                 
@@ -1112,6 +1141,16 @@ document.addEventListener('alpine:init', function() {
                     <span class="text-gray-600 dark:text-gray-400">Создан:</span>
                     <span class="font-medium text-gray-900 dark:text-white">{{ ar_content.created_at | datetime_format if ar_content.created_at else '—' }}</span>
                 </div>
+                <div class="flex items-center gap-2 text-sm">
+                    <span class="material-icons text-amber-600 dark:text-amber-400 text-base">tag</span>
+                    <span class="text-gray-600 dark:text-gray-400">ID:</span>
+                    <button @click="copyText(arContent.order_number, 'Номер заказа скопирован')" class="font-medium text-gray-900 dark:text-white hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors" x-text="arContent.order_number || '—'"></button>
+                </div>
+                <div class="flex items-center gap-2 text-sm" x-show="arContent.unique_id">
+                    <span class="material-icons text-cyan-600 dark:text-cyan-400 text-base">fingerprint</span>
+                    <span class="text-gray-600 dark:text-gray-400">UUID:</span>
+                    <button @click="copyText(arContent.unique_id, 'UUID скопирован')" class="font-medium text-gray-900 dark:text-white hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors truncate max-w-[18rem] text-left" x-text="arContent.unique_id || '—'"></button>
+                </div>
                 <!-- Срок действия скрыт — бессрочный доступ (30 лет) -->
             </div>
         </div>
@@ -1182,6 +1221,28 @@ document.addEventListener('alpine:init', function() {
                         <dd class="text-base text-gray-900 dark:text-white break-all" x-text="arContent.customer_email || '—'"></dd>
                     </div>
                 </dl>
+                <div class="mt-5 pt-4 border-t border-gray-200 dark:border-gray-700 flex flex-wrap gap-2">
+                    <a x-show="arContent.customer_phone"
+                       :href="'tel:' + arContent.customer_phone"
+                       class="btn btn-secondary text-sm px-3 py-1.5">
+                        <span class="material-icons text-sm mr-1">call</span>Позвонить
+                    </a>
+                    <a x-show="arContent.customer_email"
+                       :href="'mailto:' + arContent.customer_email"
+                       class="btn btn-secondary text-sm px-3 py-1.5">
+                        <span class="material-icons text-sm mr-1">mail</span>Написать
+                    </a>
+                    <button x-show="arContent.customer_phone"
+                            @click="copyText(arContent.customer_phone, 'Телефон скопирован')"
+                            class="btn btn-secondary text-sm px-3 py-1.5">
+                        <span class="material-icons text-sm mr-1">content_copy</span>Телефон
+                    </button>
+                    <button x-show="arContent.customer_email"
+                            @click="copyText(arContent.customer_email, 'Email скопирован')"
+                            class="btn btn-secondary text-sm px-3 py-1.5">
+                        <span class="material-icons text-sm mr-1">content_copy</span>Email
+                    </button>
+                </div>
             </div>
         </div>
         
@@ -1671,17 +1732,11 @@ document.addEventListener('alpine:init', function() {
                     </button>
                 </div>
                 <div class="flex flex-wrap gap-2">
-                    <button @click="window.open(fullArUrl, '_blank')" 
+                    <button @click="openArView()" 
                             :disabled="!fullArUrl"
                             class="btn btn-primary text-sm">
-                        <span class="material-icons text-sm mr-1">open_in_new</span>Открыть ссылку
+                        <span class="material-icons text-sm mr-1">play_arrow</span>Открыть AR
                     </button>
-                    {% if ar_content.unique_link %}
-                    <button @click="window.open('/view/{{ ar_content.unique_link.split('/')[-1] }}', '_blank')" 
-                            class="btn btn-success text-sm">
-                        <span class="material-icons text-sm mr-1">play_arrow</span>AR Просмотр
-                    </button>
-                    {% endif %}
                     <button @click="showQRDialog = true" class="btn btn-secondary text-sm">
                         <span class="material-icons text-sm mr-1">download</span>Скачать QR
                     </button>
