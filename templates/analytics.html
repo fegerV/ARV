@@ -13,6 +13,7 @@
 {# --- JSON data blocks for JS ------------------------------------------ #}
 <script type="application/json" id="views-by-day">{{ analytics_data.views_by_day | tojson }}</script>
 <script type="application/json" id="device-stats">{{ analytics_data.device_stats | tojson }}</script>
+<script type="application/json" id="browser-stats">{{ analytics_data.browser_stats | tojson }}</script>
 
 <div class="page-container" x-data="analyticsPage()" x-init="initCharts()">
 
@@ -34,7 +35,7 @@
     </div>
 
     {# ── Summary cards (6 items) ───────────────────────────────────────── #}
-    <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-6">
+    <div class="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-8 gap-4 mb-6">
         <!-- Total Views -->
         <div class="card !p-4">
             <div class="flex items-center gap-3">
@@ -68,6 +69,30 @@
                 <div class="min-w-0">
                     <p class="text-xs text-gray-500 dark:text-gray-400 truncate">Активный контент</p>
                     <p class="text-lg font-bold text-gray-900 dark:text-white">{{ analytics_data.active_content|default(0) }}</p>
+                </div>
+            </div>
+        </div>
+        <!-- Active Companies -->
+        <div class="card !p-4">
+            <div class="flex items-center gap-3">
+                <div class="p-2 rounded-full bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400 shrink-0">
+                    <span class="material-icons text-lg">apartment</span>
+                </div>
+                <div class="min-w-0">
+                    <p class="text-xs text-gray-500 dark:text-gray-400 truncate">Активные компании</p>
+                    <p class="text-lg font-bold text-gray-900 dark:text-white">{{ analytics_data.active_companies|default(0) }}</p>
+                </div>
+            </div>
+        </div>
+        <!-- Active Projects -->
+        <div class="card !p-4">
+            <div class="flex items-center gap-3">
+                <div class="p-2 rounded-full bg-cyan-100 text-cyan-600 dark:bg-cyan-900/30 dark:text-cyan-400 shrink-0">
+                    <span class="material-icons text-lg">folder_open</span>
+                </div>
+                <div class="min-w-0">
+                    <p class="text-xs text-gray-500 dark:text-gray-400 truncate">Активные проекты</p>
+                    <p class="text-lg font-bold text-gray-900 dark:text-white">{{ analytics_data.active_projects|default(0) }}</p>
                 </div>
             </div>
         </div>
@@ -131,6 +156,16 @@
                 <p class="text-xs text-gray-500 dark:text-gray-400 mb-2">Мобильные устройства: Android и iOS (desktop не учитывается)</p>
                 <div id="chart-devices" class="w-full" style="min-height:250px"></div>
                 {% if not analytics_data.device_stats %}
+                <p class="text-gray-400 dark:text-gray-500 text-center text-sm py-4">Нет данных</p>
+                {% endif %}
+            </div>
+            <div class="card">
+                <h3 class="text-base font-semibold text-gray-900 dark:text-white mb-4">
+                    <span class="material-icons text-sm align-middle mr-1">language</span>
+                    Браузеры
+                </h3>
+                <div id="chart-browsers" class="w-full" style="min-height:250px"></div>
+                {% if not analytics_data.browser_stats %}
                 <p class="text-gray-400 dark:text-gray-500 text-center text-sm py-4">Нет данных</p>
                 {% endif %}
             </div>
@@ -277,6 +312,7 @@ function analyticsPage() {
 
             this.renderViewsChart(isDark, fg, grid, bg);
             this.renderPieChart('chart-devices', 'device-stats', isDark, fg);
+            this.renderPieChart('chart-browsers', 'browser-stats', isDark, fg);
         },
 
         renderViewsChart(isDark, fg, grid, bg) {

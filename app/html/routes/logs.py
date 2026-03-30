@@ -55,6 +55,25 @@ def classify_log_lines(lines: list[str]) -> list[dict[str, str]]:
     return [{"text": line, "level": _classify_log_line(line)} for line in lines]
 
 
+def summarize_log_entries(entries: list[dict[str, str]]) -> dict[str, int]:
+    """Return counters by log level for the admin page."""
+    summary = {
+        "error": 0,
+        "warning": 0,
+        "info": 0,
+        "debug": 0,
+        "default": 0,
+        "total": 0,
+    }
+    for entry in entries:
+        level = entry.get("level", "default")
+        if level not in summary:
+            level = "default"
+        summary[level] += 1
+        summary["total"] += 1
+    return summary
+
+
 def _read_log_lines_from_file(path: str, max_lines: int) -> tuple[list[str], str | None]:
     """
     Читает последние max_lines строк из файла.
@@ -146,10 +165,12 @@ async def admin_logs_page(
 
     lines, source, error = await get_log_content(None)
     log_entries = classify_log_lines(lines)
+    log_summary = summarize_log_entries(log_entries)
     context = {
         "request": request,
         "current_user": current_user,
         "log_entries": log_entries,
+        "log_summary": log_summary,
         "log_source": source,
         "log_error": error,
         "max_lines": settings.LOG_MAX_LINES,
@@ -170,8 +191,10 @@ async def api_admin_logs(
         )
     log_lines, source, error = await get_log_content(lines)
     items = classify_log_lines(log_lines)
+    summary = summarize_log_entries(items)
     return {
         "items": items,
+        "summary": summary,
         "source": source,
         "error": error or None,
         "count": len(items),

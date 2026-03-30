@@ -8,7 +8,9 @@ duration and video play rate.  All queries accept a configurable
 
 from __future__ import annotations
 
+import copy
 from datetime import datetime, timedelta
+import time
 from typing import Any
 
 import structlog
@@ -28,6 +30,8 @@ from app.models.project import Project
 
 router = APIRouter()
 logger = structlog.get_logger()
+_ANALYTICS_CACHE_TTL = 60.0
+_ANALYTICS_CACHE: dict[int, dict[str, Any]] = {}
 
 # Valid period values (days).  0 means "all time".
 _VALID_PERIODS = {7, 30, 90, 0}
@@ -59,7 +63,14 @@ def _empty_analytics() -> dict[str, Any]:
     }
 
 
-async def get_analytics_data(db: AsyncSession, period: int = _DEFAULT_PERIOD) -> dict[str, Any]:
+def _analytics_cache_is_fresh(period: int, now: float | None = None) -> bool:
+    """Return whether cached analytics for the selected period is still fresh."""
+    now = time.monotonic() if now is None else now
+    cached = _ANALYTICS_CACHE.get(period)
+    return bool(cached and (now - cached["timestamp"]) < _ANALYTICS_CACHE_TTL)
+
+
+async def _build_analytics_data(db: AsyncSession, period: int = _DEFAULT_PERIOD) -> dict[str, Any]:
     """Collect all analytics data for the dashboard.
 
     Args:
@@ -365,6 +376,22 @@ async def get_analytics_data(db: AsyncSession, period: int = _DEFAULT_PERIOD) ->
         data = _empty_analytics()
         data["period"] = period
         return data
+
+
+async def get_analytics_data(db: AsyncSession, period: int = _DEFAULT_PERIOD) -> dict[str, Any]:
+    """Collect all analytics data for the dashboard with a short-lived cache."""
+    now = time.monotonic()
+    if _analytics_cache_is_fresh(period, now):
+        logger.info("analytics_cache_hit", period=period)
+        return copy.deepcopy(_ANALYTICS_CACHE[period]["value"])
+
+    analytics_data = await _build_analytics_data(db, period=period)
+    _ANALYTICS_CACHE[period] = {
+        "value": copy.deepcopy(analytics_data),
+        "timestamp": now,
+    }
+    logger.info("analytics_cache_refresh", period=period)
+    return analytics_data
 
 
 # ------------------------------------------------------------------
