@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 import uuid
 import structlog
@@ -15,9 +15,14 @@ from app.models.company import Company
 router = APIRouter()
 
 
+def _utcnow_naive() -> datetime:
+    """Return UTC now as naive datetime for DB comparisons."""
+    return datetime.now(timezone.utc).replace(tzinfo=None)
+
+
 @router.get("/overview")
 async def analytics_overview(db: AsyncSession = Depends(get_db)):
-    since = datetime.utcnow() - timedelta(days=30)
+    since = _utcnow_naive() - timedelta(days=30)
     
     # Use text() for SQLite compatibility with count(distinct)
     total_views = await db.execute(select(func.count()).select_from(ARViewSession).where(ARViewSession.created_at >= since))
@@ -67,7 +72,7 @@ async def analytics_summary(db: AsyncSession = Depends(get_db)):
 
 @router.get("/companies/{company_id}")
 async def analytics_company(company_id: int, db: AsyncSession = Depends(get_db)):
-    since = datetime.utcnow() - timedelta(days=30)
+    since = _utcnow_naive() - timedelta(days=30)
     views = await db.execute(select(func.count()).select_from(ARViewSession).where(ARViewSession.company_id == company_id, ARViewSession.created_at >= since))
     return {"company_id": company_id, "views_30_days": views.scalar() or 0}
 
@@ -79,14 +84,14 @@ async def analytics_company_alias(company_id: int, db: AsyncSession = Depends(ge
 
 @router.get("/projects/{project_id}")
 async def analytics_project(project_id: int, db: AsyncSession = Depends(get_db)):
-    since = datetime.utcnow() - timedelta(days=30)
+    since = _utcnow_naive() - timedelta(days=30)
     views = await db.execute(select(func.count()).select_from(ARViewSession).where(ARViewSession.project_id == project_id, ARViewSession.created_at >= since))
     return {"project_id": project_id, "views_30_days": views.scalar() or 0}
 
 
 @router.get("/ar-content/{content_id}")
 async def analytics_content(content_id: int, db: AsyncSession = Depends(get_db)):
-    since = datetime.utcnow() - timedelta(days=30)
+    since = _utcnow_naive() - timedelta(days=30)
     views = await db.execute(select(func.count()).select_from(ARViewSession).where(ARViewSession.ar_content_id == content_id, ARViewSession.created_at >= since))
     return {"ar_content_id": content_id, "views_30_days": views.scalar() or 0}
 

@@ -11,7 +11,7 @@ import asyncio
 import gzip
 import os
 import tempfile
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, UTC
 from pathlib import Path
 from typing import Optional
 from urllib.parse import urlparse
@@ -28,6 +28,10 @@ from app.models.backup import BackupHistory
 from app.models.company import Company
 
 logger = structlog.get_logger()
+
+
+def _utcnow_naive() -> datetime:
+    return datetime.now(UTC).replace(tzinfo=None)
 
 
 def _parse_database_url(url: str) -> dict:
@@ -78,7 +82,7 @@ class BackupService:
 
         async with AsyncSessionLocal() as session:
             record = BackupHistory(
-                started_at=datetime.utcnow(),
+                started_at=_utcnow_naive(),
                 status="running",
                 company_id=company_id,
                 trigger=trigger,
@@ -102,7 +106,7 @@ class BackupService:
             gz_size = os.path.getsize(gz_path)
 
             # 3. Upload to Yandex Disk
-            timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+            timestamp = _utcnow_naive().strftime("%Y%m%d_%H%M%S")
             remote_name = f"backup_{timestamp}.sql.gz"
             yd_remote_path = f"{yd_folder}/{remote_name}"
 
@@ -121,7 +125,7 @@ class BackupService:
             async with AsyncSessionLocal() as session:
                 rec = await session.get(BackupHistory, record_id)
                 if rec:
-                    rec.finished_at = datetime.utcnow()
+                    rec.finished_at = _utcnow_naive()
                     rec.status = "success"
                     rec.size_bytes = gz_size
                     rec.yd_path = yd_remote_path
@@ -138,7 +142,7 @@ class BackupService:
             async with AsyncSessionLocal() as session:
                 rec = await session.get(BackupHistory, record_id)
                 if rec:
-                    rec.finished_at = datetime.utcnow()
+                    rec.finished_at = _utcnow_naive()
                     rec.status = "failed"
                     rec.error_message = str(exc)[:1000]
                     await session.commit()
@@ -329,7 +333,7 @@ class BackupService:
             result = await session.execute(stmt)
             backups = list(result.scalars().all())
 
-        cutoff = datetime.utcnow() - timedelta(days=retention_days)
+        cutoff = _utcnow_naive() - timedelta(days=retention_days)
         to_delete: list[int] = []
 
         for idx, bkp in enumerate(backups):

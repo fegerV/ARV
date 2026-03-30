@@ -2,7 +2,6 @@
 Enhanced Validation Service with deep content analysis, security scanning, and comprehensive validation.
 """
 import asyncio
-import imghdr
 import magic
 import structlog
 from pathlib import Path
@@ -16,6 +15,11 @@ import cv2
 import numpy as np
 
 from app.core.config import settings
+
+try:
+    import imghdr
+except ModuleNotFoundError:  # pragma: no cover - Python 3.13+ compatibility path
+    imghdr = None
 
 logger = structlog.get_logger()
 
@@ -33,7 +37,7 @@ class ThreatLevel(Enum):
 
 @dataclass
 class ValidationResult:
-    is_valid: bool
+    is_valid: bool = True
     threat_level: ThreatLevel = ThreatLevel.UNKNOWN
     errors: List[str] = field(default_factory=list)
     warnings: List[str] = field(default_factory=list)
@@ -193,11 +197,12 @@ class EnhancedValidationService:
             pass
         
         # Try imghdr for images
-        try:
-            if imghdr.what(str(file_path)):
-                return 'image'
-        except Exception:
-            pass
+        if imghdr is not None:
+            try:
+                if imghdr.what(str(file_path)):
+                    return 'image'
+            except Exception:
+                pass
         
         # Try OpenCV for video detection
         try:

@@ -110,17 +110,16 @@ The API is organized into the following modules:
 3. [Projects](#projects)
 4. [AR Content](#ar-content)
 5. [Videos](#videos)
-6. [Orders](#orders) *(Coming Soon)*
-7. [Analytics](#analytics)
-8. [Notifications](#notifications)
-9. [Storage](#storage)
-10. [Rotation](#rotation)
-11. [OAuth](#oauth)
-12. [Public](#public)
-13. [Viewer](#viewer)
-14. [Settings](#settings)
-15. [Health](#health)
-16. [WebSocket](#websocket)
+6. [Analytics](#analytics)
+7. [Notifications](#notifications)
+8. [Storage](#storage)
+9. [Rotation](#rotation)
+10. [OAuth](#oauth)
+11. [Public](#public)
+12. [Viewer](#viewer)
+13. [Settings](#settings)
+14. [Health](#health)
+15. [WebSocket](#websocket)
 
 ---
 

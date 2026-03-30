@@ -11,6 +11,7 @@ from typing import Any, Optional, Dict, List, Callable
 from dataclasses import dataclass, asdict
 from enum import Enum
 from pathlib import Path
+import tempfile
 import structlog
 from prometheus_client import Counter, Histogram, Gauge
 
@@ -153,7 +154,9 @@ class MemoryCache:
 class DiskCache:
     """Disk-based L3 cache with compression."""
     
-    def __init__(self, cache_dir: str = "/tmp/vertex_cache"):
+    def __init__(self, cache_dir: Optional[str] = None):
+        if cache_dir is None:
+            cache_dir = str(Path(tempfile.gettempdir()) / "vertex_cache")
         self.cache_dir = Path(cache_dir)
         self.cache_dir.mkdir(parents=True, exist_ok=True)
         self.lock = asyncio.Lock()
@@ -297,7 +300,13 @@ class EnhancedCacheService:
         }
         
         # Background cleanup task
-        asyncio.create_task(self._background_cleanup())
+        self._cleanup_task = None
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            loop = None
+        if loop is not None:
+            self._cleanup_task = loop.create_task(self._background_cleanup())
     
     async def get(
         self,

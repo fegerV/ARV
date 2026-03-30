@@ -4,7 +4,7 @@ Enhanced Media API routes with advanced validation, caching, and reliability.
 import hashlib
 import time
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
@@ -38,31 +38,35 @@ logger = structlog.get_logger()
 
 router = APIRouter(prefix="/api/v2/media", tags=["Enhanced Media"])
 
+
+def _utcnow_iso() -> str:
+    return datetime.now(timezone.utc).replace(tzinfo=None).isoformat()
+
 # Pydantic models
 class ThumbnailRequest(BaseModel):
     file_path: str
-    size: str = Field(default="medium", regex="^(small|medium|large|hero)$")
-    format: str = Field(default="webp", regex="^(jpeg|webp|avif|png)$")
+    size: str = Field(default="medium", pattern="^(small|medium|large|hero)$")
+    format: str = Field(default="webp", pattern="^(jpeg|webp|avif|png)$")
     quality: Optional[int] = Field(default=85, ge=1, le=100)
     force_regenerate: bool = False
 
 class BatchThumbnailRequest(BaseModel):
     file_paths: List[str]
-    sizes: List[str] = Field(default=["medium"], regex="^(small|medium|large|hero)$")
-    formats: List[str] = Field(default=["webp"], regex="^(jpeg|webp|avif|png)$")
+    sizes: List[str] = Field(default=["medium"])
+    formats: List[str] = Field(default=["webp"])
     quality: Optional[int] = Field(default=85, ge=1, le=100)
     force_regenerate: bool = False
 
 class ValidationRequest(BaseModel):
     file_path: str
-    file_type: str = Field(default="auto", regex="^(auto|image|video)$")
-    validation_level: str = Field(default="standard", regex="^(basic|standard|comprehensive|paranoid)$")
+    file_type: str = Field(default="auto", pattern="^(auto|image|video)$")
+    validation_level: str = Field(default="standard", pattern="^(basic|standard|comprehensive|paranoid)$")
     original_filename: Optional[str] = None
 
 class BatchValidationRequest(BaseModel):
     file_paths: List[str]
-    file_type: str = Field(default="auto", regex="^(auto|image|video)$")
-    validation_level: str = Field(default="standard", regex="^(basic|standard|comprehensive|paranoid)$")
+    file_type: str = Field(default="auto", pattern="^(auto|image|video)$")
+    validation_level: str = Field(default="standard", pattern="^(basic|standard|comprehensive|paranoid)$")
 
 class MediaInfoResponse(BaseModel):
     file_path: str
@@ -94,8 +98,8 @@ async def generate_thumbnail(
     
     try:
         # Parse size and format
-        size_enum = ThumbnailSize(request.size.upper())
-        format_enum = ThumbnailFormat(request.format.upper())
+        size_enum = ThumbnailSize[request.size.upper()]
+        format_enum = ThumbnailFormat[request.format.upper()]
         
         # Create thumbnail config
         config = ThumbnailConfig(
@@ -106,7 +110,7 @@ async def generate_thumbnail(
         )
         
         # Check cache first
-        cache_key = f"thumbnail_request:{hashlib.md5(str(request.dict()).encode()).hexdigest()}"
+        cache_key = f"thumbnail_request:{hashlib.md5(str(request.model_dump()).encode()).hexdigest()}"
         cached_result = await enhanced_cache_service.get(cache_key, 'thumbnails')
         
         if cached_result and not request.force_regenerate:
@@ -164,8 +168,8 @@ async def generate_batch_thumbnails(
         configs = []
         for size_str in request.sizes:
             for format_str in request.formats:
-                size_enum = ThumbnailSize(size_str.upper())
-                format_enum = ThumbnailFormat(format_str.upper())
+                size_enum = ThumbnailSize[size_str.upper()]
+                format_enum = ThumbnailFormat[format_str.upper()]
                 
                 configs.append(ThumbnailConfig(
                     size=size_enum,
@@ -228,10 +232,10 @@ async def validate_file(request: ValidationRequest):
     
     try:
         # Parse validation level
-        level_enum = ValidationLevel(request.validation_level.upper())
+        level_enum = ValidationLevel[request.validation_level.upper()]
         
         # Check cache first
-        cache_key = f"validation:{hashlib.md5(str(request.dict()).encode()).hexdigest()}"
+        cache_key = f"validation:{hashlib.md5(str(request.model_dump()).encode()).hexdigest()}"
         cached_result = await enhanced_cache_service.get(cache_key, 'validation')
         
         if cached_result:
@@ -281,7 +285,7 @@ async def validate_batch_files(request: BatchValidationRequest):
     """Validate multiple files concurrently."""
     
     try:
-        level_enum = ValidationLevel(request.validation_level.upper())
+        level_enum = ValidationLevel[request.validation_level.upper()]
         
         # Perform batch validation
         results = await enhanced_validation_service.batch_validate(
@@ -364,6 +368,11 @@ async def clear_cache(
     """Clear cache entries."""
     
     try:
+        if not isinstance(pattern, str):
+            pattern = None
+        if not isinstance(cache_type, str):
+            cache_type = None
+
         if pattern:
             deleted_count = await enhanced_cache_service.invalidate_pattern(pattern, cache_type or 'default')
             return {
@@ -550,6 +559,9 @@ async def generate_ar_content_thumbnails(
             "successful_files": len([r for r in results if r["status"] == "success"])
         }
         
+    except HTTPException:
+        await db.rollback()
+        raise
     except Exception as e:
         await db.rollback()
         logger.error("ar_content_thumbnails_failed", content_id=content_id, error=str(e))
@@ -580,7 +592,7 @@ async def get_media_stats(
             "cache": cache_stats,
             "reliability": reliability_stats,
             "system": {
-                "timestamp": datetime.utcnow().isoformat(),
+                "timestamp": _utcnow_iso(),
                 "uptime": time.time() - start_time if 'start_time' in globals() else 0
             }
         }

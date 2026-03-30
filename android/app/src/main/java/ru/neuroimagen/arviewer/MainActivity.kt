@@ -64,8 +64,7 @@ class MainActivity : AppCompatActivity() {
         if (result.resultCode == RESULT_OK) {
             val uniqueId = result.data?.getStringExtra(QrScannerActivity.EXTRA_UNIQUE_ID)
             if (!uniqueId.isNullOrBlank()) {
-                binding.editUniqueId.setText(uniqueId)
-                openViewer(uniqueId, fromQrScan = true)
+                submitResolvedUniqueId(uniqueId, fromQrScan = true)
             }
         }
     }
@@ -162,8 +161,7 @@ class MainActivity : AppCompatActivity() {
                 scanBarcodeFromImage(imageUri)
             }
             if (uniqueId != null) {
-                binding.editUniqueId.setText(uniqueId)
-                viewModel.loadManifest(uniqueId, forceRefresh = true)
+                submitResolvedUniqueId(uniqueId, fromQrScan = true)
             } else {
                 viewModel.resetToInput()
                 Toast.makeText(
@@ -210,8 +208,7 @@ class MainActivity : AppCompatActivity() {
         val data: Uri = intent?.data ?: return
         val uniqueId = UniqueIdParser.parseFromUri(data) ?: return
         if (uniqueId.isNotBlank()) {
-            binding.editUniqueId.setText(uniqueId)
-            openViewer(uniqueId)
+            submitResolvedUniqueId(uniqueId)
         }
     }
 
@@ -223,17 +220,8 @@ class MainActivity : AppCompatActivity() {
             Toast.makeText(this, getString(R.string.enter_unique_id), Toast.LENGTH_SHORT).show()
             return
         }
-        val uniqueId = UniqueIdParser.extractFromInput(input)
-        if (uniqueId == null) {
-            val errorMsg = if (UniqueIdParser.looksLikeUrl(input)) {
-                getString(R.string.error_invalid_link_format)
-            } else {
-                getString(R.string.error_invalid_unique_id)
-            }
-            Toast.makeText(this, errorMsg, Toast.LENGTH_LONG).show()
-            return
-        }
-        openViewer(uniqueId)
+        val uniqueId = parseInputUniqueId(input) ?: return
+        submitResolvedUniqueId(uniqueId)
     }
 
     private fun openDemoMode() {
@@ -256,6 +244,32 @@ class MainActivity : AppCompatActivity() {
         viewModel.loadManifest(uniqueId, forceRefresh = fromQrScan)
     }
 
+    private fun submitResolvedUniqueId(
+        uniqueId: String,
+        fromQrScan: Boolean = false,
+        updateInputField: Boolean = true,
+    ) {
+        if (updateInputField) {
+            binding.editUniqueId.setText(uniqueId)
+        }
+        openViewer(uniqueId, fromQrScan = fromQrScan)
+    }
+
+    private fun parseInputUniqueId(input: String): String? {
+        val uniqueId = UniqueIdParser.extractFromInput(input)
+        if (uniqueId != null) {
+            return uniqueId
+        }
+
+        val errorMsg = if (UniqueIdParser.looksLikeUrl(input)) {
+            getString(R.string.error_invalid_link_format)
+        } else {
+            getString(R.string.error_invalid_unique_id)
+        }
+        Toast.makeText(this, errorMsg, Toast.LENGTH_LONG).show()
+        return null
+    }
+
     private fun showDeviceNotSupportedPanel(uniqueId: String) {
         viewModel.resetToInput()
         binding.panelMain.visibility = View.GONE
@@ -272,7 +286,7 @@ class MainActivity : AppCompatActivity() {
                     showMainPanel()
                     openDemoMode()
                 } else {
-                    viewModel.loadManifest(uniqueId)
+                    submitResolvedUniqueId(uniqueId, updateInputField = false)
                 }
             }
         }

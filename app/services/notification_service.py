@@ -4,13 +4,17 @@ from email.mime.multipart import MIMEMultipart
 import httpx
 import structlog
 from typing import Optional, Dict, Any
-from datetime import datetime
+from datetime import datetime, UTC
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.models.notification import Notification
 
 logger = structlog.get_logger()
+
+
+def _utcnow_naive() -> datetime:
+    return datetime.now(UTC).replace(tzinfo=None)
 
 
 async def create_notification(
@@ -47,7 +51,7 @@ async def create_notification(
             project_id=project_id,
             ar_content_id=ar_content_id,
             notification_metadata=metadata or {},
-            created_at=datetime.utcnow()
+            created_at=_utcnow_naive()
         )
         
         db.add(notification)

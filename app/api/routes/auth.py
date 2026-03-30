@@ -5,7 +5,7 @@ from app.middleware.rate_limiter import rate_limit
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, UTC
 from app.core.security import (
     verify_password,
     create_access_token,
@@ -33,6 +33,10 @@ logger = structlog.get_logger()
 # Rate limiting constants
 MAX_LOGIN_ATTEMPTS = 5
 LOCKOUT_DURATION = timedelta(minutes=15)
+
+
+def _utcnow_naive() -> datetime:
+    return datetime.now(UTC).replace(tzinfo=None)
 
 
 def _extract_request_token(request: Request, token: str = None) -> str | None:
@@ -151,7 +155,7 @@ async def login(
     
     # Check if account is locked
     if user and user.locked_until:
-        if datetime.utcnow() < user.locked_until:
+        if _utcnow_naive() < user.locked_until:
             logger.warning("Login attempt on locked account", email=form_data.username)
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
@@ -176,7 +180,7 @@ async def login(
             
             # Lock account after MAX_LOGIN_ATTEMPTS
             if user.login_attempts >= MAX_LOGIN_ATTEMPTS:
-                user.locked_until = datetime.utcnow() + LOCKOUT_DURATION
+                user.locked_until = _utcnow_naive() + LOCKOUT_DURATION
                 await db.commit()
                 
                 logger.warning("Account locked due to excessive login attempts",
@@ -222,7 +226,7 @@ async def login(
     # Reset login attempts on successful login
     user.login_attempts = 0
     user.locked_until = None
-    user.last_login_at = datetime.utcnow()
+    user.last_login_at = _utcnow_naive()
     await db.commit()
     
     timeout_minutes = await get_session_timeout_minutes(db)
@@ -237,7 +241,7 @@ async def login(
     return {
         "access_token": access_token,
         "token_type": "bearer",
-        "user": UserResponse.from_orm(user)
+        "user": UserResponse.model_validate(user)
     }
 
 @router.post("/login-form", response_class=HTMLResponse)
@@ -257,7 +261,7 @@ async def login_form(
     
     # Check if account is locked
     if user and user.locked_until:
-        if datetime.utcnow() < user.locked_until:
+        if _utcnow_naive() < user.locked_until:
             logger.warning("Login attempt on locked account", email=username)
             # Return login page with error
             context = {
@@ -282,7 +286,7 @@ async def login_form(
             
             # Lock account after MAX_LOGIN_ATTEMPTS
             if user.login_attempts >= MAX_LOGIN_ATTEMPTS:
-                user.locked_until = datetime.utcnow() + LOCKOUT_DURATION
+                user.locked_until = _utcnow_naive() + LOCKOUT_DURATION
                 await db.commit()
                 
                 logger.warning("Account locked due to excessive login attempts",
@@ -326,7 +330,7 @@ async def login_form(
     # Reset login attempts on successful login
     user.login_attempts = 0
     user.locked_until = None
-    user.last_login_at = datetime.utcnow()
+    user.last_login_at = _utcnow_naive()
     await db.commit()
     
     _timeout = await get_session_timeout_minutes(db)
@@ -354,7 +358,7 @@ async def logout(current_user: User = Depends(get_current_active_user)):
 @router.get("/me", response_model=UserResponse)
 async def read_users_me(current_user: User = Depends(get_current_active_user)):
     """Get current user info"""
-    return UserResponse.from_orm(current_user)
+    return UserResponse.model_validate(current_user)
 
 @router.post("/register", response_model=RegisterResponse)
 async def register_user(
@@ -415,6 +419,6 @@ async def register_user(
     )
     
     return RegisterResponse(
-        user=UserResponse.from_orm(new_user),
+        user=UserResponse.model_validate(new_user),
         message="User created successfully"
     )

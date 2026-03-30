@@ -47,7 +47,7 @@ class ProjectLinks(BaseModel):
 class ProjectListItem(BaseModel):
     """Schema for project list item response"""
 
-    model_config = ConfigDict(from_attributes=True)
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
 
     id: str
     name: str
@@ -55,13 +55,13 @@ class ProjectListItem(BaseModel):
     company_id: int = Field(..., description="Company ID")
     ar_content_count: int = Field(..., description="Number of AR content items for this project")
     created_at: datetime
-    _links: ProjectLinks
+    links: ProjectLinks = Field(..., alias="_links", serialization_alias="_links")
 
 
 class ProjectDetail(BaseModel):
     """Schema for detailed project response"""
 
-    model_config = ConfigDict(from_attributes=True)
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
 
     id: str
     name: str
@@ -69,7 +69,7 @@ class ProjectDetail(BaseModel):
     company_id: int
     ar_content_count: int = Field(..., description="Number of AR content items for this project")
     created_at: datetime
-    _links: ProjectLinks
+    links: ProjectLinks = Field(..., alias="_links", serialization_alias="_links")
 
 
 class PaginatedProjectsResponse(BaseModel):

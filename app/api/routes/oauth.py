@@ -1,10 +1,11 @@
 from fastapi import APIRouter, HTTPException, Query, Depends, BackgroundTasks
 from fastapi.responses import RedirectResponse
 from sqlalchemy.ext.asyncio import AsyncSession
-from datetime import datetime
+from datetime import datetime, UTC
 import httpx
 import logging
 from urllib.parse import quote_plus
+from typing import Any
 
 from app.core.database import get_db
 from app.core.config import get_settings
@@ -15,6 +16,26 @@ from app.utils.token_encryption import token_encryption
 router = APIRouter(tags=["oauth"])
 settings = get_settings()
 logger = logging.getLogger(__name__)
+
+
+def _utcnow_naive() -> datetime:
+    return datetime.now(UTC).replace(tzinfo=None)
+
+
+def _get_connection_credentials(conn: StorageConnection) -> dict[str, Any]:
+    raw_credentials = getattr(conn, "credentials", None)
+    if raw_credentials is None:
+        storage_metadata = getattr(conn, "storage_metadata", None) or {}
+        raw_credentials = storage_metadata.get("credentials")
+
+    if isinstance(raw_credentials, str):
+        credentials = token_encryption.decrypt_credentials(raw_credentials)
+    else:
+        credentials = raw_credentials or {}
+
+    if not isinstance(credentials, dict):
+        return {}
+    return credentials
 
 @router.get("/authorize")
 async def initiate_yandex_oauth(
@@ -141,7 +162,7 @@ async def yandex_oauth_callback(
             "refresh_token": token_data.get("refresh_token"),
             "expires_in": token_data.get("expires_in"),
             "token_type": token_data.get("token_type"),
-            "created_at": datetime.utcnow().isoformat(),
+            "created_at": _utcnow_naive().isoformat(),
         }
         
         # Encrypt credentials before storage
@@ -151,11 +172,12 @@ async def yandex_oauth_callback(
         connection = StorageConnection(
             name=connection_name,
             provider="yandex_disk",
-            credentials=encrypted_credentials,
+            base_path="/",
             is_active=True,
             test_status="success",
-            last_tested_at=datetime.utcnow(),
-            metadata={
+            last_tested_at=_utcnow_naive(),
+            storage_metadata={
+                "credentials": encrypted_credentials,
                 "user_display_name": (disk_info.get("user") or {}).get("display_name"),
                 "total_space": disk_info.get("total_space"),
                 "used_space": disk_info.get("used_space"),
@@ -221,11 +243,7 @@ async def list_yandex_folders(
 
     # Decrypt credentials to get OAuth token
     try:
-        if isinstance(conn.credentials, str):
-            credentials = token_encryption.decrypt_credentials(conn.credentials)
-        else:
-            credentials = conn.credentials or {}
-        
+        credentials = _get_connection_credentials(conn)
         token = credentials.get("oauth_token")
         if not token:
             logger.error("Missing OAuth token in credentials", extra={"connection_id": connection_id})
@@ -361,11 +379,7 @@ async def create_yandex_folder(
 
     # Decrypt credentials to get OAuth token
     try:
-        if isinstance(conn.credentials, str):
-            credentials = token_encryption.decrypt_credentials(conn.credentials)
-        else:
-            credentials = conn.credentials or {}
-        
+        credentials = _get_connection_credentials(conn)
         token = credentials.get("oauth_token")
         if not token:
             logger.error("Missing OAuth token in credentials", extra={"connection_id": connection_id})

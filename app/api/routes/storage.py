@@ -4,7 +4,7 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from typing import Optional
-from datetime import datetime
+from datetime import datetime, UTC
 
 import httpx
 
@@ -17,6 +17,10 @@ from app.schemas.storage import StorageConnectionCreate, StorageUsageStats
 
 logger = structlog.get_logger()
 router = APIRouter()
+
+
+def _utcnow_naive() -> datetime:
+    return datetime.now(UTC).replace(tzinfo=None)
 
 
 @router.post("/connections")
@@ -56,13 +60,13 @@ async def test_connection(connection_id: int, db: AsyncSession = Depends(get_db)
             result = {
                 "status": "error",
                 "message": f"Base path does not exist: {conn.base_path}",
-                "tested_at": datetime.utcnow().isoformat()
+                "tested_at": _utcnow_naive().isoformat()
             }
         elif not base_path.is_dir():
             result = {
                 "status": "error", 
                 "message": f"Base path is not a directory: {conn.base_path}",
-                "tested_at": datetime.utcnow().isoformat()
+                "tested_at": _utcnow_naive().isoformat()
             }
         else:
             # Try to create a test file
@@ -74,7 +78,7 @@ async def test_connection(connection_id: int, db: AsyncSession = Depends(get_db)
                 result = {
                     "status": "success",
                     "message": "Local storage connection test successful",
-                    "tested_at": datetime.utcnow().isoformat(),
+                    "tested_at": _utcnow_naive().isoformat(),
                     "base_path": str(base_path),
                     "writable": True
                 }
@@ -82,16 +86,16 @@ async def test_connection(connection_id: int, db: AsyncSession = Depends(get_db)
                 result = {
                     "status": "error",
                     "message": f"Base path is not writable: {str(e)}",
-                    "tested_at": datetime.utcnow().isoformat()
+                    "tested_at": _utcnow_naive().isoformat()
                 }
     except Exception as e:
         result = {
             "status": "error",
             "message": f"Connection test failed: {str(e)}",
-            "tested_at": datetime.utcnow().isoformat()
+            "tested_at": _utcnow_naive().isoformat()
         }
 
-    conn.last_tested_at = datetime.utcnow()
+    conn.last_tested_at = _utcnow_naive()
     conn.test_status = result.get("status")
     conn.test_error = result.get("message") if result.get("status") == "error" else None
     await db.commit()

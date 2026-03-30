@@ -30,3 +30,12 @@ def serialize_fields(data: dict, *field_names: str) -> dict:
         if field_name in data:
             data[field_name] = serialize_datetime(data[field_name])
     return data
+
+
+def serialize_nested(value):
+    """Recursively convert datetime-like values in nested lists/dicts."""
+    if isinstance(value, dict):
+        return {key: serialize_nested(item) for key, item in value.items()}
+    if isinstance(value, list):
+        return [serialize_nested(item) for item in value]
+    return serialize_datetime(value)

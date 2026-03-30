@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from typing import List
-from datetime import datetime
+from datetime import datetime, UTC
 
 import httpx
 import smtplib
@@ -11,6 +11,10 @@ import structlog
 from app.core.config import settings
 
 logger = structlog.get_logger()
+
+
+def _utcnow_naive() -> datetime:
+    return datetime.now(UTC).replace(tzinfo=None)
 
 @dataclass
 class Alert:
@@ -55,7 +59,7 @@ async def send_admin_email(alerts: List[Alert], metrics: dict) -> None:
 
     html_body = f"""
     <h2>🚨 Vertex AR System Alerts</h2>
-    <p><strong>Time:</strong> {datetime.utcnow()}</p>
+    <p><strong>Time:</strong> {_utcnow_naive()}</p>
 
     <h3>Critical Alerts ({len(alerts)}):</h3>
     {''.join([f'<div style="border:1px solid red;padding:10px;margin:5px;"><h4>{a.title}</h4><p>{a.message}</p></div>' for a in alerts])}

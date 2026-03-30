@@ -30,6 +30,71 @@ def _convert_enum_to_string(data_dict):
         data_dict["status"] = data_dict["status"].value
     return serialize_fields(data_dict, "created_at", "updated_at")
 
+
+def _serialize_company_for_project_form(company, *, projects_count: int | None = None) -> dict:
+    """Normalize company payload used by project form templates."""
+    company_dict = {
+        "id": company.id,
+        "name": company.name,
+        "contact_email": company.contact_email,
+        "status": company.status,
+        "created_at": company.created_at,
+        "updated_at": company.updated_at,
+    }
+    if projects_count is not None:
+        company_dict["projects_count"] = projects_count
+    return serialize_fields(company_dict, "created_at", "updated_at")
+
+
+async def _load_project_form_companies(
+    db: AsyncSession,
+    *,
+    include_project_counts: bool = False,
+) -> list[dict]:
+    """Load companies for project create/edit forms."""
+    companies_query = select(Company).order_by(Company.created_at.desc())
+    companies_result = await db.execute(companies_query)
+    companies_db = list(companies_result.scalars().all())
+
+    project_counts: dict[int, int] = {}
+    if include_project_counts and companies_db:
+        company_ids = [company.id for company in companies_db]
+        pc_stmt = (
+            select(Project.company_id, func.count(Project.id))
+            .where(Project.company_id.in_(company_ids))
+            .group_by(Project.company_id)
+        )
+        pc_result = await db.execute(pc_stmt)
+        project_counts = {cid: cnt for cid, cnt in pc_result.all()}
+
+    return [
+        _serialize_company_for_project_form(
+            company,
+            projects_count=project_counts.get(company.id) if include_project_counts else None,
+        )
+        for company in companies_db
+    ]
+
+
+def _build_project_form_context(
+    request: Request,
+    current_user,
+    *,
+    companies: list[dict],
+    project: dict | None = None,
+    error: str | None = None,
+) -> dict:
+    """Build shared template context for project form page."""
+    context = {
+        "request": request,
+        "companies": companies,
+        "current_user": current_user,
+        "project": project,
+    }
+    if error:
+        context["error"] = error
+    return context
+
 @router.get("/projects", response_class=HTMLResponse)
 async def projects_list(
     request: Request,
@@ -175,49 +240,11 @@ async def project_create(
         return redirect
     
     try:
-        # Query companies directly from database to avoid dependency issues
-        companies_query = select(Company).order_by(Company.created_at.desc())
-        companies_result = await db.execute(companies_query)
-        companies_db = companies_result.scalars().all()
-        
-        # Batch load project counts for all companies (avoid N+1)
-        company_ids = [c.id for c in companies_db]
-        project_counts: dict[int, int] = {}
-        if company_ids:
-            pc_stmt = (
-                select(Project.company_id, func.count(Project.id))
-                .where(Project.company_id.in_(company_ids))
-                .group_by(Project.company_id)
-            )
-            pc_result = await db.execute(pc_stmt)
-            project_counts = {cid: cnt for cid, cnt in pc_result.all()}
-
-        companies = []
-        for company in companies_db:
-            companies.append({
-                "id": company.id,
-                "name": company.name,
-                "contact_email": company.contact_email,
-                "status": company.status,
-                "projects_count": project_counts.get(company.id, 0),
-                "created_at": company.created_at,
-                "updated_at": company.updated_at
-            })
+        companies = await _load_project_form_companies(db, include_project_counts=True)
     except Exception as e:
         logger.error("companies_fetch_error", error=str(e), exc_info=True)
         try:
-            companies_query = select(Company)
-            companies_result = await db.execute(companies_query)
-            companies = []
-            for company in companies_result.scalars().all():
-                companies.append({
-                    "id": company.id,
-                    "name": company.name,
-                    "contact_email": company.contact_email,
-                    "status": company.status,
-                    "created_at": company.created_at,
-                    "updated_at": company.updated_at
-                })
+            companies = await _load_project_form_companies(db)
         except Exception as db_error:
             logger.error("companies_db_error", error=str(db_error), exc_info=True)
             companies = PROJECT_CREATE_MOCK_DATA.get("companies", [])
@@ -225,18 +252,13 @@ async def project_create(
     # Ensure companies is a list
     if not isinstance(companies, list):
         companies = []
-    
-    # Convert any datetime objects in companies to strings
-    for company in companies:
-        if isinstance(company, dict):
-            serialize_fields(company, "created_at", "updated_at")
-    
-    context = {
-        "request": request,
-        "companies": companies,
-        "current_user": current_user,
-        "project": None
-    }
+
+    context = _build_project_form_context(
+        request,
+        current_user,
+        companies=companies,
+        project=None,
+    )
     return templates.TemplateResponse("projects/form.html", context)
 
 @router.get("/projects/{project_id}", response_class=HTMLResponse)
@@ -247,11 +269,9 @@ async def project_detail(
     db: AsyncSession = Depends(get_html_db)
 ):
     """Project detail page."""
-    if not current_user:
-        return RedirectResponse(url="/admin/login", status_code=303)
-    
-    if not current_user.is_active:
-        return RedirectResponse(url="/admin/login", status_code=303)
+    redirect = require_active_user(current_user)
+    if redirect:
+        return redirect
     
     try:
         project = await get_project(int(project_id), db)
@@ -261,43 +281,22 @@ async def project_detail(
         logger.error("project_detail_error", project_id=project_id, error=str(e))
         project_data = {**MOCK_PROJECTS[0], "id": project_id}
     
-    # Get companies for edit form
     try:
-        from app.api.routes.companies import list_companies
-        companies_result = await list_companies(
-            page=1,
-            page_size=100,
-            search=None,
-            status=None,
-            db=db,
-            current_user=current_user
-        )
-        companies = [_pydantic_to_dict(item) for item in companies_result.items]
+        companies = await _load_project_form_companies(db)
     except Exception as e:
         logger.error("companies_fetch_error", error=str(e))
         try:
-            companies_query = select(Company)
-            companies_result = await db.execute(companies_query)
-            companies = []
-            for company in companies_result.scalars().all():
-                companies.append({
-                    "id": company.id,
-                    "name": company.name,
-                    "contact_email": company.contact_email,
-                    "status": company.status,
-                    "created_at": company.created_at.isoformat() if company.created_at and hasattr(company.created_at, "isoformat") else company.created_at,
-                    "updated_at": company.updated_at.isoformat() if company.updated_at and hasattr(company.updated_at, "isoformat") else company.updated_at
-                })
+            companies = await _load_project_form_companies(db)
         except Exception as db_error:
             logger.error("companies_db_error", error=str(db_error))
             companies = PROJECT_CREATE_MOCK_DATA["companies"]
-    
-    context = {
-        "request": request,
-        "project": project_data,
-        "current_user": current_user,
-        "companies": companies
-    }
+
+    context = _build_project_form_context(
+        request,
+        current_user,
+        companies=companies,
+        project=project_data,
+    )
     return templates.TemplateResponse("projects/form.html", context)
 
 @router.get("/projects/{project_id}/edit", response_class=HTMLResponse)
@@ -308,11 +307,9 @@ async def project_edit(
     db: AsyncSession = Depends(get_html_db)
 ):
     """Project edit page."""
-    if not current_user:
-        return RedirectResponse(url="/admin/login", status_code=303)
-    
-    if not current_user.is_active:
-        return RedirectResponse(url="/admin/login", status_code=303)
+    redirect = require_active_user(current_user)
+    if redirect:
+        return redirect
     
     try:
         project = await get_project(int(project_id), db)
@@ -322,43 +319,22 @@ async def project_edit(
         logger.error("project_edit_error", project_id=project_id, error=str(e))
         project_data = {**MOCK_PROJECTS[0], "id": project_id}
     
-    # Get companies for edit form
     try:
-        from app.api.routes.companies import list_companies
-        companies_result = await list_companies(
-            page=1,
-            page_size=100,
-            search=None,
-            status=None,
-            db=db,
-            current_user=current_user
-        )
-        companies = [_pydantic_to_dict(item) for item in companies_result.items]
+        companies = await _load_project_form_companies(db)
     except Exception as e:
         logger.error("companies_fetch_error", error=str(e))
         try:
-            companies_query = select(Company)
-            companies_result = await db.execute(companies_query)
-            companies = []
-            for company in companies_result.scalars().all():
-                companies.append({
-                    "id": company.id,
-                    "name": company.name,
-                    "contact_email": company.contact_email,
-                    "status": company.status,
-                    "created_at": company.created_at.isoformat() if company.created_at and hasattr(company.created_at, "isoformat") else company.created_at,
-                    "updated_at": company.updated_at.isoformat() if company.updated_at and hasattr(company.updated_at, "isoformat") else company.updated_at
-                })
+            companies = await _load_project_form_companies(db)
         except Exception as db_error:
             logger.error("companies_db_error", error=str(db_error))
             companies = PROJECT_CREATE_MOCK_DATA["companies"]
-    
-    context = {
-        "request": request,
-        "project": project_data,
-        "companies": companies,
-        "current_user": current_user
-    }
+
+    context = _build_project_form_context(
+        request,
+        current_user,
+        companies=companies,
+        project=project_data,
+    )
     return templates.TemplateResponse("projects/form.html", context)
 
 @router.post("/projects", response_class=HTMLResponse)
@@ -368,13 +344,9 @@ async def project_create_post(
     db: AsyncSession = Depends(get_html_db)
 ):
     """Handle project creation form submission."""
-    if not current_user:
-        # Redirect to login page if user is not authenticated
-        return RedirectResponse(url="/admin/login", status_code=303)
-    
-    if not current_user.is_active:
-        # Redirect to login page if user is not active
-        return RedirectResponse(url="/admin/login", status_code=303)
+    redirect = require_active_user(current_user)
+    if redirect:
+        return redirect
     
     # Get form data
     form_data = await request.form()
@@ -383,32 +355,18 @@ async def project_create_post(
     status = form_data.get("status", "active")
     
     if not name or not company_id:
-        # If validation fails, return to form with error
         try:
-            # Query companies directly from database
-            companies_query = select(Company).order_by(Company.created_at.desc())
-            companies_result = await db.execute(companies_query)
-            companies_db = companies_result.scalars().all()
-            
-            companies = []
-            for company in companies_db:
-                companies.append({
-                    "id": company.id,
-                    "name": company.name,
-                    "contact_email": company.contact_email,
-                    "status": company.status,
-                    "created_at": company.created_at.isoformat() if company.created_at and hasattr(company.created_at, "isoformat") else company.created_at,
-                    "updated_at": company.updated_at.isoformat() if company.updated_at and hasattr(company.updated_at, "isoformat") else company.updated_at
-                })
+            companies = await _load_project_form_companies(db)
         except Exception:
             companies = PROJECT_CREATE_MOCK_DATA["companies"]
-        
-        context = {
-            "request": request,
-            "companies": companies,
-            "current_user": current_user,
-            "error": "Name and Company are required fields"
-        }
+
+        context = _build_project_form_context(
+            request,
+            current_user,
+            companies=companies,
+            project={"name": name, "company_id": company_id, "status": status},
+            error="Name and Company are required fields",
+        )
         return templates.TemplateResponse("projects/form.html", context)
     
     try:
@@ -447,32 +405,18 @@ async def project_create_post(
         
     except Exception as e:
         logger.error("project_create_error", error=str(e), exc_info=True)
-        # If creation fails, return to form with error
         try:
-            # Query companies directly from database
-            companies_query = select(Company).order_by(Company.created_at.desc())
-            companies_result = await db.execute(companies_query)
-            companies_db = companies_result.scalars().all()
-            
-            companies = []
-            for company in companies_db:
-                companies.append({
-                    "id": company.id,
-                    "name": company.name,
-                    "contact_email": company.contact_email,
-                    "status": company.status,
-                    "created_at": company.created_at.isoformat() if company.created_at and hasattr(company.created_at, "isoformat") else company.created_at,
-                    "updated_at": company.updated_at.isoformat() if company.updated_at and hasattr(company.updated_at, "isoformat") else company.updated_at
-                })
+            companies = await _load_project_form_companies(db)
         except Exception:
             companies = PROJECT_CREATE_MOCK_DATA["companies"]
-        
-        context = {
-            "request": request,
-            "companies": companies,
-            "current_user": current_user,
-            "error": f"Failed to create project: {str(e)}"
-        }
+
+        context = _build_project_form_context(
+            request,
+            current_user,
+            companies=companies,
+            project={"name": name, "company_id": company_id, "status": status},
+            error=f"Failed to create project: {str(e)}",
+        )
         return templates.TemplateResponse("projects/form.html", context)
 
 @router.post("/projects/{project_id}", response_class=HTMLResponse)
@@ -483,13 +427,9 @@ async def project_update_post(
     db: AsyncSession = Depends(get_html_db)
 ):
     """Handle project update form submission."""
-    if not current_user:
-        # Redirect to login page if user is not authenticated
-        return RedirectResponse(url="/admin/login", status_code=303)
-    
-    if not current_user.is_active:
-        # Redirect to login page if user is not active
-        return RedirectResponse(url="/admin/login", status_code=303)
+    redirect = require_active_user(current_user)
+    if redirect:
+        return redirect
     
     # Get form data
     form_data = await request.form()
@@ -498,33 +438,18 @@ async def project_update_post(
     status = form_data.get("status", "active")
     
     if not name or not company_id:
-        # If validation fails, return to form with error
         try:
-            # Query companies directly from database
-            companies_query = select(Company).order_by(Company.created_at.desc())
-            companies_result = await db.execute(companies_query)
-            companies_db = companies_result.scalars().all()
-            
-            companies = []
-            for company in companies_db:
-                companies.append({
-                    "id": company.id,
-                    "name": company.name,
-                    "contact_email": company.contact_email,
-                    "status": company.status,
-                    "created_at": company.created_at.isoformat() if company.created_at and hasattr(company.created_at, "isoformat") else company.created_at,
-                    "updated_at": company.updated_at.isoformat() if company.updated_at and hasattr(company.updated_at, "isoformat") else company.updated_at
-                })
+            companies = await _load_project_form_companies(db)
         except Exception:
             companies = PROJECT_CREATE_MOCK_DATA["companies"]
-        
-        context = {
-            "request": request,
-            "companies": companies,
-            "current_user": current_user,
-            "project": {"id": project_id, "name": name, "company_id": company_id, "status": status},
-            "error": "Name and Company are required fields"
-        }
+
+        context = _build_project_form_context(
+            request,
+            current_user,
+            companies=companies,
+            project={"id": project_id, "name": name, "company_id": company_id, "status": status},
+            error="Name and Company are required fields",
+        )
         return templates.TemplateResponse("projects/form.html", context)
     
     try:
@@ -558,28 +483,18 @@ async def project_update_post(
         
     except Exception as e:
         logger.error("project_update_error", project_id=project_id, error=str(e), exc_info=True)
-        # If update fails, return to form with error
         try:
-            from app.api.routes.companies import list_companies
-            companies_result = await list_companies(
-                page=1,
-                page_size=100,
-                search=None,
-                status=None,
-                db=db,
-                current_user=current_user
-            )
-            companies = [_pydantic_to_dict(item) for item in companies_result.items]
+            companies = await _load_project_form_companies(db)
         except Exception:
             companies = PROJECT_CREATE_MOCK_DATA["companies"]
-        
-        context = {
-            "request": request,
-            "companies": companies,
-            "current_user": current_user,
-            "project": {"id": project_id, "name": name, "company_id": company_id, "status": status},
-            "error": f"Failed to update project: {str(e)}"
-        }
+
+        context = _build_project_form_context(
+            request,
+            current_user,
+            companies=companies,
+            project={"id": project_id, "name": name, "company_id": company_id, "status": status},
+            error=f"Failed to update project: {str(e)}",
+        )
         return templates.TemplateResponse("projects/form.html", context)
 
 @router.delete("/projects/{project_id}")

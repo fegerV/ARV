@@ -9,7 +9,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 from functools import wraps
 import structlog
-from datetime import datetime
+from datetime import datetime, timezone
 import traceback
 
 from prometheus_client import Counter, Histogram, Gauge
@@ -17,6 +17,10 @@ from prometheus_client import Counter, Histogram, Gauge
 from app.core.config import settings
 
 logger = structlog.get_logger()
+
+
+def _utcnow_iso() -> str:
+    return datetime.now(timezone.utc).replace(tzinfo=None).isoformat()
 
 class CircuitState(Enum):
     CLOSED = "closed"      # Normal operation
@@ -326,7 +330,13 @@ class HealthChecker:
         self.lock = asyncio.Lock()
         
         # Background monitoring task
-        asyncio.create_task(self._monitoring_loop())
+        self._monitoring_task = None
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            loop = None
+        if loop is not None:
+            self._monitoring_task = loop.create_task(self._monitoring_loop())
     
     def register_check(self, health_check: HealthCheck) -> None:
         """Register a health check."""
@@ -348,7 +358,7 @@ class HealthChecker:
                 results[name] = {
                     'status': HealthStatus.UNKNOWN.value,
                     'error': 'Health check not found',
-                    'timestamp': datetime.utcnow().isoformat()
+                    'timestamp': _utcnow_iso()
                 }
                 continue
             
@@ -388,7 +398,7 @@ class HealthChecker:
                     'message': message,
                     'details': details,
                     'duration': duration,
-                    'timestamp': datetime.utcnow().isoformat()
+                    'timestamp': _utcnow_iso()
                 }
                 
                 # Update metrics
@@ -403,7 +413,7 @@ class HealthChecker:
                     'status': HealthStatus.UNHEALTHY.value,
                     'error': f'Health check timed out after {health_check.timeout}s',
                     'duration': health_check.timeout,
-                    'timestamp': datetime.utcnow().isoformat()
+                    'timestamp': _utcnow_iso()
                 }
                 
                 HEALTH_CHECK_STATUS.labels(
@@ -417,7 +427,7 @@ class HealthChecker:
                     'error': str(e),
                     'traceback': traceback.format_exc(),
                     'duration': time.time() - start_time,
-                    'timestamp': datetime.utcnow().isoformat()
+                    'timestamp': _utcnow_iso()
                 }
                 
                 HEALTH_CHECK_STATUS.labels(
@@ -481,7 +491,7 @@ class HealthChecker:
                 'critical_failures': critical_failures,
                 'degraded_checks': degraded_checks
             },
-            'timestamp': datetime.utcnow().isoformat()
+            'timestamp': _utcnow_iso()
         }
     
     async def _monitoring_loop(self):
@@ -664,7 +674,7 @@ class ReliabilityService:
         stats = {
             'circuit_breakers': {},
             'health_status': await self.health_checker.get_overall_health(),
-            'timestamp': datetime.utcnow().isoformat()
+            'timestamp': _utcnow_iso()
         }
         
         # Circuit breaker stats
@@ -718,8 +728,8 @@ def reliable(
         @wraps(func)
         async def wrapper(*args, **kwargs):
             return await reliability_service.reliable_call(
-                service_name=service_name,
-                func=func,
+                service_name,
+                func,
                 *args,
                 circuit_breaker_config=circuit_breaker_config,
                 retry_config=retry_config,

@@ -65,6 +65,7 @@ class ThumbnailResult:
     file_size: Optional[int] = None
     generation_time: Optional[float] = None
     cache_hit: bool = False
+    error_message: Optional[str] = None
 
 # Prometheus metrics
 THUMBNAIL_GENERATION_COUNT = Counter(

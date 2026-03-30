@@ -9,6 +9,7 @@ import android.view.View
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
+import androidx.camera.core.Camera
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.ImageProxy
@@ -45,7 +46,9 @@ class QrScannerActivity : AppCompatActivity() {
     private lateinit var cameraExecutor: ExecutorService
     private lateinit var barcodeScanner: BarcodeScanner
     
+    private var camera: Camera? = null
     private var isProcessing = false
+    private var isFlashEnabled = false
     private var lastInvalidQrShownTime = 0L
     private var lastInvalidQrContent: String? = null
 
@@ -73,6 +76,8 @@ class QrScannerActivity : AppCompatActivity() {
         barcodeScanner = BarcodeScanning.getClient(options)
 
         binding.buttonClose.setOnClickListener { finish() }
+        binding.buttonToggleFlash.setOnClickListener { toggleFlash() }
+        updateFlashButton()
 
         if (hasCameraPermission()) {
             startCamera()
@@ -119,12 +124,13 @@ class QrScannerActivity : AppCompatActivity() {
 
             try {
                 cameraProvider.unbindAll()
-                cameraProvider.bindToLifecycle(
+                camera = cameraProvider.bindToLifecycle(
                     this,
                     cameraSelector,
                     preview,
                     imageAnalyzer
                 )
+                updateFlashButton()
             } catch (e: Exception) {
                 Log.e(TAG, "Ошибка привязки камеры", e)
                 Toast.makeText(this, getString(R.string.camera_error), Toast.LENGTH_LONG).show()
@@ -209,12 +215,34 @@ class QrScannerActivity : AppCompatActivity() {
             binding.panelProcessing.visibility = View.VISIBLE
         }
 
-        // Возвращаем результат в MainActivity
+        // Return the scan result to MainActivity.
         val resultIntent = Intent().apply {
             putExtra(EXTRA_UNIQUE_ID, uniqueId)
         }
         setResult(RESULT_OK, resultIntent)
         finish()
+    }
+
+    private fun toggleFlash() {
+        val camera = camera ?: return
+        if (!camera.cameraInfo.hasFlashUnit()) {
+            Toast.makeText(this, getString(R.string.flash_not_available), Toast.LENGTH_SHORT).show()
+            binding.buttonToggleFlash.isEnabled = false
+            return
+        }
+
+        isFlashEnabled = !isFlashEnabled
+        camera.cameraControl.enableTorch(isFlashEnabled)
+        updateFlashButton()
+    }
+
+    private fun updateFlashButton() {
+        val hasFlashUnit = camera?.cameraInfo?.hasFlashUnit() == true
+        binding.buttonToggleFlash.isEnabled = hasFlashUnit
+        binding.buttonToggleFlash.alpha = if (hasFlashUnit) 1f else 0.6f
+        binding.buttonToggleFlash.text = getString(
+            if (isFlashEnabled) R.string.toggle_flash_off else R.string.toggle_flash_on
+        )
     }
 
     companion object {

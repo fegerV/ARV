@@ -1,6 +1,7 @@
 package ru.neuroimagen.arviewer.util
 
 import android.net.Uri
+import java.net.URI
 
 /**
  * Single source of truth for parsing AR content unique_id from various inputs.
@@ -27,7 +28,7 @@ object UniqueIdParser {
         val trimmed = input.trim()
         if (UUID_REGEX.matches(trimmed)) return trimmed
         return try {
-            parseFromUri(Uri.parse(trimmed))
+            parseFromUriString(trimmed)
         } catch (_: Exception) {
             null
         }
@@ -39,9 +40,37 @@ object UniqueIdParser {
      * @return unique_id or null if the URI does not match any known pattern
      */
     fun parseFromUri(uri: Uri): String? {
-        return when (uri.scheme) {
-            "arv" -> parseArvScheme(uri)
-            "https", "http" -> parseHttpScheme(uri)
+        return parseUriComponents(
+            scheme = uri.scheme,
+            host = uri.host,
+            pathSegments = uri.pathSegments,
+            path = uri.path,
+        )
+    }
+
+    private fun parseFromUriString(value: String): String? {
+        val uri = URI(value)
+        return parseUriComponents(
+            scheme = uri.scheme,
+            host = uri.host,
+            pathSegments = uri.path
+                ?.trim('/')
+                ?.split('/')
+                ?.filter { it.isNotBlank() }
+                .orEmpty(),
+            path = uri.path,
+        )
+    }
+
+    private fun parseUriComponents(
+        scheme: String?,
+        host: String?,
+        pathSegments: List<String>,
+        path: String?,
+    ): String? {
+        return when (scheme) {
+            "arv" -> parseArvScheme(host, pathSegments, path)
+            "https", "http" -> parseHttpScheme(host, pathSegments)
             else -> null
         }
     }
@@ -57,19 +86,19 @@ object UniqueIdParser {
 
     // ── Private helpers ──────────────────────────────────────────────
 
-    private fun parseArvScheme(uri: Uri): String? {
-        return if (uri.host == "view") {
-            uri.pathSegments.firstOrNull()?.takeIf { UUID_REGEX.matches(it) }
-                ?: uri.path?.trimStart('/')?.takeIf { UUID_REGEX.matches(it) }
+    private fun parseArvScheme(host: String?, pathSegments: List<String>, path: String?): String? {
+        return if (host == "view") {
+            pathSegments.firstOrNull()?.takeIf { UUID_REGEX.matches(it) }
+                ?: path?.trimStart('/')?.takeIf { UUID_REGEX.matches(it) }
         } else {
-            uri.host?.takeIf { UUID_REGEX.matches(it) }
-                ?: uri.pathSegments.firstOrNull()?.takeIf { UUID_REGEX.matches(it) }
+            host?.takeIf { UUID_REGEX.matches(it) }
+                ?: pathSegments.firstOrNull()?.takeIf { UUID_REGEX.matches(it) }
         }
     }
 
-    private fun parseHttpScheme(uri: Uri): String? {
-        if (uri.host != EXPECTED_HOST) return null
-        val segments = uri.pathSegments
+    private fun parseHttpScheme(host: String?, pathSegments: List<String>): String? {
+        if (host != EXPECTED_HOST) return null
+        val segments = pathSegments
         return if (segments.size >= 2 && segments[0] == "view") {
             segments[1].takeIf { UUID_REGEX.matches(it) }
         } else {

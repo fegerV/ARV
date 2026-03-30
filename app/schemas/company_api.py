@@ -74,7 +74,7 @@ class CompanyLinks(BaseModel):
 class CompanyListItem(BaseModel):
     """Schema for company list item response."""
 
-    model_config = ConfigDict(from_attributes=True)
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
 
     id: str
     name: str
@@ -83,13 +83,13 @@ class CompanyListItem(BaseModel):
     status: CompanyStatus
     projects_count: int = Field(..., description="Number of projects for this company")
     created_at: datetime
-    _links: CompanyLinks
+    links: CompanyLinks = Field(..., alias="_links", serialization_alias="_links")
 
 
 class CompanyDetail(BaseModel):
     """Schema for detailed company response."""
 
-    model_config = ConfigDict(from_attributes=True)
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
 
     id: str
     name: str
@@ -100,7 +100,7 @@ class CompanyDetail(BaseModel):
     projects_count: int = Field(..., description="Number of projects for this company")
     ar_content_count: int = Field(..., description="Total AR content across all projects")
     created_at: datetime
-    _links: CompanyLinks
+    links: CompanyLinks = Field(..., alias="_links", serialization_alias="_links")
 
 
 class PaginatedCompaniesResponse(BaseModel):

@@ -31,7 +31,7 @@ import javax.inject.Singleton
 class ViewerRepository @Inject constructor(
     private val api: ViewerApi,
     @ApplicationContext private val context: Context,
-) {
+) : ManifestLoader {
 
     private val backgroundScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
@@ -46,7 +46,7 @@ class ViewerRepository @Inject constructor(
      *
      * @return Result with [ViewerManifest] on success, or [ViewerError] on failure.
      */
-    suspend fun loadManifest(uniqueId: String, forceRefresh: Boolean = false): Result<ViewerManifest> {
+    override suspend fun loadManifest(uniqueId: String, forceRefresh: Boolean): Result<ViewerManifest> {
         val start = System.currentTimeMillis()
         val trimmed = uniqueId.trim()
         if (trimmed.isBlank()) {

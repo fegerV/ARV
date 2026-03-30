@@ -221,30 +221,38 @@ async def save_uploaded_video(upload_file: UploadFile, destination_path: Path) -
     # Check file size during upload
     total_size = 0
     
+    too_large = False
+
     try:
         with destination_path.open("wb") as f:
             while chunk := await upload_file.read(1024 * 1024):  # 1MB chunks
                 total_size += len(chunk)
                 if total_size > MAX_VIDEO_SIZE:
-                    if destination_path.exists():
-                        destination_path.unlink()
+                    too_large = True
                     logger.error(
                         "video_upload_too_large",
                         max_size_mb=MAX_VIDEO_SIZE // (1024 * 1024),
                         size_bytes=total_size,
                         path=str(destination_path),
                     )
-                    raise HTTPException(
-                        status_code=413,
-                        detail=f"Video file too large. Maximum size: {MAX_VIDEO_SIZE // (1024*1024)}MB"
-                    )
+                    break
                 f.write(chunk)
+        if too_large:
+            if destination_path.exists():
+                destination_path.unlink()
+            raise HTTPException(
+                status_code=413,
+                detail=f"Video file too large. Maximum size: {MAX_VIDEO_SIZE // (1024*1024)}MB"
+            )
     except HTTPException:
         raise
     except Exception as exc:
         # Clean up partial file on error
-        if destination_path.exists():
-            destination_path.unlink()
+        if destination_path.exists() and destination_path.is_file():
+            try:
+                destination_path.unlink()
+            except Exception:
+                logger.warning("video_partial_cleanup_failed", path=str(destination_path))
         logger.error("video_save_failed", error=str(exc), path=str(destination_path))
         raise HTTPException(status_code=500, detail=f"Failed to save video file: {str(exc)}")
 

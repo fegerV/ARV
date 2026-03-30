@@ -127,7 +127,7 @@ APK: `android/app/build/outputs/apk/debug/app-debug.apk`.
 
 **CI (GitHub Actions):**
 
-- Workflow: [.github/workflows/android.yml](../.github/workflows/android.yml).
+- Workflow: [.github/workflows/build-mobile.yml](../.github/workflows/build-mobile.yml).
 - Триггеры: push/PR в `main`, `develop`, ручной запуск.
 - Шаги: JDK 17, Android SDK 34, кэш Gradle, `./gradlew assembleDebug --no-daemon --stacktrace`, загрузка APK в артефакты (30 дней).
 

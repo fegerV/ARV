@@ -25,6 +25,47 @@ def _convert_data_for_template(data_dict):
     """Convert datetime and status fields for template rendering."""
     return serialize_fields(data_dict, "created_at", "updated_at")
 
+
+def _build_company_form_payload(
+    *,
+    company_id=None,
+    name: str = "",
+    contact_email: str | None = None,
+    status: str = "active",
+    storage_provider: str = "local",
+    yandex_connected: bool | None = None,
+) -> dict:
+    """Build normalized company payload for create/edit form template."""
+    payload = {
+        "name": name,
+        "contact_email": contact_email,
+        "status": status,
+        "storage_provider": storage_provider,
+    }
+    if company_id is not None:
+        payload["id"] = company_id
+    if yandex_connected is not None:
+        payload["yandex_connected"] = yandex_connected
+    return payload
+
+
+def _build_company_form_context(
+    request: Request,
+    current_user,
+    *,
+    company: dict | None = None,
+    error: str | None = None,
+) -> dict:
+    """Build shared template context for company form page."""
+    context = {
+        "request": request,
+        "company": company,
+        "current_user": current_user,
+    }
+    if error:
+        context["error"] = error
+    return context
+
 @router.get("/companies", response_class=HTMLResponse)
 async def companies_list(
     request: Request,
@@ -104,12 +145,12 @@ async def company_create(
     redirect = require_active_user(current_user)
     if redirect:
         return redirect
-    
-    context = {
-        "request": request,
-        "company": None,  # No company data for create form
-        "current_user": current_user
-    }
+
+    context = _build_company_form_context(
+        request,
+        current_user,
+        company=None,
+    )
     return templates.TemplateResponse("companies/form.html", context)
 
 @router.get("/companies/{company_id}", response_class=HTMLResponse)
@@ -134,12 +175,12 @@ async def company_detail(
             company_data["yandex_connected"] = bool(company_obj.yandex_disk_token)
     except Exception:
         company_data = {**MOCK_COMPANIES[0], "id": company_id}
-    
-    context = {
-        "request": request,
-        "company": company_data,
-        "current_user": current_user
-    }
+
+    context = _build_company_form_context(
+        request,
+        current_user,
+        company=company_data,
+    )
     return templates.TemplateResponse("companies/detail.html", context)
 
 @router.get("/companies/{company_id}/edit", response_class=HTMLResponse)
@@ -171,12 +212,12 @@ async def company_edit(
         raise
     except Exception:
         company_data = {**MOCK_COMPANIES[0], "id": company_id}
-    
-    context = {
-        "request": request,
-        "company": company_data,
-        "current_user": current_user
-    }
+
+    context = _build_company_form_context(
+        request,
+        current_user,
+        company=company_data,
+    )
     return templates.TemplateResponse("companies/form.html", context)
 
 @router.post("/companies", response_class=HTMLResponse)
@@ -198,13 +239,17 @@ async def company_create_post(
     storage_provider = form_data.get("storage_provider", "local").strip()
     
     if not name:
-        context = {
-            "request": request,
-            "company": {"name": name, "contact_email": contact_email, "status": status,
-                        "storage_provider": storage_provider},
-            "current_user": current_user,
-            "error": "Name is required field"
-        }
+        context = _build_company_form_context(
+            request,
+            current_user,
+            company=_build_company_form_payload(
+                name=name,
+                contact_email=contact_email,
+                status=status,
+                storage_provider=storage_provider,
+            ),
+            error="Name is required field",
+        )
         return templates.TemplateResponse("companies/form.html", context)
     
     try:
@@ -235,13 +280,17 @@ async def company_create_post(
         
     except Exception as e:
         logger.error("company_create_error", error=str(e), exc_info=True)
-        context = {
-            "request": request,
-            "company": {"name": name, "contact_email": contact_email, "status": status,
-                        "storage_provider": storage_provider},
-            "current_user": current_user,
-            "error": f"Failed to create company: {str(e)}"
-        }
+        context = _build_company_form_context(
+            request,
+            current_user,
+            company=_build_company_form_payload(
+                name=name,
+                contact_email=contact_email,
+                status=status,
+                storage_provider=storage_provider,
+            ),
+            error=f"Failed to create company: {str(e)}",
+        )
         return templates.TemplateResponse("companies/form.html", context)
 
 
@@ -314,13 +363,9 @@ async def company_update_post(
     db: AsyncSession = Depends(get_html_db)
 ):
     """Handle company update form submission."""
-    if not current_user:
-        # Redirect to login page if user is not authenticated
-        return RedirectResponse(url="/admin/login", status_code=303)
-    
-    if not current_user.is_active:
-        # Redirect to login page if user is not active
-        return RedirectResponse(url="/admin/login", status_code=303)
+    redirect = require_active_user(current_user)
+    if redirect:
+        return redirect
     
     # Get form data
     form_data = await request.form()
@@ -330,13 +375,18 @@ async def company_update_post(
     storage_provider = form_data.get("storage_provider", "local").strip()
     
     if not name:
-        context = {
-            "request": request,
-            "company": {"id": company_id, "name": name, "contact_email": contact_email,
-                        "status": status, "storage_provider": storage_provider},
-            "current_user": current_user,
-            "error": "Name is required field"
-        }
+        context = _build_company_form_context(
+            request,
+            current_user,
+            company=_build_company_form_payload(
+                company_id=company_id,
+                name=name,
+                contact_email=contact_email,
+                status=status,
+                storage_provider=storage_provider,
+            ),
+            error="Name is required field",
+        )
         return templates.TemplateResponse("companies/form.html", context)
     
     try:
@@ -360,11 +410,16 @@ async def company_update_post(
         return RedirectResponse(url="/companies", status_code=303)
         
     except Exception as e:
-        context = {
-            "request": request,
-            "company": {"id": company_id, "name": name, "contact_email": contact_email,
-                        "status": status, "storage_provider": storage_provider},
-            "current_user": current_user,
-            "error": f"Failed to update company: {str(e)}"
-        }
+        context = _build_company_form_context(
+            request,
+            current_user,
+            company=_build_company_form_payload(
+                company_id=company_id,
+                name=name,
+                contact_email=contact_email,
+                status=status,
+                storage_provider=storage_provider,
+            ),
+            error=f"Failed to update company: {str(e)}",
+        )
         return templates.TemplateResponse("companies/form.html", context)

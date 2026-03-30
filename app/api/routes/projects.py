@@ -347,7 +347,7 @@ async def update_project_general(
        raise HTTPException(status_code=404, detail="Project not found")
    
    # Update fields
-   update_data = project_data.dict(exclude_unset=True)
+   update_data = project_data.model_dump(exclude_unset=True)
    for field, value in update_data.items():
        setattr(project, field, value)
    
@@ -499,7 +499,7 @@ async def update_project(
         raise HTTPException(status_code=404, detail="Project does not belong to specified company")
     
     # Update fields
-    update_data = project_data.dict(exclude_unset=True)
+    update_data = project_data.model_dump(exclude_unset=True)
     for field, value in update_data.items():
         setattr(project, field, value)
     

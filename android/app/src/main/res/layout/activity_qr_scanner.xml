@@ -182,23 +182,5 @@
 
     </FrameLayout>
 
-    <!-- Processing Overlay -->
-    <FrameLayout
-        android:id="@+id/panel_processing"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:background="@color/camera_overlay"
-        android:visibility="gone"
-        android:clickable="true"
-        android:focusable="true">
-
-        <com.google.android.material.progressindicator.CircularProgressIndicator
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_gravity="center"
-            android:indeterminate="true"
-            app:indicatorColor="@color/primary"
-            app:indicatorSize="48dp" />
-    </FrameLayout>
 
 </androidx.coordinatorlayout.widget.CoordinatorLayout>

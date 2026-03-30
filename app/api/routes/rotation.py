@@ -43,7 +43,10 @@ def _sanitise_payload(payload: Dict[str, Any]) -> Dict[str, Any]:
                       "day_of_week", "day_of_month"):
             clean[key] = int(value) if value is not None else None
         elif key == "is_active":
-            clean[key] = bool(value)
+            if isinstance(value, str):
+                clean[key] = value.strip().lower() in ("1", "true", "yes", "on")
+            else:
+                clean[key] = bool(value)
         elif key == "video_sequence":
             if isinstance(value, list):
                 clean[key] = [int(v) for v in value if v is not None]

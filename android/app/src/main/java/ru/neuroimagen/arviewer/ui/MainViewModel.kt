@@ -4,16 +4,16 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.google.gson.Gson
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import ru.neuroimagen.arviewer.data.model.ViewerError
-import ru.neuroimagen.arviewer.data.model.ViewerManifest
-import ru.neuroimagen.arviewer.data.repository.ViewerRepository
-import ru.neuroimagen.arviewer.util.CrashReporter
+import ru.neuroimagen.arviewer.data.repository.ManifestLoader
+import ru.neuroimagen.arviewer.di.IoDispatcher
+import ru.neuroimagen.arviewer.util.CrashLogger
 import javax.inject.Inject
 
 /**
@@ -24,8 +24,10 @@ import javax.inject.Inject
  */
 @HiltViewModel
 class MainViewModel @Inject constructor(
-    private val repository: ViewerRepository,
+    private val repository: ManifestLoader,
     private val gson: Gson,
+    private val crashLogger: CrashLogger,
+    @IoDispatcher private val ioDispatcher: CoroutineDispatcher,
 ) : ViewModel() {
 
     /** Screen states for the main activity. */
@@ -68,7 +70,7 @@ class MainViewModel @Inject constructor(
         _uiState.value = UiState.Loading
 
         viewModelScope.launch {
-            val result = withContext(Dispatchers.IO) {
+            val result = withContext(ioDispatcher) {
                 repository.loadManifest(uniqueId, forceRefresh)
             }
             result.fold(
@@ -79,8 +81,8 @@ class MainViewModel @Inject constructor(
                     )
                 },
                 onFailure = { throwable ->
-                    CrashReporter.log("loadManifest failed for id=$uniqueId")
-                    CrashReporter.recordException(throwable)
+                    crashLogger.log("loadManifest failed for id=$uniqueId")
+                    crashLogger.recordException(throwable)
                     val viewerError = throwable as? ViewerError
                     val retryable = viewerError
                         ?.let { ViewerErrorMessages.isRetryable(it) }

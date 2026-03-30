@@ -2,7 +2,7 @@ from typing import List, Optional
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, UploadFile, File, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, and_, or_
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from app.core.database import get_db, AsyncSessionLocal
 from app.models.video import Video
@@ -35,6 +35,11 @@ import structlog
 _log = structlog.get_logger()
 
 _YADISK_PREFIX = "yadisk://"
+
+
+def _utcnow_naive() -> datetime:
+    """Return UTC now as naive datetime for DB/model consistency."""
+    return datetime.now(timezone.utc).replace(tzinfo=None)
 
 
 def _is_yadisk_path(path: str) -> bool:
@@ -196,13 +201,16 @@ async def regenerate_video_thumbnail(
 def parse_subscription_preset(preset: str) -> datetime:
     """Parse subscription preset like '1y', '2y' to datetime."""
     if preset == '1y':
-        return datetime.utcnow() + timedelta(days=365)
+        return _utcnow_naive() + timedelta(days=365)
     elif preset == '2y':
-        return datetime.utcnow() + timedelta(days=730)
+        return _utcnow_naive() + timedelta(days=730)
     else:
         # Try to parse as ISO date
         try:
-            return datetime.fromisoformat(preset.replace('Z', '+00:00'))
+            parsed = datetime.fromisoformat(preset.replace('Z', '+00:00'))
+            if parsed.tzinfo is not None:
+                return parsed.astimezone(timezone.utc).replace(tzinfo=None)
+            return parsed
         except ValueError:
             raise ValueError(f"Invalid subscription format: {preset}")
 
@@ -291,7 +299,7 @@ async def upload_videos(
         # Calculate subscription_end based on AR content duration_years
         subscription_end = None
         if ar_content.duration_years:
-            subscription_end = datetime.utcnow() + timedelta(
+            subscription_end = _utcnow_naive() + timedelta(
                 days=365 * ar_content.duration_years,
             )
 
@@ -442,7 +450,7 @@ async def list_videos(
             schedule_map.setdefault(schedule.video_id, []).append(schedule)
 
     video_responses = []
-    now = datetime.utcnow()
+    now = _utcnow_naive()
     for video in videos:
         schedules = schedule_map.get(video.id, [])
         
@@ -571,7 +579,7 @@ async def update_video_subscription(
         video.subscription_end = subscription_end
         
         # If subscription is already in the past, deactivate video
-        if subscription_end <= datetime.utcnow():
+        if subscription_end <= _utcnow_naive():
             video.is_active = False
             # If this was the active video, clear it
             if ar_content.active_video_id == video_uuid:

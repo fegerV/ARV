@@ -1,4 +1,5 @@
 import uuid
+import html
 from fastapi import APIRouter, Request, Depends, BackgroundTasks
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -23,7 +24,7 @@ from app.html.deps import get_html_db
 from app.api.routes.auth import get_current_user_optional
 from app.html.mock import MOCK_AR_CONTENT, AR_CONTENT_DETAIL_MOCK_DATA, PROJECT_CREATE_MOCK_DATA
 from app.html.templating import templates
-from app.html.utils import require_active_user, serialize_datetime
+from app.html.utils import require_active_user, serialize_datetime, serialize_nested
 from app.html.filters import storage_url
 from app.core.config import settings
 import structlog
@@ -54,6 +55,109 @@ def _resolve_yadisk_urls(data: dict, company_id=None) -> dict:
             data[field] = storage_url(value, company_id)
     return data
 
+
+def _js_safe_text(value) -> str:
+    """Return text safe to embed into JS-driven form data."""
+    if not value:
+        return ""
+    return html.escape(str(value), quote=True)
+
+
+def _project_to_form_dict(project, ar_content_count: int = 0) -> dict:
+    """Serialize project model for HTML form payloads."""
+    return {
+        "id": str(project.id),
+        "name": _js_safe_text(project.name),
+        "status": project.status,
+        "company_id": project.company_id,
+        "ar_content_count": ar_content_count,
+        "created_at": serialize_datetime(getattr(project, "created_at", None)),
+        "updated_at": serialize_datetime(getattr(project, "updated_at", None)),
+        "_links": {
+            "edit": f"/api/projects/{project.id}",
+            "delete": f"/api/projects/{project.id}",
+            "view_content": f"/api/projects/{project.id}/ar-content",
+        },
+    }
+
+
+def _to_form_js_items(items: list[dict], fields: tuple[str, ...]) -> list[dict]:
+    """Pick only JS-relevant fields and serialize nested date values."""
+    return [
+        {field: serialize_datetime(item.get(field)) for field in fields}
+        for item in items
+    ]
+
+
+async def _load_projects_for_ar_form(db: AsyncSession) -> list[dict]:
+    """Load all projects with AR-content counts for create/edit forms."""
+    from sqlalchemy import func
+    from app.models.project import Project
+    from app.models.company import Company
+
+    query = select(Project).join(Company)
+    result = await db.execute(query)
+    all_projects = result.scalars().all()
+
+    project_ids = [p.id for p in all_projects]
+    ar_counts: dict[int, int] = {}
+    if project_ids:
+        counts_stmt = (
+            select(ARContent.project_id, func.count(ARContent.id))
+            .where(ARContent.project_id.in_(project_ids))
+            .group_by(ARContent.project_id)
+        )
+        counts_result = await db.execute(counts_stmt)
+        ar_counts = {pid: cnt for pid, cnt in counts_result.all()}
+
+    return [_project_to_form_dict(project, ar_counts.get(project.id, 0)) for project in all_projects]
+
+
+async def _load_ar_form_reference_data(db: AsyncSession, current_user) -> tuple[list[dict], list[dict]]:
+    """Load companies and projects used by create/edit AR content forms."""
+    companies_result = await list_companies(
+        page=1,
+        page_size=100,
+        search=None,
+        status=None,
+        db=db,
+        current_user=current_user,
+    )
+    companies = [dict(item) for item in companies_result.items]
+    projects = await _load_projects_for_ar_form(db)
+    return companies, projects
+
+
+def _build_ar_form_context(
+    request: Request,
+    current_user,
+    *,
+    companies: list[dict],
+    projects: list[dict],
+    ar_content: dict | None = None,
+    error: str | None = None,
+) -> dict:
+    """Build shared template context for AR content forms."""
+    context = {
+        "request": request,
+        "companies": companies,
+        "projects": projects,
+        "companies_js": _to_form_js_items(
+            companies,
+            ("id", "name", "status", "contact_email", "created_at", "updated_at"),
+        ),
+        "projects_js": _to_form_js_items(
+            projects,
+            ("id", "name", "company_id", "status", "description", "created_at", "updated_at"),
+        ),
+        "current_user": current_user,
+    }
+    if ar_content is not None:
+        context["ar_content"] = ar_content
+    if error:
+        context["error"] = error
+    return context
+
 async def _load_video_details(ar_content_id: int, db: AsyncSession) -> tuple[list[dict], dict | None]:
     """Load videos for AR content with schedules and active video details."""
     now = datetime.utcnow()
@@ -70,8 +174,8 @@ async def _load_video_details(ar_content_id: int, db: AsyncSession) -> tuple[lis
         for schedule in schedules:
             schedule_map.setdefault(schedule.video_id, []).append({
                 "id": schedule.id,
-                "start_time": _serialize_datetime(schedule.start_time),
-                "end_time": _serialize_datetime(schedule.end_time),
+                "start_time": serialize_datetime(schedule.start_time),
+                "end_time": serialize_datetime(schedule.end_time),
                 "status": schedule.status,
                 "description": schedule.description,
             })
@@ -87,7 +191,7 @@ async def _load_video_details(ar_content_id: int, db: AsyncSession) -> tuple[lis
                 "preview_url": getattr(video, 'preview_url', None) or getattr(video, 'video_url', ''),
                 "is_active": getattr(video, 'is_active', False),
                 "rotation_type": getattr(video, 'rotation_type', None),
-                "subscription_end": _serialize_datetime(getattr(video, 'subscription_end', None)),
+                "subscription_end": serialize_datetime(getattr(video, 'subscription_end', None)),
                 "status": compute_video_status(video, now),
                 "days_remaining": compute_days_remaining(video, now),
                 "schedules_count": len(schedules_summary),
@@ -370,64 +474,7 @@ async def ar_content_create(
     if redirect:
         return redirect
     try:
-        # Query companies and projects using the API routes to ensure proper access control
-        from app.api.routes.companies import list_companies
-
-        # Get all companies and projects with proper access control
-        # Pass only the required parameters to avoid Query object binding issues
-        companies_result = await list_companies(
-            page=1,
-            page_size=100,
-            search=None,
-            status=None,
-            db=db,
-            current_user=current_user
-        )
-        companies = [dict(item) for item in companies_result.items]
-        
-        # Get all projects without filtering by company
-        from sqlalchemy import select
-        from app.models.project import Project
-        from app.models.ar_content import ARContent
-        from app.models.company import Company
-        from sqlalchemy import func
-        
-        # Direct SQL query to get all projects
-        query = select(Project).join(Company)
-        result = await db.execute(query)
-        all_projects = result.scalars().all()
-        
-        # Batch load AR content counts for all projects (avoid N+1)
-        project_ids = [p.id for p in all_projects]
-        ar_counts: dict[int, int] = {}
-        if project_ids:
-            counts_stmt = (
-                select(ARContent.project_id, func.count(ARContent.id))
-                .where(ARContent.project_id.in_(project_ids))
-                .group_by(ARContent.project_id)
-            )
-            counts_result = await db.execute(counts_stmt)
-            ar_counts = {pid: cnt for pid, cnt in counts_result.all()}
-
-        # Build projects data manually
-        projects = []
-        for project in all_projects:
-            project_dict = {
-                "id": str(project.id),
-                "name": project.name.replace('"', '"').replace("'", "&#x27;") if project.name else "",  # Защита от XSS и ошибок в JS
-                "status": project.status,
-                "company_id": project.company_id,
-                "ar_content_count": ar_counts.get(project.id, 0),
-                "created_at": project.created_at.isoformat() if hasattr(project.created_at, 'isoformat') else str(project.created_at) if project.created_at else None,
-                "updated_at": project.updated_at.isoformat() if hasattr(project.updated_at, 'isoformat') else str(project.updated_at) if project.updated_at else None,
-                "_links": {
-                    "edit": f"/api/projects/{project.id}",
-                    "delete": f"/api/projects/{project.id}",
-                    "view_content": f"/api/projects/{project.id}/ar-content"
-                }
-            }
-            projects.append(project_dict)
-
+        companies, projects = await _load_ar_form_reference_data(db, current_user)
         if settings.DEBUG and not companies:
             data = PROJECT_CREATE_MOCK_DATA
         else:
@@ -439,47 +486,14 @@ async def ar_content_create(
         if not settings.DEBUG:
             logger.exception("ar_content_create_data_failed", error=str(exc))
             raise
-        # fallback to mock data
         data = PROJECT_CREATE_MOCK_DATA
-    
-    # Create safe JavaScript versions of the data
-    companies_js = [
-        {
-            "id": company.get("id"),
-            "name": company.get("name"),
-            "status": company.get("status"),
-            "contact_email": company.get("contact_email"),
-            "created_at": (company.get("created_at").isoformat() if company.get("created_at") and hasattr(company.get("created_at"), "isoformat")
-                          else str(company.get("created_at")) if company.get("created_at") else None),
-            "updated_at": (company.get("updated_at").isoformat() if company.get("updated_at") and hasattr(company.get("updated_at"), "isoformat")
-                          else str(company.get("updated_at")) if company.get("updated_at") else None),
-        }
-        for company in data["companies"]
-    ]
-    
-    projects_js = [
-        {
-            "id": project.get("id"),
-            "name": project.get("name"),
-            "company_id": project.get("company_id"),
-            "status": project.get("status"),
-            "description": project.get("description", ""),  # description может отсутствовать
-            "created_at": (project.get("created_at").isoformat() if project.get("created_at") and hasattr(project.get("created_at"), "isoformat")
-                          else str(project.get("created_at")) if project.get("created_at") else None),
-            "updated_at": (project.get("updated_at").isoformat() if project.get("updated_at") and hasattr(project.get("updated_at"), "isoformat")
-                          else str(project.get("updated_at")) if project.get("updated_at") else None),
-        }
-        for project in data["projects"]
-    ]
-    
-    context = {
-        "request": request,
-        "companies": data["companies"],
-        "projects": data["projects"],
-        "companies_js": companies_js,
-        "projects_js": projects_js,
-        "current_user": current_user
-    }
+
+    context = _build_ar_form_context(
+        request,
+        current_user,
+        companies=data["companies"],
+        projects=data["projects"],
+    )
     return templates.TemplateResponse("ar-content/form.html", context)
 
 @router.get("/ar-content/{ar_content_id}/edit", response_class=HTMLResponse)
@@ -505,194 +519,29 @@ async def ar_content_edit(
             ar_content = result.__dict__
         else:
             ar_content = dict(result)
-
-        # Convert datetime objects to strings for template and JSON serialization
-        def convert_datetimes(obj):
-            if isinstance(obj, dict):
-                return {k: convert_datetimes(v) for k, v in obj.items()}
-            if isinstance(obj, list):
-                return [convert_datetimes(item) for item in obj]
-            if hasattr(obj, "isoformat"):  # datetime objects
-                return obj.isoformat()
-            return obj
-
-        ar_content = convert_datetimes(ar_content)
+        ar_content = serialize_nested(ar_content)
 
         # Get companies and projects
-        companies_task = list_companies(
-            page=1,
-            page_size=100,
-            search=None,
-            status=None,
-            db=db,
-            current_user=current_user,
-        )
-
-        # Get all projects without filtering by company for edit form as well
-        from sqlalchemy import select
-        from app.models.project import Project
-        from app.models.ar_content import ARContent
-        from app.models.company import Company
-        from sqlalchemy import func
-
-        # Direct SQL query to get all projects
-        query = select(Project).join(Company)
-        result = await db.execute(query)
-        all_projects = result.scalars().all()
-
-        # Batch load AR content counts for all projects (avoid N+1)
-        project_ids = [p.id for p in all_projects]
-        ar_counts_edit: dict[int, int] = {}
-        if project_ids:
-            counts_stmt = (
-                select(ARContent.project_id, func.count(ARContent.id))
-                .where(ARContent.project_id.in_(project_ids))
-                .group_by(ARContent.project_id)
-            )
-            counts_result = await db.execute(counts_stmt)
-            ar_counts_edit = {pid: cnt for pid, cnt in counts_result.all()}
-
-        # Build projects data manually
-        projects = []
-        for project in all_projects:
-            project_dict = {
-                "id": str(project.id),
-                "name": project.name.replace('"', '"').replace("'", "&#x27;")
-                if project.name
-                else "",  # Защита от XSS и ошибок в JS
-                "status": project.status,
-                "company_id": project.company_id,
-                "ar_content_count": ar_counts_edit.get(project.id, 0),
-                "created_at": project.created_at.isoformat()
-                if hasattr(project.created_at, "isoformat")
-                else str(project.created_at)
-                if project.created_at
-                else None,
-                "updated_at": project.updated_at.isoformat()
-                if hasattr(project.updated_at, "isoformat")
-                else str(project.updated_at)
-                if project.updated_at
-                else None,
-                "_links": {
-                    "edit": f"/api/projects/{project.id}",
-                    "delete": f"/api/projects/{project.id}",
-                    "view_content": f"/api/projects/{project.id}/ar-content",
-                },
-            }
-            projects.append(project_dict)
-
-        # Execute companies query
-        companies_result = await companies_task
-        companies = [dict(item) for item in companies_result.items]
-
-        # Create safe JavaScript versions of the data
-        companies_js = [
-            {
-                "id": company.get("id"),
-                "name": company.get("name"),
-                "status": company.get("status"),
-                "contact_email": company.get("contact_email"),
-                "created_at": (
-                    company.get("created_at").isoformat()
-                    if company.get("created_at")
-                    and hasattr(company.get("created_at"), "isoformat")
-                    else str(company.get("created_at"))
-                    if company.get("created_at")
-                    else None
-                ),
-                "updated_at": (
-                    company.get("updated_at").isoformat()
-                    if company.get("updated_at")
-                    and hasattr(company.get("updated_at"), "isoformat")
-                    else str(company.get("updated_at"))
-                    if company.get("updated_at")
-                    else None
-                ),
-            }
-            for company in companies
-        ]
-
-        projects_js = [
-            {
-                "id": project.get("id"),
-                "name": project.get("name"),
-                "company_id": project.get("company_id"),
-                "status": project.get("status"),
-                "description": project.get("description", ""),  # description может отсутствовать
-                "created_at": (
-                    project.get("created_at").isoformat()
-                    if project.get("created_at")
-                    and hasattr(project.get("created_at"), "isoformat")
-                    else str(project.get("created_at"))
-                    if project.get("created_at")
-                    else None
-                ),
-                "updated_at": (
-                    project.get("updated_at").isoformat()
-                    if project.get("updated_at")
-                    and hasattr(project.get("updated_at"), "isoformat")
-                    else str(project.get("updated_at"))
-                    if project.get("updated_at")
-                    else None
-                ),
-            }
-            for project in projects
-        ]
+        companies, projects = await _load_ar_form_reference_data(db, current_user)
     except Exception as exc:
         if not settings.DEBUG:
             logger.exception("ar_content_edit_data_failed", error=str(exc))
             raise
         # fallback to mock data
-        ar_content = {**AR_CONTENT_DETAIL_MOCK_DATA, "id": ar_content_id}
+        ar_content = serialize_nested({**AR_CONTENT_DETAIL_MOCK_DATA, "id": ar_content_id})
         companies = PROJECT_CREATE_MOCK_DATA["companies"]
         projects = PROJECT_CREATE_MOCK_DATA["projects"]
-
-        # Create safe JavaScript versions of the mock data
-        companies_js = [
-            {
-                "id": company.get("id"),
-                "name": company.get("name"),
-                "status": company.get("status"),
-                "contact_email": company.get("contact_email"),
-                "created_at": str(company.get("created_at"))
-                if company.get("created_at")
-                else None,
-                "updated_at": str(company.get("updated_at"))
-                if company.get("updated_at")
-                else None,
-            }
-            for company in companies
-        ]
-
-        projects_js = [
-            {
-                "id": project.get("id"),
-                "name": project.get("name"),
-                "company_id": project.get("company_id"),
-                "status": project.get("status"),
-                "description": project.get("description", ""),  # description может отсутствовать
-                "created_at": str(project.get("created_at"))
-                if project.get("created_at")
-                else None,
-                "updated_at": str(project.get("updated_at"))
-                if project.get("updated_at")
-                else None,
-            }
-            for project in projects
-        ]
 
     # Resolve yadisk:// URLs for the edit form
     _resolve_yadisk_urls(ar_content, company_id=ar_content.get("company_id"))
 
-    context = {
-        "request": request,
-        "ar_content": ar_content,
-        "companies": companies,
-        "projects": projects,
-        "companies_js": companies_js,
-        "projects_js": projects_js,
-        "current_user": current_user,
-    }
+    context = _build_ar_form_context(
+        request,
+        current_user,
+        companies=companies,
+        projects=projects,
+        ar_content=ar_content,
+    )
     return templates.TemplateResponse("ar-content/form.html", context)
 
 @router.delete("/ar-content/{ar_content_id}")
@@ -768,19 +617,7 @@ async def ar_content_detail(
             ar_content = result.__dict__
         else:
             ar_content = dict(result)
-            
-        # Convert datetime objects to strings for template and JSON serialization
-        def convert_datetimes(obj):
-            if isinstance(obj, dict):
-                return {k: convert_datetimes(v) for k, v in obj.items()}
-            elif isinstance(obj, list):
-                return [convert_datetimes(item) for item in obj]
-            elif hasattr(obj, 'isoformat'):  # datetime objects
-                return obj.isoformat()
-            else:
-                return obj
-        
-        ar_content = convert_datetimes(ar_content)
+        ar_content = serialize_nested(ar_content)
 
         # Сразу задаём unique_id, unique_link и public_url (чтобы ссылка была даже при ошибках ниже)
         from app.utils.ar_content import build_unique_link
@@ -845,8 +682,8 @@ async def ar_content_detail(
                         "random_seed": getattr(rotation_schedule, 'random_seed', None),
                         "no_repeat_days": getattr(rotation_schedule, 'no_repeat_days', 1),
                         "is_active": getattr(rotation_schedule, 'is_active', True),
-                        "next_change_at": _serialize_datetime(getattr(rotation_schedule, 'next_change_at', None)),
-                        "last_changed_at": _serialize_datetime(getattr(rotation_schedule, 'last_changed_at', None)),
+                        "next_change_at": serialize_datetime(getattr(rotation_schedule, 'next_change_at', None)),
+                        "last_changed_at": serialize_datetime(getattr(rotation_schedule, 'last_changed_at', None)),
                         "notify_before_expiry_days": getattr(rotation_schedule, 'notify_before_expiry_days', 7),
                     }
                 except Exception as exc:
@@ -1053,15 +890,6 @@ async def ar_content_detail(
         
         # Create a simplified version for JavaScript serialization
         # Helper function to safely serialize datetime
-        def safe_serialize_datetime(value):
-            if value is None:
-                return None
-            if isinstance(value, str):
-                return value  # Already a string
-            if hasattr(value, "isoformat"):
-                return value.isoformat()
-            return str(value) if value else None
-        
         # Ensure unique_link and public_url are always set
         uid = ar_content.get("unique_id") or ""
         unique_link = ar_content.get("unique_link") or (f"/view/{uid}" if uid else "")
@@ -1100,8 +928,8 @@ async def ar_content_detail(
             "views_30_days": ar_content.get("views_30_days"),
             "active_video_title": ar_content.get("active_video_title"),
             "storage_path": ar_content.get("storage_path"),
-            "created_at": safe_serialize_datetime(ar_content.get("created_at")),
-            "updated_at": safe_serialize_datetime(ar_content.get("updated_at")),
+            "created_at": serialize_datetime(ar_content.get("created_at")),
+            "updated_at": serialize_datetime(ar_content.get("updated_at")),
         }
         
     except Exception as exc:
@@ -1253,49 +1081,19 @@ async def ar_content_create_post(
         
     except Exception as e:
         logger.error("ar_content_create_error", error=str(e), exc_info=True)
-        # Return to form with error
         try:
-            from app.api.routes.companies import list_companies
-
-            companies_result = await list_companies(
-                page=1,
-                page_size=100,
-                search=None,
-                status=None,
-                db=db,
-                current_user=current_user
-            )
-            companies = [dict(item) for item in companies_result.items]
-            
-            from sqlalchemy import select
-            from app.models.project import Project
-            from app.models.company import Company
-            
-            query = select(Project).join(Company)
-            result = await db.execute(query)
-            all_projects = result.scalars().all()
-            
-            projects = []
-            for project in all_projects:
-                projects.append({
-                    "id": str(project.id),
-                    "name": project.name,
-                    "status": project.status,
-                    "company_id": project.company_id,
-                })
+            companies, projects = await _load_ar_form_reference_data(db, current_user)
         except Exception:
             companies = []
             projects = []
-        
-        context = {
-            "request": request,
-            "companies": companies,
-            "projects": projects,
-            "companies_js": companies,
-            "projects_js": projects,
-            "current_user": current_user,
-            "error": f"Failed to create AR content: {str(e)}"
-        }
+
+        context = _build_ar_form_context(
+            request,
+            current_user,
+            companies=companies,
+            projects=projects,
+            error=f"Failed to create AR content: {str(e)}",
+        )
         return templates.TemplateResponse("ar-content/form.html", context)
 
 
