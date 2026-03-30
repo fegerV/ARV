@@ -15,6 +15,7 @@ from fastapi import FastAPI, Request
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 import structlog
+from starlette.responses import Response
 
 logger = structlog.get_logger()
 
@@ -79,6 +80,21 @@ limiter = Limiter(
 )
 
 
+async def _call_next_with_disconnect_guard(request: Request, call_next) -> Response:
+    """Suppress noisy middleware tracebacks when the client disconnects early."""
+    try:
+        return await call_next(request)
+    except RuntimeError as exc:
+        if str(exc) == "No response returned." and await request.is_disconnected():
+            logger.warning(
+                "client_disconnected_before_response",
+                path=request.url.path,
+                client_ip=_get_real_ip(request),
+            )
+            return Response(status_code=204)
+        raise
+
+
 # ── Setup ────────────────────────────────────────────────────────────
 
 def setup_rate_limiting(app: FastAPI) -> None:
@@ -93,7 +109,7 @@ def setup_rate_limiting(app: FastAPI) -> None:
         if not cached or (time.monotonic() - cached[1]) >= _CACHE_TTL:
             await _refresh_rate_limit_cache()
 
-        response = await call_next(request)
+        response = await _call_next_with_disconnect_guard(request, call_next)
         response.headers["X-Client-IP"] = _get_real_ip(request)
         return response
 
