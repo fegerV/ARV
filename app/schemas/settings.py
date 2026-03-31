@@ -108,7 +108,7 @@ class ARSettings(BaseModel):
     thumbnail_quality: int = 80
     video_processing_enabled: bool = True
     default_ar_viewer_theme: str = "default"
-    qr_code_expiration_days: int = 365
+    default_content_lifetime_years: int = 30
     
 class BackupSettings(BaseModel):
     """Database backup configuration."""

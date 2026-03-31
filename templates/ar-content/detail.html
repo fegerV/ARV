@@ -140,6 +140,7 @@ document.addEventListener('alpine:init', function() {
         rotationScheduleForm: {
             rotation_type: 'fixed',
             default_video_id: null,
+            date_rules: [],
             video_sequence_text: '',
             no_repeat_days: 1,
             notify_before_expiry_days: 7,
@@ -1086,6 +1087,140 @@ document.addEventListener('alpine:init', function() {
             }
         }
     });
+});
+</script>
+
+<script>
+document.addEventListener('alpine:init', function() {
+    const store = Alpine.store('arContentDetail');
+    if (!store) return;
+
+    store.getActiveVideoSourceLabel = function() {
+        const source = this.activeVideoInfo?.source;
+        if (source === 'schedule') return 'Источник: расписание';
+        if (source === 'date_rule') return 'Источник: особая дата';
+        if (source === 'rotation_rule') return 'Источник: правило ротации';
+        if (source === 'rotation') return 'Источник: ротация';
+        if (source === 'active_default') return 'Источник: активное видео';
+        if (source === 'fallback') return 'Источник: запасное видео';
+        return this.activeVideo ? 'Источник: вручную' : '';
+    };
+
+    store.normalizeDateRules = function(rules) {
+        if (!Array.isArray(rules) || !rules.length) return [];
+        return rules.map(rule => ({
+            date: rule?.date ? String(rule.date).slice(0, 10) : '',
+            video_id: rule?.video_id ? String(rule.video_id) : '',
+            recurring: !!rule?.recurring,
+        }));
+    };
+
+    store.addDateRule = function() {
+        if (!Array.isArray(this.rotationScheduleForm.date_rules)) {
+            this.rotationScheduleForm.date_rules = [];
+        }
+        this.rotationScheduleForm.date_rules.push({ date: '', video_id: '', recurring: false });
+    };
+
+    store.removeDateRule = function(index) {
+        if (!Array.isArray(this.rotationScheduleForm.date_rules)) {
+            this.rotationScheduleForm.date_rules = [];
+            return;
+        }
+        this.rotationScheduleForm.date_rules.splice(index, 1);
+    };
+
+    store.formatDateRulesSummary = function(rules) {
+        if (!Array.isArray(rules) || !rules.length) return '—';
+        const parts = rules.slice(0, 3).map(rule => {
+            const date = rule?.date ? String(rule.date).slice(0, 10) : '—';
+            const title = rule?.video_id ? this.getVideoTitle(Number(rule.video_id)) : 'видео не выбрано';
+            return `${date}: ${title}${rule?.recurring ? ' (ежегодно)' : ''}`;
+        });
+        if (rules.length > 3) parts.push(`+${rules.length - 3}`);
+        return parts.join(', ');
+    };
+
+    const originalInitRotationScheduleForm = store.initRotationScheduleForm?.bind(store);
+    store.initRotationScheduleForm = function() {
+        if (originalInitRotationScheduleForm) originalInitRotationScheduleForm();
+        this.rotationScheduleForm = {
+            ...this.rotationScheduleForm,
+            date_rules: this.normalizeDateRules(this.rotationSchedule?.date_rules || this.rotationScheduleForm?.date_rules || []),
+        };
+    };
+
+    store.saveRotationSchedule = async function() {
+        this.savingRotationSchedule = true;
+        try {
+            const formType = this.rotationScheduleForm.rotation_type;
+            let defaultVideoId = this.rotationScheduleForm.default_video_id;
+            defaultVideoId = (defaultVideoId && defaultVideoId !== '' && defaultVideoId !== 'null')
+                ? parseInt(defaultVideoId, 10)
+                : null;
+
+            const payload = {
+                rotation_type: formType,
+                default_video_id: defaultVideoId,
+                no_repeat_days: parseInt(this.rotationScheduleForm.no_repeat_days, 10) || 1,
+                notify_before_expiry_days: parseInt(this.rotationScheduleForm.notify_before_expiry_days, 10) || 7,
+                is_active: !!this.rotationScheduleForm.is_active,
+            };
+
+            if (formType === 'date_specific') {
+                payload.date_rules = (this.rotationScheduleForm.date_rules || [])
+                    .map(rule => ({
+                        date: (rule?.date || '').trim(),
+                        video_id: rule?.video_id ? parseInt(rule.video_id, 10) : null,
+                        recurring: !!rule?.recurring,
+                    }))
+                    .filter(rule => rule.date && rule.video_id);
+                if (!payload.date_rules.length) {
+                    this.showToast('Добавьте хотя бы одно правило по дате', 'error');
+                    return;
+                }
+            } else {
+                payload.date_rules = [];
+            }
+
+            if (formType === 'daily_cycle' || formType === 'weekly_cycle' || formType === 'random_daily') {
+                const text = this.rotationScheduleForm.video_sequence_text || '';
+                payload.video_sequence = text
+                    .split(',')
+                    .map(id => parseInt(id.trim(), 10))
+                    .filter(id => !isNaN(id) && id > 0);
+                if (payload.video_sequence.length === 0) {
+                    payload.video_sequence = this.videos.map(v => v.id);
+                }
+            } else {
+                payload.video_sequence = [];
+            }
+
+            const url = this.rotationSchedule
+                ? `/api/rotation/${this.rotationSchedule.id}`
+                : `/api/rotation/ar-content/${this.arContent.id}`;
+
+            const method = this.rotationSchedule ? 'PUT' : 'POST';
+            const response = await this.request(url, {
+                method: method,
+                body: JSON.stringify(payload),
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({}));
+                throw new Error(errorData.detail || errorData.message || 'Не удалось сохранить расписание');
+            }
+
+            this.showToast('Расписание сохранено', 'success');
+            this.showRotationScheduleDialog = false;
+            setTimeout(() => { window.location.reload(); }, 800);
+        } catch (error) {
+            this.showToast('Ошибка: ' + error.message, 'error');
+            console.error('Rotation schedule save error:', error);
+        } finally {
+            this.savingRotationSchedule = false;
+        }
+    };
 });
 </script>
 

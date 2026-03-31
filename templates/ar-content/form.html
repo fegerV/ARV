@@ -7,6 +7,7 @@
 <script type="application/json" id="companies-data">{{ companies_js | tojson }}</script>
 <script type="application/json" id="projects-data">{{ projects_js | tojson }}</script>
 <script type="application/json" id="ar-content-data">{{ ar_content | tojson if ar_content else 'null' }}</script>
+<script type="application/json" id="ar-content-default-duration">{{ default_duration_years | default(30) | tojson }}</script>
 
 <div x-data="arContentForm()" x-init="init()" @photo-selected.window="hasNewPhoto = $event.detail" @video-selected.window="hasNewVideo = $event.detail">
     <div class="max-w-4xl mx-auto">
@@ -34,6 +35,7 @@ function arContentForm() {
     const companies = JSON.parse(document.getElementById('companies-data')?.textContent || '[]');
     const allProjects = JSON.parse(document.getElementById('projects-data')?.textContent || '[]');
     const arContent = JSON.parse(document.getElementById('ar-content-data')?.textContent || 'null');
+    const defaultDurationYears = JSON.parse(document.getElementById('ar-content-default-duration')?.textContent || '30');
     const selectedCompany = arContent?.company_id ? String(arContent.company_id) : '';
     const selectedProject = arContent?.project_id ? String(arContent.project_id) : '';
 
@@ -47,7 +49,7 @@ function arContentForm() {
         customerName: arContent?.customer_name ? String(arContent.customer_name) : '',
         customerPhone: arContent?.customer_phone ? String(arContent.customer_phone) : '',
         customerEmail: arContent?.customer_email ? String(arContent.customer_email) : '',
-        durationYears: arContent?.duration_years ? String(arContent.duration_years) : '30',
+        durationYears: arContent?.duration_years ? String(arContent.duration_years) : String(defaultDurationYears || 30),
         hasNewPhoto: false,
         hasNewVideo: false,
         loading: false,

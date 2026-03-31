@@ -240,7 +240,7 @@ async def update_ar_settings(
     thumbnail_quality: int = Form(80),
     video_processing_enabled: str = Form("on"),
     default_ar_viewer_theme: str = Form("default"),
-    qr_code_expiration_days: int = Form(365),
+    default_content_lifetime_years: int = Form(30),
 ):
     """Save AR content settings. MindAR max-features preserved from DB."""
     redirect = require_active_user(current_user)
@@ -259,7 +259,7 @@ async def update_ar_settings(
                 thumbnail_quality=thumbnail_quality,
                 video_processing_enabled=(video_processing_enabled == "on"),
                 default_ar_viewer_theme=default_ar_viewer_theme,
-                qr_code_expiration_days=qr_code_expiration_days,
+                default_content_lifetime_years=max(1, default_content_lifetime_years),
             )
         )
         return await _render_settings(

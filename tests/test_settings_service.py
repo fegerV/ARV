@@ -327,7 +327,7 @@ async def test_get_all_settings_combines_defaults_and_db_values():
                 thumbnail_quality=90,
                 video_processing_enabled=False,
                 default_ar_viewer_theme="light",
-                qr_code_expiration_days=90,
+                default_content_lifetime_years=30,
             ),
             [
                 ("mindar_max_features", 1500, "integer", "ar"),
@@ -335,7 +335,8 @@ async def test_get_all_settings_combines_defaults_and_db_values():
                 ("thumbnail_quality", 90, "integer", "ar"),
                 ("video_processing_enabled", False, "boolean", "ar"),
                 ("default_ar_viewer_theme", "light", "string", "ar"),
-                ("qr_code_expiration_days", 90, "integer", "ar"),
+                ("default_subscription_years", 30, "integer", "general"),
+                ("qr_code_expiration_days", 10950, "integer", "ar"),
             ],
         ),
         (

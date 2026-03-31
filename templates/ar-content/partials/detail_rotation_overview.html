@@ -5,7 +5,7 @@
             <h3 class="text-xl font-semibold text-gray-900 dark:text-white">Расписание ротации видео</h3>
         </div>
         <p class="text-sm text-gray-600 dark:text-gray-400">
-            Настройте автоматическую ротацию видео. По умолчанию используется одно активное видео на весь срок действия.
+            Здесь настраиваются правила на конкретные даты, праздники и циклы. Если расписание активно, оно имеет приоритет над базовым режимом воспроизведения.
         </p>
     </div>
     <button @click="showRotationScheduleDialog = true" class="btn btn-primary">
@@ -24,14 +24,14 @@
                     Расписание не настроено
                 </h4>
                 <p class="text-sm text-blue-800 dark:text-blue-200 mb-3">
-                    По умолчанию используется <strong>фиксированное видео</strong>. Система автоматически выберет активное видео, которое будет проигрываться бессрочно.
+                    Если расписание не создано, используется базовое активное видео из блока «Режим воспроизведения». Ссылка и QR при этом не меняются.
                 </p>
                 <div class="text-xs text-blue-700 dark:text-blue-300 space-y-1">
                     <p><strong>Как это работает:</strong></p>
                     <ul class="list-disc list-inside space-y-1 ml-2">
                         <li>Выберите активное видео кнопкой "Сделать активным" в списке видео</li>
-                        <li>Видео работает бессрочно до ручного отключения</li>
-                        <li>Для настройки ротации между несколькими видео нажмите "Создать расписание"</li>
+                        <li>Срок доступа к видео и контенту определяется сроком жизни заказа, обычно 30 лет</li>
+                        <li>Для особых дат вроде 31 декабря, праздников или набора дней нажмите "Создать расписание"</li>
                     </ul>
                 </div>
             </div>
@@ -57,6 +57,10 @@
                 <div x-show="rotationSchedule && rotationSchedule.default_video_id">
                     <div class="text-sm font-medium text-gray-500 dark:text-gray-300 mb-1">Видео по умолчанию</div>
                     <div class="text-gray-900 dark:text-white" x-text="getVideoTitle(rotationSchedule.default_video_id)"></div>
+                </div>
+                <div x-show="rotationSchedule && rotationSchedule.date_rules && rotationSchedule.date_rules.length">
+                    <div class="text-sm font-medium text-gray-500 dark:text-gray-300 mb-1">Особые даты</div>
+                    <div class="text-gray-900 dark:text-white" x-text="formatDateRulesSummary(rotationSchedule.date_rules)"></div>
                 </div>
                 <div x-show="rotationSchedule && rotationSchedule.next_change_at">
                     <div class="text-sm font-medium text-gray-500 dark:text-gray-300 mb-1">Следующее изменение</div>

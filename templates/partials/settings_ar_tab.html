@@ -2,7 +2,7 @@
     <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
         <div class="px-6 py-5 border-b border-gray-200 dark:border-gray-700">
             <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Настройки AR-контента</h3>
-            <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">Генерация маркеров, обработка видео и параметры QR-кодов</p>
+            <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">Генерация маркеров, обработка видео и срок доступа по ссылке / QR</p>
         </div>
 
         <form method="post" action="/settings/ar" class="p-6 space-y-6">
@@ -12,14 +12,14 @@
                     <input type="number" name="thumbnail_quality" id="thumbnail_quality"
                            value="{{ settings.ar.thumbnail_quality|default(80) }}"
                            min="10" max="100" step="5" class="form-input">
-                    <p class="text-xs text-gray-400 dark:text-gray-500 mt-1">JPEG-качество генерируемых превью</p>
+                    <p class="text-xs text-gray-400 dark:text-gray-500 mt-1">Качество thumbnail и preview-изображений для карточек и списков</p>
                 </div>
                 <div>
-                    <label for="qr_code_expiration_days" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Срок действия QR (дней)</label>
-                    <input type="number" name="qr_code_expiration_days" id="qr_code_expiration_days"
-                           value="{{ settings.ar.qr_code_expiration_days|default(365) }}"
-                           min="30" max="1825" class="form-input">
-                    <p class="text-xs text-gray-400 dark:text-gray-500 mt-1">365 = 1 год, 1825 = 5 лет</p>
+                    <label for="default_content_lifetime_years" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Срок работы ссылки и QR по умолчанию (лет)</label>
+                    <input type="number" name="default_content_lifetime_years" id="default_content_lifetime_years"
+                           value="{{ settings.ar.default_content_lifetime_years|default(settings.general.default_subscription_years|default(30)) }}"
+                           min="1" max="100" class="form-input">
+                    <p class="text-xs text-gray-400 dark:text-gray-500 mt-1">Для новых заказов. Рекомендуемое значение — 30 лет.</p>
                 </div>
             </div>
 
@@ -31,6 +31,11 @@
                     <option value="minimal" {% if settings.ar.default_ar_viewer_theme == 'minimal' %}selected{% endif %}>Минималистичная</option>
                     <option value="corporate" {% if settings.ar.default_ar_viewer_theme == 'corporate' %}selected{% endif %}>Корпоративная</option>
                 </select>
+            </div>
+
+            <div class="rounded-xl border border-blue-200 bg-blue-50 dark:bg-blue-900/20 dark:border-blue-800 p-4 text-sm text-blue-900 dark:text-blue-100">
+                <div class="font-medium mb-1">Как это работает</div>
+                <p>QR-код содержит постоянную ссылку на заказ. При смене видео ссылка и QR не меняются. Срок доступа определяется сроком жизни контента, а не отдельным сроком QR.</p>
             </div>
 
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">

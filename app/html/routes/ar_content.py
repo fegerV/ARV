@@ -27,6 +27,7 @@ from app.html.templating import templates
 from app.html.utils import require_active_user, serialize_datetime, serialize_nested
 from app.html.filters import storage_url
 from app.core.config import settings
+from app.services.settings_service import SettingsService
 import structlog
 from datetime import datetime
 from pathlib import Path
@@ -128,12 +129,24 @@ async def _load_ar_form_reference_data(db: AsyncSession, current_user) -> tuple[
     return companies, projects
 
 
+async def _load_default_duration_years(db: AsyncSession) -> int:
+    """Load the default AR content lifetime in years."""
+    try:
+        settings_service = SettingsService(db)
+        all_settings = await settings_service.get_all_settings()
+        years = int(getattr(all_settings.general, "default_subscription_years", 30) or 30)
+        return max(1, years)
+    except Exception:
+        return 30
+
+
 def _build_ar_form_context(
     request: Request,
     current_user,
     *,
     companies: list[dict],
     projects: list[dict],
+    default_duration_years: int = 30,
     ar_content: dict | None = None,
     error: str | None = None,
 ) -> dict:
@@ -150,6 +163,7 @@ def _build_ar_form_context(
             projects,
             ("id", "name", "company_id", "status", "description", "created_at", "updated_at"),
         ),
+        "default_duration_years": default_duration_years,
         "current_user": current_user,
     }
     if ar_content is not None:
@@ -493,6 +507,7 @@ async def ar_content_create(
         current_user,
         companies=data["companies"],
         projects=data["projects"],
+        default_duration_years=await _load_default_duration_years(db),
     )
     return templates.TemplateResponse("ar-content/form.html", context)
 
@@ -540,6 +555,7 @@ async def ar_content_edit(
         current_user,
         companies=companies,
         projects=projects,
+        default_duration_years=await _load_default_duration_years(db),
         ar_content=ar_content,
     )
     return templates.TemplateResponse("ar-content/form.html", context)
@@ -1092,6 +1108,7 @@ async def ar_content_create_post(
             current_user,
             companies=companies,
             projects=projects,
+            default_duration_years=await _load_default_duration_years(db),
             error=f"Failed to create AR content: {str(e)}",
         )
         return templates.TemplateResponse("ar-content/form.html", context)

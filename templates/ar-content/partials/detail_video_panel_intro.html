@@ -5,7 +5,7 @@
             <h3 class="text-xl font-semibold text-gray-900 dark:text-white">Управление видео</h3>
         </div>
         <p class="text-sm text-gray-600 dark:text-gray-400">
-            Загруженные видео работают бессрочно. При необходимости видео можно отключить вручную.
+            Первое загруженное видео активируется автоматически. Ссылка и QR на заказ остаются теми же, а сами видео можно менять вручную или по правилам ротации. Срок доступа к видео ограничен сроком жизни контента.
         </p>
     </div>
     <button @click="showUploadDialog = true" class="btn btn-primary">
@@ -20,19 +20,19 @@
                 <span class="material-icons text-sm align-middle mr-1">settings</span>Режим воспроизведения
             </label>
             <select x-model="playbackMode" class="form-input w-full">
-                <option value="manual">Ручной (фиксированное видео)</option>
+                <option value="manual">Ручной (одно базовое видео)</option>
                 <option value="sequential">Авто: последовательный</option>
                 <option value="cyclic">Авто: циклический</option>
             </select>
             <div class="mt-2 text-xs text-gray-600 dark:text-gray-400 bg-white dark:bg-gray-800 p-2 rounded">
                 <template x-if="playbackMode === 'manual'">
-                    <span>Одно фиксированное видео. Выберите активное видео кнопкой "Сделать активным".</span>
+                    <span>Одно базовое видео без автоматической ротации. Если включено расписание ниже, оно имеет приоритет.</span>
                 </template>
                 <template x-if="playbackMode === 'sequential'">
-                    <span>Видео переключаются последовательно. Отметьте галочками видео для ротации.</span>
+                    <span>Базовая авторотация: активные видео идут по порядку. Если включено расписание ниже, оно перекроет этот режим.</span>
                 </template>
                 <template x-if="playbackMode === 'cyclic'">
-                    <span>Видео переключаются циклически по кругу. Отметьте галочками видео для ротации.</span>
+                    <span>Базовая авторотация по кругу. Подходит для постоянной смены нескольких роликов, если не нужно календарное правило.</span>
                 </template>
             </div>
         </div>
@@ -55,7 +55,7 @@
                 <span class="text-sm font-semibold text-gray-900 dark:text-white">Активное видео:</span>
                 <span class="text-sm text-gray-700 dark:text-gray-300 ml-1 truncate" x-text="activeVideoTitle || '—'"></span>
             </div>
-            <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-100" x-text="activeVideoSourceLabel"></span>
+            <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-100" x-text="getActiveVideoSourceLabel()"></span>
             <div class="text-xs text-gray-600 dark:text-gray-400" x-show="activeVideoSchedule">
                 <span x-text="formatSchedule(activeVideoSchedule)"></span>
             </div>

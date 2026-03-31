@@ -193,7 +193,8 @@ class SettingsService:
             thumbnail_quality=settings_dict.get("thumbnail_quality", 80),
             video_processing_enabled=settings_dict.get("video_processing_enabled", True),
             default_ar_viewer_theme=settings_dict.get("default_ar_viewer_theme", "default"),
-            qr_code_expiration_days=settings_dict.get("qr_code_expiration_days", 365)
+            default_content_lifetime_years=settings_dict.get("default_subscription_years")
+            or max(1, int((settings_dict.get("qr_code_expiration_days", 365) or 365) / 365)),
         )
         
         backup = BackupSettings(
@@ -306,8 +307,21 @@ class SettingsService:
         await self.set_setting("thumbnail_quality", settings.thumbnail_quality, "integer", "ar", commit=False)
         await self.set_setting("video_processing_enabled", settings.video_processing_enabled, "boolean", "ar", commit=False)
         await self.set_setting("default_ar_viewer_theme", settings.default_ar_viewer_theme, "string", "ar", commit=False)
-        await self.set_setting("qr_code_expiration_days", settings.qr_code_expiration_days, "integer", "ar", commit=False)
-        
+        await self.set_setting(
+            "default_subscription_years",
+            settings.default_content_lifetime_years,
+            "integer",
+            "general",
+            commit=False,
+        )
+        await self.set_setting(
+            "qr_code_expiration_days",
+            settings.default_content_lifetime_years * 365,
+            "integer",
+            "ar",
+            commit=False,
+        )
+
         await self.db.commit()
         return settings
 

@@ -41,6 +41,8 @@ def test_ar_content_detail_template_has_quick_order_and_customer_actions():
     assert "Расписание ротации видео" in joined
     assert "Все видео" in joined
     assert "Настройка расписания ротации" in joined
+    assert "Повторять ежегодно" in joined
+    assert "31 декабря" in joined
     assert "Маркер и качество" in joined
     assert "Загрузить видео" in joined
     assert "Удалить AR контент" in joined
@@ -52,3 +54,5 @@ def test_ar_content_detail_template_reuses_embedded_videos_before_refetch():
     assert "if (Array.isArray(this.videos) && this.videos.length > 0)" in template
     assert "this.playbackMode = this.inferPlaybackMode();" in template
     assert "this.loadVideos();" in template
+    assert "normalizeDateRules" in template
+    assert "payload.date_rules" in template
