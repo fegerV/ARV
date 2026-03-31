@@ -1,0 +1,134 @@
+<div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+    <div class="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-4 flex flex-col">
+        <div class="flex items-center gap-2 mb-2">
+            <span class="material-icons text-blue-500 text-lg">visibility</span>
+            <span class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">Просмотры</span>
+        </div>
+        <div class="text-2xl font-bold text-gray-900 dark:text-white">{{ ar_content.views_count or 0 }}</div>
+        <div class="text-xs text-gray-500 dark:text-gray-400 mt-1">за всё время</div>
+    </div>
+    <div class="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-4 flex flex-col">
+        <div class="flex items-center gap-2 mb-2">
+            <span class="material-icons text-green-500 text-lg">trending_up</span>
+            <span class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">30 дней</span>
+        </div>
+        <div class="text-2xl font-bold text-gray-900 dark:text-white">{{ ar_content.views_30_days or 0 }}</div>
+        <div class="text-xs text-gray-500 dark:text-gray-400 mt-1">просмотров</div>
+    </div>
+    <div class="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-4 flex flex-col">
+        <div class="flex items-center gap-2 mb-2">
+            <span class="material-icons text-purple-500 text-lg">videocam</span>
+            <span class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">Видео</span>
+        </div>
+        <div class="text-2xl font-bold text-gray-900 dark:text-white" x-text="videos ? videos.length : 0"></div>
+        <div class="text-xs text-gray-500 dark:text-gray-400 mt-1 truncate" x-text="activeVideoTitle || 'нет активного'"></div>
+    </div>
+    <div class="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-4 flex flex-col"
+         x-show="arContent.marker_status">
+        <div class="flex items-center gap-2 mb-2">
+            <span class="material-icons text-lg" :class="arContent.marker_status === 'ready' ? 'text-green-500' : 'text-yellow-500'">qr_code_2</span>
+            <span class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">Маркер</span>
+        </div>
+        <div class="text-lg font-bold text-gray-900 dark:text-white" x-text="arContent.marker_status === 'ready' ? 'Готов' : (arContent.marker_status || '—')"></div>
+        <div class="text-xs mt-1" :class="markerMetrics.is_valid === true ? 'text-green-600 dark:text-green-400' : markerMetrics.is_valid === false ? 'text-red-600 dark:text-red-400' : 'text-gray-500 dark:text-gray-400'"
+             x-text="markerMetrics.is_valid === true ? 'Валидный' : markerMetrics.is_valid === false ? 'Невалидный' : 'не проверен'"></div>
+    </div>
+</div>
+
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+    <div class="lg:col-span-1">
+        <div class="card p-5">
+            <div class="flex items-center gap-2 mb-4 pb-3 border-b border-gray-200 dark:border-gray-700">
+                <span class="material-icons text-blue-600 dark:text-blue-400">person</span>
+                <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Заказчик</h3>
+            </div>
+            <dl class="space-y-4">
+                <div>
+                    <dt class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1">Имя</dt>
+                    <dd class="text-base font-medium text-gray-900 dark:text-white" x-text="arContent.customer_name || '—'"></dd>
+                </div>
+                <div>
+                    <dt class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1">Телефон</dt>
+                    <dd class="text-base text-gray-900 dark:text-white" x-text="arContent.customer_phone || '—'"></dd>
+                </div>
+                <div>
+                    <dt class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1">Email</dt>
+                    <dd class="text-base text-gray-900 dark:text-white break-all" x-text="arContent.customer_email || '—'"></dd>
+                </div>
+            </dl>
+            <div class="mt-5 pt-4 border-t border-gray-200 dark:border-gray-700 flex flex-wrap gap-2">
+                <a x-show="arContent.customer_phone"
+                   :href="'tel:' + arContent.customer_phone"
+                   class="btn btn-secondary text-sm px-3 py-1.5">
+                    <span class="material-icons text-sm mr-1">call</span>Позвонить
+                </a>
+                <a x-show="arContent.customer_email"
+                   :href="'mailto:' + arContent.customer_email"
+                   class="btn btn-secondary text-sm px-3 py-1.5">
+                    <span class="material-icons text-sm mr-1">mail</span>Написать
+                </a>
+                <button x-show="arContent.customer_phone"
+                        @click="copyText(arContent.customer_phone, 'Телефон скопирован')"
+                        class="btn btn-secondary text-sm px-3 py-1.5">
+                    <span class="material-icons text-sm mr-1">content_copy</span>Телефон
+                </button>
+                <button x-show="arContent.customer_email"
+                        @click="copyText(arContent.customer_email, 'Email скопирован')"
+                        class="btn btn-secondary text-sm px-3 py-1.5">
+                    <span class="material-icons text-sm mr-1">content_copy</span>Email
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div class="lg:col-span-2">
+        <div class="card p-5">
+            <div class="flex items-center justify-between mb-4 pb-3 border-b border-gray-200 dark:border-gray-700">
+                <div class="flex items-center gap-2">
+                    <span class="material-icons text-purple-600 dark:text-purple-400">image</span>
+                    <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Портрет</h3>
+                </div>
+                <button @click="showPhotoUploadDialog = true" class="btn btn-secondary text-sm px-3 py-1.5">
+                    <span class="material-icons text-sm mr-1">upload</span>Загрузить
+                </button>
+            </div>
+            <div class="flex justify-center">
+                <template x-if="portraitUrl">
+                    <img :src="portraitUrl"
+                         alt="Portrait"
+                         loading="lazy"
+                         @click="showPortraitLightbox = true"
+                         class="max-h-96 rounded-lg object-contain cursor-pointer hover:opacity-90 transition-opacity shadow-sm">
+                </template>
+                <template x-if="!portraitUrl">
+                    <div class="w-full h-64 bg-gray-50 dark:bg-gray-700/50 rounded-lg border-2 border-dashed border-gray-200 dark:border-gray-600 flex items-center justify-center text-gray-400 dark:text-gray-500">
+                        <div class="text-center">
+                            <span class="material-icons text-5xl mb-3 block">image_not_supported</span>
+                            <p class="text-sm">Портрет не загружен</p>
+                        </div>
+                    </div>
+                </template>
+            </div>
+            <p class="mt-3 text-xs text-gray-500 dark:text-gray-400 text-center" x-show="portraitUrl">
+                <span class="material-icons text-xs align-middle mr-1">zoom_in</span>Кликните для просмотра в полный размер
+            </p>
+        </div>
+    </div>
+</div>
+
+{% if debug_info %}
+<div class="card p-4 mb-6">
+    <details class="cursor-pointer">
+        <summary class="text-sm font-medium text-gray-700 dark:text-gray-300 flex items-center gap-2">
+            <span class="material-icons text-base">bug_report</span>
+            Техническая информация (Debug)
+        </summary>
+        <div class="mt-4 grid grid-cols-2 md:grid-cols-4 gap-4 text-xs">
+            <div><span class="font-medium text-gray-600 dark:text-gray-400">Storage:</span><br><span class="text-gray-900 dark:text-white break-all">{{ debug_info.storage_path or '—' }}</span></div>
+            <div><span class="font-medium text-gray-600 dark:text-gray-400">Photo:</span><br><span class="text-gray-900 dark:text-white break-all">{{ debug_info.photo_path or '—' }}</span></div>
+            <div><span class="font-medium text-gray-600 dark:text-gray-400">Video:</span><br><span class="text-gray-900 dark:text-white break-all">{{ debug_info.video_path or '—' }}</span></div>
+            <div><span class="font-medium text-gray-600 dark:text-gray-400">Marker:</span><br><span class="text-gray-900 dark:text-white break-all">{{ debug_info.marker_path or '—' }}</span></div>
+        </div>
+    </details>
+</div>
+{% endif %}

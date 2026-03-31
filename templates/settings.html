@@ -74,6 +74,8 @@
     </div>
 
     <!-- ===================== ОСНОВНЫЕ НАСТРОЙКИ ===================== -->
+    {% include "partials/settings_general_tab.html" %}
+    {% if false %}
     <div x-show="activeTab === 'general'" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0 translate-y-1" x-transition:enter-end="opacity-100 translate-y-0">
         <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
             <div class="px-6 py-5 border-b border-gray-200 dark:border-gray-700">
@@ -146,6 +148,9 @@
     </div>
 
     <!-- ===================== БЕЗОПАСНОСТЬ ===================== -->
+    {% endif %}
+    {% include "partials/settings_security_tab.html" %}
+    {% if false %}
     <div x-show="activeTab === 'security'" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0 translate-y-1" x-transition:enter-end="opacity-100 translate-y-0">
         <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
             <div class="px-6 py-5 border-b border-gray-200 dark:border-gray-700">
@@ -222,6 +227,9 @@
     </div>
 
     <!-- ===================== AR-КОНТЕНТ ===================== -->
+    {% endif %}
+    {% include "partials/settings_ar_tab.html" %}
+    {% if false %}
     <div x-show="activeTab === 'ar'" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0 translate-y-1" x-transition:enter-end="opacity-100 translate-y-0">
         <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
             <div class="px-6 py-5 border-b border-gray-200 dark:border-gray-700">
@@ -291,6 +299,9 @@
     </div>
 
     <!-- ===================== УВЕДОМЛЕНИЯ ===================== -->
+    {% endif %}
+    {% include "partials/settings_notifications_tab.html" %}
+    {% if false %}
     <div x-show="activeTab === 'notifications'" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0 translate-y-1" x-transition:enter-end="opacity-100 translate-y-0">
         <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
             <div class="px-6 py-5 border-b border-gray-200 dark:border-gray-700">
@@ -459,6 +470,9 @@
     </div>
 
     <!-- ===================== ХРАНЕНИЕ ===================== -->
+    {% endif %}
+    {% include "partials/settings_storage_tab.html" %}
+    {% if false %}
     <div x-show="activeTab === 'storage'" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0 translate-y-1" x-transition:enter-end="opacity-100 translate-y-0">
         <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
             <div class="px-6 py-5 border-b border-gray-200 dark:border-gray-700">
@@ -513,6 +527,9 @@
     </div>
 
     <!-- ===================== БЭКАПЫ ===================== -->
+    {% endif %}
+    {% include "partials/settings_backup_tab.html" %}
+    {% if false %}
     <div x-show="activeTab === 'backup'" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0 translate-y-1" x-transition:enter-end="opacity-100 translate-y-0">
 
         <!-- Настройки бэкапов -->
@@ -674,6 +691,7 @@
             </div>
         </div>
     </div>
+{% endif %}
 </div>
 
 <style>

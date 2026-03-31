@@ -1090,6 +1090,9 @@ document.addEventListener('alpine:init', function() {
 </script>
 
 <div x-data="$store.arContentDetail" x-init="init()" class="page-container">
+    {% include "ar-content/partials/detail_header.html" %}
+    {% include "ar-content/partials/detail_overview.html" %}
+    {% if false %}
     <!-- ============================================ -->
     <!-- БЛОК 1: ЗАГОЛОВОК И ОСНОВНЫЕ ДЕЙСТВИЯ -->
     <!-- ============================================ -->
@@ -1304,11 +1307,14 @@ document.addEventListener('alpine:init', function() {
         </details>
     </div>
     {% endif %}
+    {% endif %}
         
     <!-- ============================================ -->
     <!-- БЛОК 4: УПРАВЛЕНИЕ ВИДЕО -->
     <!-- ============================================ -->
     <div class="card p-5 mb-6">
+        {% include "ar-content/partials/detail_video_panel_intro.html" %}
+        {% if false %}
         <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6 pb-4 border-b border-gray-200 dark:border-gray-700">
             <div class="flex-1">
                 <div class="flex items-center gap-2 mb-2">
@@ -1387,6 +1393,9 @@ document.addEventListener('alpine:init', function() {
         </template>
 
         <!-- Список всех видео -->
+        {% endif %}
+        {% include "ar-content/partials/detail_video_list.html" %}
+        {% if false %}
         <template x-if="videos && videos.length > 0">
             <div>
                 <h4 class="text-base font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
@@ -1492,12 +1501,15 @@ document.addEventListener('alpine:init', function() {
                 </div>
             </div>
         </template>
+        {% endif %}
     </div>
     
     <!-- ============================================ -->
     <!-- БЛОК 4b: РАСПИСАНИЕ РОТАЦИИ ВИДЕО -->
     <!-- ============================================ -->
     <div class="card p-5 mb-6" x-show="videos && videos.length > 0">
+        {% include "ar-content/partials/detail_rotation_overview.html" %}
+        {% if false %}
         <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6 pb-4 border-b border-gray-200 dark:border-gray-700">
             <div class="flex-1">
                 <div class="flex items-center gap-2 mb-2">
@@ -1585,7 +1597,10 @@ document.addEventListener('alpine:init', function() {
         </template>
     </div>
     
+        {% endif %}
     <!-- Rotation Schedule Dialog -->
+    {% include "ar-content/partials/detail_rotation_dialog.html" %}
+    {% if false %}
     <div x-show="showRotationScheduleDialog" 
          @click.self="showRotationScheduleDialog = false"
          @keydown.escape.window="showRotationScheduleDialog = false"
@@ -1714,7 +1729,10 @@ document.addEventListener('alpine:init', function() {
             </form>
         </div>
     </div>
+    {% endif %}
     
+    {% include "ar-content/partials/detail_links_and_marker.html" %}
+    {% if false %}
     <!-- ============================================ -->
     <!-- БЛОК 5: ССЫЛКА И QR-КОД -->
     <!-- ============================================ -->
@@ -1765,10 +1783,13 @@ document.addEventListener('alpine:init', function() {
             </div>
         </div>
     </div>
+    {% endif %}
 
     <!-- ============================================ -->
     <!-- БЛОК 6: МАРКЕР И КАЧЕСТВО (скрыт, если нет реальных метрик) -->
     <!-- ============================================ -->
+    {% include "ar-content/partials/detail_marker_quality.html" %}
+    {% if false %}
     <div class="card p-5 mb-6"
          x-show="markerMetrics.file_size_bytes || markerMetrics.features_count || (markerMetrics.image_quality && markerMetrics.image_quality.recognition_probability != null) || (markerMetrics.quality_level && markerMetrics.quality_level !== 'unknown')">
         <div class="flex items-center justify-between mb-4 pb-3 border-b border-gray-200 dark:border-gray-700">
@@ -1921,7 +1942,10 @@ document.addEventListener('alpine:init', function() {
             <p class="text-sm">Данные маркера появятся после генерации</p>
         </div>
     </div>
+    {% endif %}
     
+    {% include "ar-content/partials/detail_media_modals.html" %}
+    {% if false %}
     <!-- Video Player Lightbox -->
     <div x-show="showVideoPlayerDialog"
      @click.self="closeVideoPlayer()"
@@ -2167,5 +2191,6 @@ document.addEventListener('alpine:init', function() {
             </div>
         </div>
     </div>
+    {% endif %}
 </div>
 {% endblock %}

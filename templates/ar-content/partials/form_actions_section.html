@@ -1,0 +1,64 @@
+<div class="p-6 bg-gray-50 dark:bg-gray-700 rounded-b-lg">
+    <div class="flex justify-end space-x-3">
+        <a href="{% if ar_content %}/ar-content/{{ ar_content.id }}{% else %}/ar-content{% endif %}" 
+           class="btn btn-secondary inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-gray-600 hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 dark:bg-gray-600 dark:hover:bg-gray-700">
+            <span class="material-icons mr-2">close</span>
+            РћС‚РјРµРЅР°
+        </a>
+        <button type="submit"
+                x-bind:disabled="!isValid || submitting"
+                x-bind:class="{'opacity-50 cursor-not-allowed': !isValid || submitting}"
+                class="btn btn-primary inline-flex items-center px-6 py-3 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed">
+            <span class="material-icons mr-2" x-show="!submitting">save</span>
+            <span class="material-icons mr-2 animate-spin" x-show="submitting">refresh</span>
+            <span x-show="!submitting">
+                {% if ar_content and ar_content.id %}РћР±РЅРѕРІРёС‚СЊ AR РєРѕРЅС‚РµРЅС‚{% else %}РЎРѕР·РґР°С‚СЊ AR РєРѕРЅС‚РµРЅС‚{% endif %}
+            </span>
+            <span x-show="submitting">РЎРѕС…СЂР°РЅРµРЅРёРµ...</span>
+        </button>
+    </div>
+    
+    <div x-show="submitting"
+         x-transition:enter="transition ease-out duration-200"
+         x-transition:enter-start="opacity-0"
+         x-transition:enter-end="opacity-100"
+         class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 dark:bg-black/70">
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-2xl p-8 max-w-md w-full mx-4">
+            <div class="flex items-center gap-3 mb-4">
+                <span class="material-icons text-3xl text-indigo-500 animate-spin">refresh</span>
+                <h3 class="text-lg font-medium text-gray-900 dark:text-white">
+                    <span x-text="submitPhase === 'upload' ? 'Р—Р°РіСЂСѓР·РєР° С„Р°Р№Р»РѕРІ...' : 'РћР±СЂР°Р±РѕС‚РєР° РЅР° СЃРµСЂРІРµСЂРµ...'"></span>
+                </h3>
+            </div>
+            <p class="text-sm text-gray-500 dark:text-gray-400 mb-4" x-show="submitPhase === 'upload'">
+                Р¤РѕС‚Рѕ Рё РІРёРґРµРѕ Р·Р°РіСЂСѓР¶Р°СЋС‚СЃСЏ. Р­С‚Рѕ РјРѕР¶РµС‚ Р·Р°РЅСЏС‚СЊ РЅРµСЃРєРѕР»СЊРєРѕ РјРёРЅСѓС‚.
+            </p>
+            <p class="text-sm text-gray-500 dark:text-gray-400 mb-4" x-show="submitPhase === 'processing'">
+                Р—Р°РіСЂСѓР¶Р°РµРј РІРёРґРµРѕ РІ РѕР±Р»Р°РєРѕ, СЃРѕР·РґР°С‘Рј РјР°СЂРєРµСЂ Рё QR-РєРѕРґ. Р‘РѕР»СЊС€РёРµ СЂРѕР»РёРєРё вЂ” 2вЂ“5 РјРёРЅСѓС‚. РќРµ Р·Р°РєСЂС‹РІР°Р№С‚Рµ СЃС‚СЂР°РЅРёС†Сѓ.
+            </p>
+            <div class="w-full bg-gray-200 dark:bg-gray-600 rounded-full h-3 overflow-hidden">
+                <div class="h-full bg-indigo-500 transition-all duration-300 ease-out"
+                     :class="{ 'animate-pulse': submitPhase === 'processing' && submitProgress === null }"
+                     :style="submitProgress !== null ? `width: ${submitProgress}%` : (submitPhase === 'processing' ? 'width: 100%' : 'width: 30%')"
+                     x-show="submitPhase"></div>
+            </div>
+            <p class="text-sm font-medium text-indigo-600 dark:text-indigo-400 mt-2" x-show="submitPhase === 'upload' && submitProgress !== null">
+                <span x-text="Math.round(submitProgress || 0)"></span>%
+            </p>
+        </div>
+    </div>
+
+    <div x-show="!isValid" class="mt-4 p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-md">
+        <p class="text-sm text-yellow-800 dark:text-yellow-200 mb-2">
+            <span class="material-icons text-sm mr-1">info</span>
+            РџРѕР¶Р°Р»СѓР№СЃС‚Р°, Р·Р°РїРѕР»РЅРёС‚Рµ РІСЃРµ РѕР±СЏР·Р°С‚РµР»СЊРЅС‹Рµ РїРѕР»СЏ:
+        </p>
+        <ul class="text-xs text-yellow-700 dark:text-yellow-300 list-disc list-inside">
+            <li x-show="!selectedCompany">РљРѕРјРїР°РЅРёСЏ</li>
+            <li x-show="!selectedProject">РџСЂРѕРµРєС‚</li>
+            <li x-show="!customerName">РРјСЏ Р·Р°РєР°Р·С‡РёРєР°</li>
+            <li x-show="(!arContent || !arContent.id) && !hasNewPhoto">РџРѕСЂС‚СЂРµС‚ (РёР·РѕР±СЂР°Р¶РµРЅРёРµ)</li>
+            <li x-show="(!arContent || !arContent.id) && !hasNewVideo">Р’РёРґРµРѕ</li>
+        </ul>
+    </div>
+</div>

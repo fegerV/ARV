@@ -1,0 +1,38 @@
+<div class="p-6 border-b border-gray-200 dark:border-gray-700">
+    <h3 class="text-lg font-medium text-gray-900 dark:text-white mb-4">РРЅС„РѕСЂРјР°С†РёСЏ Рѕ Р·Р°РєР°Р·С‡РёРєРµ</h3>
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div>
+            <label for="customer_name" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                РРјСЏ Р·Р°РєР°Р·С‡РёРєР° <span class="text-red-500">*</span>
+            </label>
+            <input type="text" name="customer_name" id="customer_name"
+                   class="form-input"
+                   x-model="customerName"
+                   placeholder="РРјСЏ Р¤Р°РјРёР»РёСЏ"
+                   value="{{ ar_content.customer_name if ar_content and ar_content.customer_name else '' }}"
+                   required x-cloak>
+        </div>
+
+        <div>
+            <label for="customer_phone" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                РўРµР»РµС„РѕРЅ
+            </label>
+            <input type="tel" name="customer_phone" id="customer_phone"
+                   class="form-input"
+                   x-model="customerPhone"
+                   placeholder="+7 (999) 123-45-67"
+                   value="{{ ar_content.customer_phone if ar_content and ar_content.customer_phone else '' }}" x-cloak>
+        </div>
+
+        <div>
+            <label for="customer_email" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Email
+            </label>
+            <input type="email" name="customer_email" id="customer_email"
+                   class="form-input"
+                   x-model="customerEmail"
+                   placeholder="customer@example.com"
+                   value="{{ ar_content.customer_email if ar_content and ar_content.customer_email else '' }}" x-cloak>
+        </div>
+    </div>
+</div>

@@ -5,177 +5,18 @@
 
 {% block content %}
 <div x-data="projectForm()" class="space-y-6">
-    <!-- Page Header -->
-    <div class="flex items-center justify-between">
-        <div>
-            <h2 class="text-2xl font-semibold text-gray-900 dark:text-white">
-                {% if project %}
-                    Edit Project
-                {% else %}
-                    Create New Project
-                {% endif %}
-            </h2>
-            <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                {% if project %}
-                    Update project information and settings
-                {% else %}
-                    Set up a new project for your organization
-                {% endif %}
-            </p>
-        </div>
-    </div>
+    {% include "projects/partials/form_header.html" %}
 
-    <!-- Main Form Card -->
     <div class="bg-white dark:bg-gray-800 shadow rounded-lg">
-        <!-- Error Alert -->
-        {% if error %}
-        <div class="border-l-4 border-red-500 bg-red-50 dark:bg-red-900/20 p-4">
-            <div class="flex items-start">
-                <span class="material-icons text-red-600 dark:text-red-400 mr-3 mt-0.5">error</span>
-                <div>
-                    <h3 class="text-sm font-medium text-red-800 dark:text-red-200">Error</h3>
-                    <p class="mt-1 text-sm text-red-700 dark:text-red-300">{{ error }}</p>
-                </div>
-            </div>
-        </div>
-        {% endif %}
+        {% include "projects/partials/form_error_alert.html" %}
 
         <form method="POST" action="{% if project %}/projects/{{ project.id }}{% else %}/projects{% endif %}" class="divide-y divide-gray-200 dark:divide-gray-700">
-            <!-- Form Content -->
-            <div class="px-4 py-6 sm:px-6 space-y-6">
-                <!-- Project Name -->
-                <div>
-                    <label for="name" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                        Project Name
-                        <span class="text-red-500">*</span>
-                    </label>
-                    <input type="text" 
-                           name="name" 
-                           id="name" 
-                           value="{% if project %}{{ project.name }}{% endif %}"
-                           placeholder="e.g., AR Furniture Catalog"
-                           class="form-input w-full border border-gray-300 dark:border-gray-600 rounded-lg px-4 py-2"
-                           required
-                           minlength="3"
-                           maxlength="100">
-                    <p class="mt-1.5 text-xs text-gray-500 dark:text-gray-400">
-                        Give your project a clear, descriptive name
-                    </p>
-                </div>
-
-                <!-- Company Selection -->
-                <div>
-                    <label for="company_id" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                        Company
-                        <span class="text-red-500">*</span>
-                    </label>
-                    <select name="company_id" 
-                            id="company_id" 
-                            class="form-select w-full border border-gray-300 dark:border-gray-600 rounded-lg px-4 py-2"
-                            required>
-                        <option value="">-- Select a company --</option>
-                        {% for company in companies %}
-                        <option value="{{ company.id }}" 
-                                {% if project and project.company_id == company.id %}selected{% endif %}>
-                            {{ company.name }}
-                        </option>
-                        {% endfor %}
-                    </select>
-                    <p class="mt-1.5 text-xs text-gray-500 dark:text-gray-400">
-                        Choose the organization this project belongs to
-                    </p>
-                </div>
-
-                <!-- Status -->
-                <div>
-                    <label for="status" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                        Status
-                    </label>
-                    <div class="flex gap-4">
-                        <label class="flex items-center">
-                            <input type="radio" 
-                                   name="status" 
-                                   value="active" 
-                                   {% if not project or project.status == 'active' %}checked{% endif %}
-                                   class="w-4 h-4 text-indigo-600 dark:text-indigo-400">
-                            <span class="ml-2 text-sm text-gray-700 dark:text-gray-300">Active</span>
-                        </label>
-                        <label class="flex items-center">
-                            <input type="radio" 
-                                   name="status" 
-                                   value="inactive" 
-                                   {% if project and project.status == 'inactive' %}checked{% endif %}
-                                   class="w-4 h-4 text-indigo-600 dark:text-indigo-400">
-                            <span class="ml-2 text-sm text-gray-700 dark:text-gray-300">Inactive</span>
-                        </label>
-                        <label class="flex items-center">
-                            <input type="radio" 
-                                   name="status" 
-                                   value="archived" 
-                                   {% if project and project.status == 'archived' %}checked{% endif %}
-                                   class="w-4 h-4 text-indigo-600 dark:text-indigo-400">
-                            <span class="ml-2 text-sm text-gray-700 dark:text-gray-300">Archived</span>
-                        </label>
-                    </div>
-                    <p class="mt-1.5 text-xs text-gray-500 dark:text-gray-400">
-                        Control whether this project is actively used
-                    </p>
-                </div>
-
-                <!-- Description -->
-                <div>
-                    <label for="description" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                        Description
-                    </label>
-                    <textarea name="description" 
-                              id="description" 
-                              rows="4"
-                              placeholder="Add notes about this project, its purpose, or any special requirements..."
-                              class="form-input w-full border border-gray-300 dark:border-gray-600 rounded-lg px-4 py-2 resize-vertical"
-                              maxlength="500"></textarea>
-                    <p class="mt-1.5 text-xs text-gray-500 dark:text-gray-400">
-                        Optional: Add any additional details about this project
-                    </p>
-                </div>
-            </div>
-
-            <!-- Form Actions -->
-            <div class="px-4 py-4 sm:px-6 bg-gray-50 dark:bg-gray-900/50 flex items-center justify-between">
-                <a href="/projects" class="text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white text-sm font-medium inline-flex items-center gap-1 transition-colors">
-                    <span class="material-icons text-base">chevron_left</span>
-                    Back to Projects
-                </a>
-                <div class="flex gap-3">
-                    <a href="/projects" class="inline-flex items-center justify-center px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
-                        Cancel
-                    </a>
-                    <button type="submit" 
-                            :disabled="isSubmitting"
-                            class="inline-flex items-center justify-center px-4 py-2 bg-indigo-600 dark:bg-indigo-700 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 dark:hover:bg-indigo-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
-                        <span x-show="!isSubmitting" class="flex items-center gap-2">
-                            <span class="material-icons text-base">check</span>
-                            {% if project %}Update Project{% else %}Create Project{% endif %}
-                        </span>
-                        <span x-show="isSubmitting" class="flex items-center gap-2">
-                            <span class="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
-                            Saving...
-                        </span>
-                    </button>
-                </div>
-            </div>
+            {% include "projects/partials/form_fields.html" %}
+            {% include "projects/partials/form_actions.html" %}
         </form>
     </div>
 
-    <!-- Info Card -->
-    <div class="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
-        <div class="flex gap-3">
-            <span class="material-icons text-blue-600 dark:text-blue-400 flex-shrink-0">info</span>
-            <div class="text-sm text-blue-800 dark:text-blue-200">
-                <p class="font-medium">О проектах</p>
-                <p class="mt-1">Projects organize your AR content and link it to specific companies. Each project can contain multiple AR experiences and content items.</p>
-            </div>
-        </div>
-    </div>
+    {% include "projects/partials/form_info_card.html" %}
 </div>
 
 <script>
@@ -184,10 +25,9 @@ function projectForm() {
         isSubmitting: false,
 
         init() {
-            // Initialize form listeners
             const form = this.$el.querySelector('form');
             if (form) {
-                form.addEventListener('submit', (e) => {
+                form.addEventListener('submit', () => {
                     this.isSubmitting = true;
                 });
             }

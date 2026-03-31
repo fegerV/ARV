@@ -1,0 +1,21 @@
+{% if total_pages > 1 %}
+<nav class="flex items-center justify-between" aria-label="Pagination">
+    <a href="{% if page > 1 %}?page={{ page - 1 }}{% else %}#{% endif %}"
+       class="inline-flex items-center gap-2 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm font-medium {% if page <= 1 %}text-gray-300 dark:text-gray-600 cursor-not-allowed{% else %}text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700{% endif %}">
+        <span class="material-icons text-base">chevron_left</span>
+        Previous
+    </a>
+
+    <div class="flex items-center gap-2">
+        <span class="text-sm text-gray-600 dark:text-gray-400">
+            Page <span class="font-semibold">{{ page }}</span> of <span class="font-semibold">{{ total_pages }}</span>
+        </span>
+    </div>
+
+    <a href="{% if page < total_pages %}?page={{ page + 1 }}{% else %}#{% endif %}"
+       class="inline-flex items-center gap-2 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm font-medium {% if page >= total_pages %}text-gray-300 dark:text-gray-600 cursor-not-allowed{% else %}text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700{% endif %}">
+        Next
+        <span class="material-icons text-base">chevron_right</span>
+    </a>
+</nav>
+{% endif %}

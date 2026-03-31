@@ -1,0 +1,74 @@
+<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6 pb-4 border-b border-gray-200 dark:border-gray-700">
+    <div class="flex-1">
+        <div class="flex items-center gap-2 mb-2">
+            <span class="material-icons text-red-600 dark:text-red-400">videocam</span>
+            <h3 class="text-xl font-semibold text-gray-900 dark:text-white">Управление видео</h3>
+        </div>
+        <p class="text-sm text-gray-600 dark:text-gray-400">
+            Загруженные видео работают бессрочно. При необходимости видео можно отключить вручную.
+        </p>
+    </div>
+    <button @click="showUploadDialog = true" class="btn btn-primary">
+        <span class="material-icons mr-2">add</span>Загрузить видео
+    </button>
+</div>
+
+<div class="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4 mb-6">
+    <div class="flex flex-col md:flex-row md:items-end gap-4">
+        <div class="flex-1">
+            <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                <span class="material-icons text-sm align-middle mr-1">settings</span>Режим воспроизведения
+            </label>
+            <select x-model="playbackMode" class="form-input w-full">
+                <option value="manual">Ручной (фиксированное видео)</option>
+                <option value="sequential">Авто: последовательный</option>
+                <option value="cyclic">Авто: циклический</option>
+            </select>
+            <div class="mt-2 text-xs text-gray-600 dark:text-gray-400 bg-white dark:bg-gray-800 p-2 rounded">
+                <template x-if="playbackMode === 'manual'">
+                    <span>Одно фиксированное видео. Выберите активное видео кнопкой "Сделать активным".</span>
+                </template>
+                <template x-if="playbackMode === 'sequential'">
+                    <span>Видео переключаются последовательно. Отметьте галочками видео для ротации.</span>
+                </template>
+                <template x-if="playbackMode === 'cyclic'">
+                    <span>Видео переключаются циклически по кругу. Отметьте галочками видео для ротации.</span>
+                </template>
+            </div>
+        </div>
+        <button @click="applyPlaybackMode()"
+                :disabled="playbackModeSaving"
+                class="btn btn-primary whitespace-nowrap">
+            <span class="material-icons mr-2" x-show="!playbackModeSaving">save</span>
+            <span class="material-icons mr-2 animate-spin" x-show="playbackModeSaving">refresh</span>
+            <span x-show="!playbackModeSaving">Применить</span>
+            <span x-show="playbackModeSaving">Сохранение...</span>
+        </button>
+    </div>
+</div>
+
+<template x-if="videos && videos.length > 0 && activeVideo">
+    <div class="mb-6 bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 border border-green-200 dark:border-green-800 rounded-lg px-4 py-3">
+        <div class="flex flex-wrap items-center gap-3">
+            <span class="material-icons text-green-600 dark:text-green-400">play_circle</span>
+            <div class="flex-1 min-w-0">
+                <span class="text-sm font-semibold text-gray-900 dark:text-white">Активное видео:</span>
+                <span class="text-sm text-gray-700 dark:text-gray-300 ml-1 truncate" x-text="activeVideoTitle || '—'"></span>
+            </div>
+            <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-100" x-text="activeVideoSourceLabel"></span>
+            <div class="text-xs text-gray-600 dark:text-gray-400" x-show="activeVideoSchedule">
+                <span x-text="formatSchedule(activeVideoSchedule)"></span>
+            </div>
+        </div>
+    </div>
+</template>
+
+<template x-if="!videos || videos.length === 0">
+    <div class="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-6 text-center">
+        <span class="material-icons text-4xl text-yellow-600 dark:text-yellow-400 mb-3 block">videocam_off</span>
+        <p class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Видео не загружены</p>
+        <button @click="showUploadDialog = true" class="btn btn-primary text-sm px-3 py-1.5">
+            <span class="material-icons mr-2 text-sm">add</span>Загрузить первое видео
+        </button>
+    </div>
+</template>

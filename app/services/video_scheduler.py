@@ -30,6 +30,8 @@ def compute_video_status(video: Video, now: datetime = None) -> str:
     """Compute video status based on subscription and active state."""
     if now is None:
         now = datetime.now(timezone.utc)
+    else:
+        now = _ensure_utc(now)
     
     if not video.is_active:
         return "inactive"
@@ -50,6 +52,8 @@ def compute_days_remaining(video: Video, now: datetime = None) -> Optional[int]:
     """Compute days remaining until subscription expires."""
     if now is None:
         now = datetime.now(timezone.utc)
+    else:
+        now = _ensure_utc(now)
     
     sub_end = _ensure_utc(video.subscription_end)
     if not sub_end:

@@ -1,0 +1,163 @@
+<div x-show="activeTab === 'notifications'" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0 translate-y-1" x-transition:enter-end="opacity-100 translate-y-0">
+    <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
+        <div class="px-6 py-5 border-b border-gray-200 dark:border-gray-700">
+            <h3 class="text-lg font-semibold text-gray-900 dark:text-white">РЈРІРµРґРѕРјР»РµРЅРёСЏ</h3>
+            <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">Email Рё Telegram-СѓРІРµРґРѕРјР»РµРЅРёСЏ Рѕ СЃРѕР±С‹С‚РёСЏС… РїР»Р°С‚С„РѕСЂРјС‹</p>
+        </div>
+
+        <form method="post" action="/settings/notifications" class="p-6 space-y-6" x-ref="notificationsForm">
+            <div class="space-y-4">
+                <div class="flex items-center gap-3 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-xl border border-blue-200 dark:border-blue-800">
+                    <input id="email_enabled" name="email_enabled" type="checkbox"
+                           {% if settings.notifications.email_enabled %}checked{% endif %}
+                           value="on"
+                           class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
+                    <label for="email_enabled" class="text-sm">
+                        <span class="font-medium text-gray-900 dark:text-white">Email-СѓРІРµРґРѕРјР»РµРЅРёСЏ</span>
+                        <span class="text-gray-500 dark:text-gray-400 block text-xs mt-0.5">РћС‚РїСЂР°РІРєР° СѓРІРµРґРѕРјР»РµРЅРёР№ РїРѕ СЌР»РµРєС‚СЂРѕРЅРЅРѕР№ РїРѕС‡С‚Рµ</span>
+                    </label>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                    <div>
+                        <label for="smtp_host" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">SMTP-СЃРµСЂРІРµСЂ</label>
+                        <input type="text" name="smtp_host" id="smtp_host"
+                               value="{{ settings.notifications.smtp_host or '' }}"
+                               class="form-input" placeholder="smtp.gmail.com">
+                    </div>
+                    <div>
+                        <label for="smtp_port" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">SMTP-РїРѕСЂС‚</label>
+                        <input type="number" name="smtp_port" id="smtp_port"
+                               value="{{ settings.notifications.smtp_port|default(587) }}"
+                               min="1" max="65535" class="form-input">
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                    <div>
+                        <label for="smtp_username" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">SMTP Р»РѕРіРёРЅ</label>
+                        <input type="text" name="smtp_username" id="smtp_username"
+                               value="{{ settings.notifications.smtp_username or '' }}"
+                               class="form-input" placeholder="user@gmail.com">
+                    </div>
+                    <div>
+                        <label for="smtp_password" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">SMTP РїР°СЂРѕР»СЊ</label>
+                        <input type="password" name="smtp_password" id="smtp_password"
+                               value=""
+                               class="form-input" placeholder="РћСЃС‚Р°РІСЊС‚Рµ РїСѓСЃС‚С‹Рј, С‡С‚РѕР±С‹ РЅРµ РјРµРЅСЏС‚СЊ СЃРѕС…СЂР°РЅС‘РЅРЅС‹Р№">
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                    <div>
+                        <label for="smtp_from_email" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Email РѕС‚РїСЂР°РІРёС‚РµР»СЏ</label>
+                        <input type="email" name="smtp_from_email" id="smtp_from_email"
+                               value="{{ settings.notifications.smtp_from_email|default('noreply@vertexar.com') }}"
+                               class="form-input">
+                    </div>
+                    <div class="flex items-end">
+                        <button type="button" @click="testEmail()" :disabled="emailTesting"
+                                class="inline-flex items-center gap-1.5 text-sm px-3 py-2 rounded-lg border border-blue-300 dark:border-blue-700 text-blue-700 dark:text-blue-300 hover:bg-blue-50 dark:hover:bg-blue-900/30 transition-colors">
+                            <span class="material-icons text-base" :class="emailTesting && 'animate-spin'"
+                                  x-text="emailTesting ? 'refresh' : 'mail'"></span>
+                            <span x-text="emailTesting ? 'РћС‚РїСЂР°РІРєР°...' : 'РћС‚РїСЂР°РІРёС‚СЊ С‚РµСЃС‚РѕРІРѕРµ РїРёСЃСЊРјРѕ'"></span>
+                        </button>
+                    </div>
+                </div>
+                <p class="text-xs text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-700/50 rounded-lg p-3">
+                    РўРµСЃС‚РѕРІРѕРµ РїРёСЃСЊРјРѕ РѕС‚РїСЂР°РІР»СЏРµС‚СЃСЏ РЅР° email С‚РµРєСѓС‰РµРіРѕ Р°РґРјРёРЅРёСЃС‚СЂР°С‚РѕСЂР° Рё РёСЃРїРѕР»СЊР·СѓРµС‚ Р·РЅР°С‡РµРЅРёСЏ РёР· С„РѕСЂРјС‹. Р•СЃР»Рё РїРѕР»Рµ РїР°СЂРѕР»СЏ РїСѓСЃС‚РѕРµ, Р±РµСЂС‘С‚СЃСЏ СѓР¶Рµ СЃРѕС…СЂР°РЅС‘РЅРЅС‹Р№ РїР°СЂРѕР»СЊ.
+                </p>
+            </div>
+
+            <div class="border-t border-gray-200 dark:border-gray-700"></div>
+
+            <div class="space-y-4">
+                <div class="flex items-center gap-3 p-4 bg-sky-50 dark:bg-sky-900/20 rounded-xl border border-sky-200 dark:border-sky-800">
+                    <input id="telegram_enabled" name="telegram_enabled" type="checkbox"
+                           {% if settings.notifications.telegram_enabled %}checked{% endif %}
+                           value="on"
+                           class="h-4 w-4 text-sky-600 focus:ring-sky-500 border-gray-300 rounded">
+                    <label for="telegram_enabled" class="text-sm">
+                        <span class="font-medium text-gray-900 dark:text-white">Telegram-СѓРІРµРґРѕРјР»РµРЅРёСЏ</span>
+                        <span class="text-gray-500 dark:text-gray-400 block text-xs mt-0.5">РћС‚РїСЂР°РІРєР° СѓРІРµРґРѕРјР»РµРЅРёР№ С‡РµСЂРµР· Telegram-Р±РѕС‚Р°</span>
+                    </label>
+                </div>
+                <p class="text-xs text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-700/50 rounded-lg p-3">
+                    <strong class="text-gray-700 dark:text-gray-300">Р§С‚Рѕ РїСЂРёСЃС‹Р»Р°РµС‚ Р±РѕС‚:</strong> РєСЂРёС‚РёС‡РµСЃРєРёРµ Р°Р»РµСЂС‚С‹ (РЅР°РіСЂСѓР·РєР° CPU/RAM, Р·РґРѕСЂРѕРІСЊРµ API), С‚РµСЃС‚РѕРІРѕРµ СЃРѕРѕР±С‰РµРЅРёРµ РїРѕ РєРЅРѕРїРєРµ РЅРёР¶Рµ; РїСЂРё РІРєР»СЋС‡С‘РЅРЅРѕР№ 2FA (СЂР°Р·РґРµР» В«Р‘РµР·РѕРїР°СЃРЅРѕСЃС‚СЊВ») вЂ” РѕРґРЅРѕСЂР°Р·РѕРІС‹Р№ РєРѕРґ РІС…РѕРґР° РЅР° СѓРєР°Р·Р°РЅРЅС‹Р№ С‚Р°Рј Chat ID; РїСЂРё РЅР°СЃС‚СЂРѕР№РєРµ СѓРІРµРґРѕРјР»РµРЅРёР№ РѕР± РёСЃС‚РµС‡РµРЅРёРё РїРѕРґРїРёСЃРєРё вЂ” РїСЂРµРґСѓРїСЂРµР¶РґРµРЅРёСЏ РїРѕ РїСЂРѕРµРєС‚Р°Рј/РєРѕРјРїР°РЅРёСЏРј.
+                </p>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                    <div>
+                        <label for="telegram_bot_token" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Bot Token</label>
+                        <input type="text" name="telegram_bot_token" id="telegram_bot_token"
+                               value="{{ settings.notifications.telegram_bot_token or '' }}"
+                               class="form-input font-mono text-sm" placeholder="123456:ABC-DEF...">
+                        <p class="text-xs text-gray-400 dark:text-gray-500 mt-1">РџРѕР»СѓС‡РёС‚Рµ Сѓ <a href="https://t.me/BotFather" target="_blank" class="text-blue-500 hover:underline">@BotFather</a></p>
+                    </div>
+                    <div>
+                        <label for="telegram_admin_chat_id" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Chat ID Р°РґРјРёРЅРёСЃС‚СЂР°С‚РѕСЂР°</label>
+                        <input type="text" name="telegram_admin_chat_id" id="telegram_admin_chat_id"
+                               value="{{ settings.notifications.telegram_admin_chat_id or '' }}"
+                               class="form-input font-mono text-sm" placeholder="-1001234567890">
+                        <p class="text-xs text-gray-400 dark:text-gray-500 mt-1">РЈР·РЅР°Р№С‚Рµ С‡РµСЂРµР· <a href="https://t.me/userinfobot" target="_blank" class="text-blue-500 hover:underline">@userinfobot</a>. Р•СЃР»Рё С‚РµСЃС‚ РІРµСЂРЅС‘С‚ В«chat not foundВ» вЂ” СЃРЅР°С‡Р°Р»Р° РЅР°РїРёС€РёС‚Рµ Р±РѕС‚Сѓ РІ Telegram РєРѕРјР°РЅРґСѓ /start.</p>
+                    </div>
+                </div>
+
+                <button type="button" @click="testTelegram()" :disabled="telegramTesting"
+                        class="inline-flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-lg border border-sky-300 dark:border-sky-700 text-sky-700 dark:text-sky-300 hover:bg-sky-50 dark:hover:bg-sky-900/30 transition-colors">
+                    <span class="material-icons text-base" :class="telegramTesting && 'animate-spin'"
+                          x-text="telegramTesting ? 'refresh' : 'send'"></span>
+                    <span x-text="telegramTesting ? 'РћС‚РїСЂР°РІРєР°...' : 'РћС‚РїСЂР°РІРёС‚СЊ С‚РµСЃС‚РѕРІРѕРµ СЃРѕРѕР±С‰РµРЅРёРµ'"></span>
+                </button>
+            </div>
+
+            <div class="border-t border-gray-200 dark:border-gray-700"></div>
+
+            <div class="space-y-4">
+                <div class="flex items-center gap-3 p-4 bg-amber-50 dark:bg-amber-900/20 rounded-xl border border-amber-200 dark:border-amber-800">
+                    <input id="telegram_alerts_enabled" name="telegram_alerts_enabled" type="checkbox"
+                           {% if settings.notifications.telegram_alerts_enabled %}checked{% endif %}
+                           value="on"
+                           class="h-4 w-4 text-amber-600 focus:ring-amber-500 border-gray-300 rounded">
+                    <label for="telegram_alerts_enabled" class="text-sm">
+                        <span class="font-medium text-gray-900 dark:text-white">РЎРёСЃС‚РµРјРЅС‹Рµ Р°Р»РµСЂС‚С‹ РІ Telegram</span>
+                        <span class="text-gray-500 dark:text-gray-400 block text-xs mt-0.5">РћС‚РїСЂР°РІР»СЏС‚СЊ Р°Р»РµСЂС‚С‹ Р°РґРјРёРЅРёСЃС‚СЂР°С‚РѕСЂСѓ С‡РµСЂРµР· С‚РѕРіРѕ Р¶Рµ Telegram-Р±РѕС‚Р°</span>
+                    </label>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                    <label class="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+                        <input type="checkbox" name="alert_on_critical" value="on" {% if settings.notifications.alert_on_critical %}checked{% endif %} class="h-4 w-4 rounded border-gray-300 text-amber-600 focus:ring-amber-500">
+                        <span>РљСЂРёС‚РёС‡РµСЃРєРёРµ РѕС€РёР±РєРё</span>
+                    </label>
+                    <label class="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+                        <input type="checkbox" name="alert_on_warning" value="on" {% if settings.notifications.alert_on_warning %}checked{% endif %} class="h-4 w-4 rounded border-gray-300 text-amber-600 focus:ring-amber-500">
+                        <span>Warning-СЃРѕР±С‹С‚РёСЏ</span>
+                    </label>
+                    <label class="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+                        <input type="checkbox" name="alert_on_backup_failed" value="on" {% if settings.notifications.alert_on_backup_failed %}checked{% endif %} class="h-4 w-4 rounded border-gray-300 text-amber-600 focus:ring-amber-500">
+                        <span>РџР°РґРµРЅРёРµ backup</span>
+                    </label>
+                    <label class="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+                        <input type="checkbox" name="alert_on_storage_failed" value="on" {% if settings.notifications.alert_on_storage_failed %}checked{% endif %} class="h-4 w-4 rounded border-gray-300 text-amber-600 focus:ring-amber-500">
+                        <span>РћС€РёР±РєРё storage</span>
+                    </label>
+                    <label class="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+                        <input type="checkbox" name="alert_on_health_degraded" value="on" {% if settings.notifications.alert_on_health_degraded %}checked{% endif %} class="h-4 w-4 rounded border-gray-300 text-amber-600 focus:ring-amber-500">
+                        <span>Health degraded</span>
+                    </label>
+                </div>
+                <p class="text-xs text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-700/50 rounded-lg p-3">
+                    Р­С‚Рё РїРµСЂРµРєР»СЋС‡Р°С‚РµР»Рё СѓРїСЂР°РІР»СЏСЋС‚ СЃРёСЃС‚РµРјРЅС‹РјРё Telegram-Р°Р»РµСЂС‚Р°РјРё РґР»СЏ Р°РґРјРёРЅРёСЃС‚СЂР°С‚РѕСЂР°. Р•СЃР»Рё РѕР±С‰РёР№ Telegram РІС‹РєР»СЋС‡РµРЅ, Р°Р»РµСЂС‚С‹ С‚РѕР¶Рµ РѕС‚РїСЂР°РІР»СЏС‚СЊСЃСЏ РЅРµ Р±СѓРґСѓС‚.
+                </p>
+            </div>
+
+            <div class="flex flex-col sm:flex-row justify-end gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
+                <button type="button" onclick="window.location.reload()" class="btn btn-secondary w-full sm:w-auto">РћС‚РјРµРЅР°</button>
+                <button type="submit" class="btn btn-primary w-full sm:w-auto">
+                    <span class="material-icons text-sm mr-1">save</span>РЎРѕС…СЂР°РЅРёС‚СЊ
+                </button>
+            </div>
+        </form>
+    </div>
+</div>

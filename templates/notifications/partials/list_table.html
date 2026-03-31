@@ -1,0 +1,89 @@
+<div class="bg-white dark:bg-gray-800 shadow rounded-lg overflow-hidden">
+    <div class="overflow-x-auto">
+        <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+            <thead class="bg-gray-50 dark:bg-gray-900">
+                <tr>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                        Title
+                    </th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                        Context
+                    </th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                        Created
+                    </th>
+                    <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                        Actions
+                    </th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
+                {% if notifications %}
+                    {% for notification in notifications %}
+                    <tr class="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors {% if not notification.is_read %}bg-blue-50 dark:bg-blue-900/20{% endif %}" id="notification-{{ notification.id }}">
+                        <td class="px-6 py-4 text-sm font-medium text-gray-900 dark:text-white">
+                            <a href="/notifications/{{ notification.id }}" class="text-indigo-600 hover:text-indigo-700 dark:text-indigo-400 dark:hover:text-indigo-300">
+                                {{ notification.title }}
+                            </a>
+                        </td>
+                        <td class="px-6 py-4 text-sm text-gray-600 dark:text-gray-400">
+                            <div class="flex flex-col gap-1 text-xs">
+                                {% if notification.company_name %}
+                                    <span class="inline-flex items-center gap-1">
+                                        <span class="material-icons text-base">business</span>
+                                        {{ notification.company_name }}
+                                    </span>
+                                {% endif %}
+                                {% if notification.project_name %}
+                                    <span class="inline-flex items-center gap-1">
+                                        <span class="material-icons text-base">folder</span>
+                                        {{ notification.project_name }}
+                                    </span>
+                                {% endif %}
+                                {% if notification.ar_content_name %}
+                                    <span class="inline-flex items-center gap-1">
+                                        <span class="material-icons text-base">view_in_ar</span>
+                                        {{ notification.ar_content_name }}
+                                    </span>
+                                {% endif %}
+                            </div>
+                        </td>
+                        <td class="px-6 py-4 text-sm text-gray-600 dark:text-gray-400">
+                            {% if notification.created_at %}
+                                {{ notification.created_at|datetime_format }}
+                            {% else %}
+                                вЂ”
+                            {% endif %}
+                        </td>
+                        <td class="px-6 py-4 text-right">
+                            <div class="flex items-center justify-end gap-2">
+                                <a href="/notifications/{{ notification.id }}"
+                                   class="inline-flex items-center gap-1 px-3 py-2 text-sm font-medium text-indigo-600 hover:bg-indigo-50 dark:text-indigo-400 dark:hover:bg-indigo-900/20 rounded-lg transition-colors"
+                                   title="View details">
+                                    <span class="material-icons text-base">open_in_new</span>
+                                    <span class="hidden sm:inline">View</span>
+                                </a>
+                                <button @click="openDeleteModal('{{ notification.id }}', '{{ notification.title }}')"
+                                   class="inline-flex items-center gap-1 px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20 rounded-lg transition-colors"
+                                   title="Delete notification">
+                                    <span class="material-icons text-base">delete</span>
+                                    <span class="hidden sm:inline">Delete</span>
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                {% else %}
+                    <tr>
+                        <td colspan="4" class="px-6 py-12 text-center">
+                            <div class="flex flex-col items-center gap-2">
+                                <span class="material-icons text-4xl text-gray-300 dark:text-gray-600">notifications_none</span>
+                                <p class="text-gray-500 dark:text-gray-400">No notifications</p>
+                            </div>
+                        </td>
+                    </tr>
+                {% endif %}
+            </tbody>
+        </table>
+    </div>
+</div>

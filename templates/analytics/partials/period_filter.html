@@ -1,0 +1,15 @@
+<div class="flex flex-wrap items-center gap-2 mb-6">
+    <span class="text-sm text-gray-500 dark:text-gray-400 mr-1">РџРµСЂРёРѕРґ:</span>
+    {% set period = analytics_data.period|default(30) %}
+    {% for p, label in [(7,'7 РґРЅРµР№'),(30,'30 РґРЅРµР№'),(90,'90 РґРЅРµР№'),(0,'Р’СЃС‘ РІСЂРµРјСЏ')] %}
+    <a href="/analytics?period={{ p }}"
+       class="px-3 py-1.5 rounded-lg text-sm font-medium transition-colors
+              {% if period == p %}
+              bg-indigo-600 text-white shadow-sm
+              {% else %}
+              bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600
+              {% endif %}">
+        {{ label }}
+    </a>
+    {% endfor %}
+</div>

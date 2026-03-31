@@ -1,0 +1,90 @@
+<div class="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-8 gap-4 mb-6">
+    <div class="card !p-4">
+        <div class="flex items-center gap-3">
+            <div class="p-2 rounded-full bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400 shrink-0">
+                <span class="material-icons text-lg">visibility</span>
+            </div>
+            <div class="min-w-0">
+                <p class="text-xs text-gray-500 dark:text-gray-400 truncate">Р’СЃРµРіРѕ РїСЂРѕСЃРјРѕС‚СЂРѕРІ</p>
+                <p class="text-lg font-bold text-gray-900 dark:text-white">{{ analytics_data.total_views|default(0) }}</p>
+            </div>
+        </div>
+    </div>
+    <div class="card !p-4">
+        <div class="flex items-center gap-3">
+            <div class="p-2 rounded-full bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400 shrink-0">
+                <span class="material-icons text-lg">people</span>
+            </div>
+            <div class="min-w-0">
+                <p class="text-xs text-gray-500 dark:text-gray-400 truncate">РЈРЅРёРєР°Р»СЊРЅС‹С… СЃРµСЃСЃРёР№</p>
+                <p class="text-lg font-bold text-gray-900 dark:text-white">{{ analytics_data.unique_sessions|default(0) }}</p>
+            </div>
+        </div>
+    </div>
+    <div class="card !p-4">
+        <div class="flex items-center gap-3">
+            <div class="p-2 rounded-full bg-purple-100 text-purple-600 dark:bg-purple-900/30 dark:text-purple-400 shrink-0">
+                <span class="material-icons text-lg">view_in_ar</span>
+            </div>
+            <div class="min-w-0">
+                <p class="text-xs text-gray-500 dark:text-gray-400 truncate">РђРєС‚РёРІРЅС‹Р№ РєРѕРЅС‚РµРЅС‚</p>
+                <p class="text-lg font-bold text-gray-900 dark:text-white">{{ analytics_data.active_content|default(0) }}</p>
+            </div>
+        </div>
+    </div>
+    <div class="card !p-4">
+        <div class="flex items-center gap-3">
+            <div class="p-2 rounded-full bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400 shrink-0">
+                <span class="material-icons text-lg">apartment</span>
+            </div>
+            <div class="min-w-0">
+                <p class="text-xs text-gray-500 dark:text-gray-400 truncate">РђРєС‚РёРІРЅС‹Рµ РєРѕРјРїР°РЅРёРё</p>
+                <p class="text-lg font-bold text-gray-900 dark:text-white">{{ analytics_data.active_companies|default(0) }}</p>
+            </div>
+        </div>
+    </div>
+    <div class="card !p-4">
+        <div class="flex items-center gap-3">
+            <div class="p-2 rounded-full bg-cyan-100 text-cyan-600 dark:bg-cyan-900/30 dark:text-cyan-400 shrink-0">
+                <span class="material-icons text-lg">folder_open</span>
+            </div>
+            <div class="min-w-0">
+                <p class="text-xs text-gray-500 dark:text-gray-400 truncate">РђРєС‚РёРІРЅС‹Рµ РїСЂРѕРµРєС‚С‹</p>
+                <p class="text-lg font-bold text-gray-900 dark:text-white">{{ analytics_data.active_projects|default(0) }}</p>
+            </div>
+        </div>
+    </div>
+    <div class="card !p-4">
+        <div class="flex items-center gap-3">
+            <div class="p-2 rounded-full bg-orange-100 text-orange-600 dark:bg-orange-900/30 dark:text-orange-400 shrink-0">
+                <span class="material-icons text-lg">timer</span>
+            </div>
+            <div class="min-w-0">
+                <p class="text-xs text-gray-500 dark:text-gray-400 truncate">РЎСЂРµРґРЅСЏСЏ РґР»РёС‚РµР»СЊРЅРѕСЃС‚СЊ</p>
+                <p class="text-lg font-bold text-gray-900 dark:text-white">{{ analytics_data.avg_duration|default(0) }} s</p>
+            </div>
+        </div>
+    </div>
+    <div class="card !p-4">
+        <div class="flex items-center gap-3">
+            <div class="p-2 rounded-full bg-teal-100 text-teal-600 dark:bg-teal-900/30 dark:text-teal-400 shrink-0">
+                <span class="material-icons text-lg">play_circle</span>
+            </div>
+            <div class="min-w-0">
+                <p class="text-xs text-gray-500 dark:text-gray-400 truncate">Р”РѕР»СЏ РїСЂРѕСЃРјРѕС‚СЂР° РІРёРґРµРѕ</p>
+                <p class="text-lg font-bold text-gray-900 dark:text-white">{{ analytics_data.video_play_rate|default(0) }}%</p>
+            </div>
+        </div>
+    </div>
+    <div class="card !p-4">
+        <div class="flex items-center gap-3">
+            <div class="p-2 rounded-full bg-indigo-100 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-400 shrink-0">
+                <span class="material-icons text-lg">inventory</span>
+            </div>
+            <div class="min-w-0">
+                <p class="text-xs text-gray-500 dark:text-gray-400 truncate">Р’СЃРµРіРѕ РєРѕРЅС‚РµРЅС‚Р°</p>
+                <p class="text-lg font-bold text-gray-900 dark:text-white">{{ analytics_data.total_content|default(0) }}</p>
+            </div>
+        </div>
+    </div>
+</div>

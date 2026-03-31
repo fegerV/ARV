@@ -1,0 +1,98 @@
+<template x-if="videos && videos.length > 0">
+    <div>
+        <h4 class="text-base font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+            <span class="material-icons text-base">list</span>
+            Все видео (<span x-text="videos ? videos.length : 0"></span>)
+        </h4>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <template x-for="video in videos" :key="video.id">
+                <div class="border-2 rounded-lg overflow-hidden transition-all hover:shadow-lg"
+                     :class="video.is_active ? 'border-green-500 dark:border-green-400 bg-green-50/50 dark:bg-green-900/10' : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800'">
+                    <div class="relative bg-gray-900 overflow-hidden" style="aspect-ratio: 4/3;">
+                        <template x-if="isImagePreview(video.preview_url) && !video._previewFailed">
+                            <img :src="video.preview_url" alt="Video preview" loading="lazy"
+                                 @error="video._previewFailed = true"
+                                 class="absolute inset-0 w-full h-full object-cover">
+                        </template>
+                        <template x-if="(!isImagePreview(video.preview_url) || video._previewFailed) && video.video_url">
+                            <video :src="video.video_url" preload="metadata" muted class="absolute inset-0 w-full h-full object-cover"></video>
+                        </template>
+                        <template x-if="(!isImagePreview(video.preview_url) || video._previewFailed) && !video.video_url">
+                            <div class="absolute inset-0 flex items-center justify-center text-gray-500">
+                                <span class="material-icons text-4xl">videocam_off</span>
+                            </div>
+                        </template>
+                        <button x-show="video.video_url" @click="playVideo(video.video_url)"
+                                class="absolute inset-0 flex items-center justify-center bg-black/0 hover:bg-black/30 transition-colors group">
+                            <span class="material-icons text-5xl text-white opacity-70 group-hover:opacity-100 drop-shadow-lg transition-opacity">play_circle</span>
+                        </button>
+                        <div x-show="video.is_active" class="absolute top-2 right-2 inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-semibold bg-green-500 text-white shadow pointer-events-none">
+                            <span class="material-icons text-xs">play_arrow</span>Активно
+                        </div>
+                    </div>
+
+                    <div class="p-4 space-y-3">
+                        <div class="flex items-start justify-between gap-2">
+                            <div class="flex-1 min-w-0">
+                                <div class="text-sm font-semibold text-gray-900 dark:text-white truncate" x-text="video.title || 'Видео'"></div>
+                                <div class="flex items-center gap-2 mt-1">
+                                    <span class="text-xs px-2 py-0.5 rounded-full font-medium" :class="videoStatusClass(video.status)" x-text="video.status"></span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="space-y-1.5 text-xs text-gray-600 dark:text-gray-400">
+                            <div class="flex items-center justify-between">
+                                <span>Срок действия:</span>
+                                <span class="font-medium" :class="video.days_remaining === null ? 'text-yellow-600 dark:text-yellow-400' : ''"
+                                      x-text="video.days_remaining !== null ? video.days_remaining + ' дн.' : 'Без срока'"></span>
+                            </div>
+                            <div class="flex items-center justify-between">
+                                <span>Расписаний:</span>
+                                <span class="font-medium" x-text="video.schedules_count"></span>
+                            </div>
+                        </div>
+
+                        <div x-show="playbackMode !== 'manual'" class="pt-2 border-t border-gray-200 dark:border-gray-700">
+                            <label class="inline-flex items-center gap-2 cursor-pointer">
+                                <input type="checkbox"
+                                       :checked="video.is_active"
+                                       @change="toggleVideoActive(video, $event)"
+                                       class="form-checkbox">
+                                <span class="text-xs text-gray-700 dark:text-gray-300">Включить в ротацию</span>
+                            </label>
+                        </div>
+
+                        <div class="flex flex-col gap-2 pt-2 border-t border-gray-200 dark:border-gray-700">
+                            <button @click="setActiveVideo(video.id)"
+                                    :disabled="video.is_active || playbackMode !== 'manual'"
+                                    class="btn btn-primary btn-sm w-full text-xs"
+                                    :class="video.is_active ? 'opacity-50 cursor-not-allowed' : ''">
+                                <span class="material-icons text-sm mr-1">play_arrow</span>
+                                <span x-show="!video.is_active">Сделать активным</span>
+                                <span x-show="video.is_active">Уже активно</span>
+                            </button>
+                            <div class="flex gap-2">
+                                <button @click="playVideo(video.video_url)" class="btn btn-secondary flex-1 text-xs px-3 py-1.5">
+                                    <span class="material-icons text-sm mr-1">play_circle</span>Проиграть
+                                </button>
+                                <button @click="regenerateThumbnail(video)"
+                                        :disabled="video._regenerating"
+                                        class="btn btn-secondary text-xs px-2 py-1.5"
+                                        title="Перегенерировать превью">
+                                    <span class="material-icons text-sm" :class="video._regenerating ? 'animate-spin' : ''">refresh</span>
+                                </button>
+                                <button @click="confirmDeleteVideo(video)"
+                                        class="btn text-xs px-2 py-1.5 border border-red-300 dark:border-red-700 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20"
+                                        title="Удалить видео">
+                                    <span class="material-icons text-sm">delete</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </template>
+        </div>
+    </div>
+</template>

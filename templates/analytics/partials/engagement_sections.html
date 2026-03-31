@@ -1,0 +1,93 @@
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+    <div class="space-y-6">
+        <div class="card">
+            <h3 class="text-base font-semibold text-gray-900 dark:text-white mb-4">
+                <span class="material-icons text-sm align-middle mr-1">devices</span>
+                РЈСЃС‚СЂРѕР№СЃС‚РІР°
+            </h3>
+            <p class="text-xs text-gray-500 dark:text-gray-400 mb-2">РњРѕР±РёР»СЊРЅС‹Рµ СѓСЃС‚СЂРѕР№СЃС‚РІР°: Android Рё iOS (desktop РЅРµ СѓС‡РёС‚С‹РІР°РµС‚СЃСЏ)</p>
+            <div id="chart-devices" class="w-full" style="min-height:250px"></div>
+            {% if not analytics_data.device_stats %}
+            <p class="text-gray-400 dark:text-gray-500 text-center text-sm py-4">РќРµС‚ РґР°РЅРЅС‹С…</p>
+            {% endif %}
+        </div>
+        <div class="card">
+            <h3 class="text-base font-semibold text-gray-900 dark:text-white mb-4">
+                <span class="material-icons text-sm align-middle mr-1">language</span>
+                Р‘СЂР°СѓР·РµСЂС‹
+            </h3>
+            <div id="chart-browsers" class="w-full" style="min-height:250px"></div>
+            {% if not analytics_data.browser_stats %}
+            <p class="text-gray-400 dark:text-gray-500 text-center text-sm py-4">РќРµС‚ РґР°РЅРЅС‹С…</p>
+            {% endif %}
+        </div>
+        <div class="card">
+            <h3 class="text-base font-semibold text-gray-900 dark:text-white mb-4">
+                <span class="material-icons text-sm align-middle mr-1">phone_android</span>
+                РњРѕРґРµР»Рё СѓСЃС‚СЂРѕР№СЃС‚РІ
+            </h3>
+            {% if analytics_data.device_model_stats %}
+            <div class="overflow-x-auto">
+                <table class="table text-sm">
+                    <thead>
+                        <tr>
+                            <th class="text-left">РњРѕРґРµР»СЊ</th>
+                            <th class="text-right">РџСЂРѕСЃРјРѕС‚СЂС‹</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for row in analytics_data.device_model_stats %}
+                        <tr>
+                            <td class="text-gray-900 dark:text-white">{{ row.label }}</td>
+                            <td class="text-right font-medium text-gray-900 dark:text-white">{{ row.value }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <p class="text-gray-400 dark:text-gray-500 text-sm py-2">РќРµС‚ РґР°РЅРЅС‹С…. РњРѕРґРµР»Рё РїРµСЂРµРґР°СЋС‚СЃСЏ РёР· РїСЂРёР»РѕР¶РµРЅРёР№ Android Рё iOS.</p>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="card">
+        <h3 class="text-base font-semibold text-gray-900 dark:text-white mb-4">
+            <span class="material-icons text-sm align-middle mr-1">star</span>
+            РўРѕРї РєРѕРЅС‚РµРЅС‚Р°
+        </h3>
+        {% if analytics_data.top_content %}
+        <div class="overflow-x-auto">
+            <table class="table text-sm">
+                <thead>
+                    <tr>
+                        <th class="text-left">#</th>
+                        <th class="text-left">Р—Р°РєР°Р·</th>
+                        <th class="text-left">РљРѕРјРїР°РЅРёСЏ</th>
+                        <th class="text-right">РџСЂРѕСЃРјРѕС‚СЂС‹</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in analytics_data.top_content %}
+                    <tr>
+                        <td class="text-gray-400">{{ loop.index }}</td>
+                        <td class="font-medium text-gray-900 dark:text-white">{{ item.order_number }}</td>
+                        <td class="text-gray-500 dark:text-gray-400">{{ item.company_name }}</td>
+                        <td class="text-right font-semibold text-gray-900 dark:text-white">{{ item.views }}</td>
+                        <td>
+                            <a href="/ar-content/{{ item.id }}"
+                               class="text-indigo-600 hover:text-indigo-800 dark:text-indigo-400 text-xs">
+                                РћС‚РєСЂС‹С‚СЊ
+                            </a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <p class="text-gray-400 dark:text-gray-500 text-center py-8">РџРѕРєР° РЅРµС‚ РґР°РЅРЅС‹С… Рѕ РїСЂРѕСЃРјРѕС‚СЂР°С…</p>
+        {% endif %}
+    </div>
+</div>

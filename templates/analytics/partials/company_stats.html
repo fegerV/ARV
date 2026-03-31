@@ -1,0 +1,50 @@
+<div class="card">
+    <h3 class="text-base font-semibold text-gray-900 dark:text-white mb-4">
+        <span class="material-icons text-sm align-middle mr-1">business</span>
+        РЎС‚Р°С‚РёСЃС‚РёРєР° РїРѕ РєРѕРјРїР°РЅРёСЏРј
+    </h3>
+    {% if analytics_data.company_stats %}
+    <div class="overflow-x-auto">
+        <table class="table text-sm">
+            <thead>
+                <tr>
+                    <th class="text-left">РљРѕРјРїР°РЅРёСЏ</th>
+                    <th class="text-right">РџСЂРѕСЃРјРѕС‚СЂС‹</th>
+                    <th class="text-right">РЎРµСЃСЃРёРё</th>
+                    <th class="text-right">РЎСЂРµРґ. РґР»РёС‚РµР»СЊРЅРѕСЃС‚СЊ</th>
+                    <th class="text-right">Р’РёРґРµРѕ %</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for c in analytics_data.company_stats %}
+                <tr>
+                    <td>
+                        <a href="/companies/{{ c.id }}"
+                           class="font-medium text-gray-900 dark:text-white hover:text-indigo-600 dark:hover:text-indigo-400">
+                            {{ c.name }}
+                        </a>
+                    </td>
+                    <td class="text-right text-gray-700 dark:text-gray-300">{{ c.views }}</td>
+                    <td class="text-right text-gray-700 dark:text-gray-300">{{ c.sessions }}</td>
+                    <td class="text-right text-gray-500 dark:text-gray-400">{{ c.avg_duration }} s</td>
+                    <td class="text-right">
+                        <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium
+                            {% if c.video_rate >= 50 %}
+                            bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300
+                            {% elif c.video_rate >= 20 %}
+                            bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300
+                            {% else %}
+                            bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300
+                            {% endif %}">
+                            {{ c.video_rate }}%
+                        </span>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <p class="text-gray-400 dark:text-gray-500 text-center py-8">РџРѕРєР° РЅРµС‚ РґР°РЅРЅС‹С… РїРѕ РєРѕРјРїР°РЅРёСЏРј</p>
+    {% endif %}
+</div>

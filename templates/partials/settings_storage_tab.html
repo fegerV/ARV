@@ -1,0 +1,52 @@
+<div x-show="activeTab === 'storage'" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0 translate-y-1" x-transition:enter-end="opacity-100 translate-y-0">
+    <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
+        <div class="px-6 py-5 border-b border-gray-200 dark:border-gray-700">
+            <h3 class="text-lg font-semibold text-gray-900 dark:text-white">РҐСЂР°РЅРµРЅРёРµ С„Р°Р№Р»РѕРІ</h3>
+            <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">РќР°СЃС‚СЂРѕР№РєРё С…СЂР°РЅРёР»РёС‰Р°, Р»РёРјРёС‚С‹ С„Р°Р№Р»РѕРІ Рё CDN</p>
+        </div>
+
+        <form method="post" action="/settings/storage" class="p-6 space-y-6">
+            <div>
+                <label for="default_storage" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">РҐСЂР°РЅРёР»РёС‰Рµ РїРѕ СѓРјРѕР»С‡Р°РЅРёСЋ</label>
+                <select id="default_storage" name="default_storage" class="form-select">
+                    <option value="local" {% if settings.storage.default_storage == 'local' %}selected{% endif %}>Р›РѕРєР°Р»СЊРЅРѕРµ</option>
+                    <option value="yandex_disk" {% if settings.storage.default_storage == 'yandex_disk' %}selected{% endif %}>РЇРЅРґРµРєСЃ Р”РёСЃРє</option>
+                </select>
+                <p class="text-xs text-gray-400 dark:text-gray-500 mt-1">РЇРЅРґРµРєСЃ Р”РёСЃРє РЅР°СЃС‚СЂР°РёРІР°РµС‚СЃСЏ С‡РµСЂРµР· РїСЂРѕС„РёР»СЊ РєРѕРјРїР°РЅРёРё</p>
+            </div>
+
+            <div>
+                <label for="max_file_size" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">РњР°РєСЃ. СЂР°Р·РјРµСЂ С„Р°Р№Р»Р° (РњР‘)</label>
+                <input type="number" name="max_file_size" id="max_file_size"
+                       value="{{ settings.storage.max_file_size|default(100) }}"
+                       min="1" max="500" class="form-input">
+                <p class="text-xs text-gray-400 dark:text-gray-500 mt-1">РџСЂРёРјРµРЅСЏРµС‚СЃСЏ Рє С„РѕС‚Рѕ Рё РІРёРґРµРѕ РїСЂРё Р·Р°РіСЂСѓР·РєРµ</p>
+            </div>
+
+            <div class="flex items-center gap-3 p-4 bg-purple-50 dark:bg-purple-900/20 rounded-xl border border-purple-200 dark:border-purple-800">
+                <input id="cdn_enabled" name="cdn_enabled" type="checkbox"
+                       {% if settings.storage.cdn_enabled %}checked{% endif %}
+                       value="on"
+                       class="h-4 w-4 text-purple-600 focus:ring-purple-500 border-gray-300 rounded">
+                <label for="cdn_enabled" class="text-sm">
+                    <span class="font-medium text-gray-900 dark:text-white">CDN</span>
+                    <span class="text-gray-500 dark:text-gray-400 block text-xs mt-0.5">Р Р°Р·РґР°С‡Р° СЃС‚Р°С‚РёС‡РµСЃРєРёС… С„Р°Р№Р»РѕРІ С‡РµСЂРµР· CDN</span>
+                </label>
+            </div>
+
+            <div>
+                <label for="cdn_url" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">URL CDN</label>
+                <input type="url" name="cdn_url" id="cdn_url"
+                       value="{{ settings.storage.cdn_url or '' }}"
+                       class="form-input" placeholder="https://cdn.example.com">
+            </div>
+
+            <div class="flex flex-col sm:flex-row justify-end gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
+                <button type="button" onclick="window.location.reload()" class="btn btn-secondary w-full sm:w-auto">РћС‚РјРµРЅР°</button>
+                <button type="submit" class="btn btn-primary w-full sm:w-auto">
+                    <span class="material-icons text-sm mr-1">save</span>РЎРѕС…СЂР°РЅРёС‚СЊ
+                </button>
+            </div>
+        </form>
+    </div>
+</div>

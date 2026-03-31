@@ -1,0 +1,18 @@
+<div class="flex items-center justify-between">
+    <div>
+        <h2 class="text-2xl font-semibold text-gray-900 dark:text-white">
+            {% if project %}
+                Edit Project
+            {% else %}
+                Create New Project
+            {% endif %}
+        </h2>
+        <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
+            {% if project %}
+                Update project information and settings
+            {% else %}
+                Set up a new project for your organization
+            {% endif %}
+        </p>
+    </div>
+</div>

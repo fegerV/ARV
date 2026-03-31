@@ -1,0 +1,119 @@
+<div x-show="showRotationScheduleDialog"
+     @click.self="showRotationScheduleDialog = false"
+     @keydown.escape.window="showRotationScheduleDialog = false"
+     class="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4"
+     x-cloak>
+    <div class="relative bg-white dark:bg-gray-800 rounded-lg p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+        <button @click="showRotationScheduleDialog = false"
+                class="absolute top-4 right-4 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200">
+            <span class="material-icons">close</span>
+        </button>
+        <h3 class="text-lg font-medium text-gray-900 dark:text-white mb-2">Настройка расписания ротации</h3>
+        <p class="text-sm text-gray-500 dark:text-gray-400 mb-4">
+            Настройте, как видео будут автоматически переключаться. Для простого случая выберите "Фиксированное".
+        </p>
+
+        <form @submit.prevent="saveRotationSchedule()" x-init="initRotationScheduleForm()">
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        Тип ротации <span class="text-red-500">*</span>
+                    </label>
+                    <select x-model="rotationScheduleForm.rotation_type" class="form-input w-full" required>
+                        <option value="fixed">Фиксированное (одно видео)</option>
+                        <option value="date_specific">По датам</option>
+                        <option value="daily_cycle">Ежедневный цикл</option>
+                        <option value="weekly_cycle">Еженедельный цикл</option>
+                        <option value="random_daily">Случайное ежедневно</option>
+                    </select>
+                    <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                        <strong>Фиксированное</strong> — одно видео проигрывается бессрочно.
+                    </p>
+                </div>
+
+                <div x-show="rotationScheduleForm.rotation_type === 'fixed' || rotationScheduleForm.rotation_type === 'date_specific'">
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        Видео по умолчанию <span class="text-red-500" x-show="rotationScheduleForm.rotation_type === 'fixed'">*</span>
+                    </label>
+                    <select x-model="rotationScheduleForm.default_video_id" class="form-input w-full" :required="rotationScheduleForm.rotation_type === 'fixed'">
+                        <option value="">Не выбрано</option>
+                        <template x-for="video in videos" :key="video.id">
+                            <option :value="video.id" x-text="(video.title || 'Видео ' + video.id) + (video.days_remaining !== null ? ' (осталось ' + video.days_remaining + ' дн.)' : '')"></option>
+                        </template>
+                    </select>
+                </div>
+
+                <div x-show="rotationScheduleForm.rotation_type === 'daily_cycle' || rotationScheduleForm.rotation_type === 'weekly_cycle' || rotationScheduleForm.rotation_type === 'random_daily'">
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        Последовательность видео (ID через запятую)
+                    </label>
+                    <input type="text"
+                           x-model="rotationScheduleForm.video_sequence_text"
+                           :placeholder="videos.map(v => v.id).join(', ')"
+                           class="form-input w-full">
+                    <div class="mt-1 space-y-1">
+                        <p class="text-xs text-gray-500 dark:text-gray-400">
+                            Если оставить пустым — будут использованы все видео.
+                        </p>
+                        <div class="flex flex-wrap gap-1">
+                            <template x-for="video in videos" :key="video.id">
+                                <span class="inline-flex items-center gap-1 px-2 py-0.5 bg-gray-100 dark:bg-gray-700 text-xs rounded-md text-gray-600 dark:text-gray-300">
+                                    <span class="font-medium" x-text="'#' + video.id"></span>
+                                    <span x-text="video.title || 'Без названия'"></span>
+                                </span>
+                            </template>
+                        </div>
+                        <button type="button"
+                                @click="rotationScheduleForm.video_sequence_text = videos.map(v => v.id).join(', ')"
+                                class="text-xs text-blue-600 dark:text-blue-400 hover:underline">
+                            Заполнить всеми видео
+                        </button>
+                    </div>
+                </div>
+
+                <div x-show="rotationScheduleForm.rotation_type === 'random_daily'" class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                            Не повторять видео (дней)
+                        </label>
+                        <input type="number"
+                               x-model="rotationScheduleForm.no_repeat_days"
+                               min="1"
+                               class="form-input w-full">
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        Уведомление за (дней до истечения)
+                    </label>
+                    <input type="number"
+                           x-model="rotationScheduleForm.notify_before_expiry_days"
+                           min="0"
+                           class="form-input w-full">
+                </div>
+
+                <div>
+                    <label class="inline-flex items-center gap-2">
+                        <input type="checkbox"
+                               x-model="rotationScheduleForm.is_active"
+                               class="form-checkbox">
+                        <span class="text-sm text-gray-700 dark:text-gray-300">Активно</span>
+                    </label>
+                </div>
+            </div>
+
+            <div class="flex gap-2 mt-6">
+                <button type="submit" :disabled="savingRotationSchedule" class="btn btn-primary flex-1">
+                    <span class="material-icons mr-2" x-show="!savingRotationSchedule">save</span>
+                    <span class="material-icons mr-2 animate-spin" x-show="savingRotationSchedule">refresh</span>
+                    <span x-show="!savingRotationSchedule">Сохранить</span>
+                    <span x-show="savingRotationSchedule">Сохранение...</span>
+                </button>
+                <button type="button" @click="showRotationScheduleDialog = false" class="btn btn-secondary">
+                    Отмена
+                </button>
+            </div>
+        </form>
+    </div>
+</div>

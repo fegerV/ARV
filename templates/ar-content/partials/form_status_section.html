@@ -1,0 +1,16 @@
+<div class="p-6 border-b border-gray-200 dark:border-gray-700" x-show="arContent && arContent.id">
+    <h3 class="text-lg font-medium text-gray-900 dark:text-white mb-4">РЎС‚Р°С‚СѓСЃ</h3>
+    <div>
+        <label for="status" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+            РЎС‚Р°С‚СѓСЃ Р·Р°РєР°Р·Р°
+        </label>
+        <select name="status" id="status"
+                class="form-select"
+                x-cloak>
+            <option value="pending" {% if ar_content and ar_content.status == 'pending' %}selected{% endif %}>Р’ РѕР¶РёРґР°РЅРёРё</option>
+            <option value="processing" {% if ar_content and ar_content.status == 'processing' %}selected{% endif %}>Р’ РѕР±СЂР°Р±РѕС‚РєРµ</option>
+            <option value="ready" {% if ar_content and ar_content.status == 'ready' %}selected{% endif %}>Р“РѕС‚РѕРІ</option>
+            <option value="failed" {% if ar_content and ar_content.status == 'failed' %}selected{% endif %}>РћС€РёР±РєР°</option>
+        </select>
+    </div>
+</div>

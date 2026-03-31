@@ -1,0 +1,45 @@
+<div class="card p-5 mb-6">
+    <div class="flex items-center gap-2 mb-4 pb-3 border-b border-gray-200 dark:border-gray-700">
+        <span class="material-icons text-cyan-600 dark:text-cyan-400">link</span>
+        <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Ссылка и QR-код</h3>
+    </div>
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div class="lg:col-span-2 space-y-3">
+            <div class="flex flex-col sm:flex-row gap-2 items-stretch">
+                <input type="text"
+                       :value="fullArUrl"
+                       readonly
+                       placeholder="Ссылка для AR-просмотра"
+                       class="form-input flex-1 text-sm">
+                <button @click="copyLink" class="btn btn-secondary text-sm">
+                    <span class="material-icons text-sm mr-1">content_copy</span>Копировать
+                </button>
+            </div>
+            <div class="flex flex-wrap gap-2">
+                <button @click="openArView()"
+                        :disabled="!fullArUrl"
+                        class="btn btn-primary text-sm">
+                    <span class="material-icons text-sm mr-1">play_arrow</span>Открыть AR
+                </button>
+                <button @click="showQRDialog = true" class="btn btn-secondary text-sm">
+                    <span class="material-icons text-sm mr-1">download</span>Скачать QR
+                </button>
+            </div>
+            <p class="text-xs text-gray-500 dark:text-gray-400">
+                Отправьте ссылку или QR-код клиенту для просмотра AR-контента
+            </p>
+        </div>
+        <div class="flex items-center justify-center p-4 bg-gray-50 dark:bg-gray-700/50 rounded-xl">
+            <div class="text-center">
+                <div class="bg-white p-3 rounded-lg inline-block shadow-sm">
+                    <img :src="qrCodeUrl(140)"
+                         :alt="'QR Code'"
+                         loading="lazy"
+                         class="mx-auto"
+                         @click="showQRDialog = true"
+                         style="cursor:pointer">
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

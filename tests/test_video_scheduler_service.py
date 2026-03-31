@@ -22,6 +22,8 @@ def test_ensure_utc_and_status_helpers():
     assert video_scheduler.compute_days_remaining(SimpleNamespace(subscription_end=None), now) is None
     assert video_scheduler.compute_days_remaining(SimpleNamespace(subscription_end=now - timedelta(days=1)), now) == 0
     assert video_scheduler.compute_days_remaining(video, now) == 10
+    assert video_scheduler.compute_video_status(video, naive) == "active"
+    assert video_scheduler.compute_days_remaining(video, naive) == 10
 
 
 @pytest.mark.asyncio

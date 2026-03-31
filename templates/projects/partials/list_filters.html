@@ -1,0 +1,67 @@
+<div class="bg-white dark:bg-gray-800 shadow rounded-lg p-6">
+    <div class="flex items-center justify-between mb-4">
+        <h3 class="text-lg font-medium text-gray-900 dark:text-white">Filters</h3>
+        <button @click="resetFilters" class="text-sm text-indigo-600 hover:text-indigo-700 dark:text-indigo-400 dark:hover:text-indigo-300 font-medium">
+            Reset
+        </button>
+    </div>
+
+    <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div>
+            <label for="status-filter" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Status
+            </label>
+            <select
+                id="status-filter"
+                x-model="filters.status"
+                @change="applyFilters"
+                class="form-select w-full">
+                <option value="">All Statuses</option>
+                <option value="active">Active</option>
+                <option value="inactive">Inactive</option>
+                <option value="archived">Archived</option>
+            </select>
+        </div>
+
+        <div>
+            <label for="company-filter" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Company
+            </label>
+            <select
+                id="company-filter"
+                x-model="filters.company"
+                @change="applyFilters"
+                class="form-select w-full">
+                <option value="">Р’СЃРµ РєРѕРјРїР°РЅРёРё</option>
+                {% for company in companies %}
+                <option value="{{ company.id }}">{{ company.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div>
+            <label for="page-size-select" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Р—Р°РїРёСЃРµР№ РЅР° СЃС‚СЂР°РЅРёС†Рµ
+            </label>
+            <select
+                id="page-size-select"
+                x-model="pageSize"
+                @change="changePageSize"
+                class="form-select w-full">
+                <option value="20" {% if page_size == 20 %}selected{% endif %}>20</option>
+                <option value="30" {% if page_size == 30 %}selected{% endif %}>30</option>
+                <option value="40" {% if page_size == 40 %}selected{% endif %}>40</option>
+                <option value="50" {% if page_size == 50 %}selected{% endif %}>50</option>
+            </select>
+        </div>
+
+        <div class="flex items-end">
+            <div class="w-full p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+                <p class="text-sm text-blue-800 dark:text-blue-200">
+                    Showing <span x-text="projects.length" class="font-semibold">{{ projects|length }}</span>
+                    of <span x-text="totalCount" class="font-semibold">{{ total_count }}</span> projects
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
