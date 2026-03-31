@@ -2,14 +2,14 @@
     <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden mb-6">
         <div class="px-6 py-5 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
             <div>
-                <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Р‘СЌРєР°Рї Р±Р°Р·С‹ РґР°РЅРЅС‹С…</h3>
-                <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">РђРІС‚РѕРјР°С‚РёС‡РµСЃРєРѕРµ СЂРµР·РµСЂРІРЅРѕРµ РєРѕРїРёСЂРѕРІР°РЅРёРµ PostgreSQL РЅР° РЇРЅРґРµРєСЃ Р”РёСЃРє</p>
+                <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Бэкап базы данных</h3>
+                <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">Автоматическое резервное копирование PostgreSQL на Яндекс Диск</p>
             </div>
             <button type="button" @click="runBackupNow()" :disabled="backupRunning"
                     class="btn btn-primary text-sm flex items-center gap-1.5">
                 <span class="material-icons text-base" :class="backupRunning && 'animate-spin'"
                       x-text="backupRunning ? 'refresh' : 'backup'"></span>
-                <span x-text="backupRunning ? 'РЎРѕР·РґР°РЅРёРµ...' : 'РЎРѕР·РґР°С‚СЊ СЃРµР№С‡Р°СЃ'"></span>
+                <span x-text="backupRunning ? 'Создание...' : 'Создать сейчас'"></span>
             </button>
         </div>
 
@@ -20,24 +20,24 @@
                        value="on"
                        class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
                 <label for="backup_enabled" class="text-sm">
-                    <span class="font-medium text-gray-900 dark:text-white">РђРІС‚РѕРјР°С‚РёС‡РµСЃРєРёР№ Р±СЌРєР°Рї</span>
-                    <span class="text-gray-500 dark:text-gray-400 block text-xs mt-0.5">Р РµРіСѓР»СЏСЂРЅРѕРµ СЂРµР·РµСЂРІРЅРѕРµ РєРѕРїРёСЂРѕРІР°РЅРёРµ РїРѕ СЂР°СЃРїРёСЃР°РЅРёСЋ</span>
+                    <span class="font-medium text-gray-900 dark:text-white">Автоматический бэкап</span>
+                    <span class="text-gray-500 dark:text-gray-400 block text-xs mt-0.5">Регулярное резервное копирование по расписанию</span>
                 </label>
             </div>
 
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
                 <div>
-                    <label for="backup_company_id" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Yandex Disk Р°РєРєР°СѓРЅС‚</label>
+                    <label for="backup_company_id" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Yandex Disk аккаунт</label>
                     <select id="backup_company_id" name="backup_company_id" class="form-select">
-                        <option value="0">-- РќРµ РІС‹Р±СЂР°РЅРѕ --</option>
+                        <option value="0">-- Не выбрано --</option>
                         {% for c in yd_companies %}
                         <option value="{{ c.id }}" {% if settings.backup.backup_company_id == c.id %}selected{% endif %}>{{ c.name }}</option>
                         {% endfor %}
                     </select>
-                    <p class="text-xs text-gray-400 dark:text-gray-500 mt-1">РљРѕРјРїР°РЅРёСЏ СЃ РїРѕРґРєР»СЋС‡С‘РЅРЅС‹Рј РЇРЅРґРµРєСЃ Р”РёСЃРєРѕРј</p>
+                    <p class="text-xs text-gray-400 dark:text-gray-500 mt-1">Компания с подключённым Яндекс Диском</p>
                 </div>
                 <div>
-                    <label for="backup_yd_folder" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">РџР°РїРєР° РЅР° РЇРЅРґРµРєСЃ Р”РёСЃРєРµ</label>
+                    <label for="backup_yd_folder" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Папка на Яндекс Диске</label>
                     <input type="text" name="backup_yd_folder" id="backup_yd_folder"
                            value="{{ settings.backup.backup_yd_folder|default('backups') }}"
                            class="form-input" placeholder="backups">
@@ -46,44 +46,44 @@
 
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
                 <div>
-                    <label for="backup_schedule" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Р Р°СЃРїРёСЃР°РЅРёРµ</label>
+                    <label for="backup_schedule" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Расписание</label>
                     <select id="backup_schedule" name="backup_schedule" class="form-select"
                             x-model="backupSchedule">
-                        <option value="daily" {% if settings.backup.backup_schedule == 'daily' %}selected{% endif %}>Р•Р¶РµРґРЅРµРІРЅРѕ РІ 03:00</option>
-                        <option value="twice_daily" {% if settings.backup.backup_schedule == 'twice_daily' %}selected{% endif %}>РљР°Р¶РґС‹Рµ 12 С‡Р°СЃРѕРІ (03:00, 15:00)</option>
-                        <option value="weekly" {% if settings.backup.backup_schedule == 'weekly' %}selected{% endif %}>Р•Р¶РµРЅРµРґРµР»СЊРЅРѕ (РїРЅ 03:00)</option>
-                        <option value="custom" {% if settings.backup.backup_schedule == 'custom' %}selected{% endif %}>РЎРІРѕС‘ cron-РІС‹СЂР°Р¶РµРЅРёРµ</option>
+                        <option value="daily" {% if settings.backup.backup_schedule == 'daily' %}selected{% endif %}>Ежедневно в 03:00</option>
+                        <option value="twice_daily" {% if settings.backup.backup_schedule == 'twice_daily' %}selected{% endif %}>Каждые 12 часов (03:00, 15:00)</option>
+                        <option value="weekly" {% if settings.backup.backup_schedule == 'weekly' %}selected{% endif %}>Еженедельно (пн 03:00)</option>
+                        <option value="custom" {% if settings.backup.backup_schedule == 'custom' %}selected{% endif %}>Свое cron-выражение</option>
                     </select>
                 </div>
                 <div x-show="backupSchedule === 'custom'" x-transition>
-                    <label for="backup_cron" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Cron-РІС‹СЂР°Р¶РµРЅРёРµ</label>
+                    <label for="backup_cron" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Cron-выражение</label>
                     <input type="text" name="backup_cron" id="backup_cron"
                            value="{{ settings.backup.backup_cron|default('0 3 * * *') }}"
                            class="form-input font-mono text-sm" placeholder="0 3 * * *">
-                    <p class="text-xs text-gray-400 dark:text-gray-500 mt-1">Р¤РѕСЂРјР°С‚: РјРёРЅ С‡Р°СЃ РґРµРЅСЊ РјРµСЃСЏС† РґРµРЅСЊ_РЅРµРґРµР»Рё</p>
+                    <p class="text-xs text-gray-400 dark:text-gray-500 mt-1">Формат: мин час день месяц день_недели</p>
                 </div>
             </div>
 
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
                 <div>
-                    <label for="backup_retention_days" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">РҐСЂР°РЅРёС‚СЊ (РґРЅРµР№)</label>
+                    <label for="backup_retention_days" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Хранить (дней)</label>
                     <input type="number" name="backup_retention_days" id="backup_retention_days"
                            value="{{ settings.backup.backup_retention_days|default(30) }}"
                            min="1" max="365" class="form-input">
                 </div>
                 <div>
-                    <label for="backup_max_copies" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">РњР°РєСЃ. РєРѕРїРёР№</label>
+                    <label for="backup_max_copies" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Макс. копий</label>
                     <input type="number" name="backup_max_copies" id="backup_max_copies"
                            value="{{ settings.backup.backup_max_copies|default(30) }}"
                            min="1" max="100" class="form-input">
-                    <p class="text-xs text-gray-400 dark:text-gray-500 mt-1">РЎС‚Р°СЂС‹Рµ РєРѕРїРёРё СѓРґР°Р»СЏСЋС‚СЃСЏ Р°РІС‚РѕРјР°С‚РёС‡РµСЃРєРё</p>
+                    <p class="text-xs text-gray-400 dark:text-gray-500 mt-1">Старые копии удаляются автоматически</p>
                 </div>
             </div>
 
             <div class="flex flex-col sm:flex-row justify-end gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
-                <button type="button" onclick="window.location.reload()" class="btn btn-secondary w-full sm:w-auto">РћС‚РјРµРЅР°</button>
+                <button type="button" onclick="window.location.reload()" class="btn btn-secondary w-full sm:w-auto">Отмена</button>
                 <button type="submit" class="btn btn-primary w-full sm:w-auto">
-                    <span class="material-icons text-sm mr-1">save</span>РЎРѕС…СЂР°РЅРёС‚СЊ
+                    <span class="material-icons text-sm mr-1">save</span>Сохранить
                 </button>
             </div>
         </form>
@@ -91,25 +91,25 @@
 
     <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
         <div class="px-6 py-5 border-b border-gray-200 dark:border-gray-700">
-            <h3 class="text-lg font-semibold text-gray-900 dark:text-white">РСЃС‚РѕСЂРёСЏ Р±СЌРєР°РїРѕРІ</h3>
-            <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">РџРѕСЃР»РµРґРЅРёРµ РѕРїРµСЂР°С†РёРё СЂРµР·РµСЂРІРЅРѕРіРѕ РєРѕРїРёСЂРѕРІР°РЅРёСЏ</p>
+            <h3 class="text-lg font-semibold text-gray-900 dark:text-white">История бэкапов</h3>
+            <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">Последние операции резервного копирования</p>
         </div>
         <div class="overflow-x-auto">
             <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
                 <thead class="bg-gray-50 dark:bg-gray-900/40">
                     <tr>
-                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Р”Р°С‚Р°</th>
-                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">РЎС‚Р°С‚СѓСЃ</th>
-                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Р Р°Р·РјРµСЂ</th>
-                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">РўСЂРёРіРіРµСЂ</th>
-                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">РџСѓС‚СЊ РЅР° YD</th>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Дата</th>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Статус</th>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Размер</th>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Триггер</th>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Путь на YD</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
                     {% for bkp in backup_history %}
                     <tr>
                         <td class="px-4 py-3 text-sm text-gray-700 dark:text-gray-300 whitespace-nowrap">
-                            {{ bkp.started_at.strftime('%d.%m.%Y %H:%M') if bkp.started_at else 'вЂ”' }}
+                            {{ bkp.started_at.strftime('%d.%m.%Y %H:%M') if bkp.started_at else '—' }}
                         </td>
                         <td class="px-4 py-3 text-sm whitespace-nowrap">
                             {% if bkp.status == 'success' %}
@@ -118,30 +118,30 @@
                             </span>
                             {% elif bkp.status == 'running' %}
                             <span class="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">
-                                <span class="material-icons text-xs animate-spin">refresh</span>Р’ РїСЂРѕС†РµСЃСЃРµ
+                                <span class="material-icons text-xs animate-spin">refresh</span>В процессе
                             </span>
                             {% else %}
                             <span class="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-full bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
                                   title="{{ bkp.error_message or '' }}">
-                                <span class="material-icons text-xs">error</span>РћС€РёР±РєР°
+                                <span class="material-icons text-xs">error</span>Ошибка
                             </span>
                             {% endif %}
                         </td>
                         <td class="px-4 py-3 text-sm text-gray-700 dark:text-gray-300 whitespace-nowrap">
-                            {% if bkp.size_bytes %}{{ (bkp.size_bytes / 1048576)|round(2) }} РњР‘{% else %}вЂ”{% endif %}
+                            {% if bkp.size_bytes %}{{ (bkp.size_bytes / 1048576)|round(2) }} МБ{% else %}—{% endif %}
                         </td>
                         <td class="px-4 py-3 text-sm text-gray-500 dark:text-gray-400 whitespace-nowrap">
-                            {{ 'РђРІС‚Рѕ' if bkp.trigger == 'scheduled' else 'Р’СЂСѓС‡РЅСѓСЋ' }}
+                            {{ 'Авто' if bkp.trigger == 'scheduled' else 'Вручную' }}
                         </td>
                         <td class="px-4 py-3 text-xs text-gray-400 dark:text-gray-500 font-mono truncate max-w-[200px]" title="{{ bkp.yd_path or '' }}">
-                            {{ bkp.yd_path or 'вЂ”' }}
+                            {{ bkp.yd_path or '—' }}
                         </td>
                     </tr>
                     {% endfor %}
                     {% if not backup_history %}
                     <tr>
                         <td colspan="5" class="px-4 py-8 text-center text-sm text-gray-400 dark:text-gray-500">
-                            Р‘СЌРєР°РїРѕРІ РїРѕРєР° РЅРµС‚
+                            Бэкапов пока нет
                         </td>
                     </tr>
                     {% endif %}
