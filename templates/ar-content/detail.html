@@ -208,10 +208,10 @@ document.addEventListener('alpine:init', function() {
 
         get activeVideoSourceLabel() {
             const source = this.activeVideoInfo?.source;
-            if (source === 'schedule') return '��������: ����������';
-            if (source === 'rotation') return '��������: �������';
-            if (source === 'active_default') return '��������: �������� �����';
-            return this.activeVideo ? '��������: �������' : '';
+            if (source === 'schedule') return 'Источник: расписание';
+            if (source === 'rotation') return 'Источник: ротация';
+            if (source === 'active_default') return 'Источник: видео по умолчанию';
+            return this.activeVideo ? 'Источник: активное видео' : '';
         },
 
         get activeVideoSchedule() {
@@ -250,19 +250,19 @@ document.addEventListener('alpine:init', function() {
 
         copyText(value, successMessage) {
             if (!value) {
-                this.showToast('������ ����������', 'error');
+                this.showToast('Нечего копировать', 'error');
                 return;
             }
             navigator.clipboard.writeText(String(value)).then(() => {
                 this.showToast(successMessage, 'success');
             }).catch(() => {
-                this.showToast('�� ������� �����������', 'error');
+                this.showToast('Не удалось скопировать', 'error');
             });
         },
 
         openArView() {
             if (!this.fullArUrl) {
-                this.showToast('������ ����������', 'error');
+                this.showToast('Нечего копировать', 'error');
                 return;
             }
             window.open(this.fullArUrl, '_blank', 'noopener');
@@ -287,7 +287,7 @@ document.addEventListener('alpine:init', function() {
         },
 
         formatBytes(value) {
-            if (!value && value !== 0) return '�';
+            if (!value && value !== 0) return '-';
             if (value === 0) return '0 B';
             const sizes = ['B', 'KB', 'MB', 'GB'];
             const index = Math.min(Math.floor(Math.log(value) / Math.log(1024)), sizes.length - 1);
@@ -295,28 +295,28 @@ document.addEventListener('alpine:init', function() {
         },
 
         formatSeconds(value) {
-            if (!value && value !== 0) return '�';
-            return `${Number(value).toFixed(2)} ���`;
+            if (!value && value !== 0) return '-';
+            return `${Number(value).toFixed(2)} сек`;
         },
 
         formatPercent(value) {
-            if (value === null || value === undefined) return '�';
+            if (value === null || value === undefined) return '-';
             return `${Math.round(Number(value) * 100)}%`;
         },
 
         formatScore(value) {
-            if (value === null || value === undefined) return '�';
+            if (value === null || value === undefined) return '-';
             return Number(value).toFixed(2);
         },
         
         formatDensity(value) {
-            if (value === null || value === undefined) return '�';
+            if (value === null || value === undefined) return '-';
             const num = Number(value);
             if (num === 0) return '0.00';
             // Format as features per million pixels for better readability
             const perMillion = num * 1000000;
             if (perMillion >= 1) {
-                return perMillion.toFixed(2) + ' / ��� ��������';
+                return perMillion.toFixed(2) + ' / млн пикселей';
             } else {
                 // For very small values, use scientific notation
                 return num.toExponential(4);
@@ -324,8 +324,8 @@ document.addEventListener('alpine:init', function() {
         },
 
         formatSchedule(schedule) {
-            if (!schedule) return '�';
-            return `${schedule.start_time || '�'} > ${schedule.end_time || '�'}`;
+            if (!schedule) return '-';
+            return `${schedule.start_time || '-'} > ${schedule.end_time || '-'}`;
         },
 
         normalizeMarkerMetrics() {
@@ -368,14 +368,14 @@ document.addEventListener('alpine:init', function() {
                 if (this.playbackMode === 'manual') {
                     const activeId = this.activeVideo?.id || this.videos.find(video => video.is_active)?.id;
                     if (!activeId) {
-                        this.showToast('�������� �������� �����', 'error');
+                        this.showToast('Выберите исходное видео', 'error');
                         return;
                     }
                     payload.active_video_id = activeId;
                 } else {
                     const activeIds = this.videos.filter(video => video.is_active).map(video => video.id);
                     if (!activeIds.length) {
-                        this.showToast('�������� ����� ��� �������', 'error');
+                        this.showToast('Выберите режим показа', 'error');
                         return;
                     }
                     payload.active_video_ids = activeIds;
@@ -388,16 +388,16 @@ document.addEventListener('alpine:init', function() {
 
                 if (!response.ok) {
                     const errorData = await response.json().catch(() => ({ detail: 'Unknown error' }));
-                    const errorMessage = errorData.detail || errorData.message || '�� ������� �������� �����';
+                    const errorMessage = errorData.detail || errorData.message || 'Не удалось сохранить видео';
                     this.showToast(errorMessage, 'error');
                     return;
                 }
 
                 await this.loadVideos();
-                this.showToast('����� ��������������� ��������', 'success');
+                this.showToast('Видео успешно обновлено', 'success');
             } catch (error) {
                 console.error('Playback mode error:', error);
-                this.showToast('�� ������� �������� �����', 'error');
+                this.showToast('Не удалось сохранить видео', 'error');
             } finally {
                 this.playbackModeSaving = false;
             }
@@ -406,7 +406,7 @@ document.addEventListener('alpine:init', function() {
         async toggleVideoActive(video, event) {
             const isActive = event.target.checked;
             if (this.playbackMode === 'manual') {
-                this.showToast('� ������ ������ �������� ����� ���� ������ ���� �����', 'info');
+                this.showToast('В этом режиме активным может быть только одно видео', 'info');
                 event.target.checked = video.is_active;
                 return;
             }
@@ -419,7 +419,7 @@ document.addEventListener('alpine:init', function() {
 
                 if (!response.ok) {
                     const errorData = await response.json().catch(() => ({ detail: 'Unknown error' }));
-                    const errorMessage = errorData.detail || errorData.message || '�� ������� �������� ������';
+                    const errorMessage = errorData.detail || errorData.message || 'Не удалось сохранить режим';
                     this.showToast(errorMessage, 'error');
                     event.target.checked = video.is_active;
                     return;
@@ -428,7 +428,7 @@ document.addEventListener('alpine:init', function() {
                 video.is_active = isActive;
             } catch (error) {
                 console.error('Toggle active error:', error);
-                this.showToast('�� ������� �������� ������', 'error');
+                this.showToast('Не удалось сохранить режим', 'error');
                 event.target.checked = video.is_active;
             }
         },
@@ -460,12 +460,12 @@ document.addEventListener('alpine:init', function() {
                 });
                 if (!resp.ok) {
                     const err = await resp.json().catch(() => ({}));
-                    this.showToast(err.detail || '������ ������������� ������', 'error');
+                    this.showToast(err.detail || 'Ошибка обновления превью', 'error');
                     return;
                 }
-                this.showToast('������ ������������, �������� �������� ����� ��������� ������', 'success');
+                this.showToast('Превью обновлено, страница скоро перезагрузится', 'success');
             } catch (e) {
-                this.showToast('�� ������� ��������� �������������', 'error');
+                this.showToast('Не удалось обновить превью', 'error');
             } finally {
                 video._regenerating = false;
             }
@@ -485,16 +485,16 @@ document.addEventListener('alpine:init', function() {
                 });
                 if (!resp.ok) {
                     const err = await resp.json().catch(() => ({}));
-                    this.showToast(err.detail || '�� ������� ������� �����', 'error');
+                    this.showToast(err.detail || 'Не удалось удалить видео', 'error');
                     return;
                 }
                 this.videos = this.videos.filter(v => v.id !== this.videoToDelete.id);
-                this.showToast('����� �������', 'success');
+                this.showToast('Видео удалено', 'success');
                 if (this.videoToDelete.is_active) {
                     this.activeVideoInfo = null;
                 }
             } catch (e) {
-                this.showToast('������ ��� �������� �����', 'error');
+                this.showToast('Видео для удаления не найдено', 'error');
             } finally {
                 this.deletingVideo = false;
                 this.showDeleteVideoDialog = false;
@@ -510,26 +510,26 @@ document.addEventListener('alpine:init', function() {
                 });
                 if (!response.ok) {
                     const errorData = await response.json().catch(() => ({ detail: 'Unknown error' }));
-                    const errorMessage = errorData.detail || errorData.message || '�� ������� ���������� �������� �����';
+                    const errorMessage = errorData.detail || errorData.message || 'Не удалось установить активное видео';
                     this.showToast(errorMessage, 'error');
                     return;
                 }
                 this.playbackMode = 'manual';
                 await this.loadVideos();
-                this.showToast('�������� ����� ���������', 'success');
+                this.showToast('Активное видео обновлено', 'success');
             } catch (error) {
                 console.error('Set active error:', error);
-                this.showToast('�� ������� ���������� �������� �����', 'error');
+                this.showToast('Не удалось установить активное видео', 'error');
             }
         },
 
         copyLink() {
             if (!this.fullArUrl) {
-                this.showToast('������ ����������', 'error');
+                this.showToast('Ссылка отсутствует', 'error');
                 return;
             }
 
-            this.copyText(this.fullArUrl, '������ ����������� � ����� ������');
+            this.copyText(this.fullArUrl, 'Ссылка скопирована в буфер обмена');
         },
 
         async downloadQR(format) {
@@ -551,9 +551,9 @@ document.addEventListener('alpine:init', function() {
                         break;
                 }
 
-                this.showToast(`QR-��� ������ ��� ${format.toUpperCase()}`, 'success');
+                this.showToast(`QR-код готов в формате ${format.toUpperCase()}`, 'success');
             } catch (error) {
-                this.showToast('�� ������� ������� QR-���', 'error');
+                this.showToast('Не удалось скачать QR-код', 'error');
                 console.error('Download error:', error);
             } finally {
                 this.downloadingQR = false;
@@ -642,13 +642,13 @@ document.addEventListener('alpine:init', function() {
                         this.markerMetrics = result.marker_metadata;
                         this.normalizeMarkerMetrics();
                     }
-                    this.showToast('������ � ������ ���������', 'success');
+                    this.showToast('Фото и маркер обновлены', 'success');
                 } else {
-                    this.showToast('�� ������� �������� ������/������', 'error');
+                    this.showToast('Не удалось обновить фото или маркер', 'error');
                 }
             } catch (error) {
                 console.error('Regenerate media error:', error);
-                this.showToast('�� ������� �������� ������/������', 'error');
+                this.showToast('Не удалось обновить фото или маркер', 'error');
             } finally {
                 this.regeneratingMedia = false;
             }
@@ -662,7 +662,7 @@ document.addEventListener('alpine:init', function() {
             }
             const invalid = files.find(file => !file.type.startsWith('video/'));
             if (invalid) {
-                this.showToast('����������, �������� ������ ����������', 'error');
+                this.showToast('Пожалуйста, выберите видеофайлы', 'error');
                 event.target.value = '';
                 this.videoFiles = [];
                 return;
@@ -672,7 +672,7 @@ document.addEventListener('alpine:init', function() {
 
         async handleVideoUpload() {
             if (!this.videoFiles.length) {
-                this.showToast('����������, �������� ����������', 'error');
+                this.showToast('Пожалуйста, выберите видео', 'error');
                 return;
             }
 
@@ -689,7 +689,7 @@ document.addEventListener('alpine:init', function() {
                 });
 
                 if (response.ok) {
-                    this.showToast('����� ������� ���������!', 'success');
+                    this.showToast('Видео успешно загружено', 'success');
                     this.showUploadDialog = false;
                     this.videoFiles = [];
                     // Reset file input
@@ -699,12 +699,12 @@ document.addEventListener('alpine:init', function() {
                     await this.loadVideos();
                 } else {
                     const errorData = await response.json().catch(() => ({ detail: 'Unknown error' }));
-                    const errorMessage = errorData.detail || errorData.message || '�� ������� ��������� �����';
+                    const errorMessage = errorData.detail || errorData.message || 'Не удалось загрузить видео';
                     this.showToast(errorMessage, 'error');
                     console.error('Upload failed:', errorData);
                 }
             } catch (error) {
-                this.showToast('�� ������� ��������� �����: ' + (error.message || '����������� ������'), 'error');
+                this.showToast('Не удалось загрузить видео: ' + (error.message || 'неизвестная ошибка'), 'error');
                 console.error('Upload error:', error);
             } finally {
                 this.uploadingVideo = false;
@@ -715,7 +715,7 @@ document.addEventListener('alpine:init', function() {
             const file = event.target.files[0];
             if (file) {
                 if (!file.type.startsWith('image/')) {
-                    this.showToast('����������, �������� �����������', 'error');
+                    this.showToast('Пожалуйста, выберите изображение', 'error');
                     event.target.value = '';
                     return;
                 }
@@ -725,7 +725,7 @@ document.addEventListener('alpine:init', function() {
 
         async handlePhotoUpload() {
             if (!this.photoFile) {
-                this.showToast('����������, �������� �����������', 'error');
+                this.showToast('Пожалуйста, выберите изображение', 'error');
                 return;
             }
 
@@ -752,7 +752,7 @@ document.addEventListener('alpine:init', function() {
                         this.markerMetrics = result.marker_metadata;
                         this.normalizeMarkerMetrics();
                     }
-                    this.showToast('���� ������� ���������', 'success');
+                    this.showToast('Фото успешно загружено', 'success');
                     this.showPhotoUploadDialog = false;
                     this.photoFile = null;
                     if (this.$refs.photoFileInput) {
@@ -760,12 +760,12 @@ document.addEventListener('alpine:init', function() {
                     }
                 } else {
                     const errorData = await response.json().catch(() => ({ detail: 'Unknown error' }));
-                    const errorMessage = errorData.detail || errorData.message || '�� ������� ��������� ����';
+                    const errorMessage = errorData.detail || errorData.message || 'Не удалось загрузить фото';
                     this.showToast(errorMessage, 'error');
                     console.error('Photo upload failed:', errorData);
                 }
             } catch (error) {
-                this.showToast('�� ������� ��������� ����: ' + (error.message || '����������� ������'), 'error');
+                this.showToast('Не удалось загрузить фото: ' + (error.message || 'неизвестная ошибка'), 'error');
                 console.error('Photo upload error:', error);
             } finally {
                 this.uploadingPhoto = false;
@@ -776,7 +776,7 @@ document.addEventListener('alpine:init', function() {
             const file = event.target.files[0];
             if (file) {
                 if (!file.type.startsWith('image/')) {
-                    this.showToast('����������, �������� �����������', 'error');
+                    this.showToast('Пожалуйста, выберите изображение', 'error');
                     event.target.value = '';
                     return;
                 }
@@ -788,7 +788,7 @@ document.addEventListener('alpine:init', function() {
             const file = event.target.files[0];
             if (file) {
                 if (!file.type.startsWith('video/')) {
-                    this.showToast('����������, �������� ���������', 'error');
+                    this.showToast('Пожалуйста, выберите файл маркера', 'error');
                     event.target.value = '';
                     return;
                 }
@@ -816,7 +816,7 @@ document.addEventListener('alpine:init', function() {
 
                 if (!response.ok) {
                     const errorData = await response.json().catch(() => ({ detail: 'Unknown error' }));
-                    const errorMessage = errorData.detail || errorData.message || '�� ������� ��������� ����';
+                    const errorMessage = errorData.detail || errorData.message || 'Не удалось обновить фото';
                     this.showToast(errorMessage, 'error');
                     console.error('Photo replace failed:', errorData);
                     return false;
@@ -835,10 +835,10 @@ document.addEventListener('alpine:init', function() {
                 if (this.$refs.replacePhotoInput) {
                     this.$refs.replacePhotoInput.value = '';
                 }
-                this.showToast('���� ���������', 'success');
+                this.showToast('Фото обновлено', 'success');
                 return true;
             } catch (error) {
-                this.showToast('�� ������� ��������� ����: ' + (error.message || '����������� ������'), 'error');
+                this.showToast('Не удалось обновить фото: ' + (error.message || 'неизвестная ошибка'), 'error');
                 console.error('Photo replace error:', error);
                 return false;
             } finally {
@@ -866,7 +866,7 @@ document.addEventListener('alpine:init', function() {
 
                 if (!response.ok) {
                     const errorData = await response.json().catch(() => ({ detail: 'Unknown error' }));
-                    const errorMessage = errorData.detail || errorData.message || '�� ������� ��������� �����';
+                    const errorMessage = errorData.detail || errorData.message || 'Не удалось обновить маркер';
                     this.showToast(errorMessage, 'error');
                     console.error('Video replace failed:', errorData);
                     return false;
@@ -879,10 +879,10 @@ document.addEventListener('alpine:init', function() {
                 if (this.$refs.replaceVideoInput) {
                     this.$refs.replaceVideoInput.value = '';
                 }
-                this.showToast('����� ���������', 'success');
+                this.showToast('Видео обновлено', 'success');
                 return true;
             } catch (error) {
-                this.showToast('�� ������� ��������� �����: ' + (error.message || '����������� ������'), 'error');
+                this.showToast('Не удалось обновить видео: ' + (error.message || 'неизвестная ошибка'), 'error');
                 console.error('Video replace error:', error);
                 return false;
             } finally {
@@ -901,10 +901,10 @@ document.addEventListener('alpine:init', function() {
                 }
 
                 if (!photoUpdated && !videoUpdated && !this.regenerateOnSave) {
-                    this.showToast('��� ��������� ��� ����������', 'info');
+                    this.showToast('Нет изменений для сохранения', 'info');
                 }
             } catch (error) {
-                this.showToast('�� ������� ��������� ���������', 'error');
+                this.showToast('Не удалось сохранить изменения', 'error');
                 console.error('Save error:', error);
             } finally {
                 this.saving = false;
@@ -919,13 +919,13 @@ document.addEventListener('alpine:init', function() {
                 });
 
                 if (response.ok) {
-                    this.showToast('AR ������� ������� ������', 'success');
+                    this.showToast('AR-контент успешно удалён', 'success');
                     window.location.href = '/ar-content';
                 } else {
                     throw new Error('Delete failed');
                 }
             } catch (error) {
-                this.showToast('�� ������� ������� AR �������', 'error');
+                this.showToast('Не удалось удалить AR-контент', 'error');
                 console.error('Delete error:', error);
             } finally {
                 this.deleting = false;
@@ -953,22 +953,22 @@ document.addEventListener('alpine:init', function() {
         
         getRotationTypeLabel(type) {
             const labels = {
-                'fixed': '�������������',
-                'date_specific': '�� �����',
-                'daily_cycle': '���������� ����',
-                'weekly_cycle': '������������ ����',
-                'random_daily': '��������� ���������'
+                'fixed': 'Фиксированное',
+                'date_specific': 'По датам',
+                'daily_cycle': 'Ежедневный цикл',
+                'weekly_cycle': 'Недельный цикл',
+                'random_daily': 'Случайный показ'
             };
             return labels[type] || type;
         },
         
         getVideoTitle(videoId) {
             const video = this.videos.find(v => v.id === videoId);
-            return video ? (video.title || `����� ${videoId}`) : `����� ${videoId}`;
+            return video ? (video.title || `Видео ${videoId}`) : `Видео ${videoId}`;
         },
         
         formatDateTime(dateStr) {
-            if (!dateStr) return '�';
+            if (!dateStr) return '-';
             try {
                 const date = new Date(dateStr);
                 return date.toLocaleString('ru-RU');
@@ -1049,15 +1049,15 @@ document.addEventListener('alpine:init', function() {
                 
                 if (!response.ok) {
                     const errorData = await response.json().catch(() => ({}));
-                    throw new Error(errorData.detail || errorData.message || '�� ������� ��������� ����������');
+                    throw new Error(errorData.detail || errorData.message || 'Не удалось сохранить расписание');
                 }
                 
-                this.showToast('���������� ���������', 'success');
+                this.showToast('Расписание сохранено', 'success');
                 this.showRotationScheduleDialog = false;
                 
                 setTimeout(() => { window.location.reload(); }, 800);
             } catch (error) {
-                this.showToast('������: ' + error.message, 'error');
+                this.showToast('Ошибка: ' + error.message, 'error');
                 console.error('Rotation schedule save error:', error);
             } finally {
                 this.savingRotationSchedule = false;
@@ -1065,7 +1065,7 @@ document.addEventListener('alpine:init', function() {
         },
         
         async deleteRotationSchedule() {
-            if (!this.rotationSchedule || !confirm('������� ���������� �������?')) {
+            if (!this.rotationSchedule || !confirm('Удалить расписание видео?')) {
                 return;
             }
             
@@ -1076,13 +1076,13 @@ document.addEventListener('alpine:init', function() {
                 
                 if (!response.ok) {
                     const errorData = await response.json().catch(() => ({}));
-                    throw new Error(errorData.detail || errorData.message || '�� ������� ������� ����������');
+                    throw new Error(errorData.detail || errorData.message || 'Не удалось удалить расписание');
                 }
                 
-                this.showToast('���������� �������', 'success');
+                this.showToast('Расписание удалено', 'success');
                 setTimeout(() => { window.location.reload(); }, 800);
             } catch (error) {
-                this.showToast('������: ' + error.message, 'error');
+                this.showToast('Ошибка: ' + error.message, 'error');
                 console.error('Rotation schedule delete error:', error);
             }
         }
@@ -1097,13 +1097,13 @@ document.addEventListener('alpine:init', function() {
 
     store.getActiveVideoSourceLabel = function() {
         const source = this.activeVideoInfo?.source;
-        if (source === 'schedule') return '��������: ����������';
-        if (source === 'date_rule') return '��������: ������ ����';
-        if (source === 'rotation_rule') return '��������: ������� �������';
-        if (source === 'rotation') return '��������: �������';
-        if (source === 'active_default') return '��������: �������� �����';
-        if (source === 'fallback') return '��������: �������� �����';
-        return this.activeVideo ? '��������: �������' : '';
+        if (source === 'schedule') return 'Источник: расписание';
+        if (source === 'date_rule') return 'Источник: правило по дате';
+        if (source === 'rotation_rule') return 'Источник: правило ротации';
+        if (source === 'rotation') return 'Источник: ротация';
+        if (source === 'active_default') return 'Источник: видео по умолчанию';
+        if (source === 'fallback') return 'Источник: резервное видео';
+        return this.activeVideo ? 'Источник: активное видео' : '';
     };
 
     store.normalizeDateRules = function(rules) {
@@ -1131,11 +1131,11 @@ document.addEventListener('alpine:init', function() {
     };
 
     store.formatDateRulesSummary = function(rules) {
-        if (!Array.isArray(rules) || !rules.length) return '�';
+        if (!Array.isArray(rules) || !rules.length) return '-';
         const parts = rules.slice(0, 3).map(rule => {
-            const date = rule?.date ? String(rule.date).slice(0, 10) : '�';
-            const title = rule?.video_id ? this.getVideoTitle(Number(rule.video_id)) : '����� �� �������';
-            return `${date}: ${title}${rule?.recurring ? ' (��������)' : ''}`;
+            const date = rule?.date ? String(rule.date).slice(0, 10) : '-';
+            const title = rule?.video_id ? this.getVideoTitle(Number(rule.video_id)) : 'Видео не выбрано';
+            return `${date}: ${title}${rule?.recurring ? ' (ежегодно)' : ''}`;
         });
         if (rules.length > 3) parts.push(`+${rules.length - 3}`);
         return parts.join(', ');
@@ -1176,7 +1176,7 @@ document.addEventListener('alpine:init', function() {
                     }))
                     .filter(rule => rule.date && rule.video_id);
                 if (!payload.date_rules.length) {
-                    this.showToast('�������� ���� �� ���� ������� �� ����', 'error');
+                    this.showToast('Добавьте хотя бы одно правило по дате', 'error');
                     return;
                 }
             } else {
@@ -1208,14 +1208,14 @@ document.addEventListener('alpine:init', function() {
 
             if (!response.ok) {
                 const errorData = await response.json().catch(() => ({}));
-                throw new Error(errorData.detail || errorData.message || '�� ������� ��������� ����������');
+                throw new Error(errorData.detail || errorData.message || 'Не удалось сохранить расписание');
             }
 
-            this.showToast('���������� ���������', 'success');
+            this.showToast('Расписание сохранено', 'success');
             this.showRotationScheduleDialog = false;
             setTimeout(() => { window.location.reload(); }, 800);
         } catch (error) {
-            this.showToast('������: ' + error.message, 'error');
+            this.showToast('Ошибка: ' + error.message, 'error');
             console.error('Rotation schedule save error:', error);
         } finally {
             this.savingRotationSchedule = false;
@@ -1227,1106 +1227,37 @@ document.addEventListener('alpine:init', function() {
 <div x-data="$store.arContentDetail" x-init="init()" class="page-container">
     {% include "ar-content/partials/detail_header.html" %}
     {% include "ar-content/partials/detail_overview.html" %}
-    {% if false %}
-    <!-- ============================================ -->
-    <!-- ���� 1: ��������� � �������� �������� -->
-    <!-- ============================================ -->
-    <div class="card p-0 overflow-hidden mb-6">
-        <div class="px-4 py-5 sm:px-6 border-b border-gray-200 dark:border-gray-700 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-gray-800 dark:to-gray-700">
-            <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                <div class="flex-1">
-                    <div class="flex items-center gap-3 mb-2">
-                        <h1 class="text-2xl font-bold text-gray-900 dark:text-white">
-                            ����� {{ ar_content.order_number }}
-                        </h1>
-                        <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium"
-                              :class="arContent.status === 'ready' ? 'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-100' : 
-                                      arContent.status === 'processing' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/40 dark:text-yellow-100' : 
-                                      'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200'"
-                              x-text="arContent.status || '�'"></span>
-                    </div>
-                    <p class="text-sm text-gray-600 dark:text-gray-400">
-                        ������ AR �������� � ����������
-                    </p>
-                </div>
-                <div class="flex flex-wrap gap-2">
-                    <a href="/ar-content" class="btn btn-secondary">
-                        <span class="material-icons mr-2">arrow_back</span>�����
-                    </a>
-                    <a href="/ar-content/{{ ar_content.id }}/edit" class="btn btn-secondary">
-                        <span class="material-icons mr-2">edit</span>�������������
-                    </a>
-                    <button @click="showQRDialog = true" class="btn btn-secondary">
-                        <span class="material-icons mr-2">qr_code</span>QR-���
-                    </button>
-                    <button @click="showDeleteDialog = true" class="btn btn-danger">
-                        <span class="material-icons mr-2">delete</span>�������
-                    </button>
-                </div>
-            </div>
-        </div>
-        
-        <!-- ����-���������� -->
-        <div class="px-4 py-4 bg-white dark:bg-gray-800">
-            <div class="flex flex-wrap gap-3">
-                <div class="flex items-center gap-2 text-sm">
-                    <span class="material-icons text-blue-600 dark:text-blue-400 text-base">business</span>
-                    <span class="text-gray-600 dark:text-gray-400">��������:</span>
-                    <span class="font-medium text-gray-900 dark:text-white" x-text="arContent.company_name || '�'"></span>
-                </div>
-                <div class="flex items-center gap-2 text-sm">
-                    <span class="material-icons text-green-600 dark:text-green-400 text-base">folder</span>
-                    <span class="text-gray-600 dark:text-gray-400">������:</span>
-                    <span class="font-medium text-gray-900 dark:text-white" x-text="arContent.project_name || '�'"></span>
-                </div>
-                <div class="flex items-center gap-2 text-sm">
-                    <span class="material-icons text-gray-600 dark:text-gray-400 text-base">schedule</span>
-                    <span class="text-gray-600 dark:text-gray-400">������:</span>
-                    <span class="font-medium text-gray-900 dark:text-white">{{ ar_content.created_at | datetime_format if ar_content.created_at else '�' }}</span>
-                </div>
-                <div class="flex items-center gap-2 text-sm">
-                    <span class="material-icons text-amber-600 dark:text-amber-400 text-base">tag</span>
-                    <span class="text-gray-600 dark:text-gray-400">ID:</span>
-                    <button @click="copyText(arContent.order_number, '����� ������ ����������')" class="font-medium text-gray-900 dark:text-white hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors" x-text="arContent.order_number || '�'"></button>
-                </div>
-                <div class="flex items-center gap-2 text-sm" x-show="arContent.unique_id">
-                    <span class="material-icons text-cyan-600 dark:text-cyan-400 text-base">fingerprint</span>
-                    <span class="text-gray-600 dark:text-gray-400">UUID:</span>
-                    <button @click="copyText(arContent.unique_id, 'UUID ����������')" class="font-medium text-gray-900 dark:text-white hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors truncate max-w-[18rem] text-left" x-text="arContent.unique_id || '�'"></button>
-                </div>
-                <!-- ���� �������� ����� � ���������� ������ (30 ���) -->
-            </div>
-        </div>
-    </div>
-    
-    <!-- ============================================ -->
-    <!-- ���� 2: �������� ������� -->
-    <!-- ============================================ -->
-    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-        <div class="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-4 flex flex-col">
-            <div class="flex items-center gap-2 mb-2">
-                <span class="material-icons text-blue-500 text-lg">visibility</span>
-                <span class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">���������</span>
-            </div>
-            <div class="text-2xl font-bold text-gray-900 dark:text-white">{{ ar_content.views_count or 0 }}</div>
-            <div class="text-xs text-gray-500 dark:text-gray-400 mt-1">�� �� �����</div>
-        </div>
-        <div class="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-4 flex flex-col">
-            <div class="flex items-center gap-2 mb-2">
-                <span class="material-icons text-green-500 text-lg">trending_up</span>
-                <span class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">30 ����</span>
-            </div>
-            <div class="text-2xl font-bold text-gray-900 dark:text-white">{{ ar_content.views_30_days or 0 }}</div>
-            <div class="text-xs text-gray-500 dark:text-gray-400 mt-1">����������</div>
-        </div>
-        <div class="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-4 flex flex-col">
-            <div class="flex items-center gap-2 mb-2">
-                <span class="material-icons text-purple-500 text-lg">videocam</span>
-                <span class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">�����</span>
-            </div>
-            <div class="text-2xl font-bold text-gray-900 dark:text-white" x-text="videos ? videos.length : 0"></div>
-            <div class="text-xs text-gray-500 dark:text-gray-400 mt-1 truncate" x-text="activeVideoTitle || '��� ���������'"></div>
-        </div>
-        <div class="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-4 flex flex-col"
-             x-show="arContent.marker_status">
-            <div class="flex items-center gap-2 mb-2">
-                <span class="material-icons text-lg" :class="arContent.marker_status === 'ready' ? 'text-green-500' : 'text-yellow-500'">qr_code_2</span>
-                <span class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">������</span>
-            </div>
-            <div class="text-lg font-bold text-gray-900 dark:text-white" x-text="arContent.marker_status === 'ready' ? '�����' : (arContent.marker_status || '�')"></div>
-            <div class="text-xs mt-1" :class="markerMetrics.is_valid === true ? 'text-green-600 dark:text-green-400' : markerMetrics.is_valid === false ? 'text-red-600 dark:text-red-400' : 'text-gray-500 dark:text-gray-400'"
-                 x-text="markerMetrics.is_valid === true ? '��������' : markerMetrics.is_valid === false ? '����������' : '�� ��������'"></div>
-        </div>
+
+    <div class="card p-5 mb-6">
+        {% include "ar-content/partials/detail_video_panel_intro.html" %}
+        {% include "ar-content/partials/detail_video_list.html" %}
     </div>
 
-    <!-- ============================================ -->
-    <!-- ���� 3: �������� ���������� -->
-    <!-- ============================================ -->
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
-        <!-- ���������� � ��������� -->
-        <div class="lg:col-span-1">
-            <div class="card p-5">
-                <div class="flex items-center gap-2 mb-4 pb-3 border-b border-gray-200 dark:border-gray-700">
-                    <span class="material-icons text-blue-600 dark:text-blue-400">person</span>
-                    <h3 class="text-lg font-semibold text-gray-900 dark:text-white">��������</h3>
-                </div>
-                <dl class="space-y-4">
-                    <div>
-                        <dt class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1">���</dt>
-                        <dd class="text-base font-medium text-gray-900 dark:text-white" x-text="arContent.customer_name || '�'"></dd>
-                    </div>
-                    <div>
-                        <dt class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1">�������</dt>
-                        <dd class="text-base text-gray-900 dark:text-white" x-text="arContent.customer_phone || '�'"></dd>
-                    </div>
-                    <div>
-                        <dt class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1">Email</dt>
-                        <dd class="text-base text-gray-900 dark:text-white break-all" x-text="arContent.customer_email || '�'"></dd>
-                    </div>
-                </dl>
-                <div class="mt-5 pt-4 border-t border-gray-200 dark:border-gray-700 flex flex-wrap gap-2">
-                    <a x-show="arContent.customer_phone"
-                       :href="'tel:' + arContent.customer_phone"
-                       class="btn btn-secondary text-sm px-3 py-1.5">
-                        <span class="material-icons text-sm mr-1">call</span>���������
-                    </a>
-                    <a x-show="arContent.customer_email"
-                       :href="'mailto:' + arContent.customer_email"
-                       class="btn btn-secondary text-sm px-3 py-1.5">
-                        <span class="material-icons text-sm mr-1">mail</span>��������
-                    </a>
-                    <button x-show="arContent.customer_phone"
-                            @click="copyText(arContent.customer_phone, '������� ����������')"
-                            class="btn btn-secondary text-sm px-3 py-1.5">
-                        <span class="material-icons text-sm mr-1">content_copy</span>�������
-                    </button>
-                    <button x-show="arContent.customer_email"
-                            @click="copyText(arContent.customer_email, 'Email ����������')"
-                            class="btn btn-secondary text-sm px-3 py-1.5">
-                        <span class="material-icons text-sm mr-1">content_copy</span>Email
-                    </button>
-                </div>
-            </div>
-        </div>
-        
-        <!-- ������� -->
-        <div class="lg:col-span-2">
-            <div class="card p-5">
-                <div class="flex items-center justify-between mb-4 pb-3 border-b border-gray-200 dark:border-gray-700">
-                    <div class="flex items-center gap-2">
-                        <span class="material-icons text-purple-600 dark:text-purple-400">image</span>
-                        <h3 class="text-lg font-semibold text-gray-900 dark:text-white">�������</h3>
-                    </div>
-                    <button @click="showPhotoUploadDialog = true" class="btn btn-secondary text-sm px-3 py-1.5">
-                        <span class="material-icons text-sm mr-1">upload</span>���������
-                    </button>
-                </div>
-                <div class="flex justify-center">
-                    <template x-if="portraitUrl">
-                        <img :src="portraitUrl"
-                             alt="Portrait"
-                             loading="lazy"
-                             @click="showPortraitLightbox = true"
-                             class="max-h-96 rounded-lg object-contain cursor-pointer hover:opacity-90 transition-opacity shadow-sm">
-                    </template>
-                    <template x-if="!portraitUrl">
-                        <div class="w-full h-64 bg-gray-50 dark:bg-gray-700/50 rounded-lg border-2 border-dashed border-gray-200 dark:border-gray-600 flex items-center justify-center text-gray-400 dark:text-gray-500">
-                            <div class="text-center">
-                                <span class="material-icons text-5xl mb-3 block">image_not_supported</span>
-                                <p class="text-sm">������� �� ��������</p>
-                            </div>
-                        </div>
-                    </template>
-                </div>
-                <p class="mt-3 text-xs text-gray-500 dark:text-gray-400 text-center" x-show="portraitUrl">
-                    <span class="material-icons text-xs align-middle mr-1">zoom_in</span>�������� ��� ��������� � ������ ������
-                </p>
-            </div>
-        </div>
+    <div class="card p-5 mb-6" x-show="videos && videos.length > 0">
+        {% include "ar-content/partials/detail_rotation_overview.html" %}
     </div>
-    
-    <!-- ����������� ���������� (����������) -->
+
+    {% include "ar-content/partials/detail_links_and_marker.html" %}
+    {% include "ar-content/partials/detail_marker_quality.html" %}
+
     {% if debug_info %}
     <div class="card p-4 mb-6">
         <details class="cursor-pointer">
             <summary class="text-sm font-medium text-gray-700 dark:text-gray-300 flex items-center gap-2">
                 <span class="material-icons text-base">bug_report</span>
-                ����������� ���������� (Debug)
+                Техническая информация
             </summary>
             <div class="mt-4 grid grid-cols-2 md:grid-cols-4 gap-4 text-xs">
-                <div><span class="font-medium text-gray-600 dark:text-gray-400">Storage:</span><br><span class="text-gray-900 dark:text-white break-all">{{ debug_info.storage_path or '�' }}</span></div>
-                <div><span class="font-medium text-gray-600 dark:text-gray-400">Photo:</span><br><span class="text-gray-900 dark:text-white break-all">{{ debug_info.photo_path or '�' }}</span></div>
-                <div><span class="font-medium text-gray-600 dark:text-gray-400">Video:</span><br><span class="text-gray-900 dark:text-white break-all">{{ debug_info.video_path or '�' }}</span></div>
-                <div><span class="font-medium text-gray-600 dark:text-gray-400">Marker:</span><br><span class="text-gray-900 dark:text-white break-all">{{ debug_info.marker_path or '�' }}</span></div>
+                <div><span class="font-medium text-gray-600 dark:text-gray-400">Storage:</span><br><span class="text-gray-900 dark:text-white break-all">{{ debug_info.storage_path or '—' }}</span></div>
+                <div><span class="font-medium text-gray-600 dark:text-gray-400">Photo:</span><br><span class="text-gray-900 dark:text-white break-all">{{ debug_info.photo_path or '—' }}</span></div>
+                <div><span class="font-medium text-gray-600 dark:text-gray-400">Video:</span><br><span class="text-gray-900 dark:text-white break-all">{{ debug_info.video_path or '—' }}</span></div>
+                <div><span class="font-medium text-gray-600 dark:text-gray-400">Marker:</span><br><span class="text-gray-900 dark:text-white break-all">{{ debug_info.marker_path or '—' }}</span></div>
             </div>
         </details>
     </div>
     {% endif %}
-    {% endif %}
-        
-    <!-- ============================================ -->
-    <!-- ���� 4: ���������� ����� -->
-    <!-- ============================================ -->
-    <div class="card p-5 mb-6">
-        {% include "ar-content/partials/detail_video_panel_intro.html" %}
-        {% if false %}
-        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6 pb-4 border-b border-gray-200 dark:border-gray-700">
-            <div class="flex-1">
-                <div class="flex items-center gap-2 mb-2">
-                    <span class="material-icons text-red-600 dark:text-red-400">videocam</span>
-                    <h3 class="text-xl font-semibold text-gray-900 dark:text-white">���������� �����</h3>
-                </div>
-                <p class="text-sm text-gray-600 dark:text-gray-400">
-                    ����������� ����� �������� ���������. ��� ������������� ����� ����� ��������� �������.
-                </p>
-            </div>
-            <button @click="showUploadDialog = true" class="btn btn-primary">
-                <span class="material-icons mr-2">add</span>��������� �����
-            </button>
-        </div>
-        <!-- ��������� ������ ��������������� -->
-        <div class="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4 mb-6">
-            <div class="flex flex-col md:flex-row md:items-end gap-4">
-                <div class="flex-1">
-                    <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
-                        <span class="material-icons text-sm align-middle mr-1">settings</span>����� ���������������
-                    </label>
-                    <select x-model="playbackMode" class="form-input w-full">
-                        <option value="manual">������ (������������� �����)</option>
-                        <option value="sequential">����: ����������������</option>
-                        <option value="cyclic">����: �����������</option>
-                    </select>
-                    <div class="mt-2 text-xs text-gray-600 dark:text-gray-400 bg-white dark:bg-gray-800 p-2 rounded">
-                        <template x-if="playbackMode === 'manual'">
-                            <span>?? ���� ������������� �����. �������� �������� ����� ������� "������� ��������".</span>
-                        </template>
-                        <template x-if="playbackMode === 'sequential'">
-                            <span>?? ����� ������������� ��������������� (1>2>3>...>���������). �������� ��������� ����� ��� �������.</span>
-                        </template>
-                        <template x-if="playbackMode === 'cyclic'">
-                            <span>?? ����� ������������� ���������� (1>2>3>...>1>2>...). �������� ��������� ����� ��� �������.</span>
-                        </template>
-                    </div>
-                </div>
-                <button @click="applyPlaybackMode()"
-                        :disabled="playbackModeSaving"
-                        class="btn btn-primary whitespace-nowrap">
-                    <span class="material-icons mr-2" x-show="!playbackModeSaving">save</span>
-                    <span class="material-icons mr-2 animate-spin" x-show="playbackModeSaving">refresh</span>
-                    <span x-show="!playbackModeSaving">���������</span>
-                    <span x-show="playbackModeSaving">����������...</span>
-                </button>
-            </div>
-        </div>
 
-        <!-- ������ ��������� ����� (����������, ��� ������������ ������) -->
-        <template x-if="videos && videos.length > 0 && activeVideo">
-            <div class="mb-6 bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 border border-green-200 dark:border-green-800 rounded-lg px-4 py-3">
-                <div class="flex flex-wrap items-center gap-3">
-                    <span class="material-icons text-green-600 dark:text-green-400">play_circle</span>
-                    <div class="flex-1 min-w-0">
-                        <span class="text-sm font-semibold text-gray-900 dark:text-white">�������� �����:</span>
-                        <span class="text-sm text-gray-700 dark:text-gray-300 ml-1 truncate" x-text="activeVideoTitle || '�'"></span>
-                    </div>
-                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-100" x-text="activeVideoSourceLabel"></span>
-                    <div class="text-xs text-gray-600 dark:text-gray-400" x-show="activeVideoSchedule">
-                        <span x-text="formatSchedule(activeVideoSchedule)"></span>
-                    </div>
-                </div>
-            </div>
-        </template>
-
-        <!-- ������ ���������: ��� ����� -->
-        <template x-if="!videos || videos.length === 0">
-            <div class="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-6 text-center">
-                <span class="material-icons text-4xl text-yellow-600 dark:text-yellow-400 mb-3 block">videocam_off</span>
-                <p class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">����� �� ���������</p>
-                <button @click="showUploadDialog = true" class="btn btn-primary text-sm px-3 py-1.5">
-                    <span class="material-icons mr-2 text-sm">add</span>��������� ������ �����
-                </button>
-            </div>
-        </template>
-
-        <!-- ������ ���� ����� -->
-        {% endif %}
-        {% include "ar-content/partials/detail_video_list.html" %}
-        {% if false %}
-        <template x-if="videos && videos.length > 0">
-            <div>
-                <h4 class="text-base font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
-                    <span class="material-icons text-base">list</span>
-                    ��� ����� (<span x-text="videos ? videos.length : 0"></span>)
-                </h4>
-
-                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    <template x-for="video in videos" :key="video.id">
-                        <div class="border-2 rounded-lg overflow-hidden transition-all hover:shadow-lg"
-                             :class="video.is_active ? 'border-green-500 dark:border-green-400 bg-green-50/50 dark:bg-green-900/10' : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800'">
-                            <!-- ������ ����� (����������������, 4:3, � fallback ��� 404) -->
-                            <div class="relative bg-gray-900 overflow-hidden" style="aspect-ratio: 4/3;">
-                                <template x-if="isImagePreview(video.preview_url) && !video._previewFailed">
-                                    <img :src="video.preview_url" alt="Video preview" loading="lazy"
-                                         @error="video._previewFailed = true"
-                                         class="absolute inset-0 w-full h-full object-cover">
-                                </template>
-                                <template x-if="(!isImagePreview(video.preview_url) || video._previewFailed) && video.video_url">
-                                    <video :src="video.video_url" preload="metadata" muted class="absolute inset-0 w-full h-full object-cover"></video>
-                                </template>
-                                <template x-if="(!isImagePreview(video.preview_url) || video._previewFailed) && !video.video_url">
-                                    <div class="absolute inset-0 flex items-center justify-center text-gray-500">
-                                        <span class="material-icons text-4xl">videocam_off</span>
-                                    </div>
-                                </template>
-                                <!-- ������ Play ������ ������ -->
-                                <button x-show="video.video_url" @click="playVideo(video.video_url)"
-                                        class="absolute inset-0 flex items-center justify-center bg-black/0 hover:bg-black/30 transition-colors group">
-                                    <span class="material-icons text-5xl text-white opacity-70 group-hover:opacity-100 drop-shadow-lg transition-opacity">play_circle</span>
-                                </button>
-                                <!-- ����� ��������� ����� �� ������ -->
-                                <div x-show="video.is_active" class="absolute top-2 right-2 inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-semibold bg-green-500 text-white shadow pointer-events-none">
-                                    <span class="material-icons text-xs">play_arrow</span>�������
-                                </div>
-                            </div>
-                            
-                            <!-- ���������� � ����� -->
-                            <div class="p-4 space-y-3">
-                                <div class="flex items-start justify-between gap-2">
-                                    <div class="flex-1 min-w-0">
-                                        <div class="text-sm font-semibold text-gray-900 dark:text-white truncate" x-text="video.title || '�����'"></div>
-                                        <div class="flex items-center gap-2 mt-1">
-                                            <span class="text-xs px-2 py-0.5 rounded-full font-medium" :class="videoStatusClass(video.status)" x-text="video.status"></span>
-                                        </div>
-                                    </div>
-                                </div>
-                                
-                                <!-- ���������� -->
-                                <div class="space-y-1.5 text-xs text-gray-600 dark:text-gray-400">
-                                    <div class="flex items-center justify-between">
-                                        <span>���� ��������:</span>
-                                        <span class="font-medium" :class="video.days_remaining === null ? 'text-yellow-600 dark:text-yellow-400' : ''"
-                                              x-text="video.days_remaining !== null ? video.days_remaining + ' ��.' : '��� �����'"></span>
-                                    </div>
-                                    <div class="flex items-center justify-between">
-                                        <span>����������:</span>
-                                        <span class="font-medium" x-text="video.schedules_count"></span>
-                                    </div>
-                                </div>
-                                
-                                <!-- ������� ��� ������� -->
-                                <div x-show="playbackMode !== 'manual'" class="pt-2 border-t border-gray-200 dark:border-gray-700">
-                                    <label class="inline-flex items-center gap-2 cursor-pointer">
-                                        <input type="checkbox"
-                                               :checked="video.is_active"
-                                               @change="toggleVideoActive(video, $event)"
-                                               class="form-checkbox">
-                                        <span class="text-xs text-gray-700 dark:text-gray-300">�������� � �������</span>
-                                    </label>
-                                </div>
-                                
-                                <!-- �������� -->
-                                <div class="flex flex-col gap-2 pt-2 border-t border-gray-200 dark:border-gray-700">
-                                    <button @click="setActiveVideo(video.id)"
-                                            :disabled="video.is_active || playbackMode !== 'manual'"
-                                            class="btn btn-primary btn-sm w-full text-xs"
-                                            :class="video.is_active ? 'opacity-50 cursor-not-allowed' : ''">
-                                        <span class="material-icons text-sm mr-1">play_arrow</span>
-                                        <span x-show="!video.is_active">������� ��������</span>
-                                        <span x-show="video.is_active">��� �������</span>
-                                    </button>
-                                    <div class="flex gap-2">
-                                        <button @click="playVideo(video.video_url)" class="btn btn-secondary flex-1 text-xs px-3 py-1.5">
-                                            <span class="material-icons text-sm mr-1">play_circle</span>���������
-                                        </button>
-                                        <button @click="regenerateThumbnail(video)"
-                                                :disabled="video._regenerating"
-                                                class="btn btn-secondary text-xs px-2 py-1.5"
-                                                title="���������������� ������">
-                                            <span class="material-icons text-sm" :class="video._regenerating ? 'animate-spin' : ''">refresh</span>
-                                        </button>
-                                        <button @click="confirmDeleteVideo(video)"
-                                                class="btn text-xs px-2 py-1.5 border border-red-300 dark:border-red-700 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20"
-                                                title="������� �����">
-                                            <span class="material-icons text-sm">delete</span>
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </template>
-                </div>
-            </div>
-        </template>
-        {% endif %}
-    </div>
-    
-    <!-- ============================================ -->
-    <!-- ���� 4b: ���������� ������� ����� -->
-    <!-- ============================================ -->
-    <div class="card p-5 mb-6" x-show="videos && videos.length > 0">
-        {% include "ar-content/partials/detail_rotation_overview.html" %}
-        {% if false %}
-        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6 pb-4 border-b border-gray-200 dark:border-gray-700">
-            <div class="flex-1">
-                <div class="flex items-center gap-2 mb-2">
-                    <span class="material-icons text-orange-600 dark:text-orange-400">schedule</span>
-                    <h3 class="text-xl font-semibold text-gray-900 dark:text-white">���������� ������� �����</h3>
-                </div>
-                <p class="text-sm text-gray-600 dark:text-gray-400">
-                    ��������� �������������� ������� �����. �� ��������� ������������ ���� �������� ����� �� ���� ���� ��������.
-                </p>
-            </div>
-            <button @click="showRotationScheduleDialog = true" class="btn btn-primary">
-                <span class="material-icons mr-2">add</span>
-                <span x-show="!rotationSchedule">�������</span>
-                <span x-show="rotationSchedule">��������</span>
-            </button>
-        </div>
-        
-        <template x-if="!rotationSchedule">
-            <div class="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 p-4 rounded-lg">
-                <div class="flex items-start gap-3">
-                    <span class="material-icons text-blue-600 dark:text-blue-400 mt-0.5">info</span>
-                    <div class="flex-1">
-                        <h4 class="text-sm font-medium text-blue-900 dark:text-blue-100 mb-2">
-                            ���������� �� ���������
-                        </h4>
-                        <p class="text-sm text-blue-800 dark:text-blue-200 mb-3">
-                            �� ��������� ������������ <strong>������������� �����</strong>. ������� ������������� ������� �������� �����, ������� ����� ������������� ���������.
-                        </p>
-                        <div class="text-xs text-blue-700 dark:text-blue-300 space-y-1">
-                            <p><strong>��� ��� ��������:</strong></p>
-                            <ul class="list-disc list-inside space-y-1 ml-2">
-                                <li>�������� �������� ����� ������� "������� ��������" � ������ �����</li>
-                                <li>����� �������� ��������� �� ������� ����������</li>
-                                <li>��� ��������� ������� ����� ����������� ����� ������� "������� ����������"</li>
-                            </ul>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </template>
-        
-        <template x-if="rotationSchedule">
-            <div class="space-y-4">
-                <div class="bg-gray-50 dark:bg-gray-700/60 p-4 rounded-lg">
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                            <div class="text-sm font-medium text-gray-500 dark:text-gray-300 mb-1">��� �������</div>
-                            <div class="text-gray-900 dark:text-white" x-text="getRotationTypeLabel(rotationSchedule.rotation_type)"></div>
-                        </div>
-                        <div>
-                            <div class="text-sm font-medium text-gray-500 dark:text-gray-300 mb-1">������</div>
-                            <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium"
-                                  :class="rotationSchedule.is_active ? 'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-100' : 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200'">
-                                <span x-text="rotationSchedule.is_active ? '�������' : '���������'"></span>
-                            </span>
-                        </div>
-                        <div x-show="rotationSchedule && rotationSchedule.default_video_id">
-                            <div class="text-sm font-medium text-gray-500 dark:text-gray-300 mb-1">����� �� ���������</div>
-                            <div class="text-gray-900 dark:text-white" x-text="getVideoTitle(rotationSchedule.default_video_id)"></div>
-                        </div>
-                        <div x-show="rotationSchedule && rotationSchedule.next_change_at">
-                            <div class="text-sm font-medium text-gray-500 dark:text-gray-300 mb-1">��������� ���������</div>
-                            <div class="text-gray-900 dark:text-white" x-text="formatDateTime(rotationSchedule.next_change_at)"></div>
-                        </div>
-                        <div x-show="rotationSchedule && rotationSchedule.last_changed_at">
-                            <div class="text-sm font-medium text-gray-500 dark:text-gray-300 mb-1">��������� ���������</div>
-                            <div class="text-gray-900 dark:text-white" x-text="formatDateTime(rotationSchedule.last_changed_at)"></div>
-                        </div>
-                        <div x-show="rotationSchedule && rotationSchedule.notify_before_expiry_days">
-                            <div class="text-sm font-medium text-gray-500 dark:text-gray-300 mb-1">����������� �� (����)</div>
-                            <div class="text-gray-900 dark:text-white" x-text="rotationSchedule.notify_before_expiry_days"></div>
-                        </div>
-                    </div>
-                </div>
-                
-                <div class="flex gap-2">
-                    <button @click="showRotationScheduleDialog = true" class="btn btn-secondary">
-                        <span class="material-icons mr-2">edit</span>��������
-                    </button>
-                    <button @click="deleteRotationSchedule()" class="btn btn-danger">
-                        <span class="material-icons mr-2">delete</span>������� ����������
-                    </button>
-                </div>
-            </div>
-        </template>
-    </div>
-    
-        {% endif %}
-    <!-- Rotation Schedule Dialog -->
     {% include "ar-content/partials/detail_rotation_dialog.html" %}
-    {% if false %}
-    <div x-show="showRotationScheduleDialog" 
-         @click.self="showRotationScheduleDialog = false"
-         @keydown.escape.window="showRotationScheduleDialog = false"
-         class="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4"
-         x-cloak>
-        <div class="relative bg-white dark:bg-gray-800 rounded-lg p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-            <button @click="showRotationScheduleDialog = false"
-                    class="absolute top-4 right-4 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200">
-                <span class="material-icons">close</span>
-            </button>
-            <h3 class="text-lg font-medium text-gray-900 dark:text-white mb-2">��������� ���������� �������</h3>
-            <p class="text-sm text-gray-500 dark:text-gray-400 mb-4">
-                ���������, ��� ����� ����� ������������� �������������. ��� �������� ������ (���� ����� �� 5 ���) �������� "�������������".
-            </p>
-            
-            <form @submit.prevent="saveRotationSchedule()" x-init="initRotationScheduleForm()">
-                <div class="space-y-4">
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                            ��� ������� <span class="text-red-500">*</span>
-                        </label>
-                        <select x-model="rotationScheduleForm.rotation_type" class="form-input w-full" required>
-                            <option value="fixed">������������� (���� �����) � ������������� ��� ����������� �������</option>
-                            <option value="date_specific">�� ����� (������������� ����) � ��� ���������� � ������ �������</option>
-                            <option value="daily_cycle">���������� ���� � ����� �������� ������ ���� �� �����</option>
-                            <option value="weekly_cycle">������������ ���� � ����� �������� �� ���� ������</option>
-                            <option value="random_daily">��������� ��������� � ��������� ����� ������ ����</option>
-                        </select>
-                        <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                            <strong>�������������</strong> � ���� ����� ������������� ���������. ����������� ����� ��� ����������� �������.
-                        </p>
-                    </div>
-                    
-                    <div x-show="rotationScheduleForm.rotation_type === 'fixed' || rotationScheduleForm.rotation_type === 'date_specific'">
-                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                            ����� �� ��������� <span class="text-red-500" x-show="rotationScheduleForm.rotation_type === 'fixed'">*</span>
-                        </label>
-                        <select x-model="rotationScheduleForm.default_video_id" class="form-input w-full" :required="rotationScheduleForm.rotation_type === 'fixed'">
-                            <option value="">�� �������</option>
-                            <template x-for="video in videos" :key="video.id">
-                                <option :value="video.id" x-text="(video.title || '����� ' + video.id) + (video.days_remaining !== null ? ' (�������� ' + video.days_remaining + ' ��.)' : '')"></option>
-                            </template>
-                        </select>
-                        <p class="mt-1 text-xs text-gray-500 dark:text-gray-400" x-show="rotationScheduleForm.rotation_type === 'fixed'">
-                            �������� �����, ������� ����� ������������� ���������.
-                        </p>
-                        <p class="mt-1 text-xs text-gray-500 dark:text-gray-400" x-show="rotationScheduleForm.rotation_type === 'date_specific'">
-                            �����, ������� ����� �������������� �� ���������, ���� ��� ���������� �� �����.
-                        </p>
-                    </div>
-                    
-                    <div x-show="rotationScheduleForm.rotation_type === 'daily_cycle' || rotationScheduleForm.rotation_type === 'weekly_cycle' || rotationScheduleForm.rotation_type === 'random_daily'">
-                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                            ������������������ ����� (ID ����� �������)
-                        </label>
-                        <input type="text" 
-                               x-model="rotationScheduleForm.video_sequence_text"
-                               :placeholder="videos.map(v => v.id).join(', ')"
-                               class="form-input w-full">
-                        <div class="mt-1 space-y-1">
-                            <p class="text-xs text-gray-500 dark:text-gray-400">
-                                ������� ID ����� � ������ �������. ���� �������� ������ � ����� ������������ ��� �����.
-                            </p>
-                            <div class="flex flex-wrap gap-1">
-                                <template x-for="video in videos" :key="video.id">
-                                    <span class="inline-flex items-center gap-1 px-2 py-0.5 bg-gray-100 dark:bg-gray-700 text-xs rounded-md text-gray-600 dark:text-gray-300">
-                                        <span class="font-medium" x-text="'#' + video.id"></span>
-                                        <span x-text="video.title || '��� ��������'"></span>
-                                    </span>
-                                </template>
-                            </div>
-                            <button type="button"
-                                    @click="rotationScheduleForm.video_sequence_text = videos.map(v => v.id).join(', ')"
-                                    class="text-xs text-blue-600 dark:text-blue-400 hover:underline">
-                                ��������� ����� �����
-                            </button>
-                        </div>
-                    </div>
-                    
-                    <div x-show="rotationScheduleForm.rotation_type === 'random_daily'" class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                                �� ��������� ����� (����)
-                            </label>
-                            <input type="number" 
-                                   x-model="rotationScheduleForm.no_repeat_days"
-                                   min="1"
-                                   class="form-input w-full">
-                            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                                ����� �� ����� ����������� ��������� ����� ���� ������
-                            </p>
-                        </div>
-                    </div>
-                    
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                            ����������� �� (���� �� ���������)
-                        </label>
-                        <input type="number" 
-                               x-model="rotationScheduleForm.notify_before_expiry_days"
-                               min="0"
-                               class="form-input w-full">
-                    </div>
-                    
-                    <div>
-                        <label class="inline-flex items-center gap-2">
-                            <input type="checkbox" 
-                                   x-model="rotationScheduleForm.is_active"
-                                   class="form-checkbox">
-                            <span class="text-sm text-gray-700 dark:text-gray-300">�������</span>
-                        </label>
-                    </div>
-                </div>
-                
-                <div class="flex gap-2 mt-6">
-                    <button type="submit" :disabled="savingRotationSchedule" class="btn btn-primary flex-1">
-                        <span class="material-icons mr-2" x-show="!savingRotationSchedule">save</span>
-                        <span class="material-icons mr-2 animate-spin" x-show="savingRotationSchedule">refresh</span>
-                        <span x-show="!savingRotationSchedule">���������</span>
-                        <span x-show="savingRotationSchedule">����������...</span>
-                    </button>
-                    <button type="button" @click="showRotationScheduleDialog = false" class="btn btn-secondary">
-                        ������
-                    </button>
-                </div>
-            </form>
-        </div>
-    </div>
-    {% endif %}
-    
-    {% include "ar-content/partials/detail_links_and_marker.html" %}
-    {% if false %}
-    <!-- ============================================ -->
-    <!-- ���� 5: ������ � QR-��� -->
-    <!-- ============================================ -->
-    <div class="card p-5 mb-6">
-        <div class="flex items-center gap-2 mb-4 pb-3 border-b border-gray-200 dark:border-gray-700">
-            <span class="material-icons text-cyan-600 dark:text-cyan-400">link</span>
-            <h3 class="text-lg font-semibold text-gray-900 dark:text-white">������ � QR-���</h3>
-        </div>
-        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <!-- ������ � �������� -->
-            <div class="lg:col-span-2 space-y-3">
-                <div class="flex flex-col sm:flex-row gap-2 items-stretch">
-                    <input type="text" 
-                           :value="fullArUrl" 
-                           readonly
-                           placeholder="������ ��� AR-���������"
-                           class="form-input flex-1 text-sm">
-                    <button @click="copyLink" class="btn btn-secondary text-sm">
-                        <span class="material-icons text-sm mr-1">content_copy</span>����������
-                    </button>
-                </div>
-                <div class="flex flex-wrap gap-2">
-                    <button @click="openArView()" 
-                            :disabled="!fullArUrl"
-                            class="btn btn-primary text-sm">
-                        <span class="material-icons text-sm mr-1">play_arrow</span>������� AR
-                    </button>
-                    <button @click="showQRDialog = true" class="btn btn-secondary text-sm">
-                        <span class="material-icons text-sm mr-1">download</span>������� QR
-                    </button>
-                </div>
-                <p class="text-xs text-gray-500 dark:text-gray-400">
-                    ��������� ������ ��� QR-��� ������� ��� ��������� AR-��������
-                </p>
-            </div>
-            <!-- QR Code Preview -->
-            <div class="flex items-center justify-center p-4 bg-gray-50 dark:bg-gray-700/50 rounded-xl">
-                <div class="text-center">
-                    <div class="bg-white p-3 rounded-lg inline-block shadow-sm">
-                        <img :src="qrCodeUrl(140)"
-                             :alt="'QR Code'"
-                             loading="lazy"
-                             class="mx-auto"
-                             @click="showQRDialog = true"
-                             style="cursor:pointer">
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-    {% endif %}
-
-    <!-- ============================================ -->
-    <!-- ���� 6: ������ � �������� (�����, ���� ��� �������� ������) -->
-    <!-- ============================================ -->
-    {% include "ar-content/partials/detail_marker_quality.html" %}
-    {% if false %}
-    <div class="card p-5 mb-6"
-         x-show="markerMetrics.file_size_bytes || markerMetrics.features_count || (markerMetrics.image_quality && markerMetrics.image_quality.recognition_probability != null) || (markerMetrics.quality_level && markerMetrics.quality_level !== 'unknown')">
-        <div class="flex items-center justify-between mb-4 pb-3 border-b border-gray-200 dark:border-gray-700">
-            <div class="flex items-center gap-2">
-                <span class="material-icons text-teal-600 dark:text-teal-400">qr_code_2</span>
-                <h3 class="text-lg font-semibold text-gray-900 dark:text-white">������ � ��������</h3>
-            </div>
-            <div class="flex items-center gap-2">
-                <a :href="arContent.marker_url" target="_blank" class="btn btn-secondary text-sm px-3 py-1.5" x-show="arContent.marker_url">
-                    <span class="material-icons text-sm mr-1">download</span>�������
-                </a>
-                <button @click="regenerateMedia()" 
-                        :disabled="regeneratingMedia"
-                        class="btn btn-primary text-sm px-3 py-1.5">
-                    <span class="material-icons text-sm mr-1" x-show="!regeneratingMedia">auto_fix_high</span>
-                    <span class="material-icons text-sm mr-1 animate-spin" x-show="regeneratingMedia">refresh</span>
-                    <span x-show="!regeneratingMedia">��������</span>
-                    <span x-show="regeneratingMedia">...</span>
-                </button>
-            </div>
-        </div>
-
-        <!-- Quality level indicator -->
-        <div x-show="markerMetrics.quality_level && markerMetrics.quality_level !== 'unknown'" class="mb-4">
-            <div class="rounded-lg border p-4"
-                 :class="{
-                     'border-green-300 bg-green-50 dark:border-green-700 dark:bg-green-900/20': markerMetrics.quality_level === 'good',
-                     'border-yellow-300 bg-yellow-50 dark:border-yellow-700 dark:bg-yellow-900/20': markerMetrics.quality_level === 'fair',
-                     'border-red-300 bg-red-50 dark:border-red-700 dark:bg-red-900/20': markerMetrics.quality_level === 'poor',
-                 }">
-
-                <!-- Header -->
-                <div class="flex items-center gap-2 mb-3">
-                    <span class="material-icons text-xl"
-                          :class="{
-                              'text-green-600 dark:text-green-400': markerMetrics.quality_level === 'good',
-                              'text-yellow-600 dark:text-yellow-400': markerMetrics.quality_level === 'fair',
-                              'text-red-600 dark:text-red-400': markerMetrics.quality_level === 'poor',
-                          }"
-                          x-text="markerMetrics.quality_level === 'good' ? 'check_circle' : markerMetrics.quality_level === 'fair' ? 'warning' : 'error'">
-                    </span>
-                    <span class="font-semibold text-sm"
-                          :class="{
-                              'text-green-800 dark:text-green-300': markerMetrics.quality_level === 'good',
-                              'text-yellow-800 dark:text-yellow-300': markerMetrics.quality_level === 'fair',
-                              'text-red-800 dark:text-red-300': markerMetrics.quality_level === 'poor',
-                          }"
-                          x-text="markerMetrics.quality_level === 'good' ? '�������� �������� ��� AR-��������' : markerMetrics.quality_level === 'fair' ? '������� �������� � ������� ����� ���� ������������' : '������ �������� � ������� ���� ������ �������������'">
-                    </span>
-                </div>
-
-                <!-- Progress bar -->
-                <div class="mb-3" x-show="markerMetrics.image_quality?.recognition_probability != null">
-                    <div class="flex items-center justify-between text-xs mb-1">
-                        <span class="text-gray-600 dark:text-gray-400">����������� �������������</span>
-                        <span class="font-semibold"
-                              :class="{
-                                  'text-green-700 dark:text-green-300': markerMetrics.quality_level === 'good',
-                                  'text-yellow-700 dark:text-yellow-300': markerMetrics.quality_level === 'fair',
-                                  'text-red-700 dark:text-red-300': markerMetrics.quality_level === 'poor',
-                              }"
-                              x-text="formatPercent(markerMetrics.image_quality?.recognition_probability)">
-                        </span>
-                    </div>
-                    <div class="w-full h-2.5 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
-                        <div class="h-full rounded-full transition-all duration-500"
-                             :class="{
-                                 'bg-green-500': markerMetrics.quality_level === 'good',
-                                 'bg-yellow-500': markerMetrics.quality_level === 'fair',
-                                 'bg-red-500': markerMetrics.quality_level === 'poor',
-                             }"
-                             :style="'width:' + Math.round((markerMetrics.image_quality?.recognition_probability || 0) * 100) + '%'">
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Recommendations -->
-                <template x-if="markerMetrics.recommendations && markerMetrics.recommendations.length > 0 && markerMetrics.quality_level !== 'good'">
-                    <div class="space-y-1 border-t pt-2"
-                         :class="{
-                             'border-yellow-200 dark:border-yellow-800': markerMetrics.quality_level === 'fair',
-                             'border-red-200 dark:border-red-800': markerMetrics.quality_level === 'poor',
-                         }">
-                        <template x-for="rec in markerMetrics.recommendations" :key="rec">
-                            <div class="flex items-start gap-1.5 text-xs"
-                                 :class="{
-                                     'text-yellow-700 dark:text-yellow-300': markerMetrics.quality_level === 'fair',
-                                     'text-red-700 dark:text-red-300': markerMetrics.quality_level === 'poor',
-                                 }">
-                                <span class="material-icons text-xs mt-0.5 shrink-0">info</span>
-                                <span x-text="rec"></span>
-                            </div>
-                        </template>
-                    </div>
-                </template>
-            </div>
-        </div>
-
-        <!-- �������������� -->
-        <template x-if="markerMetrics.validation_warnings && markerMetrics.validation_warnings.length > 0">
-            <div class="mb-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-3">
-                <template x-for="warning in markerMetrics.validation_warnings" :key="warning">
-                    <div class="text-xs text-yellow-700 dark:text-yellow-300 flex items-start gap-1">
-                        <span class="material-icons text-xs mt-0.5">warning</span>
-                        <span x-text="warning"></span>
-                    </div>
-                </template>
-            </div>
-        </template>
-
-        <!-- ������� ������� � ������������ ������ ����������� -->
-        <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-            <div class="bg-gray-50 dark:bg-gray-700/50 p-3 rounded-lg" x-show="markerMetrics.image_quality?.contrast != null">
-                <div class="text-xs font-medium text-gray-500 dark:text-gray-400 mb-0.5">��������</div>
-                <div class="text-sm font-semibold text-gray-900 dark:text-white" x-text="formatScore(markerMetrics.image_quality?.contrast)"></div>
-            </div>
-            <div class="bg-gray-50 dark:bg-gray-700/50 p-3 rounded-lg" x-show="markerMetrics.image_quality?.sharpness != null">
-                <div class="text-xs font-medium text-gray-500 dark:text-gray-400 mb-0.5">��������</div>
-                <div class="text-sm font-semibold text-gray-900 dark:text-white" x-text="formatScore(markerMetrics.image_quality?.sharpness)"></div>
-            </div>
-            <div class="bg-gray-50 dark:bg-gray-700/50 p-3 rounded-lg" x-show="markerMetrics.image_quality?.brightness != null">
-                <div class="text-xs font-medium text-gray-500 dark:text-gray-400 mb-0.5">�������</div>
-                <div class="text-sm font-semibold text-gray-900 dark:text-white" x-text="formatScore(markerMetrics.image_quality?.brightness)"></div>
-            </div>
-            <div class="bg-gray-50 dark:bg-gray-700/50 p-3 rounded-lg" x-show="markerMetrics.image_quality?.edge_density != null">
-                <div class="text-xs font-medium text-gray-500 dark:text-gray-400 mb-0.5">��������� ������</div>
-                <div class="text-sm font-semibold text-gray-900 dark:text-white" x-text="formatScore(markerMetrics.image_quality?.edge_density)"></div>
-            </div>
-            <div class="bg-gray-50 dark:bg-gray-700/50 p-3 rounded-lg" x-show="markerMetrics.file_size_bytes">
-                <div class="text-xs font-medium text-gray-500 dark:text-gray-400 mb-0.5">������ �����</div>
-                <div class="text-sm font-semibold text-gray-900 dark:text-white" x-text="formatBytes(markerMetrics.file_size_bytes)"></div>
-            </div>
-            <div class="bg-gray-50 dark:bg-gray-700/50 p-3 rounded-lg" x-show="markerMetrics.generation_time_seconds">
-                <div class="text-xs font-medium text-gray-500 dark:text-gray-400 mb-0.5">���������</div>
-                <div class="text-sm font-semibold text-gray-900 dark:text-white" x-text="formatSeconds(markerMetrics.generation_time_seconds)"></div>
-            </div>
-            <div class="bg-gray-50 dark:bg-gray-700/50 p-3 rounded-lg" x-show="markerMetrics.features_count">
-                <div class="text-xs font-medium text-gray-500 dark:text-gray-400 mb-0.5">Features</div>
-                <div class="text-sm font-semibold text-gray-900 dark:text-white" x-text="markerMetrics.features_count"></div>
-            </div>
-            <div class="bg-gray-50 dark:bg-gray-700/50 p-3 rounded-lg" x-show="markerMetrics.features_density">
-                <div class="text-xs font-medium text-gray-500 dark:text-gray-400 mb-0.5">��������� features</div>
-                <div class="text-sm font-semibold text-gray-900 dark:text-white" x-text="formatDensity(markerMetrics.features_density)"></div>
-            </div>
-        </div>
-
-        <!-- ���� ��� ������ ������� -->
-        <div x-show="!markerMetrics.file_size_bytes && !markerMetrics.features_count && (!markerMetrics.image_quality || markerMetrics.image_quality.recognition_probability == null)" class="text-center py-6 text-gray-400 dark:text-gray-500">
-            <span class="material-icons text-3xl mb-2 block">info</span>
-            <p class="text-sm">������ ������� �������� ����� ���������</p>
-        </div>
-    </div>
-    {% endif %}
-    
     {% include "ar-content/partials/detail_media_modals.html" %}
-    {% if false %}
-    <!-- Video Player Lightbox -->
-    <div x-show="showVideoPlayerDialog"
-     @click.self="closeVideoPlayer()"
-     @keydown.escape.window="closeVideoPlayer()"
-     class="fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-4"
-     x-cloak>
-        <div class="relative max-w-4xl w-full">
-            <button @click="closeVideoPlayer()"
-                    class="absolute -top-10 right-0 z-10 text-white hover:text-gray-300">
-                <span class="material-icons text-3xl">close</span>
-            </button>
-            <template x-if="videoPlayerUrl">
-                <video :src="videoPlayerUrl"
-                       controls autoplay
-                       class="w-full max-h-[85vh] rounded-lg shadow-2xl bg-black">
-                </video>
-            </template>
-        </div>
-    </div>
-
-    <!-- Portrait Lightbox (������ ������ �����������) -->
-    <div x-show="showPortraitLightbox" 
-     @click.self="showPortraitLightbox = false"
-     @keydown.escape.window="showPortraitLightbox = false"
-     class="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4"
-     x-cloak>
-        <div class="relative max-w-4xl w-full flex items-center justify-center">
-            <button @click="showPortraitLightbox = false"
-                    class="absolute top-4 right-4 z-10 text-white hover:text-gray-300">
-                <span class="material-icons text-3xl">close</span>
-            </button>
-            <template x-if="portraitFullUrl || portraitUrl">
-                <img :src="portraitFullUrl || portraitUrl" 
-                     alt="Portrait" 
-                     class="max-w-full max-h-[90vh] object-contain rounded-lg shadow-2xl">
-            </template>
-            <template x-if="!portraitFullUrl && !portraitUrl">
-                <div class="w-full h-64 flex items-center justify-center text-white">
-                    <div class="text-center">
-                        <span class="material-icons text-4xl mb-2">image</span>
-                        <p>������� �� ��������</p>
-                    </div>
-                </div>
-            </template>
-        </div>
-    </div>
-
-    <!-- QR Code Modal -->
-    <div x-show="showQRDialog" 
-     @click.self="showQRDialog = false"
-     @keydown.escape.window="showQRDialog = false"
-     class="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4"
-     x-cloak>
-        <div class="relative bg-white dark:bg-gray-800 rounded-lg p-6 max-w-lg w-full">
-            <button @click="showQRDialog = false"
-                    class="absolute top-4 right-4 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200">
-                <span class="material-icons">close</span>
-            </button>
-            <h3 class="text-lg font-medium text-gray-900 dark:text-white mb-4">QR-���</h3>
-            <div class="text-center mb-4">
-                <div class="bg-white p-4 rounded-lg inline-block">
-                    <canvas x-ref="qrCanvas" class="hidden"></canvas>
-                    <img :src="qrCodeUrl(200)"
-                         :alt="'QR Code for ' + arContent.order_number"
-                         loading="lazy"
-                         class="mx-auto">
-                </div>
-                <p class="mt-2 text-sm text-gray-600 dark:text-gray-400" x-text="fullArUrl || '�'"></p>
-            </div>
-            
-            <div class="flex flex-col sm:flex-row gap-2">
-                <button @click="downloadQR('png')" :disabled="downloadingQR" class="btn btn-primary">
-                    <span class="material-icons mr-2">download</span>
-                    <span x-show="!downloadingQR">������� PNG</span>
-                    <span x-show="downloadingQR">��������...</span>
-                </button>
-                <button @click="downloadQR('svg')" :disabled="downloadingQR" class="btn btn-secondary">
-                    <span class="material-icons mr-2">download</span>
-                    <span x-show="!downloadingQR">������� SVG</span>
-                    <span x-show="downloadingQR">��������...</span>
-                </button>
-                <button @click="downloadQR('pdf')" :disabled="downloadingQR" class="btn btn-secondary">
-                    <span class="material-icons mr-2">download</span>
-                    <span x-show="!downloadingQR">������� PDF</span>
-                    <span x-show="downloadingQR">��������...</span>
-                </button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Video Upload Modal -->
-    <div x-show="showUploadDialog" 
-     @click.self="showUploadDialog = false"
-     @keydown.escape.window="showUploadDialog = false"
-     class="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4"
-     x-cloak>
-        <div class="relative bg-white dark:bg-gray-800 rounded-lg p-6 max-w-lg w-full">
-            <button @click="showUploadDialog = false"
-                    class="absolute top-4 right-4 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200">
-                <span class="material-icons">close</span>
-            </button>
-            <h3 class="text-lg font-medium text-gray-900 dark:text-white mb-4">��������� �����</h3>
-            <form @submit.prevent="handleVideoUpload">
-                <div class="mb-4">
-                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                        �������� ����������
-                    </label>
-                    <input type="file" 
-                           accept="video/*"
-                           multiple
-                           @change="handleVideoFileChange"
-                           x-ref="videoFileInput"
-                           class="form-input w-full">
-                    <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                        �������������� �������: MP4, WebM, MOV
-                    </p>
-                </div>
-                
-                <div class="flex gap-2">
-                    <button type="submit" :disabled="!videoFiles.length || uploadingVideo" class="btn btn-primary flex-1">
-                        <span class="material-icons mr-2" x-show="!uploadingVideo">upload</span>
-                        <span class="material-icons mr-2 animate-spin" x-show="uploadingVideo">refresh</span>
-                        <span x-show="!uploadingVideo">���������</span>
-                        <span x-show="uploadingVideo">��������...</span>
-                    </button>
-                    <button type="button" @click="showUploadDialog = false" class="btn btn-secondary">
-                        ������
-                    </button>
-                </div>
-            </form>
-        </div>
-    </div>
-
-    <!-- Photo Upload Modal -->
-    <div x-show="showPhotoUploadDialog" 
-     @click.self="showPhotoUploadDialog = false"
-     @keydown.escape.window="showPhotoUploadDialog = false"
-     class="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4"
-     x-cloak>
-        <div class="relative bg-white dark:bg-gray-800 rounded-lg p-6 max-w-lg w-full">
-            <button @click="showPhotoUploadDialog = false"
-                    class="absolute top-4 right-4 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200">
-                <span class="material-icons">close</span>
-            </button>
-            <h3 class="text-lg font-medium text-gray-900 dark:text-white mb-4">��������� ����</h3>
-            <form @submit.prevent="handlePhotoUpload">
-                <div class="mb-4">
-                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                        �������� �����������
-                    </label>
-                    <input type="file" 
-                           accept="image/*" 
-                           @change="handlePhotoFileChange"
-                           x-ref="photoFileInput"
-                           class="form-input w-full">
-                    <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                        �������������� �������: JPG, PNG
-                    </p>
-                </div>
-                
-                <div class="flex gap-2">
-                    <button type="submit" :disabled="!photoFile || uploadingPhoto" class="btn btn-primary flex-1">
-                        <span class="material-icons mr-2" x-show="!uploadingPhoto">upload</span>
-                        <span class="material-icons mr-2 animate-spin" x-show="uploadingPhoto">refresh</span>
-                        <span x-show="!uploadingPhoto">���������</span>
-                        <span x-show="uploadingPhoto">��������...</span>
-                    </button>
-                    <button type="button" @click="showPhotoUploadDialog = false" class="btn btn-secondary">
-                        ������
-                    </button>
-                </div>
-            </form>
-        </div>
-    </div>
-
-    <!-- Delete Video Confirmation Modal -->
-    <div x-show="showDeleteVideoDialog"
-     @click.self="showDeleteVideoDialog = false"
-     @keydown.escape.window="showDeleteVideoDialog = false"
-     class="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4"
-     x-cloak>
-        <div class="relative bg-white dark:bg-gray-800 rounded-lg p-6 max-w-md w-full">
-            <button @click="showDeleteVideoDialog = false"
-                    class="absolute top-4 right-4 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200">
-                <span class="material-icons">close</span>
-            </button>
-            <div class="text-center mb-4">
-                <div class="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-red-100 dark:bg-red-900 mb-4">
-                    <span class="material-icons text-red-600 dark:text-red-400">videocam_off</span>
-                </div>
-                <h3 class="text-lg font-medium text-gray-900 dark:text-white mb-2">������� �����</h3>
-                <p class="text-sm text-gray-600 dark:text-gray-400">
-                    �� �������, ��� ������ ������� �����
-                    <strong x-text="videoToDelete?.title || '�����'"></strong>?
-                    ��� �������� ������ ��������.
-                </p>
-            </div>
-            <div class="flex gap-2">
-                <button @click="deleteVideo()" :disabled="deletingVideo" class="btn btn-danger flex-1">
-                    <span class="material-icons mr-2" x-show="!deletingVideo">delete</span>
-                    <span class="material-icons mr-2 animate-spin" x-show="deletingVideo">refresh</span>
-                    <span x-show="!deletingVideo">�������</span>
-                    <span x-show="deletingVideo">��������...</span>
-                </button>
-                <button @click="showDeleteVideoDialog = false" class="btn btn-secondary flex-1">������</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Delete Confirmation Modal -->
-    <div x-show="showDeleteDialog" 
-     @click.self="showDeleteDialog = false"
-     @keydown.escape.window="showDeleteDialog = false"
-     class="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4"
-     x-cloak>
-        <div class="relative bg-white dark:bg-gray-800 rounded-lg p-6 max-w-lg w-full">
-            <button @click="showDeleteDialog = false"
-                    class="absolute top-4 right-4 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200">
-                <span class="material-icons">close</span>
-            </button>
-            <div class="text-center mb-4">
-                <div class="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-red-100 dark:bg-red-900 mb-4">
-                    <span class="material-icons text-red-600 dark:text-red-400">warning</span>
-                </div>
-                <h3 class="text-lg font-medium text-gray-900 dark:text-white mb-2">
-                    ������� AR �������
-                </h3>
-                <p class="text-sm text-gray-600 dark:text-gray-400">
-                    <span>�� �������, ��� ������ ������� ����� <span x-text="arContent.order_number"></span>? ��� �������� ������ ��������.</span>
-                </p>
-            </div>
-            
-            <div class="flex gap-2">
-                <button @click="handleDelete" :disabled="deleting" class="btn btn-danger flex-1">
-                    <span class="material-icons mr-2" x-show="!deleting">delete</span>
-                    <span class="material-icons mr-2 animate-spin" x-show="deleting">refresh</span>
-                    <span x-show="!deleting">�������</span>
-                    <span x-show="deleting">��������...</span>
-                </button>
-                <button @click="showDeleteDialog = false" class="btn btn-secondary">
-                    ������
-                </button>
-            </div>
-        </div>
-    </div>
-    {% endif %}
 </div>
 {% endblock %}
-

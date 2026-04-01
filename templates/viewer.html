@@ -1,14 +1,14 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="robots" content="noindex, nofollow">
-    <title>������� ������� � {{ order_number }}</title>
+    <title>Откройте AR для {{ order_number }}</title>
     <style>
         body {
             margin: 0;
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
             background: #000;
             color: #fff;
             text-align: center;
@@ -53,19 +53,18 @@
 </head>
 <body>
     <div class="container">
-        <h2>��� ������� ����</h2>
+        <h2>Откройте этот маркер</h2>
         <div class="ar-frame">
-            <img src="{{ photo_url }}" alt="�������" class="ar-photo">
+            <img src="{{ photo_url }}" alt="Маркер" class="ar-photo">
         </div>
         <div class="buttons">
-            <a href="{{ app_url }}" class="btn">������� � AR-����������</a>
-            <a href="{{ photo_url }}" class="btn secondary" download="marker.jpg">������� ������</a>
-            <a href="{{ play_url }}" class="btn secondary">������� Android-����������</a>
+            <a href="{{ app_url }}" class="btn">Открыть в AR-приложении</a>
+            <a href="{{ photo_url }}" class="btn secondary" download="marker.jpg">Скачать маркер</a>
+            <a href="{{ play_url }}" class="btn secondary">Скачать Android-приложение</a>
             {% if appstore_url %}
-            <a href="{{ appstore_url }}" class="btn secondary">������� ���������� ��� iPhone</a>
+            <a href="{{ appstore_url }}" class="btn secondary">Скачать приложение для iPhone</a>
             {% endif %}
         </div>
     </div>
 </body>
 </html>
-
