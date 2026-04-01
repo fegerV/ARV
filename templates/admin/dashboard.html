@@ -1,8 +1,8 @@
 {% extends "base.html" %}
 
-{% block title %}Главная - Vertex AR Admin{% endblock %}
+{% block title %}Панель управления - Vertex AR Admin{% endblock %}
 
-{% block page_title %}Главная{% endblock %}
+{% block page_title %}Панель управления{% endblock %}
 
 {% block body %}
 <div class="p-6">
@@ -110,7 +110,7 @@
                             <svg class="h-5 w-5 mr-2 text-yellow-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
                             </svg>
-                            Перейти в аналитику
+                            Перейти к аналитике
                         </span>
                     </a>
                     <a href="/storage" class="block w-full px-4 py-2 text-left text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded transition-colors">
@@ -118,7 +118,7 @@
                             <svg class="h-5 w-5 mr-2 text-indigo-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 1.79 4 4 4h8c2.21 0 4-1.79 4-4V7c0-2.21-1.79-4-4-4H8c-2.21 0-4 1.79-4 4z" />
                             </svg>
-                            Управление хранилищем
+                            Открыть хранилище
                         </span>
                     </a>
                     <a href="/notifications" class="block w-full px-4 py-2 text-left text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded transition-colors">
@@ -135,7 +135,7 @@
             <!-- Recent AR Content -->
             <div class="bg-white dark:bg-gray-900 rounded-lg shadow p-6">
                 <div class="flex items-center justify-between mb-4">
-                    <h2 class="text-lg font-semibold text-gray-900 dark:text-white">Недавний AR-контент</h2>
+                    <h2 class="text-lg font-semibold text-gray-900 dark:text-white">Последний AR-контент</h2>
                     <a href="/ar-content" class="text-sm text-indigo-600 hover:text-indigo-900 dark:text-indigo-400">Все</a>
                 </div>
                 {% if recent_content|length > 0 %}
@@ -162,10 +162,11 @@
                     {% endfor %}
                 </div>
                 {% else %}
-                <p class="text-sm text-gray-500 dark:text-gray-400 text-center py-4">No AR content yet</p>
+                <p class="text-sm text-gray-500 dark:text-gray-400 text-center py-4">AR-контент пока не создан</p>
                 {% endif %}
             </div>
         </div>
     </div>
 </div>
 {% endblock %}
+

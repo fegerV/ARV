@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 
-{% block title %}Projects - Vertex AR Admin{% endblock %}
-{% block page_title %}Projects{% endblock %}
+{% block title %}Проекты - Vertex AR Admin{% endblock %}
+{% block page_title %}Проекты{% endblock %}
 
 {% block content %}
 <div x-data="projectsManager()" class="space-y-6">
@@ -103,12 +103,12 @@ function projectsManager() {
                         }
                         this.showDeleteModal = false;
                         this.isDeleting = false;
-                        this.showToast('Project deleted successfully', 'success');
+                        this.showToast('Проект успешно удалён', 'success');
                     } else {
                         window.location.reload();
                     }
                 } else {
-                    let errorMessage = `РћС€РёР±РєР° ${response.status}: ${response.statusText || 'РќРµ СѓРґР°Р»РѕСЃСЊ СѓРґР°Р»РёС‚СЊ РїСЂРѕРµРєС‚'}`;
+                    let errorMessage = `Ошибка ${response.status}: ${response.statusText || 'Не удалось удалить проект'}`;
 
                     if (isJson) {
                         try {
@@ -136,7 +136,7 @@ function projectsManager() {
             })
             .catch(error => {
                 console.error('Delete error:', error);
-                const errorMessage = error.message || 'РќРµ СѓРґР°Р»РѕСЃСЊ СѓРґР°Р»РёС‚СЊ РїСЂРѕРµРєС‚';
+                const errorMessage = error.message || 'Не удалось удалить проект';
                 this.showToast(errorMessage, 'error');
                 this.isDeleting = false;
             });
@@ -149,3 +149,4 @@ function projectsManager() {
 }
 </script>
 {% endblock %}
+

@@ -38,12 +38,8 @@ def test_ar_content_detail_template_has_quick_order_and_customer_actions():
     assert "Номер заказа скопирован" in joined
     assert "Открыть AR" in joined
     assert "Управление видео" in joined
-    assert "Расписание ротации видео" in joined
-    assert "Все видео" in joined
-    assert "Настройка расписания ротации" in joined
-    assert "Повторять ежегодно" in joined
-    assert "31 декабря" in joined
     assert "Маркер и качество" in joined
+    assert "Все видео" in joined
     assert "Загрузить видео" in joined
     assert "Удалить AR контент" in joined
 

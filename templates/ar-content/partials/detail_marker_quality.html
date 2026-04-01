@@ -42,7 +42,7 @@
                           'text-yellow-800 dark:text-yellow-300': markerMetrics.quality_level === 'fair',
                           'text-red-800 dark:text-red-300': markerMetrics.quality_level === 'poor',
                       }"
-                      x-text="markerMetrics.quality_level === 'good' ? 'Отличное качество для AR-трекинга' : markerMetrics.quality_level === 'fair' ? 'Среднее качество — трекинг может быть нестабильным' : 'Низкое качество — высокий риск ошибки распознавания'">
+                      x-text="markerMetrics.quality_level === 'good' ? 'Отличное изображение для AR-распознавания' : markerMetrics.quality_level === 'fair' ? 'Хорошее изображение, но его можно улучшить' : 'Качество изображения низкое, лучше заменить файл'">
                 </span>
             </div>
 
@@ -139,6 +139,6 @@
 
     <div x-show="!markerMetrics.file_size_bytes && !markerMetrics.features_count && (!markerMetrics.image_quality || markerMetrics.image_quality.recognition_probability == null)" class="text-center py-6 text-gray-400 dark:text-gray-500">
         <span class="material-icons text-3xl mb-2 block">info</span>
-        <p class="text-sm">Данные маркера появятся после генерации</p>
+        <p class="text-sm">Метрики маркера появятся после генерации</p>
     </div>
 </div>

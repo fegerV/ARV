@@ -16,12 +16,13 @@ def test_settings_template_uses_partials_for_primary_tabs():
     assert '{% include "partials/settings_notifications_tab.html" %}' in template
     assert '{% include "partials/settings_storage_tab.html" %}' in template
     assert '{% include "partials/settings_backup_tab.html" %}' in template
+    assert '{{ t("settings.general") }}' in template
 
     assert 'action="/settings/general"' in general
     assert 'name="password_min_length"' in security
     assert 'name="thumbnail_quality"' in ar_tab
     assert 'name="default_content_lifetime_years"' in ar_tab
-    assert '30 лет' in ar_tab
+    assert 'name="video_processing_enabled"' in ar_tab
     assert 'x-ref="notificationsForm"' in notifications
     assert 'name="default_storage"' in storage
     assert 'action="/settings/backup"' in backup

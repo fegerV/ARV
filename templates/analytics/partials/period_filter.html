@@ -1,7 +1,7 @@
-<div class="flex flex-wrap items-center gap-2 mb-6">
-    <span class="text-sm text-gray-500 dark:text-gray-400 mr-1">РџРµСЂРёРѕРґ:</span>
+﻿<div class="flex flex-wrap items-center gap-2 mb-6">
+    <span class="text-sm text-gray-500 dark:text-gray-400 mr-1">{{ t("analytics.period") }}:</span>
     {% set period = analytics_data.period|default(30) %}
-    {% for p, label in [(7,'7 РґРЅРµР№'),(30,'30 РґРЅРµР№'),(90,'90 РґРЅРµР№'),(0,'Р’СЃС‘ РІСЂРµРјСЏ')] %}
+    {% for p, label in [(7, t('analytics.days_7')),(30, t('analytics.days_30')),(90, t('analytics.days_90')),(0, t('analytics.all_time'))] %}
     <a href="/analytics?period={{ p }}"
        class="px-3 py-1.5 rounded-lg text-sm font-medium transition-colors
               {% if period == p %}
@@ -13,3 +13,4 @@
     </a>
     {% endfor %}
 </div>
+

@@ -1,18 +1,16 @@
 <!DOCTYPE html>
-<html lang="en" x-data x-init="$store.darkMode.init()" class="h-full">
+<html lang="{{ request.state.locale|default('ru') }}" x-data x-init="$store.darkMode.init()" class="h-full">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="robots" content="noindex, nofollow">
     <title>{% block title %}{{ request.state.site_title|default('Vertex AR Admin') }}{% endblock %}</title>
-    
-    <!-- Preconnect hints for faster CDN loading -->
+
     <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
     <link rel="preconnect" href="https://unpkg.com" crossorigin>
     <link rel="preconnect" href="https://fonts.googleapis.com" crossorigin>
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 
-    <!-- Tailwind CSS — собранный бандл (npm run build:css) -->
     <link href="/static/css/tailwind.css" rel="stylesheet">
     <script>
         (function () {
@@ -24,21 +22,14 @@
         })();
     </script>
 
-    <!-- htmx from CDN -->
     <script src="https://unpkg.com/htmx.org@1.9.12"></script>
-    
-    <!-- Alpine.js plugins MUST load BEFORE main Alpine.js -->
     <script defer src="https://cdn.jsdelivr.net/npm/@alpinejs/intersect@3.14.8/dist/cdn.min.js"></script>
     <script defer src="https://cdn.jsdelivr.net/npm/@alpinejs/focus@3.14.8/dist/cdn.min.js"></script>
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.8/dist/cdn.min.js"></script>
-    
-    <!-- Material Icons font (display=swap — текст виден до загрузки шрифта) -->
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons&display=swap" rel="stylesheet">
-    
-    <!-- CSRF Token and htmx configuration -->
+
     <meta name="csrf-token" content="{{ request.state.csrf_token|default('') }}">
     <script>
-      // Wait for DOM to be ready before adding event listener
       if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', function() {
           if (document.body) {
@@ -50,79 +41,55 @@
             });
           }
         });
-      } else {
-        // DOM is already loaded
-        if (document.body) {
-          document.body.addEventListener('htmx:configRequest', (event) => {
-            const csrfToken = document.querySelector('meta[name="csrf-token"]');
-            if (csrfToken) {
-              event.detail.headers['X-CSRF-Token'] = csrfToken.content;
-            }
-          });
-        }
+      } else if (document.body) {
+        document.body.addEventListener('htmx:configRequest', (event) => {
+          const csrfToken = document.querySelector('meta[name="csrf-token"]');
+          if (csrfToken) {
+            event.detail.headers['X-CSRF-Token'] = csrfToken.content;
+          }
+        });
       }
     </script>
     {% block extra_head %}{% endblock %}
 </head>
 <body class="min-h-screen bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100">
-    <!-- Include sidebar component -->
     {% include "components/sidebar.html" %}
-    
-    <!-- Main content area -->
+
     <div class="lg:ml-64 transition-all duration-300">
-        <!-- Include header component -->
         {% include "components/header.html" %}
-        
-        <!-- Main content -->
         <main class="pt-16 pb-8 p-4">
             {% block content %}
                 {% block body %}{% endblock %}
             {% endblock %}
         </main>
     </div>
-    
-    <!-- Include toast component -->
+
     {% include "components/toast.html" %}
-    
-    <!-- Include modal component -->
     {% include "components/modals.html" %}
-    
+
     <script>
-        // Initialize Alpine.js stores
         document.addEventListener('alpine:init', () => {
             Alpine.store('darkMode', {
                 darkMode: localStorage.getItem('darkMode') !== 'false',
-
                 init() {
                     if (localStorage.getItem('darkMode') === null) {
                         localStorage.setItem('darkMode', 'true');
                     }
                     this.darkMode = localStorage.getItem('darkMode') === 'true';
-                    if (this.darkMode) {
-                        document.documentElement.classList.add('dark');
-                    } else {
-                        document.documentElement.classList.remove('dark');
-                    }
+                    document.documentElement.classList.toggle('dark', this.darkMode);
                 },
-                
                 toggle() {
                     this.darkMode = !this.darkMode;
                     localStorage.setItem('darkMode', this.darkMode);
-                    if (this.darkMode) {
-                        document.documentElement.classList.add('dark');
-                    } else {
-                        document.documentElement.classList.remove('dark');
-                    }
+                    document.documentElement.classList.toggle('dark', this.darkMode);
                 }
             });
 
             Alpine.store('sidebar', {
                 open: false,
-
                 toggle() {
                     this.open = !this.open;
                 },
-
                 closeMobile() {
                     if (window.innerWidth < 1024) {
                         this.open = false;
@@ -130,55 +97,13 @@
                 }
             });
         });
-        
-        // Dark mode functionality (for backward compatibility)
-        function darkMode() {
-            return {
-                get darkMode() {
-                    return Alpine.store('darkMode').darkMode;
-                },
-                
-                init() {
-                    // Initialize from store
-                    if (Alpine.store('darkMode').darkMode) {
-                        document.documentElement.classList.add('dark');
-                    } else {
-                        document.documentElement.classList.remove('dark');
-                    }
-                },
-                
-                toggle() {
-                    Alpine.store('darkMode').toggle();
-                }
-            }
-        }
-        
-        // Sidebar functionality (legacy - kept for compatibility)
-        function sidebar() {
-            return {
-                expanded: true,
-                
-                init() {
-                    this.expanded = true;
-                },
-                
-                toggle() {
-                    Alpine.store('sidebar').toggle();
-                },
-                
-                isActive(path) {
-                    return window.location.pathname.startsWith(path);
-                }
-            }
-        }
-        
-        // Toast notification functions
+
         function showToast(message, type = 'info') {
             const toastId = 'toast-' + Date.now();
-            const toastClass = type === 'error' ? 'bg-red-500' : 
-                              type === 'success' ? 'bg-green-500' : 
-                              type === 'warning' ? 'bg-yellow-500' : 'bg-blue-500';
-            
+            const toastClass = type === 'error' ? 'bg-red-500'
+                : type === 'success' ? 'bg-green-500'
+                : type === 'warning' ? 'bg-yellow-500' : 'bg-blue-500';
+
             const toast = document.createElement('div');
             toast.id = toastId;
             toast.className = `toast ${toastClass} text-white p-4 rounded shadow-lg mb-2 transition-opacity duration-300`;
@@ -188,8 +113,7 @@
                     <button onclick="removeToast('${toastId}')" class="ml-4 text-white">×</button>
                 </div>
             `;
-            
-            // Try to find toast-container, if not exists, create it or append to body
+
             let container = document.getElementById('toast-container');
             if (!container) {
                 container = document.createElement('div');
@@ -197,39 +121,24 @@
                 container.className = 'fixed bottom-4 right-4 z-50 space-y-2';
                 document.body.appendChild(container);
             }
-            
+
             container.appendChild(toast);
-            
-            // Auto remove after 5 seconds
-            setTimeout(() => {
-                removeToast(toastId);
-            }, 5000);
+            setTimeout(() => removeToast(toastId), 5000);
         }
-        
-        // Make showToast available globally
+
         window.showToast = showToast;
 
-        /**
-         * Get CSRF token from meta tag.
-         * @returns {string} CSRF token value or empty string
-         */
         function getCsrfToken() {
             const meta = document.querySelector('meta[name="csrf-token"]');
             return meta ? meta.content : '';
         }
 
-        /**
-         * Wrapper around fetch that automatically adds CSRF token and credentials.
-         * @param {string} url - Request URL
-         * @param {RequestInit} options - Fetch options
-         * @returns {Promise<Response>}
-         */
         function csrfFetch(url, options = {}) {
             const headers = new Headers(options.headers || {});
             if (!headers.has('X-CSRF-Token')) {
                 headers.set('X-CSRF-Token', getCsrfToken());
             }
-            if (!headers.has('Content-Type')) {
+            if (!headers.has('Content-Type') && !(options.body instanceof FormData)) {
                 headers.set('Content-Type', 'application/json');
             }
             return fetch(url, {
@@ -239,23 +148,16 @@
             });
         }
 
-        // Make helpers available globally
         window.getCsrfToken = getCsrfToken;
         window.csrfFetch = csrfFetch;
 
         function ensureCsrfFields() {
             const token = getCsrfToken();
-            if (!token) {
-                return;
-            }
+            if (!token) return;
             document.querySelectorAll('form').forEach((form) => {
                 const method = (form.getAttribute('method') || 'get').toUpperCase();
-                if (!['POST', 'PUT', 'PATCH', 'DELETE'].includes(method)) {
-                    return;
-                }
-                if (form.querySelector('input[name="csrf_token"]')) {
-                    return;
-                }
+                if (!['POST', 'PUT', 'PATCH', 'DELETE'].includes(method)) return;
+                if (form.querySelector('input[name="csrf_token"]')) return;
                 const field = document.createElement('input');
                 field.type = 'hidden';
                 field.name = 'csrf_token';
@@ -267,47 +169,41 @@
         window.ensureCsrfFields = ensureCsrfFields;
         document.addEventListener('DOMContentLoaded', ensureCsrfFields);
         document.body.addEventListener('htmx:afterSwap', ensureCsrfFields);
-        
+
         function removeToast(toastId) {
             const toast = document.getElementById(toastId);
             if (toast) {
                 toast.style.opacity = '0';
-                setTimeout(() => {
-                    toast.remove();
-                }, 300);
+                setTimeout(() => toast.remove(), 300);
             }
         }
-        
-        // Modal functions
+
         function showModal(content) {
             document.getElementById('modal-body').innerHTML = content;
             document.getElementById('modal-container').style.display = 'block';
         }
-        
+
         function closeModal() {
             document.getElementById('modal-container').style.display = 'none';
         }
-        
-        // Form submission with htmx
+
         function submitForm(url, data, method = 'POST') {
             const element = document.createElement('div');
             element.setAttribute('hx-' + method.toLowerCase(), url);
             element.setAttribute('hx-headers', JSON.stringify(data));
             element.setAttribute('hx-target', 'body');
             element.setAttribute('hx-swap', 'innerHTML');
-            
             htmx.process(element);
             element.click();
         }
-        
-        // Delete confirmation
+
         function confirmDelete(url) {
-            if (confirm('Are you sure you want to delete this item? This action cannot be undone.')) {
+            if (confirm('{{ t("layout.confirm_delete") }}')) {
                 window.location.href = url;
             }
         }
     </script>
-    
+
     {% block extra_scripts %}{% endblock %}
 </body>
 </html>

@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 
-{% block title %}Companies - Vertex AR Admin{% endblock %}
-{% block page_title %}Companies{% endblock %}
+{% block title %}Компании - Vertex AR Admin{% endblock %}
+{% block page_title %}Компании{% endblock %}
 
 {% block content %}
 <div x-data="companiesManager()" class="space-y-6">
@@ -102,12 +102,12 @@ function companiesManager() {
                         }
                         this.showDeleteModal = false;
                         this.isDeleting = false;
-                        this.showToast('Company deleted successfully', 'success');
+                        this.showToast('Компания успешно удалена', 'success');
                     } else {
                         window.location.reload();
                     }
                 } else {
-                    let errorMessage = `РћС€РёР±РєР° ${response.status}: ${response.statusText || 'РќРµ СѓРґР°Р»РѕСЃСЊ СѓРґР°Р»РёС‚СЊ РєРѕРјРїР°РЅРёСЋ'}`;
+                    let errorMessage = `Ошибка ${response.status}: ${response.statusText || 'Не удалось удалить компанию'}`;
 
                     if (isJson) {
                         try {
@@ -134,7 +134,7 @@ function companiesManager() {
             })
             .catch(error => {
                 console.error('Delete error:', error);
-                const errorMessage = error.message || 'РќРµ СѓРґР°Р»РѕСЃСЊ СѓРґР°Р»РёС‚СЊ РєРѕРјРїР°РЅРёСЋ';
+                const errorMessage = error.message || 'Не удалось удалить компанию';
                 this.showToast(errorMessage, 'error');
                 this.isDeleting = false;
             });
@@ -147,3 +147,4 @@ function companiesManager() {
 }
 </script>
 {% endblock %}
+

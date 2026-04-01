@@ -8,6 +8,7 @@ from fastapi.templating import Jinja2Templates
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
+from starlette.middleware.sessions import SessionMiddleware
 import logging
 import structlog
 import os
@@ -39,6 +40,7 @@ _ACCESS_LOG_PROBE_PATTERNS = (
 
 from app.core.config import settings  # noqa: E402
 from app.core.database import seed_defaults  # noqa: E402
+from app.html.i18n import DEFAULT_LANGUAGE, normalize_locale  # noqa: E402
 from app.middleware.csrf import CSRFMiddleware  # noqa: E402
 from app.middleware.maintenance import MaintenanceModeMiddleware  # noqa: E402
 from app.middleware.rate_limiter import setup_rate_limiting  # noqa: E402
@@ -231,6 +233,13 @@ app.add_middleware(
     minimum_size=500,
 )
 
+app.add_middleware(
+    SessionMiddleware,
+    secret_key=settings.SECRET_KEY,
+    same_site="lax",
+    https_only=settings.is_production,
+)
+
 # Maintenance mode — returns 503 for public routes when enabled in settings
 app.add_middleware(MaintenanceModeMiddleware)
 
@@ -242,6 +251,14 @@ app.add_middleware(CSRFMiddleware)
 
 
 # ── X-Request-ID middleware (request tracing) ────────────────────────
+@app.middleware("http")
+async def locale_middleware(request: Request, call_next):
+    """Expose active locale for templates and browser flows."""
+    request.state.locale = normalize_locale(request.scope.get("session", {}).get("language", DEFAULT_LANGUAGE))
+    response = await call_next(request)
+    return response
+
+
 @app.middleware("http")
 async def request_id_middleware(request: Request, call_next):
     """Attach a unique request ID to every request for log correlation."""

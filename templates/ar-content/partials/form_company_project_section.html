@@ -1,9 +1,9 @@
-<div class="p-6 border-b border-gray-200 dark:border-gray-700">
-    <h3 class="text-lg font-medium text-gray-900 dark:text-white mb-4">РљРѕРјРїР°РЅРёСЏ Рё РїСЂРѕРµРєС‚</h3>
+﻿<div class="p-6 border-b border-gray-200 dark:border-gray-700">
+    <h3 class="text-lg font-medium text-gray-900 dark:text-white mb-4">{{ t("ar_content.company_project") }}</h3>
     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
             <label for="company_id" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                РљРѕРјРїР°РЅРёСЏ <span class="text-red-500">*</span>
+                {{ t("ar_content.company") }} <span class="text-red-500">*</span>
             </label>
             <select name="company_id" id="company_id"
                     class="form-select"
@@ -11,7 +11,7 @@
                     :disabled="arContent && arContent.id"
                     @change="loadProjects()"
                     required x-cloak>
-                <option value="">Р’С‹Р±РµСЂРёС‚Рµ РєРѕРјРїР°РЅРёСЋ</option>
+                <option value="">{{ t("ar_content.select_company") }}</option>
                 <template x-for="company in companies" :key="company.id">
                     <option :value="company.id" x-text="company.name"></option>
                 </template>
@@ -20,7 +20,7 @@
 
         <div>
             <label for="project_id" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                РџСЂРѕРµРєС‚ <span class="text-red-500">*</span>
+                {{ t("ar_content.project") }} <span class="text-red-500">*</span>
             </label>
             <div class="relative">
                 <select name="project_id" id="project_id"
@@ -28,7 +28,7 @@
                         x-model="selectedProject"
                         :disabled="loading || !selectedCompany || (arContent && arContent.id)"
                         required x-cloak>
-                    <option value="">Р’С‹Р±РµСЂРёС‚Рµ РїСЂРѕРµРєС‚</option>
+                    <option value="">{{ t("ar_content.select_project") }}</option>
                     <template x-for="project in projects" :key="project.id">
                         <option :value="project.id" x-text="project.name"></option>
                     </template>
@@ -40,3 +40,4 @@
         </div>
     </div>
 </div>
+

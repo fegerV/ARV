@@ -1,18 +1,18 @@
-<div class="card">
+﻿<div class="card">
     <h3 class="text-base font-semibold text-gray-900 dark:text-white mb-4">
         <span class="material-icons text-sm align-middle mr-1">business</span>
-        РЎС‚Р°С‚РёСЃС‚РёРєР° РїРѕ РєРѕРјРїР°РЅРёСЏРј
+        {{ t("analytics.company_stats") }}
     </h3>
     {% if analytics_data.company_stats %}
     <div class="overflow-x-auto">
         <table class="table text-sm">
             <thead>
                 <tr>
-                    <th class="text-left">РљРѕРјРїР°РЅРёСЏ</th>
-                    <th class="text-right">РџСЂРѕСЃРјРѕС‚СЂС‹</th>
-                    <th class="text-right">РЎРµСЃСЃРёРё</th>
-                    <th class="text-right">РЎСЂРµРґ. РґР»РёС‚РµР»СЊРЅРѕСЃС‚СЊ</th>
-                    <th class="text-right">Р’РёРґРµРѕ %</th>
+                    <th class="text-left">{{ t("analytics.company") }}</th>
+                    <th class="text-right">{{ t("analytics.views") }}</th>
+                    <th class="text-right">{{ t("analytics.sessions") }}</th>
+                    <th class="text-right">{{ t("analytics.avg_short") }}</th>
+                    <th class="text-right">{{ t("analytics.video_percent") }}</th>
                 </tr>
             </thead>
             <tbody>
@@ -45,6 +45,7 @@
         </table>
     </div>
     {% else %}
-    <p class="text-gray-400 dark:text-gray-500 text-center py-8">РџРѕРєР° РЅРµС‚ РґР°РЅРЅС‹С… РїРѕ РєРѕРјРїР°РЅРёСЏРј</p>
+    <p class="text-gray-400 dark:text-gray-500 text-center py-8">{{ t("analytics.no_data") }}</p>
     {% endif %}
 </div>
+

@@ -6,8 +6,8 @@
     <div class="max-w-7xl mx-auto">
         <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-6">
             <div>
-                <h2 class="text-2xl font-semibold text-gray-900 dark:text-white">Резервное копирование</h2>
-                <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">История бэкапов БД и ручной запуск</p>
+                <h2 class="text-2xl font-semibold text-gray-900 dark:text-white">Резервные копии</h2>
+                <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">Управление архивами БД и медиафайлов</p>
             </div>
             <div class="flex gap-3">
                 <a href="/settings#backup" class="btn btn-secondary inline-flex items-center gap-2">
@@ -23,14 +23,14 @@
         <div class="mb-6 p-4 rounded-xl bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 flex items-center gap-3">
             <span class="material-icons text-amber-600 dark:text-amber-400">warning</span>
             <div>
-                <p class="text-sm font-medium text-amber-800 dark:text-amber-200">Бэкапы не настроены</p>
-                <p class="text-sm text-amber-700 dark:text-amber-300 mt-0.5">Выберите компанию в <a href="/settings#backup" class="underline">Настройках - Бэкапы</a>.</p>
+                <p class="text-sm font-medium text-amber-800 dark:text-amber-200">Бэкап не настроен</p>
+                <p class="text-sm text-amber-700 dark:text-amber-300 mt-0.5">Заполните параметры в <a href="/settings#backup" class="underline">Настройки - Бэкапы</a>.</p>
             </div>
         </div>
         {% endif %}
         <div class="bg-white dark:bg-gray-800 shadow rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700">
             <div class="px-6 py-5 border-b border-gray-200 dark:border-gray-700">
-                <h3 class="text-lg font-semibold text-gray-900 dark:text-white">История бэкапов</h3>
+                <h3 class="text-lg font-semibold text-gray-900 dark:text-white">История запусков</h3>
                 <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">Последние 50 операций</p>
             </div>
             <div class="overflow-x-auto">
@@ -40,7 +40,7 @@
                             <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Дата</th>
                             <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Статус</th>
                             <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Размер</th>
-                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Триггер</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Источник</th>
                             <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Путь</th>
                             <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Действия</th>
                         </tr>
@@ -67,7 +67,7 @@
                         </tr>
                         {% endfor %}
                         {% if not records %}
-                        <tr><td colspan="6" class="px-4 py-12 text-center text-sm text-gray-400">Бэкапов пока нет</td></tr>
+                        <tr><td colspan="6" class="px-4 py-12 text-center text-sm text-gray-400">Записей пока нет</td></tr>
                         {% endif %}
                     </tbody>
                 </table>
@@ -87,7 +87,7 @@ function backupsPage() {
                 const resp = await (window.csrfFetch || fetch)('/api/backups/run', { method: 'POST' });
                 const data = await resp.json();
                 if (resp.ok) {
-                    if (window.showToast) window.showToast('Бэкап запущен. Обновите через минуту.', 'success');
+                    if (window.showToast) window.showToast('Бэкап запущен. Обновите страницу позже.', 'success');
                     setTimeout(() => window.location.reload(), 2000);
                 } else {
                     if (window.showToast) window.showToast(data.detail || 'Ошибка', 'error');
@@ -97,7 +97,7 @@ function backupsPage() {
             } finally { this.backupRunning = false; }
         },
         async deleteBackup(id) {
-            if (!confirm('Удалить бэкап? Файл на Яндекс Диске тоже будет удалён.')) return;
+            if (!confirm('Удалить бэкап? Это действие нельзя отменить.')) return;
             try {
                 const resp = await (window.csrfFetch || fetch)('/api/backups/' + id, { method: 'DELETE' });
                 if (resp.ok) {
@@ -115,3 +115,4 @@ function backupsPage() {
 }
 </script>
 {% endblock %}
+

@@ -4,22 +4,22 @@
             <thead class="bg-gray-50 dark:bg-gray-900">
                 <tr>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                        Project Name
+                        Название проекта
                     </th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                        Company
+                        Компания
                     </th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                        Status
+                        Статус
                     </th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                        AR Content
+                        AR-контент
                     </th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                        Created
+                        Создан
                     </th>
                     <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                        Actions
+                        Действия
                     </th>
                 </tr>
             </thead>
@@ -39,12 +39,12 @@
                             {% if project.status == 'active' %}
                                 <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-200">
                                     <span class="inline-block w-2 h-2 bg-green-600 rounded-full"></span>
-                                    Active
+                                    Активен
                                 </span>
                             {% elif project.status == 'inactive' %}
                                 <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-200">
                                     <span class="inline-block w-2 h-2 bg-yellow-600 rounded-full"></span>
-                                    Inactive
+                                    Неактивен
                                 </span>
                             {% else %}
                                 <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300">
@@ -65,21 +65,21 @@
                             <div class="flex items-center justify-end gap-2">
                                 <a href="/projects/{{ project.id }}/edit"
                                    class="inline-flex items-center gap-1 px-3 py-2 text-sm font-medium text-indigo-600 hover:bg-indigo-50 dark:text-indigo-400 dark:hover:bg-indigo-900/20 rounded-lg transition-colors"
-                                   title="Edit project">
+                                   title="Редактировать проект">
                                     <span class="material-icons text-base">edit</span>
-                                    <span class="hidden sm:inline">Edit</span>
+                                    <span class="hidden sm:inline">Редактировать</span>
                                 </a>
                                 <a href="/projects/{{ project.id }}/ar-content"
                                    class="inline-flex items-center gap-1 px-3 py-2 text-sm font-medium text-green-600 hover:bg-green-50 dark:text-green-400 dark:hover:bg-green-900/20 rounded-lg transition-colors"
-                                   title="Manage AR content">
+                                   title="Открыть AR-контент">
                                     <span class="material-icons text-base">image</span>
-                                    <span class="hidden sm:inline">Content</span>
+                                    <span class="hidden sm:inline">Контент</span>
                                 </a>
                                 <button @click="openDeleteModal('{{ project.id }}', '{{ project.name }}')"
                                    class="inline-flex items-center gap-1 px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20 rounded-lg transition-colors"
-                                   title="Delete project">
+                                   title="Удалить проект">
                                     <span class="material-icons text-base">delete</span>
-                                    <span class="hidden sm:inline">Delete</span>
+                                    <span class="hidden sm:inline">Удалить</span>
                                 </button>
                             </div>
                         </td>
@@ -90,9 +90,9 @@
                         <td colspan="6" class="px-6 py-12 text-center">
                             <div class="flex flex-col items-center gap-2">
                                 <span class="material-icons text-4xl text-gray-300 dark:text-gray-600">folder_open</span>
-                                <p class="text-gray-500 dark:text-gray-400">No projects found</p>
+                                <p class="text-gray-500 dark:text-gray-400">Проекты не найдены</p>
                                 <a href="/projects/create" class="mt-2 text-sm text-indigo-600 hover:text-indigo-700 dark:text-indigo-400 dark:hover:text-indigo-300 font-medium">
-                                    Create your first project &rarr;
+                                    Создать первый проект &rarr;
                                 </a>
                             </div>
                         </td>

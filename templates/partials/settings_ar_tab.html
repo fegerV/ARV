@@ -1,69 +1,59 @@
 <div x-show="activeTab === 'ar'" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0 translate-y-1" x-transition:enter-end="opacity-100 translate-y-0">
     <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
         <div class="px-6 py-5 border-b border-gray-200 dark:border-gray-700">
-            <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Настройки AR-контента</h3>
-            <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">Генерация маркеров, обработка видео и срок доступа по ссылке / QR</p>
+            <h3 class="text-lg font-semibold text-gray-900 dark:text-white">{{ t("settings.ar.heading") }}</h3>
+            <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">{{ t("settings.ar.description") }}</p>
         </div>
 
         <form method="post" action="/settings/ar" class="p-6 space-y-6">
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
                 <div>
-                    <label for="thumbnail_quality" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Качество превью (%)</label>
-                    <input type="number" name="thumbnail_quality" id="thumbnail_quality"
-                           value="{{ settings.ar.thumbnail_quality|default(80) }}"
-                           min="10" max="100" step="5" class="form-input">
-                    <p class="text-xs text-gray-400 dark:text-gray-500 mt-1">Качество thumbnail и preview-изображений для карточек и списков</p>
+                    <label for="thumbnail_quality" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">{{ t("settings.ar.thumbnail_quality") }}</label>
+                    <input type="number" name="thumbnail_quality" id="thumbnail_quality" value="{{ settings.ar.thumbnail_quality|default(80) }}" min="10" max="100" step="5" class="form-input">
+                    <p class="text-xs text-gray-400 dark:text-gray-500 mt-1">{{ t("settings.ar.thumbnail_quality_hint") }}</p>
                 </div>
                 <div>
-                    <label for="default_content_lifetime_years" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Срок работы ссылки и QR по умолчанию (лет)</label>
-                    <input type="number" name="default_content_lifetime_years" id="default_content_lifetime_years"
-                           value="{{ settings.ar.default_content_lifetime_years|default(settings.general.default_subscription_years|default(30)) }}"
-                           min="1" max="100" class="form-input">
-                    <p class="text-xs text-gray-400 dark:text-gray-500 mt-1">Для новых заказов. Рекомендуемое значение — 30 лет.</p>
+                    <label for="default_content_lifetime_years" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">{{ t("settings.ar.default_lifetime") }}</label>
+                    <input type="number" name="default_content_lifetime_years" id="default_content_lifetime_years" value="{{ settings.ar.default_content_lifetime_years|default(settings.general.default_subscription_years|default(30)) }}" min="1" max="100" class="form-input">
+                    <p class="text-xs text-gray-400 dark:text-gray-500 mt-1">{{ t("settings.ar.default_lifetime_hint") }}</p>
                 </div>
             </div>
 
             <div>
-                <label for="default_ar_viewer_theme" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Тема AR-просмотрщика</label>
+                <label for="default_ar_viewer_theme" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">{{ t("settings.ar.default_theme") }}</label>
                 <select id="default_ar_viewer_theme" name="default_ar_viewer_theme" class="form-select">
-                    <option value="default" {% if settings.ar.default_ar_viewer_theme == 'default' %}selected{% endif %}>По умолчанию</option>
-                    <option value="dark" {% if settings.ar.default_ar_viewer_theme == 'dark' %}selected{% endif %}>Тёмная</option>
-                    <option value="minimal" {% if settings.ar.default_ar_viewer_theme == 'minimal' %}selected{% endif %}>Минималистичная</option>
-                    <option value="corporate" {% if settings.ar.default_ar_viewer_theme == 'corporate' %}selected{% endif %}>Корпоративная</option>
+                    <option value="default" {% if settings.ar.default_ar_viewer_theme == 'default' %}selected{% endif %}>{{ t("settings.ar.default_theme_default") }}</option>
+                    <option value="dark" {% if settings.ar.default_ar_viewer_theme == 'dark' %}selected{% endif %}>{{ t("settings.ar.default_theme_dark") }}</option>
+                    <option value="minimal" {% if settings.ar.default_ar_viewer_theme == 'minimal' %}selected{% endif %}>{{ t("settings.ar.default_theme_minimal") }}</option>
+                    <option value="corporate" {% if settings.ar.default_ar_viewer_theme == 'corporate' %}selected{% endif %}>{{ t("settings.ar.default_theme_corporate") }}</option>
                 </select>
             </div>
 
             <div class="rounded-xl border border-blue-200 bg-blue-50 dark:bg-blue-900/20 dark:border-blue-800 p-4 text-sm text-blue-900 dark:text-blue-100">
-                <div class="font-medium mb-1">Как это работает</div>
-                <p>QR-код содержит постоянную ссылку на заказ. При смене видео ссылка и QR не меняются. Срок доступа определяется сроком жизни контента, а не отдельным сроком QR.</p>
+                <div class="font-medium mb-1">{{ t("settings.ar.rotation_help_title") }}</div>
+                <p>{{ t("settings.ar.rotation_help_text") }}</p>
             </div>
 
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <label class="flex items-start gap-3 p-4 rounded-xl border border-gray-200 dark:border-gray-700">
-                    <input type="checkbox" name="enable_video_compression" value="on"
-                           {% if settings.ar.enable_video_compression %}checked{% endif %}
-                           class="mt-0.5 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
+                    <input type="checkbox" name="video_processing_enabled" value="on" {% if settings.ar.video_processing_enabled %}checked{% endif %} class="mt-0.5 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
                     <span class="text-sm">
-                        <span class="font-medium text-gray-900 dark:text-white">Сжатие видео</span>
-                        <span class="text-gray-500 dark:text-gray-400 block text-xs mt-0.5">Автоматическая оптимизация видео при загрузке</span>
+                        <span class="font-medium text-gray-900 dark:text-white">{{ t("settings.ar.video_compression") }}</span>
+                        <span class="text-gray-500 dark:text-gray-400 block text-xs mt-0.5">{{ t("settings.ar.video_compression_hint") }}</span>
                     </span>
                 </label>
                 <label class="flex items-start gap-3 p-4 rounded-xl border border-gray-200 dark:border-gray-700">
-                    <input type="checkbox" name="auto_generate_markers" value="on"
-                           {% if settings.ar.auto_generate_markers %}checked{% endif %}
-                           class="mt-0.5 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
+                    <input type="checkbox" name="marker_generation_enabled" value="on" {% if settings.ar.marker_generation_enabled %}checked{% endif %} class="mt-0.5 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
                     <span class="text-sm">
-                        <span class="font-medium text-gray-900 dark:text-white">Автогенерация маркеров</span>
-                        <span class="text-gray-500 dark:text-gray-400 block text-xs mt-0.5">Автоматическое создание AR-маркеров</span>
+                        <span class="font-medium text-gray-900 dark:text-white">{{ t("settings.ar.auto_markers") }}</span>
+                        <span class="text-gray-500 dark:text-gray-400 block text-xs mt-0.5">{{ t("settings.ar.auto_markers_hint") }}</span>
                     </span>
                 </label>
             </div>
 
             <div class="flex flex-col sm:flex-row justify-end gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
-                <button type="button" onclick="window.location.reload()" class="btn btn-secondary w-full sm:w-auto">Отмена</button>
-                <button type="submit" class="btn btn-primary w-full sm:w-auto">
-                    <span class="material-icons text-sm mr-1">save</span>Сохранить
-                </button>
+                <button type="button" onclick="window.location.reload()" class="btn btn-secondary w-full sm:w-auto">{{ t("common.cancel") }}</button>
+                <button type="submit" class="btn btn-primary w-full sm:w-auto"><span class="material-icons text-sm mr-1">save</span>{{ t("common.save") }}</button>
             </div>
         </form>
     </div>

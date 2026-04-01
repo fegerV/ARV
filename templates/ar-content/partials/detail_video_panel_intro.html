@@ -5,7 +5,7 @@
             <h3 class="text-xl font-semibold text-gray-900 dark:text-white">Управление видео</h3>
         </div>
         <p class="text-sm text-gray-600 dark:text-gray-400">
-            Первое загруженное видео активируется автоматически. Ссылка и QR на заказ остаются теми же, а сами видео можно менять вручную или по правилам ротации. Срок доступа к видео ограничен сроком жизни контента.
+            Здесь отображаются все ролики, привязанные к заказу. Один и тот же QR-код может вести на разные видео в зависимости от выбранного режима показа и расписания.
         </p>
     </div>
     <button @click="showUploadDialog = true" class="btn btn-primary">
@@ -20,19 +20,19 @@
                 <span class="material-icons text-sm align-middle mr-1">settings</span>Режим воспроизведения
             </label>
             <select x-model="playbackMode" class="form-input w-full">
-                <option value="manual">Ручной (одно базовое видео)</option>
-                <option value="sequential">Авто: последовательный</option>
-                <option value="cyclic">Авто: циклический</option>
+                <option value="manual">Ручной</option>
+                <option value="sequential">По очереди</option>
+                <option value="cyclic">По кругу</option>
             </select>
             <div class="mt-2 text-xs text-gray-600 dark:text-gray-400 bg-white dark:bg-gray-800 p-2 rounded">
                 <template x-if="playbackMode === 'manual'">
-                    <span>Одно базовое видео без автоматической ротации. Если включено расписание ниже, оно имеет приоритет.</span>
+                    <span>Активное видео выбирается вручную. Этот режим удобен, когда нужен один основной ролик.</span>
                 </template>
                 <template x-if="playbackMode === 'sequential'">
-                    <span>Базовая авторотация: активные видео идут по порядку. Если включено расписание ниже, оно перекроет этот режим.</span>
+                    <span>Видео идут по очереди: после завершения одного ролика активируется следующий.</span>
                 </template>
                 <template x-if="playbackMode === 'cyclic'">
-                    <span>Базовая авторотация по кругу. Подходит для постоянной смены нескольких роликов, если не нужно календарное правило.</span>
+                    <span>Видео переключаются по кругу. Подходит для длинной ротации нескольких материалов.</span>
                 </template>
             </div>
         </div>
@@ -41,7 +41,7 @@
                 class="btn btn-primary whitespace-nowrap">
             <span class="material-icons mr-2" x-show="!playbackModeSaving">save</span>
             <span class="material-icons mr-2 animate-spin" x-show="playbackModeSaving">refresh</span>
-            <span x-show="!playbackModeSaving">Применить</span>
+            <span x-show="!playbackModeSaving">Сохранить</span>
             <span x-show="playbackModeSaving">Сохранение...</span>
         </button>
     </div>
@@ -66,7 +66,7 @@
 <template x-if="!videos || videos.length === 0">
     <div class="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-6 text-center">
         <span class="material-icons text-4xl text-yellow-600 dark:text-yellow-400 mb-3 block">videocam_off</span>
-        <p class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Видео не загружены</p>
+        <p class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Видео ещё не загружены</p>
         <button @click="showUploadDialog = true" class="btn btn-primary text-sm px-3 py-1.5">
             <span class="material-icons mr-2 text-sm">add</span>Загрузить первое видео
         </button>

@@ -2,147 +2,114 @@
     <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden mb-6">
         <div class="px-6 py-5 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
             <div>
-                <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Бэкап базы данных</h3>
-                <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">Автоматическое резервное копирование PostgreSQL на Яндекс Диск</p>
+                <h3 class="text-lg font-semibold text-gray-900 dark:text-white">{{ t("settings.backup.heading") }}</h3>
+                <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">{{ t("settings.backup.description") }}</p>
             </div>
-            <button type="button" @click="runBackupNow()" :disabled="backupRunning"
-                    class="btn btn-primary text-sm flex items-center gap-1.5">
-                <span class="material-icons text-base" :class="backupRunning && 'animate-spin'"
-                      x-text="backupRunning ? 'refresh' : 'backup'"></span>
-                <span x-text="backupRunning ? 'Создание...' : 'Создать сейчас'"></span>
+            <button type="button" @click="runBackupNow()" :disabled="backupRunning" class="btn btn-primary text-sm flex items-center gap-1.5">
+                <span class="material-icons text-base" :class="backupRunning && 'animate-spin'" x-text="backupRunning ? 'refresh' : 'backup'"></span>
+                <span x-text="backupRunning ? '{{ t('common.loading') }}' : '{{ t('settings.backup.run_now') }}'"></span>
             </button>
         </div>
 
         <form method="post" action="/settings/backup" class="p-6 space-y-6">
             <div class="flex items-center gap-3 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-xl border border-blue-200 dark:border-blue-800">
-                <input id="backup_enabled" name="backup_enabled" type="checkbox"
-                       {% if settings.backup.backup_enabled %}checked{% endif %}
-                       value="on"
-                       class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
+                <input id="backup_enabled" name="backup_enabled" type="checkbox" {% if settings.backup.backup_enabled %}checked{% endif %} value="on" class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
                 <label for="backup_enabled" class="text-sm">
-                    <span class="font-medium text-gray-900 dark:text-white">Автоматический бэкап</span>
-                    <span class="text-gray-500 dark:text-gray-400 block text-xs mt-0.5">Регулярное резервное копирование по расписанию</span>
+                    <span class="font-medium text-gray-900 dark:text-white">{{ t("settings.backup.enabled") }}</span>
+                    <span class="text-gray-500 dark:text-gray-400 block text-xs mt-0.5">{{ t("settings.backup.enabled_hint") }}</span>
                 </label>
             </div>
 
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
                 <div>
-                    <label for="backup_company_id" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Yandex Disk аккаунт</label>
+                    <label for="backup_company_id" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">{{ t("settings.backup.company") }}</label>
                     <select id="backup_company_id" name="backup_company_id" class="form-select">
-                        <option value="0">-- Не выбрано --</option>
+                        <option value="0">{{ t("settings.backup.company_placeholder") }}</option>
                         {% for c in yd_companies %}
                         <option value="{{ c.id }}" {% if settings.backup.backup_company_id == c.id %}selected{% endif %}>{{ c.name }}</option>
                         {% endfor %}
                     </select>
-                    <p class="text-xs text-gray-400 dark:text-gray-500 mt-1">Компания с подключённым Яндекс Диском</p>
+                    <p class="text-xs text-gray-400 dark:text-gray-500 mt-1">{{ t("settings.backup.company_hint") }}</p>
                 </div>
                 <div>
-                    <label for="backup_yd_folder" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Папка на Яндекс Диске</label>
-                    <input type="text" name="backup_yd_folder" id="backup_yd_folder"
-                           value="{{ settings.backup.backup_yd_folder|default('backups') }}"
-                           class="form-input" placeholder="backups">
+                    <label for="backup_yd_folder" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">{{ t("settings.backup.folder") }}</label>
+                    <input type="text" name="backup_yd_folder" id="backup_yd_folder" value="{{ settings.backup.backup_yd_folder|default('backups') }}" class="form-input" placeholder="backups">
                 </div>
             </div>
 
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
                 <div>
-                    <label for="backup_schedule" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Расписание</label>
-                    <select id="backup_schedule" name="backup_schedule" class="form-select"
-                            x-model="backupSchedule">
-                        <option value="daily" {% if settings.backup.backup_schedule == 'daily' %}selected{% endif %}>Ежедневно в 03:00</option>
-                        <option value="twice_daily" {% if settings.backup.backup_schedule == 'twice_daily' %}selected{% endif %}>Каждые 12 часов (03:00, 15:00)</option>
-                        <option value="weekly" {% if settings.backup.backup_schedule == 'weekly' %}selected{% endif %}>Еженедельно (пн 03:00)</option>
-                        <option value="custom" {% if settings.backup.backup_schedule == 'custom' %}selected{% endif %}>Свое cron-выражение</option>
+                    <label for="backup_schedule" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">{{ t("settings.backup.schedule") }}</label>
+                    <select id="backup_schedule" name="backup_schedule" class="form-select" x-model="backupSchedule">
+                        <option value="daily" {% if settings.backup.backup_schedule == 'daily' %}selected{% endif %}>{{ t("settings.backup.schedule_daily") }}</option>
+                        <option value="twice_daily" {% if settings.backup.backup_schedule == 'twice_daily' %}selected{% endif %}>{{ t("settings.backup.schedule_twice_daily") }}</option>
+                        <option value="weekly" {% if settings.backup.backup_schedule == 'weekly' %}selected{% endif %}>{{ t("settings.backup.schedule_weekly") }}</option>
+                        <option value="custom" {% if settings.backup.backup_schedule == 'custom' %}selected{% endif %}>{{ t("settings.backup.schedule_custom") }}</option>
                     </select>
                 </div>
                 <div x-show="backupSchedule === 'custom'" x-transition>
-                    <label for="backup_cron" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Cron-выражение</label>
-                    <input type="text" name="backup_cron" id="backup_cron"
-                           value="{{ settings.backup.backup_cron|default('0 3 * * *') }}"
-                           class="form-input font-mono text-sm" placeholder="0 3 * * *">
-                    <p class="text-xs text-gray-400 dark:text-gray-500 mt-1">Формат: мин час день месяц день_недели</p>
+                    <label for="backup_cron" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">{{ t("settings.backup.cron") }}</label>
+                    <input type="text" name="backup_cron" id="backup_cron" value="{{ settings.backup.backup_cron|default('0 3 * * *') }}" class="form-input font-mono text-sm" placeholder="0 3 * * *">
+                    <p class="text-xs text-gray-400 dark:text-gray-500 mt-1">{{ t("settings.backup.cron_hint") }}</p>
                 </div>
             </div>
 
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
                 <div>
-                    <label for="backup_retention_days" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Хранить (дней)</label>
-                    <input type="number" name="backup_retention_days" id="backup_retention_days"
-                           value="{{ settings.backup.backup_retention_days|default(30) }}"
-                           min="1" max="365" class="form-input">
+                    <label for="backup_retention_days" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">{{ t("settings.backup.retention_days") }}</label>
+                    <input type="number" name="backup_retention_days" id="backup_retention_days" value="{{ settings.backup.backup_retention_days|default(30) }}" min="1" max="365" class="form-input">
                 </div>
                 <div>
-                    <label for="backup_max_copies" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Макс. копий</label>
-                    <input type="number" name="backup_max_copies" id="backup_max_copies"
-                           value="{{ settings.backup.backup_max_copies|default(30) }}"
-                           min="1" max="100" class="form-input">
-                    <p class="text-xs text-gray-400 dark:text-gray-500 mt-1">Старые копии удаляются автоматически</p>
+                    <label for="backup_max_copies" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">{{ t("settings.backup.max_copies") }}</label>
+                    <input type="number" name="backup_max_copies" id="backup_max_copies" value="{{ settings.backup.backup_max_copies|default(30) }}" min="1" max="100" class="form-input">
+                    <p class="text-xs text-gray-400 dark:text-gray-500 mt-1">{{ t("settings.backup.max_copies_hint") }}</p>
                 </div>
             </div>
 
             <div class="flex flex-col sm:flex-row justify-end gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
-                <button type="button" onclick="window.location.reload()" class="btn btn-secondary w-full sm:w-auto">Отмена</button>
-                <button type="submit" class="btn btn-primary w-full sm:w-auto">
-                    <span class="material-icons text-sm mr-1">save</span>Сохранить
-                </button>
+                <button type="button" onclick="window.location.reload()" class="btn btn-secondary w-full sm:w-auto">{{ t("common.cancel") }}</button>
+                <button type="submit" class="btn btn-primary w-full sm:w-auto"><span class="material-icons text-sm mr-1">save</span>{{ t("common.save") }}</button>
             </div>
         </form>
     </div>
 
     <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
         <div class="px-6 py-5 border-b border-gray-200 dark:border-gray-700">
-            <h3 class="text-lg font-semibold text-gray-900 dark:text-white">История бэкапов</h3>
-            <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">Последние операции резервного копирования</p>
+            <h3 class="text-lg font-semibold text-gray-900 dark:text-white">{{ t("settings.backup.history_heading") }}</h3>
+            <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">{{ t("settings.backup.history_description") }}</p>
         </div>
         <div class="overflow-x-auto">
             <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
                 <thead class="bg-gray-50 dark:bg-gray-900/40">
                     <tr>
-                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Дата</th>
-                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Статус</th>
-                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Размер</th>
-                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Триггер</th>
-                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Путь на YD</th>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">{{ t("settings.backup.created") }}</th>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">{{ t("settings.backup.status") }}</th>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">{{ t("settings.backup.size") }}</th>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">{{ t("settings.backup.trigger") }}</th>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">{{ t("settings.backup.path") }}</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
                     {% for bkp in backup_history %}
                     <tr>
-                        <td class="px-4 py-3 text-sm text-gray-700 dark:text-gray-300 whitespace-nowrap">
-                            {{ bkp.started_at.strftime('%d.%m.%Y %H:%M') if bkp.started_at else '—' }}
-                        </td>
+                        <td class="px-4 py-3 text-sm text-gray-700 dark:text-gray-300 whitespace-nowrap">{{ bkp.started_at.strftime('%d.%m.%Y %H:%M') if bkp.started_at else '—' }}</td>
                         <td class="px-4 py-3 text-sm whitespace-nowrap">
                             {% if bkp.status == 'success' %}
-                            <span class="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-full bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">
-                                <span class="material-icons text-xs">check_circle</span>OK
-                            </span>
+                            <span class="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-full bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"><span class="material-icons text-xs">check_circle</span>OK</span>
                             {% elif bkp.status == 'running' %}
-                            <span class="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">
-                                <span class="material-icons text-xs animate-spin">refresh</span>В процессе
-                            </span>
+                            <span class="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400"><span class="material-icons text-xs animate-spin">refresh</span>{{ t("settings.backup.running") }}</span>
                             {% else %}
-                            <span class="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-full bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
-                                  title="{{ bkp.error_message or '' }}">
-                                <span class="material-icons text-xs">error</span>Ошибка
-                            </span>
+                            <span class="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-full bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400" title="{{ bkp.error_message or '' }}"><span class="material-icons text-xs">error</span>{{ t("settings.backup.failed") }}</span>
                             {% endif %}
                         </td>
-                        <td class="px-4 py-3 text-sm text-gray-700 dark:text-gray-300 whitespace-nowrap">
-                            {% if bkp.size_bytes %}{{ (bkp.size_bytes / 1048576)|round(2) }} МБ{% else %}—{% endif %}
-                        </td>
-                        <td class="px-4 py-3 text-sm text-gray-500 dark:text-gray-400 whitespace-nowrap">
-                            {{ 'Авто' if bkp.trigger == 'scheduled' else 'Вручную' }}
-                        </td>
-                        <td class="px-4 py-3 text-xs text-gray-400 dark:text-gray-500 font-mono truncate max-w-[200px]" title="{{ bkp.yd_path or '' }}">
-                            {{ bkp.yd_path or '—' }}
-                        </td>
+                        <td class="px-4 py-3 text-sm text-gray-700 dark:text-gray-300 whitespace-nowrap">{% if bkp.size_bytes %}{{ (bkp.size_bytes / 1048576)|round(2) }} MB{% else %}—{% endif %}</td>
+                        <td class="px-4 py-3 text-sm text-gray-500 dark:text-gray-400 whitespace-nowrap">{{ t("settings.backup.trigger_scheduled") if bkp.trigger == 'scheduled' else t("settings.backup.trigger_manual") }}</td>
+                        <td class="px-4 py-3 text-xs text-gray-400 dark:text-gray-500 font-mono truncate max-w-[200px]" title="{{ bkp.yd_path or '' }}">{{ bkp.yd_path or '—' }}</td>
                     </tr>
                     {% endfor %}
                     {% if not backup_history %}
                     <tr>
-                        <td colspan="5" class="px-4 py-8 text-center text-sm text-gray-400 dark:text-gray-500">
-                            Бэкапов пока нет
-                        </td>
+                        <td colspan="5" class="px-4 py-8 text-center text-sm text-gray-400 dark:text-gray-500">{{ t("settings.backup.empty") }}</td>
                     </tr>
                     {% endif %}
                 </tbody>

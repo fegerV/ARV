@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 
-{% block title %}Notifications - Vertex AR Admin{% endblock %}
-{% block page_title %}Notifications{% endblock %}
+{% block title %}{{ t("notifications.title") }} - Vertex AR Admin{% endblock %}
+{% block page_title %}{{ t("notifications.title") }}{% endblock %}
 
 {% block content %}
 <div x-data="notificationsManager()" class="space-y-6">
@@ -27,51 +27,40 @@ function notificationsManager() {
 
         confirmDelete() {
             if (!this.deleteNotification.id) return;
-
             this.isDeleting = true;
             const notificationId = this.deleteNotification.id;
 
-            csrfFetch(`/notifications/${notificationId}`, {
-                method: 'DELETE'
-            })
-            .then(response => {
-                if (response.ok) {
-                    const row = document.getElementById(`notification-${notificationId}`);
-                    if (row) {
-                        row.style.transition = 'opacity 0.3s ease';
-                        row.style.opacity = '0';
-                        setTimeout(() => {
-                            row.remove();
-                        }, 300);
+            csrfFetch(`/notifications/${notificationId}`, { method: 'DELETE' })
+                .then(response => {
+                    if (response.ok) {
+                        const row = document.getElementById(`notification-${notificationId}`);
+                        if (row) {
+                            row.style.transition = 'opacity 0.3s ease';
+                            row.style.opacity = '0';
+                            setTimeout(() => row.remove(), 300);
+                        }
+                        this.showDeleteModal = false;
+                        this.isDeleting = false;
+                        showToast('{{ t("notifications.delete") }}', 'success');
+                    } else {
+                        return response.json().then(data => {
+                            throw new Error(data.detail || '{{ t("notifications.delete") }}');
+                        });
                     }
-                    this.showDeleteModal = false;
+                })
+                .catch(error => {
+                    console.error('Delete error:', error);
+                    showToast('Error: ' + error.message, 'error');
                     this.isDeleting = false;
-                    showToast('Notification deleted successfully', 'success');
-                } else {
-                    return response.json().then(data => {
-                        throw new Error(data.detail || 'Failed to delete notification');
-                    });
-                }
-            })
-            .catch(error => {
-                console.error('Delete error:', error);
-                showToast('Error: ' + error.message, 'error');
-                this.isDeleting = false;
-            });
+                });
         },
 
         markAllRead() {
-            csrfFetch('/api/notifications/mark-all-read', {
-                method: 'POST'
-            })
-            .then(response => {
-                if (response.ok) {
-                    window.location.reload();
-                }
-            })
-            .catch(error => {
-                console.error('Error:', error);
-            });
+            csrfFetch('/api/notifications/mark-all-read', { method: 'POST' })
+                .then(response => {
+                    if (response.ok) window.location.reload();
+                })
+                .catch(error => console.error('Error:', error));
         }
     };
 }

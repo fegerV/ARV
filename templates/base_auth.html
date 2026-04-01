@@ -1,15 +1,12 @@
 <!DOCTYPE html>
-<html lang="en" class="h-full">
+<html lang="{{ request.state.locale|default('ru') }}" class="h-full">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="robots" content="noindex, nofollow">
     <title>{% block title %}Vertex AR Admin{% endblock %}</title>
-    
-    <!-- Material Icons -->
-    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
-    
-    <!-- Tailwind CSS — собранный бандл (npm run build:css), без CDN в production -->
+
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons&display=swap" rel="stylesheet">
     <link href="/static/css/tailwind.css" rel="stylesheet">
     <script>
         (function () {
@@ -20,75 +17,73 @@
             }
         })();
     </script>
-    
-    <!-- htmx from CDN -->
+
     <script src="https://unpkg.com/htmx.org@1.9.10"></script>
-    
-    <!-- Alpine.js from CDN -->
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
-    
-    <!-- Alpine.js Inter from CDN -->
     <script defer src="https://cdn.jsdelivr.net/npm/@alpinejs/intersect@3.x/dist/cdn.min.js"></script>
-    
-    <!-- Alpine.js Focus from CDN -->
     <script defer src="https://cdn.jsdelivr.net/npm/@alpinejs/focus@3.x/dist/cdn.min.js"></script>
-    
-    <!-- Стили .btn, .form-input, .modal и т.д. — в /static/css/tailwind.css -->
+    <meta name="csrf-token" content="{{ request.state.csrf_token|default('') }}">
+    <script>
+        function getCsrfToken() {
+            const meta = document.querySelector('meta[name="csrf-token"]');
+            return meta ? meta.content : '';
+        }
+
+        function ensureCsrfFields() {
+            const token = getCsrfToken();
+            if (!token) return;
+            document.querySelectorAll('form').forEach((form) => {
+                const method = (form.getAttribute('method') || 'get').toUpperCase();
+                if (!['POST', 'PUT', 'PATCH', 'DELETE'].includes(method)) return;
+                if (form.querySelector('input[name="csrf_token"]')) return;
+                const field = document.createElement('input');
+                field.type = 'hidden';
+                field.name = 'csrf_token';
+                field.value = token;
+                form.appendChild(field);
+            });
+        }
+
+        document.addEventListener('DOMContentLoaded', ensureCsrfFields);
+    </script>
     {% block extra_head %}{% endblock %}
 </head>
 <body class="min-h-screen bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100">
-    <!-- Main content area without sidebar -->
     <div class="min-h-screen">
-        <!-- Main content -->
         <main class="pt-0 pb-8">
             {% block content %}
                 {% block body %}{% endblock %}
             {% endblock %}
         </main>
     </div>
-    
-    <!-- Include toast component -->
+
     {% include "components/toast.html" %}
-    
-    <!-- Include modal component -->
     {% include "components/modals.html" %}
-    
+
     <script>
         document.addEventListener('alpine:init', () => {
             Alpine.store('darkMode', {
                 darkMode: localStorage.getItem('darkMode') !== 'false',
-
                 init() {
                     if (localStorage.getItem('darkMode') === null) {
                         localStorage.setItem('darkMode', 'true');
                     }
                     this.darkMode = localStorage.getItem('darkMode') === 'true';
-                    if (this.darkMode) {
-                        document.documentElement.classList.add('dark');
-                    } else {
-                        document.documentElement.classList.remove('dark');
-                    }
+                    document.documentElement.classList.toggle('dark', this.darkMode);
                 },
-
                 toggle() {
                     this.darkMode = !this.darkMode;
                     localStorage.setItem('darkMode', this.darkMode);
-                    if (this.darkMode) {
-                        document.documentElement.classList.add('dark');
-                    } else {
-                        document.documentElement.classList.remove('dark');
-                    }
+                    document.documentElement.classList.toggle('dark', this.darkMode);
                 }
             });
         });
 
-        // Toast notification functions
         function showToast(message, type = 'info') {
             const toastId = 'toast-' + Date.now();
-            const toastClass = type === 'error' ? 'bg-red-500' : 
-                              type === 'success' ? 'bg-green-500' : 
-                              type === 'warning' ? 'bg-yellow-500' : 'bg-blue-500';
-            
+            const toastClass = type === 'error' ? 'bg-red-500'
+                : type === 'success' ? 'bg-green-500'
+                : type === 'warning' ? 'bg-yellow-500' : 'bg-blue-500';
             const toast = document.createElement('div');
             toast.id = toastId;
             toast.className = `toast ${toastClass} text-white p-4 rounded shadow-lg mb-2 transition-opacity duration-300`;
@@ -98,48 +93,27 @@
                     <button onclick="removeToast('${toastId}')" class="ml-4 text-white">×</button>
                 </div>
             `;
-            
-            document.getElementById('toast-container').appendChild(toast);
-            
-            // Auto remove after 5 seconds
-            setTimeout(() => {
-                removeToast(toastId);
-            }, 5000);
+
+            let container = document.getElementById('toast-container');
+            if (!container) {
+                container = document.createElement('div');
+                container.id = 'toast-container';
+                container.className = 'fixed bottom-4 right-4 z-50 space-y-2';
+                document.body.appendChild(container);
+            }
+            container.appendChild(toast);
+            setTimeout(() => removeToast(toastId), 5000);
         }
-        
+
         function removeToast(toastId) {
             const toast = document.getElementById(toastId);
             if (toast) {
                 toast.style.opacity = '0';
-                setTimeout(() => {
-                    toast.remove();
-                }, 300);
+                setTimeout(() => toast.remove(), 300);
             }
         }
-        
-        // Modal functions
-        function showModal(content) {
-            document.getElementById('modal-body').innerHTML = content;
-            document.getElementById('modal-container').style.display = 'block';
-        }
-        
-        function closeModal() {
-            document.getElementById('modal-container').style.display = 'none';
-        }
-        
-        // Form submission with htmx
-        function submitForm(url, data, method = 'POST') {
-            const element = document.createElement('div');
-            element.setAttribute('hx-' + method.toLowerCase(), url);
-            element.setAttribute('hx-headers', JSON.stringify(data));
-            element.setAttribute('hx-target', 'body');
-            element.setAttribute('hx-swap', 'innerHTML');
-            
-            htmx.process(element);
-            element.click();
-        }
     </script>
-    
+
     {% block extra_scripts %}{% endblock %}
 </body>
 </html>

@@ -1,12 +1,10 @@
 {% extends "base.html" %}
 
-{% block title %}Настройки - Vertex AR Admin{% endblock %}
-
-{% block page_title %}Настройки{% endblock %}
+{% block title %}{{ t("settings.title") }} - Vertex AR Admin{% endblock %}
+{% block page_title %}{{ t("settings.title") }}{% endblock %}
 
 {% block content %}
 <div x-data="settingsPage()" class="max-w-5xl mx-auto px-4 sm:px-0">
-    <!-- Уведомления -->
     {% if success_message %}
     <div class="mb-6 p-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-xl flex items-center gap-3">
         <span class="material-icons text-green-600 dark:text-green-400">check_circle</span>
@@ -21,677 +19,51 @@
     </div>
     {% endif %}
 
-    <!-- Табы навигации (мобильные — горизонтальный скролл) -->
     <div class="flex gap-2 mb-6 overflow-x-auto pb-1 scrollbar-hide">
         <button @click="activeTab = 'general'"
-                :class="activeTab === 'general'
-                    ? 'bg-blue-600 text-white shadow-sm'
-                    : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700'"
+                :class="activeTab === 'general' ? 'bg-blue-600 text-white shadow-sm' : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700'"
                 class="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium whitespace-nowrap transition-all">
             <span class="material-icons text-lg">settings</span>
-            Основные
+            {{ t("settings.general") }}
         </button>
         <button @click="activeTab = 'security'"
-                :class="activeTab === 'security'
-                    ? 'bg-blue-600 text-white shadow-sm'
-                    : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700'"
+                :class="activeTab === 'security' ? 'bg-blue-600 text-white shadow-sm' : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700'"
                 class="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium whitespace-nowrap transition-all">
             <span class="material-icons text-lg">security</span>
-            Безопасность
+            {{ t("settings.security") }}
         </button>
         <button @click="activeTab = 'ar'"
-                :class="activeTab === 'ar'
-                    ? 'bg-blue-600 text-white shadow-sm'
-                    : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700'"
+                :class="activeTab === 'ar' ? 'bg-blue-600 text-white shadow-sm' : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700'"
                 class="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium whitespace-nowrap transition-all">
             <span class="material-icons text-lg">view_in_ar</span>
-            AR-контент
+            {{ t("settings.ar") }}
         </button>
         <button @click="activeTab = 'notifications'"
-                :class="activeTab === 'notifications'
-                    ? 'bg-blue-600 text-white shadow-sm'
-                    : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700'"
+                :class="activeTab === 'notifications' ? 'bg-blue-600 text-white shadow-sm' : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700'"
                 class="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium whitespace-nowrap transition-all">
             <span class="material-icons text-lg">notifications</span>
-            Уведомления
+            {{ t("settings.notifications") }}
         </button>
         <button @click="activeTab = 'storage'"
-                :class="activeTab === 'storage'
-                    ? 'bg-blue-600 text-white shadow-sm'
-                    : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700'"
+                :class="activeTab === 'storage' ? 'bg-blue-600 text-white shadow-sm' : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700'"
                 class="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium whitespace-nowrap transition-all">
             <span class="material-icons text-lg">cloud</span>
-            Хранение
+            {{ t("settings.storage") }}
         </button>
         <button @click="activeTab = 'backup'"
-                :class="activeTab === 'backup'
-                    ? 'bg-blue-600 text-white shadow-sm'
-                    : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700'"
+                :class="activeTab === 'backup' ? 'bg-blue-600 text-white shadow-sm' : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700'"
                 class="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium whitespace-nowrap transition-all">
             <span class="material-icons text-lg">backup</span>
-            Бэкапы
+            {{ t("settings.backup") }}
         </button>
     </div>
 
-    <!-- ===================== ОСНОВНЫЕ НАСТРОЙКИ ===================== -->
     {% include "partials/settings_general_tab.html" %}
-    {% if false %}
-    <div x-show="activeTab === 'general'" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0 translate-y-1" x-transition:enter-end="opacity-100 translate-y-0">
-        <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
-            <div class="px-6 py-5 border-b border-gray-200 dark:border-gray-700">
-                <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Основные настройки</h3>
-                <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">Название платформы, контакты и общие параметры</p>
-            </div>
-
-            <form method="post" action="/settings/general" class="p-6 space-y-6">
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
-                    <div>
-                        <label for="site_title" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Название платформы</label>
-                        <input type="text" name="site_title" id="site_title"
-                               value="{{ settings.general.site_title|default('Vertex AR B2B Platform') }}"
-                               class="form-input" required>
-                    </div>
-                    <div>
-                        <label for="admin_email" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Email администратора</label>
-                        <input type="email" name="admin_email" id="admin_email"
-                               value="{{ settings.general.admin_email|default('admin@vertexar.com') }}"
-                               class="form-input" required>
-                    </div>
-                </div>
-
-                <div>
-                    <label for="site_description" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Описание платформы</label>
-                    <textarea id="site_description" name="site_description" rows="2"
-                              class="form-input">{{ settings.general.site_description|default('B2B SaaS платформа для создания AR-контента') }}</textarea>
-                </div>
-
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
-                    <div>
-                        <label for="timezone" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Часовой пояс</label>
-                        <select id="timezone" name="timezone" class="form-select">
-                            <option value="UTC" {% if settings.general.timezone == 'UTC' %}selected{% endif %}>UTC</option>
-                            <option value="Europe/Moscow" {% if settings.general.timezone == 'Europe/Moscow' %}selected{% endif %}>Москва (UTC+3)</option>
-                            <option value="Europe/London" {% if settings.general.timezone == 'Europe/London' %}selected{% endif %}>Лондон (UTC+0)</option>
-                            <option value="America/New_York" {% if settings.general.timezone == 'America/New_York' %}selected{% endif %}>Нью-Йорк (UTC-5)</option>
-                        </select>
-                    </div>
-                    <div>
-                        <label for="language" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Язык</label>
-                        <select id="language" name="language" class="form-select">
-                            <option value="ru" {% if settings.general.language == 'ru' %}selected{% endif %}>Русский</option>
-                            <option value="en" {% if settings.general.language == 'en' %}selected{% endif %}>English</option>
-                        </select>
-                    </div>
-                </div>
-                <!-- managed centrally for the current business model -->
-                <input type="hidden" name="default_subscription_years" value="30">
-
-                <div class="flex items-center gap-3 p-4 bg-amber-50 dark:bg-amber-900/20 rounded-xl border border-amber-200 dark:border-amber-800">
-                    <input id="maintenance_mode" name="maintenance_mode" type="checkbox"
-                           {% if settings.general.maintenance_mode %}checked{% endif %}
-                           value="on"
-                           class="h-4 w-4 text-amber-600 focus:ring-amber-500 border-gray-300 rounded">
-                    <label for="maintenance_mode" class="text-sm">
-                        <span class="font-medium text-gray-900 dark:text-white">Режим обслуживания</span>
-                        <span class="text-gray-500 dark:text-gray-400 block text-xs mt-0.5">Временно закрыть публичный доступ к платформе</span>
-                    </label>
-                </div>
-
-                <div class="flex flex-col sm:flex-row justify-end gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
-                    <button type="button" onclick="window.location.reload()" class="btn btn-secondary w-full sm:w-auto">Отмена</button>
-                    <button type="submit" class="btn btn-primary w-full sm:w-auto">
-                        <span class="material-icons text-sm mr-1">save</span>Сохранить
-                    </button>
-                </div>
-            </form>
-        </div>
-    </div>
-
-    <!-- ===================== БЕЗОПАСНОСТЬ ===================== -->
-    {% endif %}
     {% include "partials/settings_security_tab.html" %}
-    {% if false %}
-    <div x-show="activeTab === 'security'" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0 translate-y-1" x-transition:enter-end="opacity-100 translate-y-0">
-        <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
-            <div class="px-6 py-5 border-b border-gray-200 dark:border-gray-700">
-                <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Безопасность</h3>
-                <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">Политики паролей, сессий и ограничения доступа</p>
-            </div>
-
-            <form method="post" action="/settings/security" class="p-6 space-y-6">
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
-                    <div>
-                        <label for="password_min_length" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Мин. длина пароля</label>
-                        <input type="number" name="password_min_length" id="password_min_length"
-                               value="{{ settings.security.password_min_length|default(8) }}"
-                               min="6" max="50" class="form-input">
-                    </div>
-                    <div>
-                        <label for="session_timeout" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Таймаут сессии (мин.)</label>
-                        <input type="number" name="session_timeout" id="session_timeout"
-                               value="{{ settings.security.session_timeout|default(60) }}"
-                               min="5" max="1440" class="form-input">
-                    </div>
-                </div>
-
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
-                    <div>
-                        <label for="max_login_attempts" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Макс. попыток входа</label>
-                        <input type="number" name="max_login_attempts" id="max_login_attempts"
-                               value="{{ settings.security.max_login_attempts|default(5) }}"
-                               min="3" max="20" class="form-input">
-                    </div>
-                    <div>
-                        <label for="lockout_duration" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Блокировка (сек.)</label>
-                        <input type="number" name="lockout_duration" id="lockout_duration"
-                               value="{{ settings.security.lockout_duration|default(300) }}"
-                               min="60" max="3600" class="form-input">
-                        <p class="text-xs text-gray-400 dark:text-gray-500 mt-1">300 сек. = 5 мин.</p>
-                    </div>
-                </div>
-
-                <div>
-                    <label for="api_rate_limit" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Лимит API (запросов/мин.)</label>
-                    <input type="number" name="api_rate_limit" id="api_rate_limit"
-                           value="{{ settings.security.api_rate_limit|default(100) }}"
-                           min="10" max="1000" class="form-input">
-                </div>
-
-                <div class="flex items-center gap-3 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-xl border border-blue-200 dark:border-blue-800">
-                    <input id="require_2fa" name="require_2fa" type="checkbox"
-                           {% if settings.security.require_2fa %}checked{% endif %}
-                           value="on"
-                           class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
-                    <label for="require_2fa" class="text-sm">
-                        <span class="font-medium text-gray-900 dark:text-white">Двухфакторная аутентификация</span>
-                        <span class="text-gray-500 dark:text-gray-400 block text-xs mt-0.5">Код из 6 цифр отправляется в Telegram админа</span>
-                    </label>
-                </div>
-                <div>
-                    <label for="telegram_2fa_chat_id" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Telegram ID для кодов 2FA</label>
-                    <input type="text" name="telegram_2fa_chat_id" id="telegram_2fa_chat_id"
-                           value="{{ settings.security.telegram_2fa_chat_id or '' }}"
-                           placeholder="-1001234567890"
-                           class="form-input max-w-xs">
-                    <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Оставьте пустым, пока 2FA выключена. Перед включением укажите реальный Chat ID администратора.</p>
-                </div>
-
-                <div class="flex flex-col sm:flex-row justify-end gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
-                    <button type="button" onclick="window.location.reload()" class="btn btn-secondary w-full sm:w-auto">Отмена</button>
-                    <button type="submit" class="btn btn-primary w-full sm:w-auto">
-                        <span class="material-icons text-sm mr-1">save</span>Сохранить
-                    </button>
-                </div>
-            </form>
-        </div>
-    </div>
-
-    <!-- ===================== AR-КОНТЕНТ ===================== -->
-    {% endif %}
     {% include "partials/settings_ar_tab.html" %}
-    {% if false %}
-    <div x-show="activeTab === 'ar'" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0 translate-y-1" x-transition:enter-end="opacity-100 translate-y-0">
-        <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
-            <div class="px-6 py-5 border-b border-gray-200 dark:border-gray-700">
-                <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Настройки AR-контента</h3>
-                <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">Генерация маркеров, обработка видео и параметры QR-кодов</p>
-            </div>
-
-            <form method="post" action="/settings/ar" class="p-6 space-y-6">
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
-                    <div>
-                        <label for="thumbnail_quality" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Качество превью (%)</label>
-                        <input type="number" name="thumbnail_quality" id="thumbnail_quality"
-                               value="{{ settings.ar.thumbnail_quality|default(80) }}"
-                               min="10" max="100" step="5" class="form-input">
-                        <p class="text-xs text-gray-400 dark:text-gray-500 mt-1">JPEG-качество генерируемых превью</p>
-                    </div>
-                    <div>
-                        <label for="qr_code_expiration_days" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Срок действия QR (дней)</label>
-                        <input type="number" name="qr_code_expiration_days" id="qr_code_expiration_days"
-                               value="{{ settings.ar.qr_code_expiration_days|default(365) }}"
-                               min="30" max="1825" class="form-input">
-                        <p class="text-xs text-gray-400 dark:text-gray-500 mt-1">365 = 1 год, 1825 = 5 лет</p>
-                    </div>
-                </div>
-
-                <div>
-                    <label for="default_ar_viewer_theme" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Тема AR-просмотрщика</label>
-                    <select id="default_ar_viewer_theme" name="default_ar_viewer_theme" class="form-select">
-                        <option value="default" {% if settings.ar.default_ar_viewer_theme == 'default' %}selected{% endif %}>По умолчанию</option>
-                        <option value="dark" {% if settings.ar.default_ar_viewer_theme == 'dark' %}selected{% endif %}>Тёмная</option>
-                        <option value="minimal" {% if settings.ar.default_ar_viewer_theme == 'minimal' %}selected{% endif %}>Минималистичная</option>
-                        <option value="corporate" {% if settings.ar.default_ar_viewer_theme == 'corporate' %}selected{% endif %}>Корпоративная</option>
-                    </select>
-                </div>
-
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div class="flex items-center gap-3 p-4 bg-green-50 dark:bg-green-900/20 rounded-xl border border-green-200 dark:border-green-800">
-                        <input id="marker_generation_enabled" name="marker_generation_enabled" type="checkbox"
-                               {% if settings.ar.marker_generation_enabled %}checked{% endif %}
-                               value="on"
-                               class="h-4 w-4 text-green-600 focus:ring-green-500 border-gray-300 rounded">
-                        <label for="marker_generation_enabled" class="text-sm">
-                            <span class="font-medium text-gray-900 dark:text-white">Генерация маркеров</span>
-                            <span class="text-gray-500 dark:text-gray-400 block text-xs mt-0.5">Автоматическое создание AR-маркеров</span>
-                        </label>
-                    </div>
-                    <div class="flex items-center gap-3 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-xl border border-blue-200 dark:border-blue-800">
-                        <input id="video_processing_enabled" name="video_processing_enabled" type="checkbox"
-                               {% if settings.ar.video_processing_enabled %}checked{% endif %}
-                               value="on"
-                               class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
-                        <label for="video_processing_enabled" class="text-sm">
-                            <span class="font-medium text-gray-900 dark:text-white">Обработка видео</span>
-                            <span class="text-gray-500 dark:text-gray-400 block text-xs mt-0.5">Фоновая оптимизация видеофайлов</span>
-                        </label>
-                    </div>
-                </div>
-
-                <div class="flex flex-col sm:flex-row justify-end gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
-                    <button type="button" onclick="window.location.reload()" class="btn btn-secondary w-full sm:w-auto">Отмена</button>
-                    <button type="submit" class="btn btn-primary w-full sm:w-auto">
-                        <span class="material-icons text-sm mr-1">save</span>Сохранить
-                    </button>
-                </div>
-            </form>
-        </div>
-    </div>
-
-    <!-- ===================== УВЕДОМЛЕНИЯ ===================== -->
-    {% endif %}
     {% include "partials/settings_notifications_tab.html" %}
-    {% if false %}
-    <div x-show="activeTab === 'notifications'" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0 translate-y-1" x-transition:enter-end="opacity-100 translate-y-0">
-        <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
-            <div class="px-6 py-5 border-b border-gray-200 dark:border-gray-700">
-                <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Уведомления</h3>
-                <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">Email и Telegram-уведомления о событиях платформы</p>
-            </div>
-
-            <form method="post" action="/settings/notifications" class="p-6 space-y-6" x-ref="notificationsForm">
-                <!-- Email section -->
-                <div class="space-y-4">
-                    <div class="flex items-center gap-3 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-xl border border-blue-200 dark:border-blue-800">
-                        <input id="email_enabled" name="email_enabled" type="checkbox"
-                               {% if settings.notifications.email_enabled %}checked{% endif %}
-                               value="on"
-                               class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
-                        <label for="email_enabled" class="text-sm">
-                            <span class="font-medium text-gray-900 dark:text-white">Email-уведомления</span>
-                            <span class="text-gray-500 dark:text-gray-400 block text-xs mt-0.5">Отправка уведомлений по электронной почте</span>
-                        </label>
-                    </div>
-
-                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
-                        <div>
-                            <label for="smtp_host" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">SMTP-сервер</label>
-                            <input type="text" name="smtp_host" id="smtp_host"
-                                   value="{{ settings.notifications.smtp_host or '' }}"
-                                   class="form-input" placeholder="smtp.gmail.com">
-                        </div>
-                        <div>
-                            <label for="smtp_port" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">SMTP-порт</label>
-                            <input type="number" name="smtp_port" id="smtp_port"
-                                   value="{{ settings.notifications.smtp_port|default(587) }}"
-                                   min="1" max="65535" class="form-input">
-                        </div>
-                    </div>
-
-                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
-                        <div>
-                            <label for="smtp_username" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">SMTP логин</label>
-                            <input type="text" name="smtp_username" id="smtp_username"
-                                   value="{{ settings.notifications.smtp_username or '' }}"
-                                   class="form-input" placeholder="user@gmail.com">
-                        </div>
-                        <div>
-                            <label for="smtp_password" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">SMTP пароль</label>
-                            <input type="password" name="smtp_password" id="smtp_password"
-                                   value=""
-                                   class="form-input" placeholder="Оставьте пустым, чтобы не менять сохранённый">
-                        </div>
-                    </div>
-
-                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
-                        <div>
-                            <label for="smtp_from_email" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Email отправителя</label>
-                            <input type="email" name="smtp_from_email" id="smtp_from_email"
-                                   value="{{ settings.notifications.smtp_from_email|default('noreply@vertexar.com') }}"
-                                   class="form-input">
-                        </div>
-                        <div class="flex items-end">
-                            <button type="button" @click="testEmail()" :disabled="emailTesting"
-                                    class="inline-flex items-center gap-1.5 text-sm px-3 py-2 rounded-lg border border-blue-300 dark:border-blue-700 text-blue-700 dark:text-blue-300 hover:bg-blue-50 dark:hover:bg-blue-900/30 transition-colors">
-                                <span class="material-icons text-base" :class="emailTesting && 'animate-spin'"
-                                      x-text="emailTesting ? 'refresh' : 'mail'"></span>
-                                <span x-text="emailTesting ? 'Отправка...' : 'Отправить тестовое письмо'"></span>
-                            </button>
-                        </div>
-                    </div>
-                    <p class="text-xs text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-700/50 rounded-lg p-3">
-                        Тестовое письмо отправляется на email текущего администратора и использует значения из формы. Если поле пароля пустое, берётся уже сохранённый пароль.
-                    </p>
-                </div>
-
-                <!-- Divider -->
-                <div class="border-t border-gray-200 dark:border-gray-700"></div>
-
-                <!-- Telegram section -->
-                <div class="space-y-4">
-                    <div class="flex items-center gap-3 p-4 bg-sky-50 dark:bg-sky-900/20 rounded-xl border border-sky-200 dark:border-sky-800">
-                        <input id="telegram_enabled" name="telegram_enabled" type="checkbox"
-                               {% if settings.notifications.telegram_enabled %}checked{% endif %}
-                               value="on"
-                               class="h-4 w-4 text-sky-600 focus:ring-sky-500 border-gray-300 rounded">
-                        <label for="telegram_enabled" class="text-sm">
-                            <span class="font-medium text-gray-900 dark:text-white">Telegram-уведомления</span>
-                            <span class="text-gray-500 dark:text-gray-400 block text-xs mt-0.5">Отправка уведомлений через Telegram-бота</span>
-                        </label>
-                    </div>
-                    <p class="text-xs text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-700/50 rounded-lg p-3">
-                        <strong class="text-gray-700 dark:text-gray-300">Что присылает бот:</strong> критические алерты (нагрузка CPU/RAM, здоровье API), тестовое сообщение по кнопке ниже; при включённой 2FA (раздел «Безопасность») — одноразовый код входа на указанный там Chat ID; при настройке уведомлений об истечении подписки — предупреждения по проектам/компаниям.
-                    </p>
-
-                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
-                        <div>
-                            <label for="telegram_bot_token" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Bot Token</label>
-                            <input type="text" name="telegram_bot_token" id="telegram_bot_token"
-                                   value="{{ settings.notifications.telegram_bot_token or '' }}"
-                                   class="form-input font-mono text-sm" placeholder="123456:ABC-DEF...">
-                            <p class="text-xs text-gray-400 dark:text-gray-500 mt-1">Получите у <a href="https://t.me/BotFather" target="_blank" class="text-blue-500 hover:underline">@BotFather</a></p>
-                        </div>
-                        <div>
-                            <label for="telegram_admin_chat_id" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Chat ID администратора</label>
-                            <input type="text" name="telegram_admin_chat_id" id="telegram_admin_chat_id"
-                                   value="{{ settings.notifications.telegram_admin_chat_id or '' }}"
-                                   class="form-input font-mono text-sm" placeholder="-1001234567890">
-                            <p class="text-xs text-gray-400 dark:text-gray-500 mt-1">Узнайте через <a href="https://t.me/userinfobot" target="_blank" class="text-blue-500 hover:underline">@userinfobot</a>. Если тест вернёт «chat not found» — сначала напишите боту в Telegram команду /start.</p>
-                        </div>
-                    </div>
-
-                    <button type="button" @click="testTelegram()" :disabled="telegramTesting"
-                            class="inline-flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-lg border border-sky-300 dark:border-sky-700 text-sky-700 dark:text-sky-300 hover:bg-sky-50 dark:hover:bg-sky-900/30 transition-colors">
-                        <span class="material-icons text-base" :class="telegramTesting && 'animate-spin'"
-                              x-text="telegramTesting ? 'refresh' : 'send'"></span>
-                        <span x-text="telegramTesting ? 'Отправка...' : 'Отправить тестовое сообщение'"></span>
-                    </button>
-                </div>
-
-                <div class="border-t border-gray-200 dark:border-gray-700"></div>
-
-                <div class="space-y-4">
-                    <div class="flex items-center gap-3 p-4 bg-amber-50 dark:bg-amber-900/20 rounded-xl border border-amber-200 dark:border-amber-800">
-                        <input id="telegram_alerts_enabled" name="telegram_alerts_enabled" type="checkbox"
-                               {% if settings.notifications.telegram_alerts_enabled %}checked{% endif %}
-                               value="on"
-                               class="h-4 w-4 text-amber-600 focus:ring-amber-500 border-gray-300 rounded">
-                        <label for="telegram_alerts_enabled" class="text-sm">
-                            <span class="font-medium text-gray-900 dark:text-white">Системные алерты в Telegram</span>
-                            <span class="text-gray-500 dark:text-gray-400 block text-xs mt-0.5">Отправлять алерты администратору через того же Telegram-бота</span>
-                        </label>
-                    </div>
-
-                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                        <label class="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
-                            <input type="checkbox" name="alert_on_critical" value="on" {% if settings.notifications.alert_on_critical %}checked{% endif %} class="h-4 w-4 rounded border-gray-300 text-amber-600 focus:ring-amber-500">
-                            <span>Критические ошибки</span>
-                        </label>
-                        <label class="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
-                            <input type="checkbox" name="alert_on_warning" value="on" {% if settings.notifications.alert_on_warning %}checked{% endif %} class="h-4 w-4 rounded border-gray-300 text-amber-600 focus:ring-amber-500">
-                            <span>Warning-события</span>
-                        </label>
-                        <label class="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
-                            <input type="checkbox" name="alert_on_backup_failed" value="on" {% if settings.notifications.alert_on_backup_failed %}checked{% endif %} class="h-4 w-4 rounded border-gray-300 text-amber-600 focus:ring-amber-500">
-                            <span>Падение backup</span>
-                        </label>
-                        <label class="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
-                            <input type="checkbox" name="alert_on_storage_failed" value="on" {% if settings.notifications.alert_on_storage_failed %}checked{% endif %} class="h-4 w-4 rounded border-gray-300 text-amber-600 focus:ring-amber-500">
-                            <span>Ошибки storage</span>
-                        </label>
-                        <label class="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
-                            <input type="checkbox" name="alert_on_health_degraded" value="on" {% if settings.notifications.alert_on_health_degraded %}checked{% endif %} class="h-4 w-4 rounded border-gray-300 text-amber-600 focus:ring-amber-500">
-                            <span>Health degraded</span>
-                        </label>
-                    </div>
-                    <p class="text-xs text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-700/50 rounded-lg p-3">
-                        Эти переключатели управляют системными Telegram-алертами для администратора. Если общий Telegram выключен, алерты тоже отправляться не будут.
-                    </p>
-                </div>
-
-                <div class="flex flex-col sm:flex-row justify-end gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
-                    <button type="button" onclick="window.location.reload()" class="btn btn-secondary w-full sm:w-auto">Отмена</button>
-                    <button type="submit" class="btn btn-primary w-full sm:w-auto">
-                        <span class="material-icons text-sm mr-1">save</span>Сохранить
-                    </button>
-                </div>
-            </form>
-        </div>
-    </div>
-
-    <!-- ===================== ХРАНЕНИЕ ===================== -->
-    {% endif %}
     {% include "partials/settings_storage_tab.html" %}
-    {% if false %}
-    <div x-show="activeTab === 'storage'" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0 translate-y-1" x-transition:enter-end="opacity-100 translate-y-0">
-        <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
-            <div class="px-6 py-5 border-b border-gray-200 dark:border-gray-700">
-                <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Хранение файлов</h3>
-                <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">Настройки хранилища, лимиты файлов и CDN</p>
-            </div>
-
-            <form method="post" action="/settings/storage" class="p-6 space-y-6">
-                <div>
-                    <label for="default_storage" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Хранилище по умолчанию</label>
-                    <select id="default_storage" name="default_storage" class="form-select">
-                        <option value="local" {% if settings.storage.default_storage == 'local' %}selected{% endif %}>Локальное</option>
-                        <option value="yandex_disk" {% if settings.storage.default_storage == 'yandex_disk' %}selected{% endif %}>Яндекс Диск</option>
-                    </select>
-                    <p class="text-xs text-gray-400 dark:text-gray-500 mt-1">Яндекс Диск настраивается через профиль компании</p>
-                </div>
-
-                <div>
-                    <label for="max_file_size" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Макс. размер файла (МБ)</label>
-                    <input type="number" name="max_file_size" id="max_file_size"
-                           value="{{ settings.storage.max_file_size|default(100) }}"
-                           min="1" max="500" class="form-input">
-                    <p class="text-xs text-gray-400 dark:text-gray-500 mt-1">Применяется к фото и видео при загрузке</p>
-                </div>
-
-                <div class="flex items-center gap-3 p-4 bg-purple-50 dark:bg-purple-900/20 rounded-xl border border-purple-200 dark:border-purple-800">
-                    <input id="cdn_enabled" name="cdn_enabled" type="checkbox"
-                           {% if settings.storage.cdn_enabled %}checked{% endif %}
-                           value="on"
-                           class="h-4 w-4 text-purple-600 focus:ring-purple-500 border-gray-300 rounded">
-                    <label for="cdn_enabled" class="text-sm">
-                        <span class="font-medium text-gray-900 dark:text-white">CDN</span>
-                        <span class="text-gray-500 dark:text-gray-400 block text-xs mt-0.5">Раздача статических файлов через CDN</span>
-                    </label>
-                </div>
-
-                <div>
-                    <label for="cdn_url" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">URL CDN</label>
-                    <input type="url" name="cdn_url" id="cdn_url"
-                           value="{{ settings.storage.cdn_url or '' }}"
-                           class="form-input" placeholder="https://cdn.example.com">
-                </div>
-
-                <div class="flex flex-col sm:flex-row justify-end gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
-                    <button type="button" onclick="window.location.reload()" class="btn btn-secondary w-full sm:w-auto">Отмена</button>
-                    <button type="submit" class="btn btn-primary w-full sm:w-auto">
-                        <span class="material-icons text-sm mr-1">save</span>Сохранить
-                    </button>
-                </div>
-            </form>
-        </div>
-    </div>
-
-    <!-- ===================== БЭКАПЫ ===================== -->
-    {% endif %}
     {% include "partials/settings_backup_tab.html" %}
-    {% if false %}
-    <div x-show="activeTab === 'backup'" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0 translate-y-1" x-transition:enter-end="opacity-100 translate-y-0">
-
-        <!-- Настройки бэкапов -->
-        <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden mb-6">
-            <div class="px-6 py-5 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
-                <div>
-                    <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Бэкап базы данных</h3>
-                    <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">Автоматическое резервное копирование PostgreSQL на Яндекс Диск</p>
-                </div>
-                <button type="button" @click="runBackupNow()" :disabled="backupRunning"
-                        class="btn btn-primary text-sm flex items-center gap-1.5">
-                    <span class="material-icons text-base" :class="backupRunning && 'animate-spin'"
-                          x-text="backupRunning ? 'refresh' : 'backup'"></span>
-                    <span x-text="backupRunning ? 'Создание...' : 'Создать сейчас'"></span>
-                </button>
-            </div>
-
-            <form method="post" action="/settings/backup" class="p-6 space-y-6">
-
-                <!-- Enable toggle -->
-                <div class="flex items-center gap-3 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-xl border border-blue-200 dark:border-blue-800">
-                    <input id="backup_enabled" name="backup_enabled" type="checkbox"
-                           {% if settings.backup.backup_enabled %}checked{% endif %}
-                           value="on"
-                           class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
-                    <label for="backup_enabled" class="text-sm">
-                        <span class="font-medium text-gray-900 dark:text-white">Автоматический бэкап</span>
-                        <span class="text-gray-500 dark:text-gray-400 block text-xs mt-0.5">Регулярное резервное копирование по расписанию</span>
-                    </label>
-                </div>
-
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
-                    <!-- Company selector -->
-                    <div>
-                        <label for="backup_company_id" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Yandex Disk аккаунт</label>
-                        <select id="backup_company_id" name="backup_company_id" class="form-select">
-                            <option value="0">-- Не выбрано --</option>
-                            {% for c in yd_companies %}
-                            <option value="{{ c.id }}" {% if settings.backup.backup_company_id == c.id %}selected{% endif %}>{{ c.name }}</option>
-                            {% endfor %}
-                        </select>
-                        <p class="text-xs text-gray-400 dark:text-gray-500 mt-1">Компания с подключённым Яндекс Диском</p>
-                    </div>
-                    <!-- Folder on YD -->
-                    <div>
-                        <label for="backup_yd_folder" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Папка на Яндекс Диске</label>
-                        <input type="text" name="backup_yd_folder" id="backup_yd_folder"
-                               value="{{ settings.backup.backup_yd_folder|default('backups') }}"
-                               class="form-input" placeholder="backups">
-                    </div>
-                </div>
-
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
-                    <!-- Schedule -->
-                    <div>
-                        <label for="backup_schedule" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Расписание</label>
-                        <select id="backup_schedule" name="backup_schedule" class="form-select"
-                                x-model="backupSchedule">
-                            <option value="daily" {% if settings.backup.backup_schedule == 'daily' %}selected{% endif %}>Ежедневно в 03:00</option>
-                            <option value="twice_daily" {% if settings.backup.backup_schedule == 'twice_daily' %}selected{% endif %}>Каждые 12 часов (03:00, 15:00)</option>
-                            <option value="weekly" {% if settings.backup.backup_schedule == 'weekly' %}selected{% endif %}>Еженедельно (пн 03:00)</option>
-                            <option value="custom" {% if settings.backup.backup_schedule == 'custom' %}selected{% endif %}>Своё cron-выражение</option>
-                        </select>
-                    </div>
-                    <!-- Custom cron (only when schedule=custom) -->
-                    <div x-show="backupSchedule === 'custom'" x-transition>
-                        <label for="backup_cron" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Cron-выражение</label>
-                        <input type="text" name="backup_cron" id="backup_cron"
-                               value="{{ settings.backup.backup_cron|default('0 3 * * *') }}"
-                               class="form-input font-mono text-sm" placeholder="0 3 * * *">
-                        <p class="text-xs text-gray-400 dark:text-gray-500 mt-1">Формат: мин час день месяц день_недели</p>
-                    </div>
-                </div>
-
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
-                    <div>
-                        <label for="backup_retention_days" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Хранить (дней)</label>
-                        <input type="number" name="backup_retention_days" id="backup_retention_days"
-                               value="{{ settings.backup.backup_retention_days|default(30) }}"
-                               min="1" max="365" class="form-input">
-                    </div>
-                    <div>
-                        <label for="backup_max_copies" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Макс. копий</label>
-                        <input type="number" name="backup_max_copies" id="backup_max_copies"
-                               value="{{ settings.backup.backup_max_copies|default(30) }}"
-                               min="1" max="100" class="form-input">
-                        <p class="text-xs text-gray-400 dark:text-gray-500 mt-1">Старые копии удаляются автоматически</p>
-                    </div>
-                </div>
-
-                <div class="flex flex-col sm:flex-row justify-end gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
-                    <button type="button" onclick="window.location.reload()" class="btn btn-secondary w-full sm:w-auto">Отмена</button>
-                    <button type="submit" class="btn btn-primary w-full sm:w-auto">
-                        <span class="material-icons text-sm mr-1">save</span>Сохранить
-                    </button>
-                </div>
-            </form>
-        </div>
-
-        <!-- Backup history table -->
-        <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
-            <div class="px-6 py-5 border-b border-gray-200 dark:border-gray-700">
-                <h3 class="text-lg font-semibold text-gray-900 dark:text-white">История бэкапов</h3>
-                <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">Последние операции резервного копирования</p>
-            </div>
-            <div class="overflow-x-auto">
-                <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                    <thead class="bg-gray-50 dark:bg-gray-900/40">
-                        <tr>
-                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Дата</th>
-                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Статус</th>
-                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Размер</th>
-                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Триггер</th>
-                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Путь на YD</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
-                        {% for bkp in backup_history %}
-                        <tr>
-                            <td class="px-4 py-3 text-sm text-gray-700 dark:text-gray-300 whitespace-nowrap">
-                                {{ bkp.started_at.strftime('%d.%m.%Y %H:%M') if bkp.started_at else '—' }}
-                            </td>
-                            <td class="px-4 py-3 text-sm whitespace-nowrap">
-                                {% if bkp.status == 'success' %}
-                                <span class="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-full bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">
-                                    <span class="material-icons text-xs">check_circle</span>OK
-                                </span>
-                                {% elif bkp.status == 'running' %}
-                                <span class="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">
-                                    <span class="material-icons text-xs animate-spin">refresh</span>В процессе
-                                </span>
-                                {% else %}
-                                <span class="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-full bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
-                                      title="{{ bkp.error_message or '' }}">
-                                    <span class="material-icons text-xs">error</span>Ошибка
-                                </span>
-                                {% endif %}
-                            </td>
-                            <td class="px-4 py-3 text-sm text-gray-700 dark:text-gray-300 whitespace-nowrap">
-                                {% if bkp.size_bytes %}{{ (bkp.size_bytes / 1048576)|round(2) }} МБ{% else %}—{% endif %}
-                            </td>
-                            <td class="px-4 py-3 text-sm text-gray-500 dark:text-gray-400 whitespace-nowrap">
-                                {{ 'Авто' if bkp.trigger == 'scheduled' else 'Вручную' }}
-                            </td>
-                            <td class="px-4 py-3 text-xs text-gray-400 dark:text-gray-500 font-mono truncate max-w-[200px]" title="{{ bkp.yd_path or '' }}">
-                                {{ bkp.yd_path or '—' }}
-                            </td>
-                        </tr>
-                        {% endfor %}
-                        {% if not backup_history %}
-                        <tr>
-                            <td colspan="5" class="px-4 py-8 text-center text-sm text-gray-400 dark:text-gray-500">
-                                Бэкапов пока нет
-                            </td>
-                        </tr>
-                        {% endif %}
-                    </tbody>
-                </table>
-            </div>
-        </div>
-    </div>
-{% endif %}
 </div>
 
 <style>
@@ -707,6 +79,7 @@ function settingsPage() {
         backupRunning: false,
         emailTesting: false,
         telegramTesting: false,
+
         init() {
             const hash = window.location.hash.substring(1);
             if (['general', 'security', 'ar', 'notifications', 'storage', 'backup'].includes(hash)) {
@@ -715,16 +88,7 @@ function settingsPage() {
             this.$watch('activeTab', (val) => {
                 window.location.hash = val;
             });
-            document.querySelectorAll('form').forEach(form => {
-                form.addEventListener('submit', function() {
-                    const btn = this.querySelector('button[type="submit"]');
-                    if (btn) {
-                        btn.disabled = true;
-                        btn.innerHTML = '<span class="material-icons text-sm mr-1 animate-spin">refresh</span>Сохранение...';
-                    }
-                });
-            });
-            document.querySelectorAll('form[action^="/settings/"]').forEach(form => {
+            document.querySelectorAll('form[action^="/settings/"]').forEach((form) => {
                 if (form.dataset.ajaxBound === '1') {
                     return;
                 }
@@ -734,16 +98,12 @@ function settingsPage() {
                     event.stopImmediatePropagation();
                     const btn = this.querySelector('button[type="submit"]');
                     const originalHtml = btn ? btn.innerHTML : null;
-                    if (btn) {
-                        btn.disabled = true;
-                    }
+                    if (btn) btn.disabled = true;
                     try {
                         const response = await fetch(this.action, {
                             method: (this.method || 'POST').toUpperCase(),
                             body: new FormData(this),
-                            headers: {
-                                'X-CSRF-Token': window.getCsrfToken ? window.getCsrfToken() : ''
-                            },
+                            headers: { 'X-CSRF-Token': window.getCsrfToken ? window.getCsrfToken() : '' },
                             credentials: 'include'
                         });
                         const html = await response.text();
@@ -751,7 +111,7 @@ function settingsPage() {
                         document.write(html);
                         document.close();
                     } catch (error) {
-                        if (window.showToast) window.showToast('РћС€РёР±РєР° СЃРѕС…СЂР°РЅРµРЅРёСЏ', 'error');
+                        if (window.showToast) window.showToast('{{ t("settings.js.save_error") }}', 'error');
                         if (btn) {
                             btn.disabled = false;
                             btn.innerHTML = originalHtml;
@@ -760,6 +120,7 @@ function settingsPage() {
                 }, true);
             });
         },
+
         async runBackupNow() {
             if (this.backupRunning) return;
             this.backupRunning = true;
@@ -767,16 +128,17 @@ function settingsPage() {
                 const resp = await (window.csrfFetch || fetch)('/api/backups/run', { method: 'POST' });
                 const data = await resp.json();
                 if (resp.ok) {
-                    if (window.showToast) window.showToast('Бэкап запущен. Обновите страницу через пару минут.', 'success');
-                } else {
-                    if (window.showToast) window.showToast(data.detail || 'Ошибка запуска бэкапа', 'error');
+                    if (window.showToast) window.showToast('{{ t("settings.js.backup_started") }}', 'success');
+                } else if (window.showToast) {
+                    window.showToast(data.detail || '{{ t("settings.js.backup_start_error") }}', 'error');
                 }
             } catch (err) {
-                if (window.showToast) window.showToast('Ошибка сети', 'error');
+                if (window.showToast) window.showToast('{{ t("settings.js.network_error") }}', 'error');
             } finally {
                 setTimeout(() => { this.backupRunning = false; }, 3000);
             }
         },
+
         async testEmail() {
             if (this.emailTesting) return;
             this.emailTesting = true;
@@ -785,16 +147,17 @@ function settingsPage() {
                 const resp = await (window.csrfFetch || fetch)('/api/notifications/test-email', { method: 'POST', body: formData });
                 const data = await resp.json();
                 if (resp.ok && data.status === 'ok') {
-                    if (window.showToast) window.showToast(data.detail || 'Тестовое письмо отправлено', 'success');
-                } else {
-                    if (window.showToast) window.showToast(data.detail || 'Ошибка отправки письма', 'error');
+                    if (window.showToast) window.showToast(data.detail || '{{ t("settings.js.email_sent") }}', 'success');
+                } else if (window.showToast) {
+                    window.showToast(data.detail || '{{ t("settings.js.email_error") }}', 'error');
                 }
             } catch (err) {
-                if (window.showToast) window.showToast('Ошибка сети', 'error');
+                if (window.showToast) window.showToast('{{ t("settings.js.network_error") }}', 'error');
             } finally {
                 setTimeout(() => { this.emailTesting = false; }, 2000);
             }
         },
+
         async testTelegram() {
             if (this.telegramTesting) return;
             this.telegramTesting = true;
@@ -803,12 +166,12 @@ function settingsPage() {
                 const resp = await (window.csrfFetch || fetch)('/api/notifications/test-telegram', { method: 'POST', body: formData });
                 const data = await resp.json();
                 if (resp.ok && data.status === 'ok') {
-                    if (window.showToast) window.showToast(data.detail || 'Тестовое сообщение отправлено', 'success');
-                } else {
-                    if (window.showToast) window.showToast(data.detail || 'Ошибка отправки', 'error');
+                    if (window.showToast) window.showToast(data.detail || '{{ t("settings.js.telegram_sent") }}', 'success');
+                } else if (window.showToast) {
+                    window.showToast(data.detail || '{{ t("settings.js.telegram_error") }}', 'error');
                 }
             } catch (err) {
-                if (window.showToast) window.showToast('Ошибка сети', 'error');
+                if (window.showToast) window.showToast('{{ t("settings.js.network_error") }}', 'error');
             } finally {
                 setTimeout(() => { this.telegramTesting = false; }, 2000);
             }

@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 
-{% block title %}{% if ar_content and ar_content.id %}Edit AR Content - Vertex AR Admin{% else %}Create AR Content - Vertex AR Admin{% endif %}{% endblock %}
-{% block page_title %}{% if ar_content and ar_content.id %}Edit AR Content{% else %}Create AR Content{% endif %}{% endblock %}
+{% block title %}{% if ar_content and ar_content.id %}{{ t("ar_content.edit") }} - Vertex AR Admin{% else %}{{ t("ar_content.create") }} - Vertex AR Admin{% endif %}{% endblock %}
+{% block page_title %}{% if ar_content and ar_content.id %}{{ t("ar_content.edit") }}{% else %}{{ t("ar_content.create") }}{% endif %}{% endblock %}
 
 {% block content %}
 <script type="application/json" id="companies-data">{{ companies_js | tojson }}</script>
@@ -15,16 +15,12 @@
 
         <form @submit.prevent="submitForm" method="post" enctype="multipart/form-data" class="bg-white dark:bg-gray-800 shadow rounded-lg">
             {% include "ar-content/partials/form_company_project_section.html" %}
-
             {% include "ar-content/partials/form_customer_section.html" %}
 
-            <!-- Duration (hidden, default 30 years) -->
             <input type="hidden" name="duration_years" :value="durationYears">
 
             {% include "ar-content/partials/form_file_upload_section.html" %}
-
             {% include "ar-content/partials/form_status_section.html" %}
-
             {% include "ar-content/partials/form_actions_section.html" %}
         </form>
     </div>
@@ -54,18 +50,14 @@ function arContentForm() {
         hasNewVideo: false,
         loading: false,
         submitting: false,
-        /** 0-100 during upload, null when indeterminate (server processing) */
         submitProgress: null,
-        /** 'upload' | 'processing' */
         submitPhase: null,
 
         init() {
-            // Initial projects load if company is pre-selected (e.g. in edit mode)
             if (this.selectedCompany) {
                 this.loadProjects();
             }
 
-            // Watch for company changes to reload projects
             this.$watch('selectedCompany', () => {
                 this.loadProjects();
             });
@@ -79,14 +71,11 @@ function arContentForm() {
             }
 
             this.loading = true;
-
-            // Step 1: Try to filter from allProjects first (optimistic load)
             const localProjects = this.allProjects.filter(
                 (project) => String(project.company_id) === String(this.selectedCompany)
             );
             if (localProjects.length > 0) {
                 this.projects = localProjects;
-                // We still continue to fetch from API to get the most fresh/complete list
             }
 
             try {
@@ -94,14 +83,13 @@ function arContentForm() {
                     credentials: 'same-origin',
                 });
                 if (!response.ok) {
-                    // If local projects exist, we don't throw to avoid UI disruption
                     if (this.projects.length === 0) {
                         let errorPayload = null;
                         try {
                             errorPayload = await response.json();
                         } catch (e) {}
                         throw new Error(
-                            errorPayload?.detail || response.statusText || 'Не удалось загрузить проекты'
+                            errorPayload?.detail || response.statusText || '{{ t("ar_content.load_projects_error") }}'
                         );
                     }
                     return;
@@ -110,26 +98,23 @@ function arContentForm() {
                 const data = await response.json();
                 const apiProjects = data.projects || [];
 
-                // Merge or replace projects
                 if (apiProjects.length > 0) {
                     this.projects = apiProjects;
                 } else if (localProjects.length > 0) {
-                    // Keep local ones if API returned empty but we have some locals
                     this.projects = localProjects;
                 } else {
                     this.projects = [];
                 }
 
-                // Validate selected project
-                if (this.selectedProject && !this.projects.some((p) => String(p.id) === String(this.selectedProject))) {
+                if (this.selectedProject && !this.projects.some((project) => String(project.id) === String(this.selectedProject))) {
                     this.selectedProject = '';
                 }
             } catch (error) {
-                console.error('Ошибка при загрузке проектов:', error);
+                console.error('{{ t("layout.system_error") }}:', error);
                 if (this.projects.length === 0) {
                     this.projects = [];
                     this.selectedProject = '';
-                    this.showToast(error?.message || 'Не удалось загрузить проекты', 'error');
+                    this.showToast(error?.message || '{{ t("ar_content.load_projects_error") }}', 'error');
                 }
             } finally {
                 this.loading = false;
@@ -137,11 +122,7 @@ function arContentForm() {
         },
 
         get isValid() {
-            const hasBasicFields =
-                this.selectedCompany &&
-                this.selectedProject &&
-                this.customerName &&
-                this.durationYears;
+            const hasBasicFields = this.selectedCompany && this.selectedProject && this.customerName && this.durationYears;
 
             if (!this.arContent || !this.arContent.id) {
                 return hasBasicFields && this.hasNewPhoto && this.hasNewVideo;
@@ -149,21 +130,17 @@ function arContentForm() {
 
             const hasExistingPhoto = !!this.arContent.photo_url;
             const hasExistingVideo = !!this.arContent.video_url;
-            return (
-                hasBasicFields &&
-                (this.hasNewPhoto || hasExistingPhoto) &&
-                (this.hasNewVideo || hasExistingVideo)
-            );
+            return hasBasicFields && (this.hasNewPhoto || hasExistingPhoto) && (this.hasNewVideo || hasExistingVideo);
         },
 
         async _readError(response) {
             try {
                 const data = await response.json();
                 if (typeof data?.detail === 'string') return data.detail;
-                if (Array.isArray(data?.detail)) return 'Ошибка валидации';
-                return 'Ошибка запроса';
+                if (Array.isArray(data?.detail)) return '{{ t("ar_content.validation_error") }}';
+                return '{{ t("ar_content.request_error") }}';
             } catch (e) {
-                return response.statusText || 'Ошибка запроса';
+                return response.statusText || '{{ t("ar_content.request_error") }}';
             }
         },
 
@@ -182,18 +159,19 @@ function arContentForm() {
 
         async submitForm() {
             if (!this.isValid) {
-                this.showToast('Пожалуйста, заполните все обязательные поля', 'error');
+                this.showToast('{{ t("ar_content.fill_required") }}', 'error');
                 return;
             }
 
             this.submitting = true;
             this.submitProgress = null;
             this.submitPhase = null;
+
             try {
-            const customerName = this.customerName?.trim() || '';
-            const customerPhone = this.customerPhone?.trim() || '';
-            const customerEmail = this.customerEmail?.trim() || '';
-            const durationYears = this.durationYears;
+                const customerName = this.customerName?.trim() || '';
+                const customerPhone = this.customerPhone?.trim() || '';
+                const customerEmail = this.customerEmail?.trim() || '';
+                const durationYears = this.durationYears;
 
                 const photoInput = document.querySelector('input[type="file"][name="photo_file"]');
                 const videoInput = document.querySelector('input[type="file"][name="video_file"]');
@@ -232,19 +210,19 @@ function arContentForm() {
                         await this._patchFile(`${updateUrl}/video`, 'video', videoFile);
                     }
 
-                    this.showToast('AR контент успешно обновлен', 'success');
+                    this.showToast('{{ t("ar_content.updated_success") }}', 'success');
                     window.location.href = `/ar-content/${this.arContent.id}`;
                     return;
                 }
 
                 const createUrl = `/api/companies/${this.selectedCompany}/projects/${this.selectedProject}/ar-content`;
                 const formData = new FormData();
-            formData.append('customer_name', customerName);
-            formData.append('customer_phone', customerPhone);
+                formData.append('customer_name', customerName);
+                formData.append('customer_phone', customerPhone);
                 if (customerEmail) {
                     formData.append('customer_email', customerEmail);
                 }
-            formData.append('duration_years', durationYears);
+                formData.append('duration_years', durationYears);
                 if (photoFile) {
                     formData.append('photo_file', photoFile);
                 }
@@ -275,30 +253,30 @@ function arContentForm() {
                             try {
                                 resolve(JSON.parse(xhr.responseText));
                             } catch (err) {
-                                reject(new Error('Ошибка ответа сервера'));
+                                reject(new Error('{{ t("ar_content.request_error") }}'));
                             }
                         } else {
-                            let detail = 'Ошибка запроса';
+                            let detail = '{{ t("ar_content.request_error") }}';
                             try {
                                 const data = JSON.parse(xhr.responseText);
                                 if (typeof data?.detail === 'string') detail = data.detail;
-                                else if (Array.isArray(data?.detail)) detail = 'Ошибка валидации';
+                                else if (Array.isArray(data?.detail)) detail = '{{ t("ar_content.validation_error") }}';
                             } catch (_) {}
                             reject(new Error(detail));
                         }
                     });
-                    xhr.addEventListener('error', () => reject(new Error('Ошибка сети')));
-                    xhr.addEventListener('abort', () => reject(new Error('Запрос отменён')));
+                    xhr.addEventListener('error', () => reject(new Error('{{ t("settings.js.network_error") }}')));
+                    xhr.addEventListener('abort', () => reject(new Error('{{ t("common.cancel") }}')));
 
                     xhr.open('POST', createUrl);
                     xhr.send(formData);
                 });
 
-                this.showToast('AR контент успешно создан', 'success');
+                this.showToast('{{ t("ar_content.created_success") }}', 'success');
                 window.location.href = `/ar-content/${result.id}`;
             } catch (error) {
-                console.error('Submit error:', error);
-                this.showToast(error?.message || 'Не удалось сохранить AR контент', 'error');
+                console.error('{{ t("layout.system_error") }}:', error);
+                this.showToast(error?.message || '{{ t("ar_content.request_error") }}', 'error');
             } finally {
                 this.submitting = false;
                 this.submitProgress = null;
@@ -322,15 +300,12 @@ function arContentForm() {
     };
 }
 
-// Photo uploader component
 function photoUploader() {
     return {
         selectedFile: null,
         previewUrl: null,
         uploading: false,
         dragOver: false,
-
-        // Quality analysis state
         analyzing: false,
         qualityResult: null,
 
@@ -362,12 +337,12 @@ function photoUploader() {
         processFile(file) {
             if (!file.type.startsWith('image/')) {
                 this.$dispatch('photo-selected', false);
-                this.showToast('Пожалуйста, выберите изображение', 'error');
+                this.showToast('{{ t("ar_content.image_only") }}', 'error');
                 return;
             }
             if (file.size > 10 * 1024 * 1024) {
                 this.$dispatch('photo-selected', false);
-                this.showToast('Размер файла не должен превышать 10MB', 'error');
+                this.showToast('{{ t("ar_content.max_image_size") }}', 'error');
                 return;
             }
 
@@ -401,10 +376,7 @@ function photoUploader() {
         },
 
         removeFile() {
-            const existingUrl = (this.$root.arContent && this.$root.arContent.photo_url)
-                ? this.$root.arContent.photo_url
-                : null;
-
+            const existingUrl = (this.$root.arContent && this.$root.arContent.photo_url) ? this.$root.arContent.photo_url : null;
             this.selectedFile = null;
             this.qualityResult = null;
             this.analyzing = false;
@@ -419,9 +391,9 @@ function photoUploader() {
         qualityLabel() {
             if (!this.qualityResult) return '';
             const lvl = this.qualityResult.quality_level;
-            if (lvl === 'good') return 'Отличное качество для AR-трекинга';
-            if (lvl === 'fair') return 'Среднее качество — трекинг может быть нестабильным';
-            return 'Низкое качество — высокий риск ошибки распознавания';
+            if (lvl === 'good') return '{{ t("ar_content.quality_good") }}';
+            if (lvl === 'fair') return '{{ t("ar_content.quality_fair") }}';
+            return '{{ t("ar_content.quality_poor") }}';
         },
         qualityColor() {
             if (!this.qualityResult) return 'gray';
@@ -451,32 +423,30 @@ function photoUploader() {
     }
 }
 
-// Video uploader component
 function videoUploader() {
     return {
         selectedFile: null,
         previewUrl: null,
         uploading: false,
         dragOver: false,
-        
+
         init() {
-            // Initialize with existing video if editing
             if (this.$root.arContent && this.$root.arContent.video_url) {
                 this.previewUrl = this.$root.arContent.video_url;
             }
         },
-        
+
         triggerFileInput() {
             this.$refs.fileInput.click();
         },
-        
+
         handleFileSelect(event) {
             const file = event.target.files[0];
             if (file) {
                 this.processFile(file);
             }
         },
-        
+
         handleDrop(event) {
             this.dragOver = false;
             const files = event.dataTransfer.files;
@@ -484,32 +454,27 @@ function videoUploader() {
                 this.processFile(files[0]);
             }
         },
-        
+
         processFile(file) {
-            // Validate file type
             if (!file.type.startsWith('video/')) {
                 this.$dispatch('video-selected', false);
-                this.showToast('Пожалуйста, выберите видеофайл', 'error');
+                this.showToast('{{ t("ar_content.video_only") }}', 'error');
                 return;
             }
-            
-            // Validate file size (100MB)
+
             if (file.size > 100 * 1024 * 1024) {
                 this.$dispatch('video-selected', false);
-                this.showToast('Размер файла не должен превышать 100MB', 'error');
+                this.showToast('{{ t("ar_content.max_video_size") }}', 'error');
                 return;
             }
-            
+
             this.selectedFile = file;
             this.previewUrl = URL.createObjectURL(file);
             this.$dispatch('video-selected', true);
         },
-        
-        removeFile() {
-            const existingUrl = (this.$root.arContent && this.$root.arContent.video_url)
-                ? this.$root.arContent.video_url
-                : null;
 
+        removeFile() {
+            const existingUrl = (this.$root.arContent && this.$root.arContent.video_url) ? this.$root.arContent.video_url : null;
             this.selectedFile = null;
             if (this.previewUrl && this.previewUrl.startsWith('blob:')) {
                 URL.revokeObjectURL(this.previewUrl);
@@ -518,7 +483,7 @@ function videoUploader() {
             this.$refs.fileInput.value = '';
             this.$dispatch('video-selected', false);
         },
-        
+
         formatFileSize(bytes) {
             if (bytes === 0) return '0 Bytes';
             const k = 1024;
@@ -526,7 +491,7 @@ function videoUploader() {
             const i = Math.floor(Math.log(bytes) / Math.log(k));
             return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
         },
-        
+
         showToast(message, type = 'info') {
             if (this.$root.showToast) {
                 this.$root.showToast(message, type);

@@ -1,17 +1,17 @@
-<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6 pb-4 border-b border-gray-200 dark:border-gray-700">
+﻿<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6 pb-4 border-b border-gray-200 dark:border-gray-700">
     <div class="flex-1">
         <div class="flex items-center gap-2 mb-2">
             <span class="material-icons text-orange-600 dark:text-orange-400">schedule</span>
-            <h3 class="text-xl font-semibold text-gray-900 dark:text-white">Расписание ротации видео</h3>
+            <h3 class="text-xl font-semibold text-gray-900 dark:text-white">���������� ������� �����</h3>
         </div>
         <p class="text-sm text-gray-600 dark:text-gray-400">
-            Здесь настраиваются правила на конкретные даты, праздники и циклы. Если расписание активно, оно имеет приоритет над базовым режимом воспроизведения.
+            ����� ������������� ������� �� ���������� ����, ��������� � �����. ���� ���������� �������, ��� ����� ��������� ��� ������� ������� ���������������.
         </p>
     </div>
     <button @click="showRotationScheduleDialog = true" class="btn btn-primary">
         <span class="material-icons mr-2">add</span>
-        <span x-show="!rotationSchedule">Создать</span>
-        <span x-show="rotationSchedule">Изменить</span>
+        <span x-show="!rotationSchedule">�������</span>
+        <span x-show="rotationSchedule">��������</span>
     </button>
 </div>
 
@@ -21,17 +21,17 @@
             <span class="material-icons text-blue-600 dark:text-blue-400 mt-0.5">info</span>
             <div class="flex-1">
                 <h4 class="text-sm font-medium text-blue-900 dark:text-blue-100 mb-2">
-                    Расписание не настроено
+                    ���������� �� ���������
                 </h4>
                 <p class="text-sm text-blue-800 dark:text-blue-200 mb-3">
-                    Если расписание не создано, используется базовое активное видео из блока «Режим воспроизведения». Ссылка и QR при этом не меняются.
+                    ���� ���������� �� �������, ������������ ������� �������� ����� �� ����� ������ ����������������. ������ � QR ��� ���� �� ��������.
                 </p>
                 <div class="text-xs text-blue-700 dark:text-blue-300 space-y-1">
-                    <p><strong>Как это работает:</strong></p>
+                    <p><strong>��� ��� ��������:</strong></p>
                     <ul class="list-disc list-inside space-y-1 ml-2">
-                        <li>Выберите активное видео кнопкой "Сделать активным" в списке видео</li>
-                        <li>Срок доступа к видео и контенту определяется сроком жизни заказа, обычно 30 лет</li>
-                        <li>Для особых дат вроде 31 декабря, праздников или набора дней нажмите "Создать расписание"</li>
+                        <li>�������� �������� ����� ������� "������� ��������" � ������ �����</li>
+                        <li>���� ������� � ����� � �������� ������������ ������ ����� ������, ������ 30 ���</li>
+                        <li>��� ������ ��� ����� 31 �������, ���������� ��� ������ ���� ������� "������� ����������"</li>
                     </ul>
                 </div>
             </div>
@@ -44,34 +44,34 @@
         <div class="bg-gray-50 dark:bg-gray-700/60 p-4 rounded-lg">
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                    <div class="text-sm font-medium text-gray-500 dark:text-gray-300 mb-1">Тип ротации</div>
+                    <div class="text-sm font-medium text-gray-500 dark:text-gray-300 mb-1">��� �������</div>
                     <div class="text-gray-900 dark:text-white" x-text="getRotationTypeLabel(rotationSchedule.rotation_type)"></div>
                 </div>
                 <div>
-                    <div class="text-sm font-medium text-gray-500 dark:text-gray-300 mb-1">Статус</div>
+                    <div class="text-sm font-medium text-gray-500 dark:text-gray-300 mb-1">������</div>
                     <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium"
                           :class="rotationSchedule.is_active ? 'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-100' : 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200'">
-                        <span x-text="rotationSchedule.is_active ? 'Активно' : 'Неактивно'"></span>
+                        <span x-text="rotationSchedule.is_active ? '�������' : '���������'"></span>
                     </span>
                 </div>
                 <div x-show="rotationSchedule && rotationSchedule.default_video_id">
-                    <div class="text-sm font-medium text-gray-500 dark:text-gray-300 mb-1">Видео по умолчанию</div>
+                    <div class="text-sm font-medium text-gray-500 dark:text-gray-300 mb-1">����� �� ���������</div>
                     <div class="text-gray-900 dark:text-white" x-text="getVideoTitle(rotationSchedule.default_video_id)"></div>
                 </div>
                 <div x-show="rotationSchedule && rotationSchedule.date_rules && rotationSchedule.date_rules.length">
-                    <div class="text-sm font-medium text-gray-500 dark:text-gray-300 mb-1">Особые даты</div>
+                    <div class="text-sm font-medium text-gray-500 dark:text-gray-300 mb-1">������ ����</div>
                     <div class="text-gray-900 dark:text-white" x-text="formatDateRulesSummary(rotationSchedule.date_rules)"></div>
                 </div>
                 <div x-show="rotationSchedule && rotationSchedule.next_change_at">
-                    <div class="text-sm font-medium text-gray-500 dark:text-gray-300 mb-1">Следующее изменение</div>
+                    <div class="text-sm font-medium text-gray-500 dark:text-gray-300 mb-1">��������� ���������</div>
                     <div class="text-gray-900 dark:text-white" x-text="formatDateTime(rotationSchedule.next_change_at)"></div>
                 </div>
                 <div x-show="rotationSchedule && rotationSchedule.last_changed_at">
-                    <div class="text-sm font-medium text-gray-500 dark:text-gray-300 mb-1">Последнее изменение</div>
+                    <div class="text-sm font-medium text-gray-500 dark:text-gray-300 mb-1">��������� ���������</div>
                     <div class="text-gray-900 dark:text-white" x-text="formatDateTime(rotationSchedule.last_changed_at)"></div>
                 </div>
                 <div x-show="rotationSchedule && rotationSchedule.notify_before_expiry_days">
-                    <div class="text-sm font-medium text-gray-500 dark:text-gray-300 mb-1">Уведомление за (дней)</div>
+                    <div class="text-sm font-medium text-gray-500 dark:text-gray-300 mb-1">����������� �� (����)</div>
                     <div class="text-gray-900 dark:text-white" x-text="rotationSchedule.notify_before_expiry_days"></div>
                 </div>
             </div>
@@ -79,11 +79,12 @@
 
         <div class="flex gap-2">
             <button @click="showRotationScheduleDialog = true" class="btn btn-secondary">
-                <span class="material-icons mr-2">edit</span>Изменить
+                <span class="material-icons mr-2">edit</span>��������
             </button>
             <button @click="deleteRotationSchedule()" class="btn btn-danger">
-                <span class="material-icons mr-2">delete</span>Удалить расписание
+                <span class="material-icons mr-2">delete</span>������� ����������
             </button>
         </div>
     </div>
 </template>
+

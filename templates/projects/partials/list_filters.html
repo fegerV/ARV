@@ -1,38 +1,38 @@
 <div class="bg-white dark:bg-gray-800 shadow rounded-lg p-6">
     <div class="flex items-center justify-between mb-4">
-        <h3 class="text-lg font-medium text-gray-900 dark:text-white">Filters</h3>
+        <h3 class="text-lg font-medium text-gray-900 dark:text-white">Фильтры</h3>
         <button @click="resetFilters" class="text-sm text-indigo-600 hover:text-indigo-700 dark:text-indigo-400 dark:hover:text-indigo-300 font-medium">
-            Reset
+            Сбросить
         </button>
     </div>
 
     <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <div>
             <label for="status-filter" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Status
+                Статус
             </label>
             <select
                 id="status-filter"
                 x-model="filters.status"
                 @change="applyFilters"
                 class="form-select w-full">
-                <option value="">All Statuses</option>
-                <option value="active">Active</option>
-                <option value="inactive">Inactive</option>
-                <option value="archived">Archived</option>
+                <option value="">Все статусы</option>
+                <option value="active">Активен</option>
+                <option value="inactive">Неактивен</option>
+                <option value="archived">Архивный</option>
             </select>
         </div>
 
         <div>
             <label for="company-filter" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Company
+                Компания
             </label>
             <select
                 id="company-filter"
                 x-model="filters.company"
                 @change="applyFilters"
                 class="form-select w-full">
-                <option value="">Р’СЃРµ РєРѕРјРїР°РЅРёРё</option>
+                <option value="">Все компании</option>
                 {% for company in companies %}
                 <option value="{{ company.id }}">{{ company.name }}</option>
                 {% endfor %}
@@ -41,7 +41,7 @@
 
         <div>
             <label for="page-size-select" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Р—Р°РїРёСЃРµР№ РЅР° СЃС‚СЂР°РЅРёС†Рµ
+                Записей на странице
             </label>
             <select
                 id="page-size-select"
@@ -58,10 +58,11 @@
         <div class="flex items-end">
             <div class="w-full p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
                 <p class="text-sm text-blue-800 dark:text-blue-200">
-                    Showing <span x-text="projects.length" class="font-semibold">{{ projects|length }}</span>
-                    of <span x-text="totalCount" class="font-semibold">{{ total_count }}</span> projects
+                    Показано <span x-text="projects.length" class="font-semibold">{{ projects|length }}</span>
+                    из <span x-text="totalCount" class="font-semibold">{{ total_count }}</span> проектов
                 </p>
             </div>
         </div>
     </div>
 </div>
+

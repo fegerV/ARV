@@ -1,10 +1,10 @@
-{% extends "base.html" %}
+﻿{% extends "base.html" %}
 
-{% block title %}РђРЅР°Р»РёС‚РёРєР° - Vertex AR Admin{% endblock %}
-{% block page_title %}РђРЅР°Р»РёС‚РёРєР°{% endblock %}
+{% block title %}{{ t("analytics.title") }} - Vertex AR Admin{% endblock %}
+{% block page_title %}{{ t("analytics.title") }}{% endblock %}
 
 {% block extra_head %}
-{# ApexCharts Р±РµР· defer, С‡С‚РѕР±С‹ Рє РјРѕРјРµРЅС‚Сѓ x-init Alpine РѕРЅ Р±С‹Р» СѓР¶Рµ РѕРїСЂРµРґРµР»С‘РЅ #}
+{# ApexCharts без defer, чтобы к моменту x-init Alpine он был уже определён #}
 <script src="https://cdn.jsdelivr.net/npm/apexcharts@3.49.0/dist/apexcharts.min.js"></script>
 {% endblock %}
 
@@ -57,7 +57,7 @@ function analyticsPage() {
                     fontFamily: 'inherit',
                     foreColor: fg,
                 },
-                series: [{ name: 'РџСЂРѕСЃРјРѕС‚СЂС‹', data: series }],
+                series: [{ name: '{{ t("analytics.views") }}', data: series }],
                 xaxis: {
                     categories,
                     labels: {
@@ -136,7 +136,7 @@ function analyticsPage() {
                                 show: true,
                                 total: {
                                     show: true,
-                                    label: 'Р’СЃРµРіРѕ',
+                                    label: '{{ t("storage.total") }}',
                                     color: fg,
                                 },
                             },
@@ -153,3 +153,4 @@ function analyticsPage() {
 }
 </script>
 {% endblock %}
+

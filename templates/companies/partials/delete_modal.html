@@ -19,12 +19,12 @@
                 </div>
 
                 <h3 class="mt-4 text-lg font-medium text-gray-900 dark:text-white text-center">
-                    Delete Company
+                    Удалить компанию
                 </h3>
 
                 <p class="mt-2 text-sm text-gray-500 dark:text-gray-400 text-center">
-                    Are you sure you want to delete <span x-text="deleteCompany.name" class="font-semibold text-gray-900 dark:text-white"></span>?
-                    This action cannot be undone.
+                    Вы уверены, что хотите удалить <span x-text="deleteCompany.name" class="font-semibold text-gray-900 dark:text-white"></span>?
+                    Это действие нельзя отменить.
                 </p>
             </div>
 
@@ -32,16 +32,16 @@
                 <button @click="confirmDelete"
                         :disabled="isDeleting"
                         class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-red-600 text-base font-medium text-white hover:bg-red-700 dark:bg-red-700 dark:hover:bg-red-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors sm:w-auto">
-                    <span x-show="!isDeleting">Delete Company</span>
+                    <span x-show="!isDeleting">Удалить компанию</span>
                     <span x-show="isDeleting" class="flex items-center gap-2">
                         <span class="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
-                        Deleting...
+                        Удаление...
                     </span>
                 </button>
                 <button @click="showDeleteModal = false"
                         :disabled="isDeleting"
                         class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 dark:border-gray-600 shadow-sm px-4 py-2 bg-white dark:bg-gray-800 text-base font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors sm:mt-0 sm:w-auto">
-                    Cancel
+                    Отмена
                 </button>
             </div>
         </div>

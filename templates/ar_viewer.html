@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
@@ -60,14 +60,14 @@
 </head>
 <body>
     <div id="loading">
-        <div>Загрузка AR...</div>
+        <div>�������� AR...</div>
         <div style="font-size: 14px; margin-top: 10px; opacity: 0.7;">
-            Пожалуйста, разрешите доступ к камере
+            ����������, ��������� ������ � ������
         </div>
     </div>
     
     <div id="instructions" class="hidden">
-        Наведите камеру на портрет
+        �������� ������ �� �������
     </div>
     
     <div id="ar-container"></div>
@@ -83,19 +83,19 @@
         
         async function initAR() {
             try {
-                // Получаем данные портрета
+                // �������� ������ ��������
                 const portraitRes = await fetch(`${API_BASE}/api/ar-content/by-unique/${PORTRAIT_UID}`);
                 const portrait = await portraitRes.json();
                 
                 if (portrait.marker_status !== 'ready') {
-                    throw new Error('AR маркер еще не готов');
+                    throw new Error('AR ������ ��� �� �����');
                 }
                 
-                // Получаем активное видео
+                // �������� �������� �����
                 const videoRes = await fetch(`${API_BASE}/api/ar/${PORTRAIT_UID}/active-video`);
                 const videoData = await videoRes.json();
                 
-                // Инициализируем Mind AR
+                // �������������� Mind AR
                 const mindarThree = new window.MINDAR.IMAGE.MindARThree({
                     container: document.getElementById("ar-container"),
                     imageTargetSrc: portrait.marker_url,
@@ -108,15 +108,15 @@
                 
                 const {renderer, scene, camera} = mindarThree;
                 
-                // Создаем видео элемент
+                // ������� ����� �������
                 const video = document.createElement('video');
                 video.src = videoData.video_url;
-                video.loop = false; // Отключаем loop для автоматического переключения
+                video.loop = false; // ��������� loop ��� ��������������� ������������
                 video.muted = true;
                 video.playsInline = true;
                 video.preload = "auto";
                 
-                // Оптимизация для мобильных
+                // ����������� ��� ���������
                 video.width = 640;
                 video.height = 360;
                 
@@ -126,7 +126,7 @@
                 texture.magFilter = THREE.LinearFilter;
                 texture.format = THREE.RGBFormat;
                 
-                // Плоскость для видео (16:9)
+                // ��������� ��� ����� (16:9)
                 const geometry = new THREE.PlaneGeometry(1, 0.5625);
                 const material = new THREE.MeshBasicMaterial({
                     map: texture,
@@ -139,7 +139,7 @@
                 const anchor = mindarThree.addAnchor(0);
                 anchor.group.add(plane);
                 
-                // Функция для загрузки и переключения на следующее видео
+                // ������� ��� �������� � ������������ �� ��������� �����
                 async function loadNextVideo() {
                     try {
                         const nextVideoRes = await fetch(`${API_BASE}/api/ar/${PORTRAIT_UID}/active-video`);
@@ -150,12 +150,12 @@
                             texture.needsUpdate = true;
                             video.load();
                             
-                            // Если маркер найден, сразу воспроизводим новое видео
+                            // ���� ������ ������, ����� ������������� ����� �����
                             if (anchor.visible) {
                                 video.play().catch(e => console.error('Video play error:', e));
                             }
                         } else {
-                            // Если то же видео, просто перезапускаем
+                            // ���� �� �� �����, ������ �������������
                             video.currentTime = 0;
                             if (anchor.visible) {
                                 video.play().catch(e => console.error('Video play error:', e));
@@ -163,7 +163,7 @@
                         }
                     } catch (error) {
                         console.error('Failed to load next video:', error);
-                        // В случае ошибки перезапускаем текущее видео
+                        // � ������ ������ ������������� ������� �����
                         video.currentTime = 0;
                         if (anchor.visible) {
                             video.play().catch(e => console.error('Video play error:', e));
@@ -171,7 +171,7 @@
                     }
                 }
                 
-                // Переключение видео после окончания воспроизведения
+                // ������������ ����� ����� ��������� ���������������
                 video.addEventListener('ended', () => {
                     console.log('Video ended, switching to next');
                     loadNextVideo();
@@ -201,19 +201,19 @@
                     renderer.render(scene, camera);
                 });
                 
-                // Аналитика
+                // ���������
                 trackARSession(PORTRAIT_UID);
                 
             } catch (error) {
                 console.error('AR initialization error:', error);
                 document.getElementById('loading').innerHTML = `
-                    <div style="color: #ff4444;">Ошибка загрузки AR</div>
+                    <div style="color: #ff4444;">������ �������� AR</div>
                     <div style="font-size: 14px; margin-top: 10px;">${error.message}</div>
                 `;
             }
         }
         
-        // Аналитика AR сессий
+        // ��������� AR ������
         function trackARSession(portraitId) {
             const sessionId = generateUUID();
             const startTime = Date.now();
@@ -229,7 +229,7 @@
                 })
             });
             
-            // Длительность при закрытии
+            // ������������ ��� ��������
             window.addEventListener('beforeunload', () => {
                 const duration = Math.round((Date.now() - startTime) / 1000);
                 navigator.sendBeacon(
@@ -262,8 +262,9 @@
             });
         }
         
-        // Запуск
+        // ������
         window.addEventListener('DOMContentLoaded', initAR);
     </script>
 </body>
 </html>
+

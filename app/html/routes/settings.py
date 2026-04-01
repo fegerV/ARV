@@ -1,36 +1,32 @@
-"""HTML routes for the Settings page.
+"""HTML routes for the Settings page."""
 
-Sections: general, security, ar, notifications, storage, backup.
-"""
+from typing import Optional
+import logging
 
 from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import HTMLResponse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from typing import Optional
 
 from app.api.routes.auth import get_current_user_optional
 from app.html.deps import get_html_db
+from app.html.i18n import normalize_locale, translate
 from app.html.templating import templates
 from app.html.utils import require_active_user
 from app.models.company import Company
 from app.schemas.settings import (
-    ARSettings, BackupSettings, GeneralSettings, NotificationSettings,
-    SecuritySettings, StorageSettings,
+    ARSettings,
+    BackupSettings,
+    GeneralSettings,
+    NotificationSettings,
+    SecuritySettings,
+    StorageSettings,
 )
 from app.services.backup_service import BackupService
 from app.services.settings_service import SettingsService
 
-import logging
-
 logger = logging.getLogger(__name__)
-
 router = APIRouter()
-
-
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
 
 
 async def _yd_companies(db: AsyncSession) -> list[dict]:
@@ -40,10 +36,7 @@ async def _yd_companies(db: AsyncSession) -> list[dict]:
         Company.yandex_disk_token.isnot(None),
     )
     result = await db.execute(stmt)
-    return [
-        {"id": c.id, "name": c.name}
-        for c in result.scalars().all()
-    ]
+    return [{"id": company.id, "name": company.name} for company in result.scalars().all()]
 
 
 async def _render_settings(
@@ -59,11 +52,11 @@ async def _render_settings(
     try:
         all_settings = await settings_service.get_all_settings()
     except Exception as exc:
-        logger.error("Error loading settings: %s", exc)
+        logger.error("settings_load_failed: %s", exc)
         from app.html.mock import SETTINGS_MOCK_DATA
+
         all_settings = SETTINGS_MOCK_DATA["settings"]
 
-    # Extra context for the Backup tab
     yd_company_list: list[dict] = []
     backup_history: list[dict] = []
     try:
@@ -71,20 +64,20 @@ async def _render_settings(
     except Exception:
         pass
     try:
-        svc = BackupService()
-        records = await svc.list_backups(db, limit=10)
+        service = BackupService()
+        records = await service.list_backups(db, limit=10)
         backup_history = [
             {
-                "id": r.id,
-                "started_at": r.started_at,
-                "finished_at": r.finished_at,
-                "status": r.status,
-                "size_bytes": r.size_bytes,
-                "yd_path": r.yd_path,
-                "error_message": r.error_message,
-                "trigger": r.trigger,
+                "id": record.id,
+                "started_at": record.started_at,
+                "finished_at": record.finished_at,
+                "status": record.status,
+                "size_bytes": record.size_bytes,
+                "yd_path": record.yd_path,
+                "error_message": record.error_message,
+                "trigger": record.trigger,
             }
-            for r in records
+            for record in records
         ]
     except Exception:
         pass
@@ -104,10 +97,6 @@ async def _render_settings(
     )
 
 
-# ---------------------------------------------------------------------------
-# GET  /settings
-# ---------------------------------------------------------------------------
-
 @router.get("/settings", response_class=HTMLResponse)
 async def settings_page(
     request: Request,
@@ -121,10 +110,6 @@ async def settings_page(
     return await _render_settings(request, db, current_user)
 
 
-# ---------------------------------------------------------------------------
-# POST  /settings/general
-# ---------------------------------------------------------------------------
-
 @router.post("/settings/general")
 async def update_general_settings(
     request: Request,
@@ -135,7 +120,7 @@ async def update_general_settings(
     site_description: str = Form(...),
     maintenance_mode: str = Form("off"),
     timezone: str = Form("UTC"),
-    language: str = Form("en"),
+    language: str = Form("ru"),
     default_subscription_years: int = Form(30),
 ):
     """Save general settings."""
@@ -145,6 +130,7 @@ async def update_general_settings(
 
     settings_service = SettingsService(db)
     try:
+        normalized_language = normalize_locale(language)
         await settings_service.update_general_settings(
             GeneralSettings(
                 site_title=site_title,
@@ -152,27 +138,29 @@ async def update_general_settings(
                 site_description=site_description,
                 maintenance_mode=(maintenance_mode == "on"),
                 timezone=timezone,
-                language=language,
+                language=normalized_language,
                 default_subscription_years=default_subscription_years,
             )
         )
+        request.session["language"] = normalized_language
+        request.state.locale = normalized_language
         return await _render_settings(
-            request, db, current_user,
+            request,
+            db,
+            current_user,
             active_section="general",
-            success_message="Основные настройки сохранены",
+            success_message=translate("settings.saved_general", normalized_language),
         )
     except Exception as exc:
-        logger.error("Error updating general settings: %s", exc)
+        logger.error("general_settings_update_failed: %s", exc)
         return await _render_settings(
-            request, db, current_user,
+            request,
+            db,
+            current_user,
             active_section="general",
-            error_message="Не удалось сохранить настройки",
+            error_message=translate("settings.save_failed", request.state.locale),
         )
 
-
-# ---------------------------------------------------------------------------
-# POST  /settings/security
-# ---------------------------------------------------------------------------
 
 @router.post("/settings/security")
 async def update_security_settings(
@@ -197,9 +185,11 @@ async def update_security_settings(
         normalized_2fa_chat_id = telegram_2fa_chat_id.strip() or None
         if require_2fa == "on" and not normalized_2fa_chat_id:
             return await _render_settings(
-                request, db, current_user,
+                request,
+                db,
+                current_user,
                 active_section="security",
-                error_message="Укажите Telegram Chat ID перед включением 2FA",
+                error_message=translate("auth.enable_2fa_chat_required", request.state.locale),
             )
 
         await settings_service.update_security_settings(
@@ -214,22 +204,22 @@ async def update_security_settings(
             )
         )
         return await _render_settings(
-            request, db, current_user,
+            request,
+            db,
+            current_user,
             active_section="security",
-            success_message="Настройки безопасности сохранены",
+            success_message=translate("settings.saved_security", request.state.locale),
         )
     except Exception as exc:
-        logger.error("Error updating security settings: %s", exc)
+        logger.error("security_settings_update_failed: %s", exc)
         return await _render_settings(
-            request, db, current_user,
+            request,
+            db,
+            current_user,
             active_section="security",
-            error_message="Не удалось сохранить настройки",
+            error_message=translate("settings.save_failed", request.state.locale),
         )
 
-
-# ---------------------------------------------------------------------------
-# POST  /settings/ar
-# ---------------------------------------------------------------------------
 
 @router.post("/settings/ar")
 async def update_ar_settings(
@@ -242,7 +232,7 @@ async def update_ar_settings(
     default_ar_viewer_theme: str = Form("default"),
     default_content_lifetime_years: int = Form(30),
 ):
-    """Save AR content settings. MindAR max-features preserved from DB."""
+    """Save AR content settings."""
     redirect = require_active_user(current_user)
     if redirect:
         return redirect
@@ -263,22 +253,22 @@ async def update_ar_settings(
             )
         )
         return await _render_settings(
-            request, db, current_user,
+            request,
+            db,
+            current_user,
             active_section="ar",
-            success_message="Настройки AR-контента сохранены",
+            success_message=translate("settings.saved_ar", request.state.locale),
         )
     except Exception as exc:
-        logger.error("Error updating AR settings: %s", exc)
+        logger.error("ar_settings_update_failed: %s", exc)
         return await _render_settings(
-            request, db, current_user,
+            request,
+            db,
+            current_user,
             active_section="ar",
-            error_message="Не удалось сохранить настройки",
+            error_message=translate("settings.save_failed", request.state.locale),
         )
 
-
-# ---------------------------------------------------------------------------
-# POST  /settings/backup
-# ---------------------------------------------------------------------------
 
 _SCHEDULE_CRON_MAP = {
     "daily": "0 3 * * *",
@@ -306,14 +296,9 @@ async def update_backup_settings(
         return redirect
 
     is_enabled = backup_enabled == "on"
-
-    # Map preset schedule names to cron expressions
-    if backup_schedule != "custom":
-        effective_cron = _SCHEDULE_CRON_MAP.get(backup_schedule, "0 3 * * *")
-    else:
-        effective_cron = backup_cron
-
+    effective_cron = _SCHEDULE_CRON_MAP.get(backup_schedule, "0 3 * * *") if backup_schedule != "custom" else backup_cron
     settings_service = SettingsService(db)
+
     try:
         await settings_service.update_backup_settings(
             BackupSettings(
@@ -327,27 +312,27 @@ async def update_backup_settings(
             )
         )
 
-        # Reschedule the APScheduler job in real time
         from app.core.scheduler import reschedule_backup
+
         reschedule_backup(effective_cron, enabled=is_enabled and bool(backup_company_id))
 
         return await _render_settings(
-            request, db, current_user,
+            request,
+            db,
+            current_user,
             active_section="backup",
-            success_message="Настройки бэкапов сохранены",
+            success_message=translate("settings.saved_backup", request.state.locale),
         )
     except Exception as exc:
-        logger.error("Error updating backup settings: %s", exc)
+        logger.error("backup_settings_update_failed: %s", exc)
         return await _render_settings(
-            request, db, current_user,
+            request,
+            db,
+            current_user,
             active_section="backup",
-            error_message="Не удалось сохранить настройки бэкапов",
+            error_message=translate("settings.save_failed_backup", request.state.locale),
         )
 
-
-# ---------------------------------------------------------------------------
-# POST  /settings/notifications
-# ---------------------------------------------------------------------------
 
 @router.post("/settings/notifications")
 async def update_notification_settings(
@@ -379,6 +364,7 @@ async def update_notification_settings(
     try:
         current = await settings_service.get_all_settings()
         effective_smtp_password = smtp_password if smtp_password.strip() else current.notifications.smtp_password
+
         await settings_service.update_notification_settings(
             NotificationSettings(
                 email_enabled=(email_enabled == "on"),
@@ -399,22 +385,22 @@ async def update_notification_settings(
             )
         )
         return await _render_settings(
-            request, db, current_user,
+            request,
+            db,
+            current_user,
             active_section="notifications",
-            success_message="Настройки уведомлений сохранены",
+            success_message=translate("settings.saved_notifications", request.state.locale),
         )
     except Exception as exc:
-        logger.error("Error updating notification settings: %s", exc)
+        logger.error("notification_settings_update_failed: %s", exc)
         return await _render_settings(
-            request, db, current_user,
+            request,
+            db,
+            current_user,
             active_section="notifications",
-            error_message="Не удалось сохранить настройки уведомлений",
+            error_message=translate("settings.save_failed", request.state.locale),
         )
 
-
-# ---------------------------------------------------------------------------
-# POST  /settings/storage
-# ---------------------------------------------------------------------------
 
 @router.post("/settings/storage")
 async def update_storage_settings(
@@ -445,14 +431,18 @@ async def update_storage_settings(
             )
         )
         return await _render_settings(
-            request, db, current_user,
+            request,
+            db,
+            current_user,
             active_section="storage",
-            success_message="Настройки хранения сохранены",
+            success_message=translate("settings.saved_storage", request.state.locale),
         )
     except Exception as exc:
-        logger.error("Error updating storage settings: %s", exc)
+        logger.error("storage_settings_update_failed: %s", exc)
         return await _render_settings(
-            request, db, current_user,
+            request,
+            db,
+            current_user,
             active_section="storage",
-            error_message="Не удалось сохранить настройки хранения",
+            error_message=translate("settings.save_failed", request.state.locale),
         )

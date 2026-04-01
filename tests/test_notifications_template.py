@@ -13,7 +13,7 @@ def test_notifications_template_uses_partials():
     assert '{% include "notifications/partials/pagination.html" %}' in template
     assert '{% include "notifications/partials/delete_modal.html" %}' in template
 
-    assert "Track system events and status updates" in header
-    assert "No notifications" in table
-    assert 'Page <span class="font-semibold">{{ page }}</span>' in pagination
-    assert "Delete Notification" in delete_modal
+    assert '{{ t("notifications.mark_all_read") }}' in header
+    assert '{{ t("notifications.no_items") }}' in table
+    assert '{{ t("common.next") }}' in pagination
+    assert '{{ t("layout.confirm_delete") }}' in delete_modal

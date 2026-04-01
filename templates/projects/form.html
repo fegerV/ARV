@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 
-{% block title %}{% if project %}Edit Project - {{ project.name }}{% else %}Create Project{% endif %} - Vertex AR Admin{% endblock %}
-{% block page_title %}{% if project %}Edit Project{% else %}Create Project{% endif %}{% endblock %}
+{% block title %}{% if project %}Редактирование проекта - {{ project.name }}{% else %}Создание проекта{% endif %} - Vertex AR Admin{% endblock %}
+{% block page_title %}{% if project %}Редактирование проекта{% else %}Создание проекта{% endif %}{% endblock %}
 
 {% block content %}
 <div x-data="projectForm()" class="space-y-6">

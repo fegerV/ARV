@@ -1,12 +1,12 @@
-{% extends "base.html" %}
+﻿{% extends "base.html" %}
 
-{% block title %}РЎРїСЂР°РІРєР° - Vertex AR Admin{% endblock %}
-{% block page_title %}РЎРїСЂР°РІРєР°{% endblock %}
+{% block title %}{{ t("help.title") }} - Vertex AR Admin{% endblock %}
+{% block page_title %}{{ t("help.title") }}{% endblock %}
 
 {% block content %}
 <div class="max-w-4xl mx-auto px-4 pb-16">
     <p class="text-gray-500 dark:text-gray-400 mb-6">
-        РџРѕР»РЅР°СЏ РґРѕРєСѓРјРµРЅС‚Р°С†РёСЏ РїРѕ РїР»Р°С‚С„РѕСЂРјРµ Vertex AR: РѕС‚ РїРµСЂРІРѕРіРѕ РІС…РѕРґР° РґРѕ РїСѓР±Р»РёРєР°С†РёРё AR-РєРѕРЅС‚РµРЅС‚Р°, РЅР°СЃС‚СЂРѕР№РєРё РєРѕРјРїР°РЅРёР№, Р°РЅР°Р»РёС‚РёРєРё Рё РѕР±СЃР»СѓР¶РёРІР°РЅРёСЏ.
+        Полная документация по платформе Vertex AR: от первого входа до публикации AR-контента, настройки компаний, аналитики и обслуживания.
     </p>
 
     {% include "help/partials/toc.html" %}
@@ -28,3 +28,4 @@
     {% include "help/partials/contacts_section.html" %}
 </div>
 {% endblock %}
+
