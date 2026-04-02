@@ -79,4 +79,40 @@
     <string name="how_it_works_step2">2. Install the app</string>
     <string name="how_it_works_step3">3. Point camera at QR</string>
     <string name="how_it_works_step4">4. Photo comes alive</string>
+    <string name="footer_support">Support</string>
+    <string name="footer_privacy">Privacy</string>
+    <string name="footer_about">About app</string>
+    <string name="dialog_about_title">About the app</string>
+    <string name="dialog_support_title">Support</string>
+    <string name="privacy_url" translatable="false">https://vertex-art.ru/privacy-v-portal</string>
+    <string name="dialog_about_body"><![CDATA[
+<b>V-Portal app description</b><br/><br/>
+V-Portal is an application for viewing and creating augmented reality (AR) for printed images.<br/><br/>
+With the app, you can:<br/><br/>
+• Scan images and view AR content<br/>
+• Bring portraits, posters, menus, photos, and other materials to life<br/>
+• View demo AR scenes<br/>
+• Create your own AR projects and submit orders<br/><br/>
+The app is used with printed products that contain AR markers or QR codes.<br/><br/>
+V-Portal is suitable for:<br/><br/>
+• personal gifts<br/>
+• advertising materials<br/>
+• restaurant menus<br/>
+• souvenirs and printed products<br/><br/>
+Camera access is required for proper operation.<br/><br/>
+© 2026 Vertex Art
+]]></string>
+    <string name="dialog_support_body"><![CDATA[
+Have a question or issue?<br/>
+We will help you.<br/><br/>
+<b>Developer:</b><br/>
+V-Portal / Vertex Art<br/><br/>
+<b>Support email:</b><br/>
+<a href="mailto:info@vertex-art.ru">info@vertex-art.ru</a><br/><br/>
+<b>Telegram:</b><br/>
+<a href="https://t.me/vertex_art">https://t.me/vertex_art</a><br/><br/>
+<b>Website:</b><br/>
+<a href="https://vertex-art.ru">https://vertex-art.ru</a><br/><br/>
+Version: 1.0.0
+]]></string>
 </resources>

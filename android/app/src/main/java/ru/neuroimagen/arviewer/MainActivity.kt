@@ -6,15 +6,19 @@ import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Bundle
 import android.util.Log
+import android.view.Gravity
 import android.view.View
+import android.view.ViewGroup
 import android.view.animation.AlphaAnimation
 import android.view.animation.LinearInterpolator
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
+import androidx.core.text.HtmlCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
@@ -29,10 +33,12 @@ import kotlinx.coroutines.withContext
 import ru.neuroimagen.arviewer.ar.ArSessionHelper
 import ru.neuroimagen.arviewer.data.model.ViewerError
 import ru.neuroimagen.arviewer.databinding.ActivityMainBinding
+import ru.neuroimagen.arviewer.databinding.DialogInfoOverlayBinding
 import ru.neuroimagen.arviewer.ui.MainViewModel
 import ru.neuroimagen.arviewer.ui.ViewerErrorMessages
 import dagger.hilt.android.AndroidEntryPoint
 import ru.neuroimagen.arviewer.util.UniqueIdParser
+import android.text.method.LinkMovementMethod
 
 /**
  * Main screen: QR scanning (primary action), QR from gallery, and manual unique_id input.
@@ -94,6 +100,9 @@ class MainActivity : AppCompatActivity() {
         binding.buttonHowItWorks.setOnClickListener { startActivity(Intent(this, HowItWorksActivity::class.java)) }
         binding.buttonCheckArSupport.setOnClickListener { openArCorePlayStore() }
         binding.buttonRetry.setOnClickListener { viewModel.retry() }
+        binding.textPrivacy.setOnClickListener { openPrivacyPolicy() }
+        binding.textAbout.setOnClickListener { showInfoDialog(R.string.dialog_about_title, R.string.dialog_about_body) }
+        binding.textSupport.setOnClickListener { showInfoDialog(R.string.dialog_support_title, R.string.dialog_support_body) }
 
         startHeroStarAnimation()
         observeUiState()
@@ -230,6 +239,38 @@ class MainActivity : AppCompatActivity() {
             return
         }
         startActivity(Intent(this, DemoIntroActivity::class.java))
+    }
+
+    private fun openPrivacyPolicy() {
+        startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(getString(R.string.privacy_url))))
+    }
+
+    private fun showInfoDialog(titleRes: Int, bodyRes: Int) {
+        val dialogBinding = DialogInfoOverlayBinding.inflate(layoutInflater)
+        val dialog = AlertDialog.Builder(this, androidx.appcompat.R.style.Theme_AppCompat_Dialog)
+            .setView(dialogBinding.root)
+            .create()
+
+        dialogBinding.textDialogTitle.setText(titleRes)
+        dialogBinding.textDialogBody.text = HtmlCompat.fromHtml(
+            getString(bodyRes),
+            HtmlCompat.FROM_HTML_MODE_LEGACY,
+        )
+        dialogBinding.textDialogBody.movementMethod = LinkMovementMethod.getInstance()
+        dialogBinding.buttonCloseDialog.setOnClickListener { dialog.dismiss() }
+
+        dialog.setCanceledOnTouchOutside(true)
+        dialog.window?.apply {
+            setBackgroundDrawableResource(android.R.color.transparent)
+            setDimAmount(0.72f)
+            setGravity(Gravity.CENTER)
+        }
+
+        dialog.show()
+        dialog.window?.setLayout(
+            (resources.displayMetrics.widthPixels * 0.9f).toInt(),
+            ViewGroup.LayoutParams.WRAP_CONTENT,
+        )
     }
 
     /**

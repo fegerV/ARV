@@ -146,5 +146,41 @@
     <string name="camera_error">Не удалось запустить камеру</string>
     <string name="permission_required">Требуется разрешение</string>
     <string name="permission_settings">Настройки</string>
+    <string name="footer_support">Поддержка</string>
+    <string name="footer_privacy">Политика</string>
+    <string name="footer_about">О приложении</string>
+    <string name="dialog_about_title">О приложении</string>
+    <string name="dialog_support_title">Поддержка</string>
+    <string name="privacy_url" translatable="false">https://vertex-art.ru/privacy-v-portal</string>
+    <string name="dialog_about_body"><![CDATA[
+<b>Описание приложения V-Portal</b><br/><br/>
+V-Portal — это приложение для просмотра и создания дополненной реальности (AR) для печатных изображений.<br/><br/>
+С помощью приложения вы можете:<br/><br/>
+• Сканировать изображения и просматривать AR-контент<br/>
+• Оживлять портреты, постеры, меню, фотографии и другие материалы<br/>
+• Просматривать демонстрационные AR-сцены<br/>
+• Создавать собственные AR-проекты и отправлять заказы<br/><br/>
+Приложение используется для работы с печатной продукцией, содержащей AR-маркеры или QR-коды.<br/><br/>
+V-Portal подходит для:<br/><br/>
+• персональных подарков<br/>
+• рекламных материалов<br/>
+• ресторанных меню<br/>
+• сувениров и полиграфии<br/><br/>
+Для корректной работы требуется доступ к камере устройства.<br/><br/>
+© 2026 Vertex Art
+]]></string>
+    <string name="dialog_support_body"><![CDATA[
+Есть вопрос или проблема?<br/>
+Мы поможем вам<br/><br/>
+<b>Разработчик:</b><br/>
+V-Portal / Vertex Art<br/><br/>
+<b>Email поддержки:</b><br/>
+<a href="mailto:info@vertex-art.ru">info@vertex-art.ru</a><br/><br/>
+<b>Telegram:</b><br/>
+<a href="https://t.me/vertex_art">https://t.me/vertex_art</a><br/><br/>
+<b>Сайт:</b><br/>
+<a href="https://vertex-art.ru">https://vertex-art.ru</a><br/><br/>
+Версия: 1.0.0
+]]></string>
     <string name="appbar_scrolling_view_behavior" translatable="false">com.google.android.material.appbar.AppBarLayout$ScrollingViewBehavior</string>
 </resources>
