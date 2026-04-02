@@ -10,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.routes.auth import get_current_user_optional
 from app.html.deps import get_html_db
-from app.html.i18n import normalize_locale, translate
+from app.html.i18n import get_request_locale, normalize_locale, translate
 from app.html.templating import templates
 from app.html.utils import require_active_user
 from app.models.company import Company
@@ -49,6 +49,7 @@ async def _render_settings(
 ) -> HTMLResponse:
     """Build the settings page response with fresh data from DB."""
     settings_service = SettingsService(db)
+    locale = get_request_locale(request)
     try:
         all_settings = await settings_service.get_all_settings()
     except Exception as exc:
@@ -93,6 +94,7 @@ async def _render_settings(
             "error_message": error_message,
             "yd_companies": yd_company_list,
             "backup_history": backup_history,
+            "active_locale": locale,
         },
     )
 
@@ -158,7 +160,7 @@ async def update_general_settings(
             db,
             current_user,
             active_section="general",
-            error_message=translate("settings.save_failed", request.state.locale),
+            error_message=translate("settings.save_failed", get_request_locale(request)),
         )
 
 
@@ -189,7 +191,7 @@ async def update_security_settings(
                 db,
                 current_user,
                 active_section="security",
-                error_message=translate("auth.enable_2fa_chat_required", request.state.locale),
+                error_message=translate("auth.enable_2fa_chat_required", get_request_locale(request)),
             )
 
         await settings_service.update_security_settings(
@@ -208,7 +210,7 @@ async def update_security_settings(
             db,
             current_user,
             active_section="security",
-            success_message=translate("settings.saved_security", request.state.locale),
+            success_message=translate("settings.saved_security", get_request_locale(request)),
         )
     except Exception as exc:
         logger.error("security_settings_update_failed: %s", exc)
@@ -217,7 +219,7 @@ async def update_security_settings(
             db,
             current_user,
             active_section="security",
-            error_message=translate("settings.save_failed", request.state.locale),
+            error_message=translate("settings.save_failed", get_request_locale(request)),
         )
 
 
@@ -257,7 +259,7 @@ async def update_ar_settings(
             db,
             current_user,
             active_section="ar",
-            success_message=translate("settings.saved_ar", request.state.locale),
+            success_message=translate("settings.saved_ar", get_request_locale(request)),
         )
     except Exception as exc:
         logger.error("ar_settings_update_failed: %s", exc)
@@ -266,7 +268,7 @@ async def update_ar_settings(
             db,
             current_user,
             active_section="ar",
-            error_message=translate("settings.save_failed", request.state.locale),
+            error_message=translate("settings.save_failed", get_request_locale(request)),
         )
 
 
@@ -321,7 +323,7 @@ async def update_backup_settings(
             db,
             current_user,
             active_section="backup",
-            success_message=translate("settings.saved_backup", request.state.locale),
+            success_message=translate("settings.saved_backup", get_request_locale(request)),
         )
     except Exception as exc:
         logger.error("backup_settings_update_failed: %s", exc)
@@ -330,7 +332,7 @@ async def update_backup_settings(
             db,
             current_user,
             active_section="backup",
-            error_message=translate("settings.save_failed_backup", request.state.locale),
+            error_message=translate("settings.save_failed_backup", get_request_locale(request)),
         )
 
 
@@ -389,7 +391,7 @@ async def update_notification_settings(
             db,
             current_user,
             active_section="notifications",
-            success_message=translate("settings.saved_notifications", request.state.locale),
+            success_message=translate("settings.saved_notifications", get_request_locale(request)),
         )
     except Exception as exc:
         logger.error("notification_settings_update_failed: %s", exc)
@@ -398,7 +400,7 @@ async def update_notification_settings(
             db,
             current_user,
             active_section="notifications",
-            error_message=translate("settings.save_failed", request.state.locale),
+            error_message=translate("settings.save_failed", get_request_locale(request)),
         )
 
 
@@ -435,7 +437,7 @@ async def update_storage_settings(
             db,
             current_user,
             active_section="storage",
-            success_message=translate("settings.saved_storage", request.state.locale),
+            success_message=translate("settings.saved_storage", get_request_locale(request)),
         )
     except Exception as exc:
         logger.error("storage_settings_update_failed: %s", exc)
@@ -444,5 +446,5 @@ async def update_storage_settings(
             db,
             current_user,
             active_section="storage",
-            error_message=translate("settings.save_failed", request.state.locale),
+            error_message=translate("settings.save_failed", get_request_locale(request)),
         )

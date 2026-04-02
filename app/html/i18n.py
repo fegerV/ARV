@@ -548,11 +548,25 @@ def translate(key: str, locale: str | None = None, **params: Any) -> str:
 
 
 def get_request_locale(request: Any) -> str:
-    state_locale = getattr(getattr(request, "state", None), "locale", None)
-    if state_locale:
-        return normalize_locale(state_locale)
-    session = getattr(request, "session", {}) or {}
-    return normalize_locale(session.get(SESSION_LANGUAGE_KEY))
+    session = {}
+    try:
+        session = getattr(request, "session", {}) or {}
+    except AssertionError:
+        session = getattr(request, "scope", {}).get("session", {}) or {}
+
+    session_locale = session.get(SESSION_LANGUAGE_KEY)
+    if session_locale:
+        locale = normalize_locale(session_locale)
+    else:
+        state_locale = getattr(getattr(request, "state", None), "locale", None)
+        locale = normalize_locale(state_locale)
+
+    try:
+        request.state.locale = locale
+    except Exception:
+        pass
+
+    return locale
 
 
 @pass_context

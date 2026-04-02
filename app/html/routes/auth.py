@@ -21,7 +21,7 @@ from app.core.config import settings
 from app.core.database import get_db
 from app.core.redis import redis_client
 from app.core.security import get_password_hash, needs_password_rehash, verify_password
-from app.html.i18n import normalize_locale, translate
+from app.html.i18n import get_request_locale, normalize_locale, translate
 from app.html.templating import templates
 from app.middleware.rate_limiter import limiter
 from app.models.user import User
@@ -42,6 +42,7 @@ def _login_context(request: Request, **extra) -> dict:
 
 
 def _render_login(request: Request, **extra) -> HTMLResponse:
+    get_request_locale(request)
     return templates.TemplateResponse("admin/login.html", _login_context(request, **extra))
 
 
@@ -72,6 +73,7 @@ async def admin_login_page(request: Request):
 async def admin_set_language(request: Request, language: str = Form(...)):
     """Persist selected admin locale in session and redirect back."""
     request.session["language"] = normalize_locale(language)
+    request.state.locale = request.session["language"]
     redirect_to = request.headers.get("referer") or "/admin"
     return RedirectResponse(url=redirect_to, status_code=303)
 
@@ -97,7 +99,7 @@ async def login_form(
         logger.exception("login_form_error", error=str(exc))
         return _render_login(
             request,
-            error=translate("auth.error_login", request.state.locale, error=str(exc)),
+            error=translate("auth.error_login", get_request_locale(request), error=str(exc)),
         )
 
     if user and user.locked_until:
@@ -105,7 +107,7 @@ async def login_form(
             logger.warning("login_attempt_locked_account", email=username)
             return _render_login(
                 request,
-                error=translate("auth.account_locked", request.state.locale),
+                error=translate("auth.account_locked", get_request_locale(request)),
                 locked_until=user.locked_until.isoformat(),
             )
         user.locked_until = None
@@ -123,7 +125,7 @@ async def login_form(
                     request,
                     error=translate(
                         "auth.too_many_attempts",
-                        request.state.locale,
+                        get_request_locale(request),
                         minutes=LOCKOUT_DURATION.seconds // 60,
                     ),
                     locked_until=user.locked_until.isoformat(),
@@ -133,13 +135,13 @@ async def login_form(
             attempts_left = max(MAX_LOGIN_ATTEMPTS - user.login_attempts, 0)
             return _render_login(
                 request,
-                error=translate("auth.invalid_credentials", request.state.locale),
+                error=translate("auth.invalid_credentials", get_request_locale(request)),
                 attempts_left=attempts_left,
             )
-        return _render_login(request, error=translate("auth.invalid_credentials", request.state.locale))
+        return _render_login(request, error=translate("auth.invalid_credentials", get_request_locale(request)))
 
     if not user.is_active:
-        return _render_login(request, error=translate("auth.account_disabled", request.state.locale))
+        return _render_login(request, error=translate("auth.account_disabled", get_request_locale(request)))
 
     try:
         if needs_password_rehash(user.hashed_password):
@@ -202,7 +204,7 @@ async def login_form(
         logger.exception("login_form_success_error", error=str(exc))
         return _render_login(
             request,
-            error=translate("auth.error_login_process", request.state.locale, error=str(exc)),
+            error=translate("auth.error_login_process", get_request_locale(request), error=str(exc)),
         )
 
 
@@ -216,33 +218,33 @@ async def login_2fa_verify(
     """Verify 2FA code and create browser session."""
     code = (code or "").strip().replace(" ", "")
     if len(code) != 6 or not code.isdigit():
-        return _render_2fa_step(request, pending_2fa_token, error=translate("auth.enter_2fa_code", request.state.locale))
+        return _render_2fa_step(request, pending_2fa_token, error=translate("auth.enter_2fa_code", get_request_locale(request)))
 
     redis_key = f"2fa:pending:{pending_2fa_token}"
     try:
         raw = await redis_client.get(redis_key)
     except Exception as exc:
         logger.warning("2fa_redis_get_error", error=str(exc))
-        return _render_login(request, error=translate("auth.otp_verify_error", request.state.locale))
+        return _render_login(request, error=translate("auth.otp_verify_error", get_request_locale(request)))
 
     if not raw:
-        return _render_login(request, error=translate("auth.otp_expired", request.state.locale))
+        return _render_login(request, error=translate("auth.otp_expired", get_request_locale(request)))
 
     try:
         data = json.loads(raw)
     except (json.JSONDecodeError, TypeError):
         await redis_client.delete(redis_key)
-        return _render_login(request, error=translate("auth.otp_data_error", request.state.locale))
+        return _render_login(request, error=translate("auth.otp_data_error", get_request_locale(request)))
 
     if data.get("code") != code:
-        return _render_2fa_step(request, pending_2fa_token, error=translate("auth.otp_invalid", request.state.locale))
+        return _render_2fa_step(request, pending_2fa_token, error=translate("auth.otp_invalid", get_request_locale(request)))
 
     user_id = data.get("user_id")
     result = await db.execute(select(User).where(User.id == user_id))
     user = result.scalar_one_or_none()
     if not user or not user.is_active:
         await redis_client.delete(redis_key)
-        return _render_login(request, error=translate("auth.user_not_found_or_blocked", request.state.locale))
+        return _render_login(request, error=translate("auth.user_not_found_or_blocked", get_request_locale(request)))
 
     await redis_client.delete(redis_key)
     timeout_minutes = await _get_html_session_timeout_minutes(db)
