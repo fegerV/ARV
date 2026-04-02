@@ -1,11 +1,13 @@
+{% set is_en = request.state.locale == "en" %}
+
 <section id="companies" class="mb-10">
     <h2 class="text-xl font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
         <span class="material-icons text-blue-500">business</span>
-        Компании
+        {{ "Companies" if is_en else "Компании" }}
     </h2>
     <div class="space-y-3 text-gray-700 dark:text-gray-300">
-        <p>Раздел <code class="text-sm bg-gray-100 dark:bg-gray-700 px-1 rounded">/companies</code> хранит клиентов, бренды и их параметры хранения.</p>
-        <p>В карточке компании задаются название, контактный email, статус, тип хранилища и, при необходимости, интеграция с Яндекс Диском.</p>
-        <p>От компании зависит, где будут храниться медиафайлы и какие проекты/материалы будут ей принадлежать.</p>
+        <p>{% if is_en %}The <code class="text-sm bg-gray-100 dark:bg-gray-700 px-1 rounded">/companies</code> section stores clients, brands, and storage settings.{% else %}Раздел <code class="text-sm bg-gray-100 dark:bg-gray-700 px-1 rounded">/companies</code> хранит клиентов, бренды и их параметры хранения.{% endif %}</p>
+        <p>{% if is_en %}A company card contains the name, contact email, status, storage type, and optionally Yandex Disk integration.{% else %}В карточке компании задаются название, контактный email, статус, тип хранилища и, при необходимости, интеграция с Яндекс Диском.{% endif %}</p>
+        <p>{% if is_en %}The company defines where media files are stored and which projects and materials belong to it.{% else %}От компании зависит, где будут храниться медиафайлы и какие проекты и материалы будут ей принадлежать.{% endif %}</p>
     </div>
 </section>

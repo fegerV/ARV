@@ -1,39 +1,36 @@
 {% extends "base.html" %}
 
-{% block title %}{% if company %}Редактирование компании - {{ company.name }}{% else %}Создание компании{% endif %} - Vertex AR Admin{% endblock %}
-{% block page_title %}{% if company %}Редактирование компании{% else %}Создание компании{% endif %}{% endblock %}
+{% block title %}{% if company %}{{ "Edit company" if request.state.locale == "en" else "Редактирование компании" }} - {{ company.name }}{% else %}{{ "Create company" if request.state.locale == "en" else "Создание компании" }}{% endif %} - Vertex AR Admin{% endblock %}
+{% block page_title %}{% if company %}{{ "Edit company" if request.state.locale == "en" else "Редактирование компании" }}{% else %}{{ "Create company" if request.state.locale == "en" else "Создание компании" }}{% endif %}{% endblock %}
 
 {% block content %}
 <div x-data="companyForm()" class="space-y-6">
-    <!-- Page Header -->
     <div class="flex items-center justify-between">
         <div>
             <h2 class="text-2xl font-semibold text-gray-900 dark:text-white">
                 {% if company %}
-                    Редактирование компании
+                    {{ "Edit company" if request.state.locale == "en" else "Редактирование компании" }}
                 {% else %}
-                    Новая компания
+                    {{ "New company" if request.state.locale == "en" else "Новая компания" }}
                 {% endif %}
             </h2>
             <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
                 {% if company %}
-                    Обновите информацию о компании и её настройки
+                    {{ "Update company information and settings" if request.state.locale == "en" else "Обновите информацию о компании и её настройки" }}
                 {% else %}
-                    Добавьте новую организацию в систему
+                    {{ "Add a new organization to the system" if request.state.locale == "en" else "Добавьте новую организацию в систему" }}
                 {% endif %}
             </p>
         </div>
     </div>
 
-    <!-- Main Form Card -->
     <div class="bg-white dark:bg-gray-800 shadow rounded-lg">
-        <!-- Error Alert -->
         {% if error %}
         <div class="border-l-4 border-red-500 bg-red-50 dark:bg-red-900/20 p-4">
             <div class="flex items-start">
                 <span class="material-icons text-red-600 dark:text-red-400 mr-3 mt-0.5">error</span>
                 <div>
-                    <h3 class="text-sm font-medium text-red-800 dark:text-red-200">Ошибка</h3>
+                    <h3 class="text-sm font-medium text-red-800 dark:text-red-200">{{ "Error" if request.state.locale == "en" else "Ошибка" }}</h3>
                     <p class="mt-1 text-sm text-red-700 dark:text-red-300">{{ error }}</p>
                 </div>
             </div>
@@ -41,77 +38,72 @@
         {% endif %}
 
         <form method="POST" action="{% if company %}/companies/{{ company.id }}{% else %}/companies{% endif %}" class="divide-y divide-gray-200 dark:divide-gray-700">
-            <!-- Form Content -->
             <div class="px-4 py-6 sm:px-6 space-y-6">
-                <!-- Company Name -->
                 <div>
                     <label for="name" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                        Название компании
+                        {{ "Company name" if request.state.locale == "en" else "Название компании" }}
                         <span class="text-red-500">*</span>
                     </label>
-                    <input type="text" 
-                           name="name" 
-                           id="name" 
+                    <input type="text"
+                           name="name"
+                           id="name"
                            value="{% if company %}{{ company.name }}{% endif %}"
-                           placeholder="Например, Acme Corporation"
+                           placeholder="{{ 'For example, Acme Corporation' if request.state.locale == 'en' else 'Например, Acme Corporation' }}"
                            class="form-input w-full border border-gray-300 dark:border-gray-600 rounded-lg px-4 py-2"
                            required
                            minlength="2"
                            maxlength="100">
                     <p class="mt-1.5 text-xs text-gray-500 dark:text-gray-400">
-                        Официальное название организации
+                        {{ "Official organization name" if request.state.locale == "en" else "Официальное название организации" }}
                     </p>
                 </div>
 
-                <!-- Contact Email -->
                 <div>
                     <label for="contact_email" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                        Контактный email
+                        {{ "Contact email" if request.state.locale == "en" else "Контактный email" }}
                     </label>
-                    <input type="email" 
-                           name="contact_email" 
-                           id="contact_email" 
+                    <input type="email"
+                           name="contact_email"
+                           id="contact_email"
                            value="{% if company %}{{ company.contact_email }}{% endif %}"
                            placeholder="contact@company.com"
                            class="form-input w-full border border-gray-300 dark:border-gray-600 rounded-lg px-4 py-2"
                            maxlength="100">
                     <p class="mt-1.5 text-xs text-gray-500 dark:text-gray-400">
-                        Основной контактный email компании
+                        {{ "Primary company contact email" if request.state.locale == "en" else "Основной контактный email компании" }}
                     </p>
                 </div>
 
-                <!-- Status -->
                 <div>
                     <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                        Статус
+                        {{ "Status" if request.state.locale == "en" else "Статус" }}
                     </label>
                     <div class="flex gap-4">
                         <label class="flex items-center">
-                            <input type="radio" 
-                                   name="status" 
-                                   value="active" 
+                            <input type="radio"
+                                   name="status"
+                                   value="active"
                                    {% if not company or company.status == 'active' %}checked{% endif %}
                                    class="w-4 h-4 text-indigo-600 dark:text-indigo-400">
-                            <span class="ml-2 text-sm text-gray-700 dark:text-gray-300">Активна</span>
+                            <span class="ml-2 text-sm text-gray-700 dark:text-gray-300">{{ "Active" if request.state.locale == "en" else "Активна" }}</span>
                         </label>
                         <label class="flex items-center">
-                            <input type="radio" 
-                                   name="status" 
-                                   value="inactive" 
+                            <input type="radio"
+                                   name="status"
+                                   value="inactive"
                                    {% if company and company.status == 'inactive' %}checked{% endif %}
                                    class="w-4 h-4 text-indigo-600 dark:text-indigo-400">
-                            <span class="ml-2 text-sm text-gray-700 dark:text-gray-300">Неактивна</span>
+                            <span class="ml-2 text-sm text-gray-700 dark:text-gray-300">{{ "Inactive" if request.state.locale == "en" else "Неактивна" }}</span>
                         </label>
                     </div>
                     <p class="mt-1.5 text-xs text-gray-500 dark:text-gray-400">
-                        Управляет тем, доступна ли компания для работы в системе
+                        {{ "Controls whether the company can be used in the platform" if request.state.locale == "en" else "Управляет тем, доступна ли компания для работы в системе" }}
                     </p>
                 </div>
 
-                <!-- Storage Provider -->
                 <div x-data="storageProviderSection()">
                     <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                        Провайдер хранилища
+                        {{ "Storage provider" if request.state.locale == "en" else "Провайдер хранилища" }}
                     </label>
                     <div class="flex gap-4 mb-3">
                         <label class="flex items-center">
@@ -121,7 +113,7 @@
                                    x-model="provider"
                                    {% if not company or (company.storage_provider|default('local')) == 'local' %}checked{% endif %}
                                    class="w-4 h-4 text-indigo-600 dark:text-indigo-400">
-                            <span class="ml-2 text-sm text-gray-700 dark:text-gray-300">Локальное хранилище</span>
+                            <span class="ml-2 text-sm text-gray-700 dark:text-gray-300">{{ "Local storage" if request.state.locale == "en" else "Локальное хранилище" }}</span>
                         </label>
                         <label class="flex items-center">
                             <input type="radio"
@@ -130,60 +122,55 @@
                                    x-model="provider"
                                    {% if company and company.storage_provider == 'yandex_disk' %}checked{% endif %}
                                    class="w-4 h-4 text-indigo-600 dark:text-indigo-400">
-                            <span class="ml-2 text-sm text-gray-700 dark:text-gray-300">Яндекс Диск</span>
+                            <span class="ml-2 text-sm text-gray-700 dark:text-gray-300">{{ "Yandex Disk" if request.state.locale == "en" else "Яндекс Диск" }}</span>
                         </label>
                     </div>
                     <p class="mt-1.5 text-xs text-gray-500 dark:text-gray-400 mb-3">
-                        Локальное хранилище работает сразу после сохранения. Яндекс Диск требует подключения и авторизации.
+                        {{ "Local storage works immediately after saving. Yandex Disk requires connection and authorization." if request.state.locale == "en" else "Локальное хранилище работает сразу после сохранения. Яндекс Диск требует подключения и авторизации." }}
                     </p>
 
-                    <!-- Yandex Disk OAuth section (shown when yandex_disk selected) -->
                     <div x-show="provider === 'yandex_disk'" x-cloak
                          class="mt-4 p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg border border-gray-200 dark:border-gray-600 space-y-4">
-
-                        <!-- Connection status -->
                         {% if company and company.yandex_connected %}
                         <div class="flex items-center gap-2 text-green-600 dark:text-green-400">
                             <span class="material-icons text-base">check_circle</span>
-                            <span class="text-sm font-medium">Яндекс Диск подключён</span>
+                            <span class="text-sm font-medium">{{ "Yandex Disk connected" if request.state.locale == "en" else "Яндекс Диск подключён" }}</span>
                         </div>
                         {% else %}
                         <div class="flex items-center gap-2 text-yellow-600 dark:text-yellow-400"
                              x-show="!connected" x-cloak>
                             <span class="material-icons text-base">warning</span>
-                            <span class="text-sm font-medium">Яндекс Диск не подключён</span>
+                            <span class="text-sm font-medium">{{ "Yandex Disk not connected" if request.state.locale == "en" else "Яндекс Диск не подключён" }}</span>
                         </div>
                         <div class="flex items-center gap-2 text-green-600 dark:text-green-400"
                              x-show="connected" x-cloak>
                             <span class="material-icons text-base">check_circle</span>
-                            <span class="text-sm font-medium">Яндекс Диск подключён</span>
+                            <span class="text-sm font-medium">{{ "Yandex Disk connected" if request.state.locale == "en" else "Яндекс Диск подключён" }}</span>
                         </div>
                         {% endif %}
 
                         {% if company and company.id %}
-                        <!-- Step 1: Get auth URL -->
                         <button type="button"
                                 @click="openYandexAuth()"
                                 class="inline-flex items-center gap-2 px-4 py-2 bg-yellow-500 hover:bg-yellow-600 text-white rounded-lg text-sm font-medium transition-colors">
                             <span class="material-icons text-base">link</span>
-                            Подключить Яндекс Диск
+                            {{ "Connect Yandex Disk" if request.state.locale == "en" else "Подключить Яндекс Диск" }}
                         </button>
 
-                        <!-- Step 2: Enter code -->
                         <div x-show="showCodeInput" x-cloak class="space-y-2">
                             <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                                Введите код авторизации
+                                {{ "Enter authorization code" if request.state.locale == "en" else "Введите код авторизации" }}
                             </label>
                             <div class="flex gap-2">
                                 <input type="text"
                                        x-model="authCode"
-                                       placeholder="Вставьте код со страницы"
+                                       placeholder="{{ 'Paste the code from the page' if request.state.locale == 'en' else 'Вставьте код со страницы' }}"
                                        class="form-input flex-1 border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm">
                                 <button type="button"
                                         @click="exchangeCode()"
                                         :disabled="!authCode || exchanging"
                                         class="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 disabled:opacity-50 transition-colors">
-                                    <span x-show="!exchanging">Подтвердить</span>
+                                    <span x-show="!exchanging">{{ "Confirm" if request.state.locale == "en" else "Подтвердить" }}</span>
                                     <span x-show="exchanging" class="flex items-center gap-1">
                                         <span class="inline-block w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
                                         ...
@@ -193,45 +180,43 @@
                             <p x-show="exchangeError" x-text="exchangeError" class="text-sm text-red-600 dark:text-red-400"></p>
                         </div>
 
-                        <!-- Disconnect button -->
                         {% if company and company.yandex_connected %}
                         <button type="button"
                                 @click="disconnectYandex()"
                                 class="inline-flex items-center gap-2 px-4 py-2 border border-red-300 dark:border-red-600 text-red-600 dark:text-red-400 rounded-lg text-sm font-medium hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors">
                             <span class="material-icons text-base">link_off</span>
-                            Отключить Яндекс Диск
+                            {{ "Disconnect Yandex Disk" if request.state.locale == "en" else "Отключить Яндекс Диск" }}
                         </button>
                         {% endif %}
 
                         {% else %}
                         <p class="text-sm text-gray-500 dark:text-gray-400">
-                            Сначала сохраните компанию, чтобы затем подключить Яндекс Диск.
+                            {{ "Save the company first, then connect Yandex Disk." if request.state.locale == "en" else "Сначала сохраните компанию, чтобы затем подключить Яндекс Диск." }}
                         </p>
                         {% endif %}
                     </div>
                 </div>
             </div>
 
-            <!-- Form Actions -->
             <div class="px-4 py-4 sm:px-6 bg-gray-50 dark:bg-gray-900/50 flex items-center justify-between">
                 <a href="/companies" class="text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white text-sm font-medium inline-flex items-center gap-1 transition-colors">
                     <span class="material-icons text-base">chevron_left</span>
-                    К списку компаний
+                    {{ "Back to companies" if request.state.locale == "en" else "К списку компаний" }}
                 </a>
                 <div class="flex gap-3">
                     <a href="/companies" class="inline-flex items-center justify-center px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
-                        Отмена
+                        {{ "Cancel" if request.state.locale == "en" else "Отмена" }}
                     </a>
-                    <button type="submit" 
+                    <button type="submit"
                             :disabled="isSubmitting"
                             class="inline-flex items-center justify-center px-4 py-2 bg-indigo-600 dark:bg-indigo-700 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 dark:hover:bg-indigo-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
                         <span x-show="!isSubmitting" class="flex items-center gap-2">
                             <span class="material-icons text-base">check</span>
-                            {% if company %}Сохранить изменения{% else %}Создать компанию{% endif %}
+                            {% if company %}{{ "Save changes" if request.state.locale == "en" else "Сохранить изменения" }}{% else %}{{ "Create company" if request.state.locale == "en" else "Создать компанию" }}{% endif %}
                         </span>
                         <span x-show="isSubmitting" class="flex items-center gap-2">
                             <span class="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
-                            Сохранение...
+                            {{ "Saving..." if request.state.locale == "en" else "Сохранение..." }}
                         </span>
                     </button>
                 </div>
@@ -239,13 +224,12 @@
         </form>
     </div>
 
-    <!-- Info Card -->
     <div class="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
         <div class="flex gap-3">
             <span class="material-icons text-blue-600 dark:text-blue-400 flex-shrink-0">info</span>
             <div class="text-sm text-blue-800 dark:text-blue-200">
-                <p class="font-medium">О компаниях</p>
-                <p class="mt-1">Компании представляют организации, работающие в Vertex AR. У каждой компании может быть несколько проектов и единиц AR-контента.</p>
+                <p class="font-medium">{{ "About companies" if request.state.locale == "en" else "О компаниях" }}</p>
+                <p class="mt-1">{{ "Companies represent organizations working in Vertex AR. Each company can have multiple projects and AR content items." if request.state.locale == "en" else "Компании представляют организации, работающие в Vertex AR. У каждой компании может быть несколько проектов и единиц AR-контента." }}</p>
             </div>
         </div>
     </div>
@@ -308,10 +292,10 @@ function storageProviderSection() {
                     this.showCodeInput = false;
                     this.authCode = '';
                 } else {
-                    this.exchangeError = data.detail || 'Ошибка подключения';
+                    this.exchangeError = data.detail || ('{{ "Connection error" if request.state.locale == "en" else "Ошибка подключения" }}');
                 }
             } catch (e) {
-                this.exchangeError = 'Не удалось подключиться: ' + e.message;
+                this.exchangeError = ('{{ "Could not connect" if request.state.locale == "en" else "Не удалось подключиться" }}') + ': ' + e.message;
             }
             this.exchanging = false;
         },
@@ -319,13 +303,12 @@ function storageProviderSection() {
         async disconnectYandex() {
             const companyId = '{{ company.id if company and company.id else "" }}';
             if (!companyId) return;
-            if (!confirm('Отключить Яндекс Диск для этой компании?')) return;
+            if (!confirm('{{ "Disconnect Yandex Disk for this company?" if request.state.locale == "en" else "Отключить Яндекс Диск для этой компании?" }}')) return;
             try {
                 const resp = await fetch('/api/companies/' + companyId + '/yandex-token', {method: 'DELETE'});
                 if (resp.ok) {
                     this.connected = false;
                     this.provider = 'local';
-                    // Update the hidden radio
                     const localRadio = document.querySelector('input[name="storage_provider"][value="local"]');
                     if (localRadio) localRadio.checked = true;
                 }
@@ -337,4 +320,3 @@ function storageProviderSection() {
 }
 </script>
 {% endblock %}
-

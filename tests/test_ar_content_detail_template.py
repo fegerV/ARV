@@ -37,11 +37,11 @@ def test_ar_content_detail_template_has_quick_order_and_customer_actions():
     assert "Написать" in joined
     assert "Номер заказа скопирован" in joined
     assert "Открыть AR" in joined
-    assert "Управление видео" in joined
-    assert "Маркер и качество" in joined
+    assert '{{ "Video management" if is_en else "Управление видео" }}' in video_panel
+    assert '{{ "Marker and quality" if is_en else "Маркер и качество" }}' in marker_quality
     assert "Все видео" in joined
-    assert "Загрузить видео" in joined
-    assert "Удалить AR контент" in joined
+    assert '{{ "Upload video" if is_en else "Загрузить видео" }}' in video_panel
+    assert '{{ "Delete AR content" if is_en else "Удалить AR контент" }}' in media_modals
 
 
 def test_ar_content_detail_template_reuses_embedded_videos_before_refetch():

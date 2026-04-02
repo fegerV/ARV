@@ -3,7 +3,7 @@
     <div class="flex items-start">
         <span class="material-icons text-red-600 dark:text-red-400 mr-3 mt-0.5">error</span>
         <div>
-            <h3 class="text-sm font-medium text-red-800 dark:text-red-200">Error</h3>
+            <h3 class="text-sm font-medium text-red-800 dark:text-red-200">{{ "Error" if request.state.locale == "en" else "Ошибка" }}</h3>
             <p class="mt-1 text-sm text-red-700 dark:text-red-300">{{ error }}</p>
         </div>
     </div>

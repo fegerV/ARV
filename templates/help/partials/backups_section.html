@@ -1,10 +1,12 @@
+{% set is_en = request.state.locale == "en" %}
+
 <section id="backups" class="mb-10">
     <h2 class="text-xl font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
         <span class="material-icons text-gray-500">backup</span>
-        Резервные копии
+        {{ "Backups" if is_en else "Резервные копии" }}
     </h2>
     <div class="space-y-4 text-gray-700 dark:text-gray-300">
-        <p>Раздел <code class="text-sm bg-gray-100 dark:bg-gray-700 px-1 rounded">/backups</code> показывает историю резервных копий базы данных и позволяет отслеживать статус последних запусков.</p>
-        <p>На странице настроек можно включить автоматические бэкапы, выбрать компанию с Яндекс Диском, папку назначения и расписание.</p>
+        <p>{% if is_en %}The <code class="text-sm bg-gray-100 dark:bg-gray-700 px-1 rounded">/backups</code> section shows backup history and run statuses.{% else %}Раздел <code class="text-sm bg-gray-100 dark:bg-gray-700 px-1 rounded">/backups</code> показывает историю резервных копий базы данных и позволяет отслеживать статус последних запусков.{% endif %}</p>
+        <p>{% if is_en %}From settings you can enable automatic backups, choose a company with Yandex Disk, define the destination folder, and configure the schedule.{% else %}На странице настроек можно включить автоматические бэкапы, выбрать компанию с Яндекс Диском, папку назначения и расписание.{% endif %}</p>
     </div>
 </section>

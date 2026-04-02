@@ -5,6 +5,7 @@
 {% block page_title %}{{ ar_content.order_number }}{% endblock %}
 
 {% block content %}
+{% set is_en = request.state.locale == "en" %}
 <script type="application/json" id="ar-content-data">{{ ar_content_js | tojson }}</script>
 <script type="application/json" id="ar-content-videos">{{ videos_js | default([]) | tojson }}</script>
 <script type="application/json" id="ar-content-active-video">{{ active_video_js | default(None) | tojson }}</script>
@@ -14,6 +15,71 @@
 <script>
 // Use Alpine.store so the same scope is used for all bindings (fixes "X is not defined" with defer + plugins)
 document.addEventListener('alpine:init', function() {
+    const i18n = {
+        activeVideoSchedule: {{ ("Source: schedule" if is_en else "Источник: расписание") | tojson }},
+        activeVideoRotation: {{ ("Source: rotation" if is_en else "Источник: ротация") | tojson }},
+        activeVideoDefault: {{ ("Source: default video" if is_en else "Источник: видео по умолчанию") | tojson }},
+        activeVideoActive: {{ ("Source: active video" if is_en else "Источник: активное видео") | tojson }},
+        nothingToCopy: {{ ("Nothing to copy" if is_en else "Нечего копировать") | tojson }},
+        copyFailed: {{ ("Failed to copy" if is_en else "Не удалось скопировать") | tojson }},
+        secondsSuffix: {{ (" sec" if is_en else " сек") | tojson }},
+        densitySuffix: {{ (" / million pixels" if is_en else " / млн пикселей") | tojson }},
+        selectSourceVideo: {{ ("Select a source video" if is_en else "Выберите исходное видео") | tojson }},
+        selectPlaybackMode: {{ ("Select playback mode" if is_en else "Выберите режим показа") | tojson }},
+        saveVideoFailed: {{ ("Failed to save video" if is_en else "Не удалось сохранить видео") | tojson }},
+        videoUpdated: {{ ("Video updated successfully" if is_en else "Видео успешно обновлено") | tojson }},
+        saveModeFailed: {{ ("Failed to save mode" if is_en else "Не удалось сохранить режим") | tojson }},
+        singleActiveOnly: {{ ("Only one active video is allowed in this mode" if is_en else "В этом режиме активным может быть только одно видео") | tojson }},
+        previewUpdateFailed: {{ ("Failed to update preview" if is_en else "Ошибка обновления превью") | tojson }},
+        previewUpdatedSoon: {{ ("Preview updated, the page will reload soon" if is_en else "Превью обновлено, страница скоро перезагрузится") | tojson }},
+        deleteVideoFailed: {{ ("Failed to delete video" if is_en else "Не удалось удалить видео") | tojson }},
+        videoDeleted: {{ ("Video deleted" if is_en else "Видео удалено") | tojson }},
+        videoMissing: {{ ("Video for deletion was not found" if is_en else "Видео для удаления не найдено") | tojson }},
+        setActiveFailed: {{ ("Failed to set active video" if is_en else "Не удалось установить активное видео") | tojson }},
+        activeVideoUpdated: {{ ("Active video updated" if is_en else "Активное видео обновлено") | tojson }},
+        linkMissing: {{ ("Link is missing" if is_en else "Ссылка отсутствует") | tojson }},
+        linkCopied: {{ ("Link copied to clipboard" if is_en else "Ссылка скопирована в буфер обмена") | tojson }},
+        qrReadyPrefix: {{ ("QR code is ready in " if is_en else "QR-код готов в формате ") | tojson }},
+        downloadQrFailed: {{ ("Failed to download QR code" if is_en else "Не удалось скачать QR-код") | tojson }},
+        photoMarkerUpdated: {{ ("Photo and marker updated" if is_en else "Фото и маркер обновлены") | tojson }},
+        photoMarkerFailed: {{ ("Failed to update photo or marker" if is_en else "Не удалось обновить фото или маркер") | tojson }},
+        selectVideoFiles: {{ ("Please select video files" if is_en else "Пожалуйста, выберите видеофайлы") | tojson }},
+        selectVideo: {{ ("Please select a video" if is_en else "Пожалуйста, выберите видео") | tojson }},
+        videoUploaded: {{ ("Video uploaded successfully" if is_en else "Видео успешно загружено") | tojson }},
+        uploadVideoFailed: {{ ("Failed to upload video" if is_en else "Не удалось загрузить видео") | tojson }},
+        unknownError: {{ ("unknown error" if is_en else "неизвестная ошибка") | tojson }},
+        selectImage: {{ ("Please select an image" if is_en else "Пожалуйста, выберите изображение") | tojson }},
+        photoUploaded: {{ ("Photo uploaded successfully" if is_en else "Фото успешно загружено") | tojson }},
+        uploadPhotoFailed: {{ ("Failed to upload photo" if is_en else "Не удалось загрузить фото") | tojson }},
+        selectMarkerFile: {{ ("Please select a marker file" if is_en else "Пожалуйста, выберите файл маркера") | tojson }},
+        updatePhotoFailed: {{ ("Failed to update photo" if is_en else "Не удалось обновить фото") | tojson }},
+        photoUpdated: {{ ("Photo updated" if is_en else "Фото обновлено") | tojson }},
+        updateMarkerFailed: {{ ("Failed to update marker" if is_en else "Не удалось обновить маркер") | tojson }},
+        videoUpdatedShort: {{ ("Video updated" if is_en else "Видео обновлено") | tojson }},
+        noChanges: {{ ("No changes to save" if is_en else "Нет изменений для сохранения") | tojson }},
+        saveChangesFailed: {{ ("Failed to save changes" if is_en else "Не удалось сохранить изменения") | tojson }},
+        arDeleted: {{ ("AR content deleted successfully" if is_en else "AR-контент успешно удалён") | tojson }},
+        deleteArFailed: {{ ("Failed to delete AR content" if is_en else "Не удалось удалить AR-контент") | tojson }},
+        fixed: {{ ("Fixed" if is_en else "Фиксированное") | tojson }},
+        dateSpecific: {{ ("By dates" if is_en else "По датам") | tojson }},
+        dailyCycle: {{ ("Daily cycle" if is_en else "Ежедневный цикл") | tojson }},
+        weeklyCycle: {{ ("Weekly cycle" if is_en else "Недельный цикл") | tojson }},
+        randomDaily: {{ ("Random playback" if is_en else "Случайный показ") | tojson }},
+        videoLabel: {{ ("Video" if is_en else "Видео") | tojson }},
+        scheduleSaveFailed: {{ ("Failed to save schedule" if is_en else "Не удалось сохранить расписание") | tojson }},
+        scheduleSaved: {{ ("Schedule saved" if is_en else "Расписание сохранено") | tojson }},
+        errorPrefix: {{ ("Error: " if is_en else "Ошибка: ") | tojson }},
+        deleteScheduleConfirm: {{ ("Delete video schedule?" if is_en else "Удалить расписание видео?") | tojson }},
+        deleteScheduleFailed: {{ ("Failed to delete schedule" if is_en else "Не удалось удалить расписание") | tojson }},
+        scheduleDeleted: {{ ("Schedule deleted" if is_en else "Расписание удалено") | tojson }},
+        activeVideoDateRule: {{ ("Source: date rule" if is_en else "Источник: правило по дате") | tojson }},
+        activeVideoRotationRule: {{ ("Source: rotation rule" if is_en else "Источник: правило ротации") | tojson }},
+        activeVideoFallback: {{ ("Source: fallback video" if is_en else "Источник: резервное видео") | tojson }},
+        videoNotSelected: {{ ("Video not selected" if is_en else "Видео не выбрано") | tojson }},
+        recurringSuffix: {{ (" (yearly)" if is_en else " (ежегодно)") | tojson }},
+        addDateRule: {{ ("Add at least one date rule" if is_en else "Добавьте хотя бы одно правило по дате") | tojson }},
+        technicalInfo: {{ ("Technical information" if is_en else "Техническая информация") | tojson }}
+    };
     function fullArUrlFromContent(c) {
         var url = (c && (c.public_url || c.unique_link)) || '';
         return url.indexOf('/') === 0 ? window.location.origin + url : url;
@@ -208,10 +274,10 @@ document.addEventListener('alpine:init', function() {
 
         get activeVideoSourceLabel() {
             const source = this.activeVideoInfo?.source;
-            if (source === 'schedule') return 'Источник: расписание';
-            if (source === 'rotation') return 'Источник: ротация';
-            if (source === 'active_default') return 'Источник: видео по умолчанию';
-            return this.activeVideo ? 'Источник: активное видео' : '';
+            if (source === 'schedule') return i18n.activeVideoSchedule;
+            if (source === 'rotation') return i18n.activeVideoRotation;
+            if (source === 'active_default') return i18n.activeVideoDefault;
+            return this.activeVideo ? i18n.activeVideoActive : '';
         },
 
         get activeVideoSchedule() {
@@ -250,19 +316,19 @@ document.addEventListener('alpine:init', function() {
 
         copyText(value, successMessage) {
             if (!value) {
-                this.showToast('Нечего копировать', 'error');
+                this.showToast(i18n.nothingToCopy, 'error');
                 return;
             }
             navigator.clipboard.writeText(String(value)).then(() => {
                 this.showToast(successMessage, 'success');
             }).catch(() => {
-                this.showToast('Не удалось скопировать', 'error');
+                this.showToast(i18n.copyFailed, 'error');
             });
         },
 
         openArView() {
             if (!this.fullArUrl) {
-                this.showToast('Нечего копировать', 'error');
+                this.showToast(i18n.nothingToCopy, 'error');
                 return;
             }
             window.open(this.fullArUrl, '_blank', 'noopener');
@@ -296,7 +362,7 @@ document.addEventListener('alpine:init', function() {
 
         formatSeconds(value) {
             if (!value && value !== 0) return '-';
-            return `${Number(value).toFixed(2)} сек`;
+            return `${Number(value).toFixed(2)}${i18n.secondsSuffix}`;
         },
 
         formatPercent(value) {
@@ -316,7 +382,7 @@ document.addEventListener('alpine:init', function() {
             // Format as features per million pixels for better readability
             const perMillion = num * 1000000;
             if (perMillion >= 1) {
-                return perMillion.toFixed(2) + ' / млн пикселей';
+                return perMillion.toFixed(2) + i18n.densitySuffix;
             } else {
                 // For very small values, use scientific notation
                 return num.toExponential(4);
@@ -368,14 +434,14 @@ document.addEventListener('alpine:init', function() {
                 if (this.playbackMode === 'manual') {
                     const activeId = this.activeVideo?.id || this.videos.find(video => video.is_active)?.id;
                     if (!activeId) {
-                        this.showToast('Выберите исходное видео', 'error');
+                        this.showToast(i18n.selectSourceVideo, 'error');
                         return;
                     }
                     payload.active_video_id = activeId;
                 } else {
                     const activeIds = this.videos.filter(video => video.is_active).map(video => video.id);
                     if (!activeIds.length) {
-                        this.showToast('Выберите режим показа', 'error');
+                        this.showToast(i18n.selectPlaybackMode, 'error');
                         return;
                     }
                     payload.active_video_ids = activeIds;
@@ -388,16 +454,16 @@ document.addEventListener('alpine:init', function() {
 
                 if (!response.ok) {
                     const errorData = await response.json().catch(() => ({ detail: 'Unknown error' }));
-                    const errorMessage = errorData.detail || errorData.message || 'Не удалось сохранить видео';
+                    const errorMessage = errorData.detail || errorData.message || i18n.saveVideoFailed;
                     this.showToast(errorMessage, 'error');
                     return;
                 }
 
                 await this.loadVideos();
-                this.showToast('Видео успешно обновлено', 'success');
+                this.showToast(i18n.videoUpdated, 'success');
             } catch (error) {
                 console.error('Playback mode error:', error);
-                this.showToast('Не удалось сохранить видео', 'error');
+                this.showToast(i18n.saveVideoFailed, 'error');
             } finally {
                 this.playbackModeSaving = false;
             }
@@ -406,7 +472,7 @@ document.addEventListener('alpine:init', function() {
         async toggleVideoActive(video, event) {
             const isActive = event.target.checked;
             if (this.playbackMode === 'manual') {
-                this.showToast('В этом режиме активным может быть только одно видео', 'info');
+                this.showToast(i18n.singleActiveOnly, 'info');
                 event.target.checked = video.is_active;
                 return;
             }
@@ -419,7 +485,7 @@ document.addEventListener('alpine:init', function() {
 
                 if (!response.ok) {
                     const errorData = await response.json().catch(() => ({ detail: 'Unknown error' }));
-                    const errorMessage = errorData.detail || errorData.message || 'Не удалось сохранить режим';
+                    const errorMessage = errorData.detail || errorData.message || i18n.saveModeFailed;
                     this.showToast(errorMessage, 'error');
                     event.target.checked = video.is_active;
                     return;
@@ -428,7 +494,7 @@ document.addEventListener('alpine:init', function() {
                 video.is_active = isActive;
             } catch (error) {
                 console.error('Toggle active error:', error);
-                this.showToast('Не удалось сохранить режим', 'error');
+                this.showToast(i18n.saveModeFailed, 'error');
                 event.target.checked = video.is_active;
             }
         },
@@ -460,12 +526,12 @@ document.addEventListener('alpine:init', function() {
                 });
                 if (!resp.ok) {
                     const err = await resp.json().catch(() => ({}));
-                    this.showToast(err.detail || 'Ошибка обновления превью', 'error');
+                    this.showToast(err.detail || i18n.previewUpdateFailed, 'error');
                     return;
                 }
-                this.showToast('Превью обновлено, страница скоро перезагрузится', 'success');
+                this.showToast(i18n.previewUpdatedSoon, 'success');
             } catch (e) {
-                this.showToast('Не удалось обновить превью', 'error');
+                this.showToast(i18n.previewUpdateFailed, 'error');
             } finally {
                 video._regenerating = false;
             }
@@ -485,16 +551,16 @@ document.addEventListener('alpine:init', function() {
                 });
                 if (!resp.ok) {
                     const err = await resp.json().catch(() => ({}));
-                    this.showToast(err.detail || 'Не удалось удалить видео', 'error');
+                    this.showToast(err.detail || i18n.deleteVideoFailed, 'error');
                     return;
                 }
                 this.videos = this.videos.filter(v => v.id !== this.videoToDelete.id);
-                this.showToast('Видео удалено', 'success');
+                this.showToast(i18n.videoDeleted, 'success');
                 if (this.videoToDelete.is_active) {
                     this.activeVideoInfo = null;
                 }
             } catch (e) {
-                this.showToast('Видео для удаления не найдено', 'error');
+                this.showToast(i18n.videoMissing, 'error');
             } finally {
                 this.deletingVideo = false;
                 this.showDeleteVideoDialog = false;
@@ -510,26 +576,26 @@ document.addEventListener('alpine:init', function() {
                 });
                 if (!response.ok) {
                     const errorData = await response.json().catch(() => ({ detail: 'Unknown error' }));
-                    const errorMessage = errorData.detail || errorData.message || 'Не удалось установить активное видео';
+                    const errorMessage = errorData.detail || errorData.message || i18n.setActiveFailed;
                     this.showToast(errorMessage, 'error');
                     return;
                 }
                 this.playbackMode = 'manual';
                 await this.loadVideos();
-                this.showToast('Активное видео обновлено', 'success');
+                this.showToast(i18n.activeVideoUpdated, 'success');
             } catch (error) {
                 console.error('Set active error:', error);
-                this.showToast('Не удалось установить активное видео', 'error');
+                this.showToast(i18n.setActiveFailed, 'error');
             }
         },
 
         copyLink() {
             if (!this.fullArUrl) {
-                this.showToast('Ссылка отсутствует', 'error');
+                this.showToast(i18n.linkMissing, 'error');
                 return;
             }
 
-            this.copyText(this.fullArUrl, 'Ссылка скопирована в буфер обмена');
+            this.copyText(this.fullArUrl, i18n.linkCopied);
         },
 
         async downloadQR(format) {
@@ -551,9 +617,9 @@ document.addEventListener('alpine:init', function() {
                         break;
                 }
 
-                this.showToast(`QR-код готов в формате ${format.toUpperCase()}`, 'success');
+                this.showToast(`${i18n.qrReadyPrefix}${format.toUpperCase()}`, 'success');
             } catch (error) {
-                this.showToast('Не удалось скачать QR-код', 'error');
+                this.showToast(i18n.downloadQrFailed, 'error');
                 console.error('Download error:', error);
             } finally {
                 this.downloadingQR = false;
@@ -642,13 +708,13 @@ document.addEventListener('alpine:init', function() {
                         this.markerMetrics = result.marker_metadata;
                         this.normalizeMarkerMetrics();
                     }
-                    this.showToast('Фото и маркер обновлены', 'success');
+                    this.showToast(i18n.photoMarkerUpdated, 'success');
                 } else {
-                    this.showToast('Не удалось обновить фото или маркер', 'error');
+                    this.showToast(i18n.photoMarkerFailed, 'error');
                 }
             } catch (error) {
                 console.error('Regenerate media error:', error);
-                this.showToast('Не удалось обновить фото или маркер', 'error');
+                this.showToast(i18n.photoMarkerFailed, 'error');
             } finally {
                 this.regeneratingMedia = false;
             }
@@ -662,7 +728,7 @@ document.addEventListener('alpine:init', function() {
             }
             const invalid = files.find(file => !file.type.startsWith('video/'));
             if (invalid) {
-                this.showToast('Пожалуйста, выберите видеофайлы', 'error');
+                this.showToast(i18n.selectVideoFiles, 'error');
                 event.target.value = '';
                 this.videoFiles = [];
                 return;
@@ -672,7 +738,7 @@ document.addEventListener('alpine:init', function() {
 
         async handleVideoUpload() {
             if (!this.videoFiles.length) {
-                this.showToast('Пожалуйста, выберите видео', 'error');
+                this.showToast(i18n.selectVideo, 'error');
                 return;
             }
 
@@ -689,7 +755,7 @@ document.addEventListener('alpine:init', function() {
                 });
 
                 if (response.ok) {
-                    this.showToast('Видео успешно загружено', 'success');
+                    this.showToast(i18n.videoUploaded, 'success');
                     this.showUploadDialog = false;
                     this.videoFiles = [];
                     // Reset file input
@@ -699,12 +765,12 @@ document.addEventListener('alpine:init', function() {
                     await this.loadVideos();
                 } else {
                     const errorData = await response.json().catch(() => ({ detail: 'Unknown error' }));
-                    const errorMessage = errorData.detail || errorData.message || 'Не удалось загрузить видео';
+                    const errorMessage = errorData.detail || errorData.message || i18n.uploadVideoFailed;
                     this.showToast(errorMessage, 'error');
                     console.error('Upload failed:', errorData);
                 }
             } catch (error) {
-                this.showToast('Не удалось загрузить видео: ' + (error.message || 'неизвестная ошибка'), 'error');
+                this.showToast(i18n.uploadVideoFailed + ': ' + (error.message || i18n.unknownError), 'error');
                 console.error('Upload error:', error);
             } finally {
                 this.uploadingVideo = false;
@@ -715,7 +781,7 @@ document.addEventListener('alpine:init', function() {
             const file = event.target.files[0];
             if (file) {
                 if (!file.type.startsWith('image/')) {
-                    this.showToast('Пожалуйста, выберите изображение', 'error');
+                    this.showToast(i18n.selectImage, 'error');
                     event.target.value = '';
                     return;
                 }
@@ -725,7 +791,7 @@ document.addEventListener('alpine:init', function() {
 
         async handlePhotoUpload() {
             if (!this.photoFile) {
-                this.showToast('Пожалуйста, выберите изображение', 'error');
+                this.showToast(i18n.selectImage, 'error');
                 return;
             }
 
@@ -752,7 +818,7 @@ document.addEventListener('alpine:init', function() {
                         this.markerMetrics = result.marker_metadata;
                         this.normalizeMarkerMetrics();
                     }
-                    this.showToast('Фото успешно загружено', 'success');
+                    this.showToast(i18n.photoUploaded, 'success');
                     this.showPhotoUploadDialog = false;
                     this.photoFile = null;
                     if (this.$refs.photoFileInput) {
@@ -760,12 +826,12 @@ document.addEventListener('alpine:init', function() {
                     }
                 } else {
                     const errorData = await response.json().catch(() => ({ detail: 'Unknown error' }));
-                    const errorMessage = errorData.detail || errorData.message || 'Не удалось загрузить фото';
+                    const errorMessage = errorData.detail || errorData.message || i18n.uploadPhotoFailed;
                     this.showToast(errorMessage, 'error');
                     console.error('Photo upload failed:', errorData);
                 }
             } catch (error) {
-                this.showToast('Не удалось загрузить фото: ' + (error.message || 'неизвестная ошибка'), 'error');
+                this.showToast(i18n.uploadPhotoFailed + ': ' + (error.message || i18n.unknownError), 'error');
                 console.error('Photo upload error:', error);
             } finally {
                 this.uploadingPhoto = false;
@@ -776,7 +842,7 @@ document.addEventListener('alpine:init', function() {
             const file = event.target.files[0];
             if (file) {
                 if (!file.type.startsWith('image/')) {
-                    this.showToast('Пожалуйста, выберите изображение', 'error');
+                    this.showToast(i18n.selectImage, 'error');
                     event.target.value = '';
                     return;
                 }
@@ -788,7 +854,7 @@ document.addEventListener('alpine:init', function() {
             const file = event.target.files[0];
             if (file) {
                 if (!file.type.startsWith('video/')) {
-                    this.showToast('Пожалуйста, выберите файл маркера', 'error');
+                    this.showToast(i18n.selectMarkerFile, 'error');
                     event.target.value = '';
                     return;
                 }
@@ -816,7 +882,7 @@ document.addEventListener('alpine:init', function() {
 
                 if (!response.ok) {
                     const errorData = await response.json().catch(() => ({ detail: 'Unknown error' }));
-                    const errorMessage = errorData.detail || errorData.message || 'Не удалось обновить фото';
+                    const errorMessage = errorData.detail || errorData.message || i18n.updatePhotoFailed;
                     this.showToast(errorMessage, 'error');
                     console.error('Photo replace failed:', errorData);
                     return false;
@@ -835,10 +901,10 @@ document.addEventListener('alpine:init', function() {
                 if (this.$refs.replacePhotoInput) {
                     this.$refs.replacePhotoInput.value = '';
                 }
-                this.showToast('Фото обновлено', 'success');
+                this.showToast(i18n.photoUpdated, 'success');
                 return true;
             } catch (error) {
-                this.showToast('Не удалось обновить фото: ' + (error.message || 'неизвестная ошибка'), 'error');
+                this.showToast(i18n.updatePhotoFailed + ': ' + (error.message || i18n.unknownError), 'error');
                 console.error('Photo replace error:', error);
                 return false;
             } finally {
@@ -866,7 +932,7 @@ document.addEventListener('alpine:init', function() {
 
                 if (!response.ok) {
                     const errorData = await response.json().catch(() => ({ detail: 'Unknown error' }));
-                    const errorMessage = errorData.detail || errorData.message || 'Не удалось обновить маркер';
+                    const errorMessage = errorData.detail || errorData.message || i18n.updateMarkerFailed;
                     this.showToast(errorMessage, 'error');
                     console.error('Video replace failed:', errorData);
                     return false;
@@ -879,10 +945,10 @@ document.addEventListener('alpine:init', function() {
                 if (this.$refs.replaceVideoInput) {
                     this.$refs.replaceVideoInput.value = '';
                 }
-                this.showToast('Видео обновлено', 'success');
+                this.showToast(i18n.videoUpdatedShort, 'success');
                 return true;
             } catch (error) {
-                this.showToast('Не удалось обновить видео: ' + (error.message || 'неизвестная ошибка'), 'error');
+                this.showToast(i18n.saveVideoFailed + ': ' + (error.message || i18n.unknownError), 'error');
                 console.error('Video replace error:', error);
                 return false;
             } finally {
@@ -901,10 +967,10 @@ document.addEventListener('alpine:init', function() {
                 }
 
                 if (!photoUpdated && !videoUpdated && !this.regenerateOnSave) {
-                    this.showToast('Нет изменений для сохранения', 'info');
+                    this.showToast(i18n.noChanges, 'info');
                 }
             } catch (error) {
-                this.showToast('Не удалось сохранить изменения', 'error');
+                this.showToast(i18n.saveChangesFailed, 'error');
                 console.error('Save error:', error);
             } finally {
                 this.saving = false;
@@ -919,13 +985,13 @@ document.addEventListener('alpine:init', function() {
                 });
 
                 if (response.ok) {
-                    this.showToast('AR-контент успешно удалён', 'success');
+                    this.showToast(i18n.arDeleted, 'success');
                     window.location.href = '/ar-content';
                 } else {
                     throw new Error('Delete failed');
                 }
             } catch (error) {
-                this.showToast('Не удалось удалить AR-контент', 'error');
+                this.showToast(i18n.deleteArFailed, 'error');
                 console.error('Delete error:', error);
             } finally {
                 this.deleting = false;
@@ -953,18 +1019,18 @@ document.addEventListener('alpine:init', function() {
         
         getRotationTypeLabel(type) {
             const labels = {
-                'fixed': 'Фиксированное',
-                'date_specific': 'По датам',
-                'daily_cycle': 'Ежедневный цикл',
-                'weekly_cycle': 'Недельный цикл',
-                'random_daily': 'Случайный показ'
+                'fixed': i18n.fixed,
+                'date_specific': i18n.dateSpecific,
+                'daily_cycle': i18n.dailyCycle,
+                'weekly_cycle': i18n.weeklyCycle,
+                'random_daily': i18n.randomDaily
             };
             return labels[type] || type;
         },
         
         getVideoTitle(videoId) {
             const video = this.videos.find(v => v.id === videoId);
-            return video ? (video.title || `Видео ${videoId}`) : `Видео ${videoId}`;
+            return video ? (video.title || `${i18n.videoLabel} ${videoId}`) : `${i18n.videoLabel} ${videoId}`;
         },
         
         formatDateTime(dateStr) {
@@ -1049,15 +1115,15 @@ document.addEventListener('alpine:init', function() {
                 
                 if (!response.ok) {
                     const errorData = await response.json().catch(() => ({}));
-                    throw new Error(errorData.detail || errorData.message || 'Не удалось сохранить расписание');
+                    throw new Error(errorData.detail || errorData.message || i18n.scheduleSaveFailed);
                 }
                 
-                this.showToast('Расписание сохранено', 'success');
+                this.showToast(i18n.scheduleSaved, 'success');
                 this.showRotationScheduleDialog = false;
                 
                 setTimeout(() => { window.location.reload(); }, 800);
             } catch (error) {
-                this.showToast('Ошибка: ' + error.message, 'error');
+                this.showToast(i18n.errorPrefix + error.message, 'error');
                 console.error('Rotation schedule save error:', error);
             } finally {
                 this.savingRotationSchedule = false;
@@ -1065,7 +1131,7 @@ document.addEventListener('alpine:init', function() {
         },
         
         async deleteRotationSchedule() {
-            if (!this.rotationSchedule || !confirm('Удалить расписание видео?')) {
+            if (!this.rotationSchedule || !confirm(i18n.deleteScheduleConfirm)) {
                 return;
             }
             
@@ -1076,13 +1142,13 @@ document.addEventListener('alpine:init', function() {
                 
                 if (!response.ok) {
                     const errorData = await response.json().catch(() => ({}));
-                    throw new Error(errorData.detail || errorData.message || 'Не удалось удалить расписание');
+                    throw new Error(errorData.detail || errorData.message || i18n.deleteScheduleFailed);
                 }
                 
-                this.showToast('Расписание удалено', 'success');
+                this.showToast(i18n.scheduleDeleted, 'success');
                 setTimeout(() => { window.location.reload(); }, 800);
             } catch (error) {
-                this.showToast('Ошибка: ' + error.message, 'error');
+                this.showToast(i18n.errorPrefix + error.message, 'error');
                 console.error('Rotation schedule delete error:', error);
             }
         }
@@ -1097,13 +1163,13 @@ document.addEventListener('alpine:init', function() {
 
     store.getActiveVideoSourceLabel = function() {
         const source = this.activeVideoInfo?.source;
-        if (source === 'schedule') return 'Источник: расписание';
-        if (source === 'date_rule') return 'Источник: правило по дате';
-        if (source === 'rotation_rule') return 'Источник: правило ротации';
-        if (source === 'rotation') return 'Источник: ротация';
-        if (source === 'active_default') return 'Источник: видео по умолчанию';
-        if (source === 'fallback') return 'Источник: резервное видео';
-        return this.activeVideo ? 'Источник: активное видео' : '';
+        if (source === 'schedule') return i18n.activeVideoSchedule;
+        if (source === 'date_rule') return i18n.activeVideoDateRule;
+        if (source === 'rotation_rule') return i18n.activeVideoRotationRule;
+        if (source === 'rotation') return i18n.activeVideoRotation;
+        if (source === 'active_default') return i18n.activeVideoDefault;
+        if (source === 'fallback') return i18n.activeVideoFallback;
+        return this.activeVideo ? i18n.activeVideoActive : '';
     };
 
     store.normalizeDateRules = function(rules) {
@@ -1134,8 +1200,8 @@ document.addEventListener('alpine:init', function() {
         if (!Array.isArray(rules) || !rules.length) return '-';
         const parts = rules.slice(0, 3).map(rule => {
             const date = rule?.date ? String(rule.date).slice(0, 10) : '-';
-            const title = rule?.video_id ? this.getVideoTitle(Number(rule.video_id)) : 'Видео не выбрано';
-            return `${date}: ${title}${rule?.recurring ? ' (ежегодно)' : ''}`;
+            const title = rule?.video_id ? this.getVideoTitle(Number(rule.video_id)) : i18n.videoNotSelected;
+            return `${date}: ${title}${rule?.recurring ? i18n.recurringSuffix : ''}`;
         });
         if (rules.length > 3) parts.push(`+${rules.length - 3}`);
         return parts.join(', ');
@@ -1176,7 +1242,7 @@ document.addEventListener('alpine:init', function() {
                     }))
                     .filter(rule => rule.date && rule.video_id);
                 if (!payload.date_rules.length) {
-                    this.showToast('Добавьте хотя бы одно правило по дате', 'error');
+                    this.showToast(i18n.addDateRule, 'error');
                     return;
                 }
             } else {
@@ -1208,14 +1274,14 @@ document.addEventListener('alpine:init', function() {
 
             if (!response.ok) {
                 const errorData = await response.json().catch(() => ({}));
-                throw new Error(errorData.detail || errorData.message || 'Не удалось сохранить расписание');
+                throw new Error(errorData.detail || errorData.message || i18n.scheduleSaveFailed);
             }
 
-            this.showToast('Расписание сохранено', 'success');
+            this.showToast(i18n.scheduleSaved, 'success');
             this.showRotationScheduleDialog = false;
             setTimeout(() => { window.location.reload(); }, 800);
         } catch (error) {
-            this.showToast('Ошибка: ' + error.message, 'error');
+            this.showToast(i18n.errorPrefix + error.message, 'error');
             console.error('Rotation schedule save error:', error);
         } finally {
             this.savingRotationSchedule = false;
@@ -1245,7 +1311,7 @@ document.addEventListener('alpine:init', function() {
         <details class="cursor-pointer">
             <summary class="text-sm font-medium text-gray-700 dark:text-gray-300 flex items-center gap-2">
                 <span class="material-icons text-base">bug_report</span>
-                Техническая информация
+                {{ "Technical information" if is_en else "Техническая информация" }}
             </summary>
             <div class="mt-4 grid grid-cols-2 md:grid-cols-4 gap-4 text-xs">
                 <div><span class="font-medium text-gray-600 dark:text-gray-400">Storage:</span><br><span class="text-gray-900 dark:text-white break-all">{{ debug_info.storage_path or '—' }}</span></div>

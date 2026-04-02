@@ -1,12 +1,14 @@
+{% set is_en = request.state.locale == "en" %}
+
 <section id="how-it-works" class="mb-10">
     <h2 class="text-xl font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
         <span class="material-icons text-indigo-500">architecture</span>
-        Как работает платформа
+        {{ "How the platform works" if is_en else "Как работает платформа" }}
     </h2>
     <div class="prose dark:prose-invert max-w-none text-gray-700 dark:text-gray-300 space-y-3">
-        <p><strong>Шаг 1.</strong> Администратор создаёт компанию, затем проект и карточку AR-контента.</p>
-        <p><strong>Шаг 2.</strong> В карточку загружаются фото-маркер, превью и одно или несколько видео. После сохранения система формирует публичную ссылку и QR-код.</p>
-        <p><strong>Шаг 3.</strong> Пользователь открывает ссылку или сканирует QR-код в мобильном приложении, наводит камеру на маркер и видит AR-контент поверх изображения.</p>
-        <p><strong>Шаг 4.</strong> Если для карточки настроено несколько видео, можно использовать ручной выбор, расписание или ротацию без перевыпуска ссылки и QR-кода.</p>
+        <p>{% if is_en %}<strong>Step 1.</strong> The administrator creates a company, then a project, and then an AR content card.{% else %}<strong>Шаг 1.</strong> Администратор создаёт компанию, затем проект и карточку AR-контента.{% endif %}</p>
+        <p>{% if is_en %}<strong>Step 2.</strong> The card receives a marker photo, preview, and one or several videos. After saving, the system generates a public link and QR code.{% else %}<strong>Шаг 2.</strong> В карточку загружаются фото-маркер, превью и одно или несколько видео. После сохранения система формирует публичную ссылку и QR-код.{% endif %}</p>
+        <p>{% if is_en %}<strong>Step 3.</strong> The user opens the link or scans the QR code in the mobile app, points the camera at the marker, and sees AR content over the image.{% else %}<strong>Шаг 3.</strong> Пользователь открывает ссылку или сканирует QR-код в мобильном приложении, наводит камеру на маркер и видит AR-контент поверх изображения.{% endif %}</p>
+        <p>{% if is_en %}<strong>Step 4.</strong> If several videos are attached, manual switching, schedule rules, or rotation can be used without changing the public link and QR code.{% else %}<strong>Шаг 4.</strong> Если для карточки настроено несколько видео, можно использовать ручной выбор, расписание или ротацию без перевыпуска ссылки и QR-кода.{% endif %}</p>
     </div>
 </section>

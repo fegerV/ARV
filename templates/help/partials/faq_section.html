@@ -1,25 +1,26 @@
-﻿<section id="faq" class="mb-10">
+{% set is_en = request.state.locale == "en" %}
+
+<section id="faq" class="mb-10">
     <h2 class="text-xl font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
         <span class="material-icons text-blue-500">help</span>
-        Частые вопросы (FAQ)
+        {{ "Frequently asked questions (FAQ)" if is_en else "Частые вопросы (FAQ)" }}
     </h2>
     <div class="space-y-6">
         <div class="border-l-4 border-indigo-500 pl-4">
-            <h3 class="font-medium text-gray-900 dark:text-white">Как пользователь открывает AR?</h3>
-            <p class="text-sm text-gray-600 dark:text-gray-400 mt-1">По ссылке или QR-коду в приложении Portal AR, затем наводит камеру на распечатанный маркер.</p>
+            <h3 class="font-medium text-gray-900 dark:text-white">{{ "How does a user open AR?" if is_en else "Как пользователь открывает AR?" }}</h3>
+            <p class="text-sm text-gray-600 dark:text-gray-400 mt-1">{% if is_en %}By opening the link or QR code in the Portal AR app and then pointing the camera at the printed marker.{% else %}По ссылке или QR-коду в приложении Portal AR, затем наводит камеру на распечатанный маркер.{% endif %}</p>
         </div>
         <div class="border-l-4 border-indigo-500 pl-4">
-            <h3 class="font-medium text-gray-900 dark:text-white">Почему AR не запускается?</h3>
-            <p class="text-sm text-gray-600 dark:text-gray-400 mt-1">Проверьте поддержку ARCore и качество изображения маркера.</p>
+            <h3 class="font-medium text-gray-900 dark:text-white">{{ "Why does AR not start?" if is_en else "Почему AR не запускается?" }}</h3>
+            <p class="text-sm text-gray-600 dark:text-gray-400 mt-1">{% if is_en %}Check ARCore support and marker image quality.{% else %}Проверьте поддержку ARCore и качество изображения маркера.{% endif %}</p>
         </div>
         <div class="border-l-4 border-indigo-500 pl-4">
-            <h3 class="font-medium text-gray-900 dark:text-white">Как обновить видео без смены QR?</h3>
-            <p class="text-sm text-gray-600 dark:text-gray-400 mt-1">Добавьте несколько видео в один AR-контент и используйте ротацию.</p>
+            <h3 class="font-medium text-gray-900 dark:text-white">{{ "How do I update a video without changing the QR code?" if is_en else "Как обновить видео без смены QR?" }}</h3>
+            <p class="text-sm text-gray-600 dark:text-gray-400 mt-1">{% if is_en %}Add several videos to one AR content item and use rotation or schedule rules.{% else %}Добавьте несколько видео в один AR-контент и используйте ротацию.{% endif %}</p>
         </div>
         <div class="border-l-4 border-indigo-500 pl-4">
-            <h3 class="font-medium text-gray-900 dark:text-white">Куда приходят уведомления?</h3>
-            <p class="text-sm text-gray-600 dark:text-gray-400 mt-1">В Email и Telegram, если эти каналы настроены в разделе «Настройки».</p>
+            <h3 class="font-medium text-gray-900 dark:text-white">{{ "Where are notifications delivered?" if is_en else "Куда приходят уведомления?" }}</h3>
+            <p class="text-sm text-gray-600 dark:text-gray-400 mt-1">{% if is_en %}To Email and Telegram if these channels are configured in Settings.{% else %}В Email и Telegram, если эти каналы настроены в разделе «Настройки».{% endif %}</p>
         </div>
     </div>
 </section>
-

@@ -1,11 +1,13 @@
+{% set is_en = request.state.locale == "en" %}
+
 <section id="analytics" class="mb-10">
     <h2 class="text-xl font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
         <span class="material-icons text-cyan-500">analytics</span>
-        Аналитика
+        {{ "Analytics" if is_en else "Аналитика" }}
     </h2>
     <div class="space-y-3 text-gray-700 dark:text-gray-300">
-        <p>Раздел <code class="text-sm bg-gray-100 dark:bg-gray-700 px-1 rounded">/analytics</code> показывает просмотры, устройства, популярный контент и статистику по компаниям.</p>
-        <p>Через фильтр периода можно оценивать активность за последние 7, 30, 90 дней или за всё время.</p>
-        <p>Аналитика полезна для понимания того, какие проекты и материалы реально используются конечными пользователями.</p>
+        <p>{% if is_en %}The <code class="text-sm bg-gray-100 dark:bg-gray-700 px-1 rounded">/analytics</code> section shows views, devices, top content, and company statistics.{% else %}Раздел <code class="text-sm bg-gray-100 dark:bg-gray-700 px-1 rounded">/analytics</code> показывает просмотры, устройства, популярный контент и статистику по компаниям.{% endif %}</p>
+        <p>{% if is_en %}Use the period filter to evaluate activity for the last 7, 30, 90 days or for all time.{% else %}Через фильтр периода можно оценивать активность за последние 7, 30, 90 дней или за всё время.{% endif %}</p>
+        <p>{% if is_en %}Analytics helps understand which projects and materials are actually used by end users.{% else %}Аналитика полезна для понимания того, какие проекты и материалы реально используются конечными пользователями.{% endif %}</p>
     </div>
 </section>

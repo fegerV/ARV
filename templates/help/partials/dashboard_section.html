@@ -1,15 +1,16 @@
-﻿<section id="dashboard" class="mb-10">
+{% set is_en = request.state.locale == "en" %}
+
+<section id="dashboard" class="mb-10">
     <h2 class="text-xl font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
         <span class="material-icons text-blue-500">dashboard</span>
-        Главная (дашборд)
+        {{ "Dashboard" if is_en else "Главная (дашборд)" }}
     </h2>
     <div class="space-y-3 text-gray-700 dark:text-gray-300">
-        <p>По адресу <code class="text-sm bg-gray-100 dark:bg-gray-700 px-1 rounded">/admin</code> отображается сводная страница:</p>
+        <p>{% if is_en %}The summary page is available at <code class="text-sm bg-gray-100 dark:bg-gray-700 px-1 rounded">/admin</code>.{% else %}По адресу <code class="text-sm bg-gray-100 dark:bg-gray-700 px-1 rounded">/admin</code> отображается сводная страница.{% endif %}</p>
         <ul class="list-disc list-inside space-y-1">
-            <li><strong>Карточки статистики:</strong> количество компаний, проектов, AR-контента и просмотров с переходом в соответствующие разделы.</li>
-            <li><strong>Быстрые действия:</strong> ссылки на создание компании, проекта, AR-контента и переход к ключевым административным разделам.</li>
-            <li><strong>Недавний AR-контент:</strong> список последних записей с быстрым переходом в карточку заказа.</li>
+            <li>{% if is_en %}<strong>Stats cards:</strong> company, project, AR content, and view counters with direct links.{% else %}<strong>Карточки статистики:</strong> количество компаний, проектов, AR-контента и просмотров с переходом в соответствующие разделы.{% endif %}</li>
+            <li>{% if is_en %}<strong>Quick actions:</strong> shortcuts for creating companies, projects, AR content, and opening key admin pages.{% else %}<strong>Быстрые действия:</strong> ссылки на создание компании, проекта, AR-контента и переход к ключевым административным разделам.{% endif %}</li>
+            <li>{% if is_en %}<strong>Recent AR content:</strong> latest records with a quick jump to the order page.{% else %}<strong>Недавний AR-контент:</strong> список последних записей с быстрым переходом в карточку заказа.{% endif %}</li>
         </ul>
     </div>
 </section>
-

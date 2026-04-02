@@ -1,66 +1,45 @@
-<div x-show="showVideoPlayerDialog"
-     @click.self="closeVideoPlayer()"
-     @keydown.escape.window="closeVideoPlayer()"
-     class="fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-4"
-     x-cloak>
+{% set is_en = request.state.locale == "en" %}
+
+<div x-show="showVideoPlayerDialog" @click.self="closeVideoPlayer()" @keydown.escape.window="closeVideoPlayer()" class="fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-4" x-cloak>
     <div class="relative max-w-4xl w-full">
-        <button @click="closeVideoPlayer()"
-                class="absolute -top-10 right-0 z-10 text-white hover:text-gray-300">
+        <button @click="closeVideoPlayer()" class="absolute -top-10 right-0 z-10 text-white hover:text-gray-300">
             <span class="material-icons text-3xl">close</span>
         </button>
         <template x-if="videoPlayerUrl">
-            <video :src="videoPlayerUrl"
-                   controls autoplay
-                   class="w-full max-h-[85vh] rounded-lg shadow-2xl bg-black">
-            </video>
+            <video :src="videoPlayerUrl" controls autoplay class="w-full max-h-[85vh] rounded-lg shadow-2xl bg-black"></video>
         </template>
     </div>
 </div>
 
-<div x-show="showPortraitLightbox"
-     @click.self="showPortraitLightbox = false"
-     @keydown.escape.window="showPortraitLightbox = false"
-     class="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4"
-     x-cloak>
+<div x-show="showPortraitLightbox" @click.self="showPortraitLightbox = false" @keydown.escape.window="showPortraitLightbox = false" class="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4" x-cloak>
     <div class="relative max-w-4xl w-full flex items-center justify-center">
-        <button @click="showPortraitLightbox = false"
-                class="absolute top-4 right-4 z-10 text-white hover:text-gray-300">
+        <button @click="showPortraitLightbox = false" class="absolute top-4 right-4 z-10 text-white hover:text-gray-300">
             <span class="material-icons text-3xl">close</span>
         </button>
         <template x-if="portraitFullUrl || portraitUrl">
-            <img :src="portraitFullUrl || portraitUrl"
-                 alt="Portrait"
-                 class="max-w-full max-h-[90vh] object-contain rounded-lg shadow-2xl">
+            <img :src="portraitFullUrl || portraitUrl" alt="Portrait" class="max-w-full max-h-[90vh] object-contain rounded-lg shadow-2xl">
         </template>
         <template x-if="!portraitFullUrl && !portraitUrl">
             <div class="w-full h-64 flex items-center justify-center text-white">
                 <div class="text-center">
                     <span class="material-icons text-4xl mb-2">image</span>
-                    <p>Портрет не загружен</p>
+                    <p>{{ "Portrait not uploaded" if is_en else "Портрет не загружен" }}</p>
                 </div>
             </div>
         </template>
     </div>
 </div>
 
-<div x-show="showQRDialog"
-     @click.self="showQRDialog = false"
-     @keydown.escape.window="showQRDialog = false"
-     class="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4"
-     x-cloak>
+<div x-show="showQRDialog" @click.self="showQRDialog = false" @keydown.escape.window="showQRDialog = false" class="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4" x-cloak>
     <div class="relative bg-white dark:bg-gray-800 rounded-lg p-6 max-w-lg w-full">
-        <button @click="showQRDialog = false"
-                class="absolute top-4 right-4 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200">
+        <button @click="showQRDialog = false" class="absolute top-4 right-4 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200">
             <span class="material-icons">close</span>
         </button>
-        <h3 class="text-lg font-medium text-gray-900 dark:text-white mb-4">QR-код</h3>
+        <h3 class="text-lg font-medium text-gray-900 dark:text-white mb-4">{{ "QR code" if is_en else "QR-код" }}</h3>
         <div class="text-center mb-4">
             <div class="bg-white p-4 rounded-lg inline-block">
                 <canvas x-ref="qrCanvas" class="hidden"></canvas>
-                <img :src="qrCodeUrl(200)"
-                     :alt="'QR Code for ' + arContent.order_number"
-                     loading="lazy"
-                     class="mx-auto">
+                <img :src="qrCodeUrl(200)" :alt="'QR Code for ' + arContent.order_number" loading="lazy" class="mx-auto">
             </div>
             <p class="mt-2 text-sm text-gray-600 dark:text-gray-400" x-text="fullArUrl || '—'"></p>
         </div>
@@ -68,171 +47,129 @@
         <div class="flex flex-col sm:flex-row gap-2">
             <button @click="downloadQR('png')" :disabled="downloadingQR" class="btn btn-primary">
                 <span class="material-icons mr-2">download</span>
-                <span x-show="!downloadingQR">Скачать PNG</span>
-                <span x-show="downloadingQR">Загрузка...</span>
+                <span x-show="!downloadingQR">{{ "Download PNG" if is_en else "Скачать PNG" }}</span>
+                <span x-show="downloadingQR">{{ "Loading..." if is_en else "Загрузка..." }}</span>
             </button>
             <button @click="downloadQR('svg')" :disabled="downloadingQR" class="btn btn-secondary">
                 <span class="material-icons mr-2">download</span>
-                <span x-show="!downloadingQR">Скачать SVG</span>
-                <span x-show="downloadingQR">Загрузка...</span>
+                <span x-show="!downloadingQR">{{ "Download SVG" if is_en else "Скачать SVG" }}</span>
+                <span x-show="downloadingQR">{{ "Loading..." if is_en else "Загрузка..." }}</span>
             </button>
             <button @click="downloadQR('pdf')" :disabled="downloadingQR" class="btn btn-secondary">
                 <span class="material-icons mr-2">download</span>
-                <span x-show="!downloadingQR">Скачать PDF</span>
-                <span x-show="downloadingQR">Загрузка...</span>
+                <span x-show="!downloadingQR">{{ "Download PDF" if is_en else "Скачать PDF" }}</span>
+                <span x-show="downloadingQR">{{ "Loading..." if is_en else "Загрузка..." }}</span>
             </button>
         </div>
     </div>
 </div>
 
-<div x-show="showUploadDialog"
-     @click.self="showUploadDialog = false"
-     @keydown.escape.window="showUploadDialog = false"
-     class="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4"
-     x-cloak>
+<div x-show="showUploadDialog" @click.self="showUploadDialog = false" @keydown.escape.window="showUploadDialog = false" class="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4" x-cloak>
     <div class="relative bg-white dark:bg-gray-800 rounded-lg p-6 max-w-lg w-full">
-        <button @click="showUploadDialog = false"
-                class="absolute top-4 right-4 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200">
+        <button @click="showUploadDialog = false" class="absolute top-4 right-4 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200">
             <span class="material-icons">close</span>
         </button>
-        <h3 class="text-lg font-medium text-gray-900 dark:text-white mb-4">Загрузить видео</h3>
+        <h3 class="text-lg font-medium text-gray-900 dark:text-white mb-4">{{ "Upload video" if is_en else "Загрузить видео" }}</h3>
         <form @submit.prevent="handleVideoUpload">
             <div class="mb-4">
-                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Выберите файлы
-                </label>
-                <input type="file"
-                       accept="video/*"
-                       multiple
-                       @change="handleVideoFileChange"
-                       x-ref="videoFileInput"
-                       class="form-input w-full">
-                <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                    Поддерживаются форматы: MP4, WebM, MOV
-                </p>
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">{{ "Choose files" if is_en else "Выберите файлы" }}</label>
+                <input type="file" accept="video/*" multiple @change="handleVideoFileChange" x-ref="videoFileInput" class="form-input w-full">
+                <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ "Supported formats: MP4, WebM, MOV" if is_en else "Поддерживаются форматы: MP4, WebM, MOV" }}</p>
             </div>
-
             <div class="flex gap-2">
                 <button type="submit" :disabled="!videoFiles.length || uploadingVideo" class="btn btn-primary flex-1">
                     <span class="material-icons mr-2" x-show="!uploadingVideo">upload</span>
                     <span class="material-icons mr-2 animate-spin" x-show="uploadingVideo">refresh</span>
-                    <span x-show="!uploadingVideo">Загрузить</span>
-                    <span x-show="uploadingVideo">Загрузка...</span>
+                    <span x-show="!uploadingVideo">{{ "Upload" if is_en else "Загрузить" }}</span>
+                    <span x-show="uploadingVideo">{{ "Loading..." if is_en else "Загрузка..." }}</span>
                 </button>
-                <button type="button" @click="showUploadDialog = false" class="btn btn-secondary">
-                    Отмена
-                </button>
+                <button type="button" @click="showUploadDialog = false" class="btn btn-secondary">{{ "Cancel" if is_en else "Отмена" }}</button>
             </div>
         </form>
     </div>
 </div>
 
-<div x-show="showPhotoUploadDialog"
-     @click.self="showPhotoUploadDialog = false"
-     @keydown.escape.window="showPhotoUploadDialog = false"
-     class="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4"
-     x-cloak>
+<div x-show="showPhotoUploadDialog" @click.self="showPhotoUploadDialog = false" @keydown.escape.window="showPhotoUploadDialog = false" class="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4" x-cloak>
     <div class="relative bg-white dark:bg-gray-800 rounded-lg p-6 max-w-lg w-full">
-        <button @click="showPhotoUploadDialog = false"
-                class="absolute top-4 right-4 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200">
+        <button @click="showPhotoUploadDialog = false" class="absolute top-4 right-4 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200">
             <span class="material-icons">close</span>
         </button>
-        <h3 class="text-lg font-medium text-gray-900 dark:text-white mb-4">Загрузить портрет</h3>
+        <h3 class="text-lg font-medium text-gray-900 dark:text-white mb-4">{{ "Upload portrait" if is_en else "Загрузить портрет" }}</h3>
         <form @submit.prevent="handlePhotoUpload">
             <div class="mb-4">
-                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Выберите изображение
-                </label>
-                <input type="file"
-                       accept="image/*"
-                       @change="handlePhotoFileChange"
-                       x-ref="photoFileInput"
-                       class="form-input w-full">
-                <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                    Поддерживаются форматы: JPG, PNG
-                </p>
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">{{ "Choose image" if is_en else "Выберите изображение" }}</label>
+                <input type="file" accept="image/*" @change="handlePhotoFileChange" x-ref="photoFileInput" class="form-input w-full">
+                <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ "Supported formats: JPG, PNG" if is_en else "Поддерживаются форматы: JPG, PNG" }}</p>
             </div>
-
             <div class="flex gap-2">
                 <button type="submit" :disabled="!photoFile || uploadingPhoto" class="btn btn-primary flex-1">
                     <span class="material-icons mr-2" x-show="!uploadingPhoto">upload</span>
                     <span class="material-icons mr-2 animate-spin" x-show="uploadingPhoto">refresh</span>
-                    <span x-show="!uploadingPhoto">Загрузить</span>
-                    <span x-show="uploadingPhoto">Загрузка...</span>
+                    <span x-show="!uploadingPhoto">{{ "Upload" if is_en else "Загрузить" }}</span>
+                    <span x-show="uploadingPhoto">{{ "Loading..." if is_en else "Загрузка..." }}</span>
                 </button>
-                <button type="button" @click="showPhotoUploadDialog = false" class="btn btn-secondary">
-                    Отмена
-                </button>
+                <button type="button" @click="showPhotoUploadDialog = false" class="btn btn-secondary">{{ "Cancel" if is_en else "Отмена" }}</button>
             </div>
         </form>
     </div>
 </div>
 
-<div x-show="showDeleteVideoDialog"
-     @click.self="showDeleteVideoDialog = false"
-     @keydown.escape.window="showDeleteVideoDialog = false"
-     class="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4"
-     x-cloak>
+<div x-show="showDeleteVideoDialog" @click.self="showDeleteVideoDialog = false" @keydown.escape.window="showDeleteVideoDialog = false" class="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4" x-cloak>
     <div class="relative bg-white dark:bg-gray-800 rounded-lg p-6 max-w-md w-full">
-        <button @click="showDeleteVideoDialog = false"
-                class="absolute top-4 right-4 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200">
+        <button @click="showDeleteVideoDialog = false" class="absolute top-4 right-4 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200">
             <span class="material-icons">close</span>
         </button>
         <div class="text-center mb-4">
             <div class="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-red-100 dark:bg-red-900 mb-4">
                 <span class="material-icons text-red-600 dark:text-red-400">videocam_off</span>
             </div>
-            <h3 class="text-lg font-medium text-gray-900 dark:text-white mb-2">Удалить видео</h3>
+            <h3 class="text-lg font-medium text-gray-900 dark:text-white mb-2">{{ "Delete video" if is_en else "Удалить видео" }}</h3>
             <p class="text-sm text-gray-600 dark:text-gray-400">
-                Вы уверены, что хотите удалить видео
-                <strong x-text="videoToDelete?.title || 'Видео'"></strong>?
-                Это действие нельзя отменить.
+                {% if is_en %}
+                Are you sure you want to delete video <strong x-text="videoToDelete?.title || 'Video'"></strong>? This action cannot be undone.
+                {% else %}
+                Вы уверены, что хотите удалить видео <strong x-text="videoToDelete?.title || 'Видео'"></strong>? Это действие нельзя отменить.
+                {% endif %}
             </p>
         </div>
         <div class="flex gap-2">
             <button @click="deleteVideo()" :disabled="deletingVideo" class="btn btn-danger flex-1">
                 <span class="material-icons mr-2" x-show="!deletingVideo">delete</span>
                 <span class="material-icons mr-2 animate-spin" x-show="deletingVideo">refresh</span>
-                <span x-show="!deletingVideo">Удалить</span>
-                <span x-show="deletingVideo">Удаление...</span>
+                <span x-show="!deletingVideo">{{ "Delete" if is_en else "Удалить" }}</span>
+                <span x-show="deletingVideo">{{ "Deleting..." if is_en else "Удаление..." }}</span>
             </button>
-            <button @click="showDeleteVideoDialog = false" class="btn btn-secondary flex-1">Отмена</button>
+            <button @click="showDeleteVideoDialog = false" class="btn btn-secondary flex-1">{{ "Cancel" if is_en else "Отмена" }}</button>
         </div>
     </div>
 </div>
 
-<div x-show="showDeleteDialog"
-     @click.self="showDeleteDialog = false"
-     @keydown.escape.window="showDeleteDialog = false"
-     class="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4"
-     x-cloak>
+<div x-show="showDeleteDialog" @click.self="showDeleteDialog = false" @keydown.escape.window="showDeleteDialog = false" class="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4" x-cloak>
     <div class="relative bg-white dark:bg-gray-800 rounded-lg p-6 max-w-lg w-full">
-        <button @click="showDeleteDialog = false"
-                class="absolute top-4 right-4 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200">
+        <button @click="showDeleteDialog = false" class="absolute top-4 right-4 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200">
             <span class="material-icons">close</span>
         </button>
         <div class="text-center mb-4">
             <div class="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-red-100 dark:bg-red-900 mb-4">
                 <span class="material-icons text-red-600 dark:text-red-400">warning</span>
             </div>
-            <h3 class="text-lg font-medium text-gray-900 dark:text-white mb-2">
-                Удалить AR контент
-            </h3>
+            <h3 class="text-lg font-medium text-gray-900 dark:text-white mb-2">{{ "Delete AR content" if is_en else "Удалить AR контент" }}</h3>
             <p class="text-sm text-gray-600 dark:text-gray-400">
-                <span>Вы уверены, что хотите удалить заказ <span x-text="arContent.order_number"></span>? Это действие нельзя отменить.</span>
+                {% if is_en %}
+                Are you sure you want to delete order <span x-text="arContent.order_number"></span>? This action cannot be undone.
+                {% else %}
+                Вы уверены, что хотите удалить заказ <span x-text="arContent.order_number"></span>? Это действие нельзя отменить.
+                {% endif %}
             </p>
         </div>
-
         <div class="flex gap-2">
             <button @click="handleDelete" :disabled="deleting" class="btn btn-danger flex-1">
                 <span class="material-icons mr-2" x-show="!deleting">delete</span>
                 <span class="material-icons mr-2 animate-spin" x-show="deleting">refresh</span>
-                <span x-show="!deleting">Удалить</span>
-                <span x-show="deleting">Удаление...</span>
+                <span x-show="!deleting">{{ "Delete" if is_en else "Удалить" }}</span>
+                <span x-show="deleting">{{ "Deleting..." if is_en else "Удаление..." }}</span>
             </button>
-            <button @click="showDeleteDialog = false" class="btn btn-secondary">
-                Отмена
-            </button>
+            <button @click="showDeleteDialog = false" class="btn btn-secondary">{{ "Cancel" if is_en else "Отмена" }}</button>
         </div>
     </div>
 </div>

@@ -1,33 +1,33 @@
 <div class="px-4 py-6 sm:px-6 space-y-6">
     <div>
         <label for="name" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-            Название проекта
+            {{ "Project name" if request.state.locale == "en" else "Название проекта" }}
             <span class="text-red-500">*</span>
         </label>
         <input type="text"
                name="name"
                id="name"
                value="{% if project %}{{ project.name }}{% endif %}"
-               placeholder="Например, AR Furniture Catalog"
+               placeholder="{{ 'For example, AR Furniture Catalog' if request.state.locale == 'en' else 'Например, AR Furniture Catalog' }}"
                class="form-input w-full border border-gray-300 dark:border-gray-600 rounded-lg px-4 py-2"
                required
                minlength="3"
                maxlength="100">
         <p class="mt-1.5 text-xs text-gray-500 dark:text-gray-400">
-            Укажите понятное и описательное название проекта
+            {{ "Use a clear and descriptive project name" if request.state.locale == "en" else "Укажите понятное и описательное название проекта" }}
         </p>
     </div>
 
     <div>
         <label for="company_id" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-            Компания
+            {{ "Company" if request.state.locale == "en" else "Компания" }}
             <span class="text-red-500">*</span>
         </label>
         <select name="company_id"
                 id="company_id"
                 class="form-select w-full border border-gray-300 dark:border-gray-600 rounded-lg px-4 py-2"
                 required>
-            <option value="">-- Выберите компанию --</option>
+            <option value="">{{ "-- Select company --" if request.state.locale == "en" else "-- Выберите компанию --" }}</option>
             {% for company in companies %}
             <option value="{{ company.id }}"
                     {% if project and project.company_id == company.id %}selected{% endif %}>
@@ -36,13 +36,13 @@
             {% endfor %}
         </select>
         <p class="mt-1.5 text-xs text-gray-500 dark:text-gray-400">
-            Выберите организацию, к которой относится проект
+            {{ "Choose the organization this project belongs to" if request.state.locale == "en" else "Выберите организацию, к которой относится проект" }}
         </p>
     </div>
 
     <div>
         <label for="status" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-            Статус
+            {{ "Status" if request.state.locale == "en" else "Статус" }}
         </label>
         <div class="flex gap-4">
             <label class="flex items-center">
@@ -51,7 +51,7 @@
                        value="active"
                        {% if not project or project.status == 'active' %}checked{% endif %}
                        class="w-4 h-4 text-indigo-600 dark:text-indigo-400">
-                <span class="ml-2 text-sm text-gray-700 dark:text-gray-300">Активен</span>
+                <span class="ml-2 text-sm text-gray-700 dark:text-gray-300">{{ "Active" if request.state.locale == "en" else "Активен" }}</span>
             </label>
             <label class="flex items-center">
                 <input type="radio"
@@ -59,7 +59,7 @@
                        value="inactive"
                        {% if project and project.status == 'inactive' %}checked{% endif %}
                        class="w-4 h-4 text-indigo-600 dark:text-indigo-400">
-                <span class="ml-2 text-sm text-gray-700 dark:text-gray-300">Неактивен</span>
+                <span class="ml-2 text-sm text-gray-700 dark:text-gray-300">{{ "Inactive" if request.state.locale == "en" else "Неактивен" }}</span>
             </label>
             <label class="flex items-center">
                 <input type="radio"
@@ -67,26 +67,26 @@
                        value="archived"
                        {% if project and project.status == 'archived' %}checked{% endif %}
                        class="w-4 h-4 text-indigo-600 dark:text-indigo-400">
-                <span class="ml-2 text-sm text-gray-700 dark:text-gray-300">Архивный</span>
+                <span class="ml-2 text-sm text-gray-700 dark:text-gray-300">{{ "Archived" if request.state.locale == "en" else "Архивный" }}</span>
             </label>
         </div>
         <p class="mt-1.5 text-xs text-gray-500 dark:text-gray-400">
-            Определяет, используется ли проект в работе
+            {{ "Controls whether the project is used in active work" if request.state.locale == "en" else "Определяет, используется ли проект в работе" }}
         </p>
     </div>
 
     <div>
         <label for="description" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-            Описание
+            {{ "Description" if request.state.locale == "en" else "Описание" }}
         </label>
         <textarea name="description"
                   id="description"
                   rows="4"
-                  placeholder="Добавьте заметки о проекте, его назначении или особых требованиях..."
+                  placeholder="{{ 'Add notes about the project, its purpose, or special requirements...' if request.state.locale == 'en' else 'Добавьте заметки о проекте, его назначении или особых требованиях...' }}"
                   class="form-input w-full border border-gray-300 dark:border-gray-600 rounded-lg px-4 py-2 resize-vertical"
                   maxlength="500"></textarea>
         <p class="mt-1.5 text-xs text-gray-500 dark:text-gray-400">
-            Необязательно: укажите дополнительные сведения о проекте
+            {{ "Optional: provide additional details about the project" if request.state.locale == "en" else "Необязательно: укажите дополнительные сведения о проекте" }}
         </p>
     </div>
 </div>

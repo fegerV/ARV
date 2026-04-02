@@ -1,15 +1,17 @@
+{% set is_en = request.state.locale == "en" %}
+
 <section id="video-schedule-rotation" class="mb-10">
     <h2 class="text-xl font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
         <span class="material-icons text-violet-500">schedule</span>
-        Видео и ротация
+        {{ "Video and rotation" if is_en else "Видео и ротация" }}
     </h2>
     <div class="space-y-3 text-gray-700 dark:text-gray-300">
-        <p>Для одной карточки AR-контента можно хранить несколько видео и управлять тем, какое из них считается активным.</p>
+        <p>{% if is_en %}A single AR content card can store several videos and control which one is considered active.{% else %}Для одной карточки AR-контента можно хранить несколько видео и управлять тем, какое из них считается активным.{% endif %}</p>
         <ul class="list-disc list-inside space-y-1">
-            <li><strong>Ручной режим:</strong> активное видео выбирается вручную.</li>
-            <li><strong>Расписание:</strong> ролики переключаются по датам и интервалам времени.</li>
-            <li><strong>Ротация:</strong> видео меняются без изменения публичной ссылки и QR-кода.</li>
+            <li>{% if is_en %}<strong>Manual mode:</strong> the active video is selected manually.{% else %}<strong>Ручной режим:</strong> активное видео выбирается вручную.{% endif %}</li>
+            <li>{% if is_en %}<strong>Schedule:</strong> videos switch by dates and time intervals.{% else %}<strong>Расписание:</strong> ролики переключаются по датам и интервалам времени.{% endif %}</li>
+            <li>{% if is_en %}<strong>Rotation:</strong> videos change without updating the public link and QR code.{% else %}<strong>Ротация:</strong> видео меняются без изменения публичной ссылки и QR-кода.{% endif %}</li>
         </ul>
-        <p>Это позволяет запускать сезонные или этапные кампании без пересоздания материалов для пользователя.</p>
+        <p>{% if is_en %}This makes seasonal or staged campaigns possible without recreating user-facing materials.{% else %}Это позволяет запускать сезонные или этапные кампании без пересоздания пользовательских материалов.{% endif %}</p>
     </div>
 </section>

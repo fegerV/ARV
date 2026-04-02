@@ -2,9 +2,8 @@
     <div class="flex gap-3">
         <span class="material-icons text-blue-600 dark:text-blue-400 flex-shrink-0">info</span>
         <div class="text-sm text-blue-800 dark:text-blue-200">
-            <p class="font-medium">О проектах</p>
-            <p class="mt-1">Проекты помогают структурировать AR-контент и привязать его к конкретным компаниям. В одном проекте может быть несколько AR-сценариев и единиц контента.</p>
+            <p class="font-medium">{{ "About projects" if request.state.locale == "en" else "О проектах" }}</p>
+            <p class="mt-1">{{ "Projects help organize AR content and tie it to specific companies. A single project can contain multiple AR scenarios and content items." if request.state.locale == "en" else "Проекты помогают структурировать AR-контент и привязать его к конкретным компаниям. В одном проекте может быть несколько AR-сценариев и единиц контента." }}</p>
         </div>
     </div>
 </div>
-

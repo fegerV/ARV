@@ -1,16 +1,18 @@
+{% set is_en = request.state.locale == "en" %}
+
 <section id="settings" class="mb-10">
     <h2 class="text-xl font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
         <span class="material-icons text-gray-500">settings</span>
-        Настройки
+        {{ "Settings" if is_en else "Настройки" }}
     </h2>
     <div class="space-y-4 text-gray-700 dark:text-gray-300">
-        <p>Раздел <code class="text-sm bg-gray-100 dark:bg-gray-700 px-1 rounded">/settings</code> объединяет ключевые параметры платформы.</p>
+        <p>{% if is_en %}The <code class="text-sm bg-gray-100 dark:bg-gray-700 px-1 rounded">/settings</code> section combines the key platform parameters.{% else %}Раздел <code class="text-sm bg-gray-100 dark:bg-gray-700 px-1 rounded">/settings</code> объединяет ключевые параметры платформы.{% endif %}</p>
         <ul class="list-disc list-inside space-y-1">
-            <li><strong>Общие:</strong> название, email администратора, язык и режим обслуживания.</li>
-            <li><strong>Безопасность:</strong> длина пароля, время сессии, лимиты входа и 2FA.</li>
-            <li><strong>AR-контент:</strong> качество превью, срок жизни контента и тема viewer.</li>
-            <li><strong>Уведомления:</strong> SMTP, Telegram-бот и системные алерты.</li>
-            <li><strong>Хранение и бэкапы:</strong> CDN, ограничения файлов и резервные копии.</li>
+            <li>{% if is_en %}<strong>General:</strong> project name, admin email, language, and maintenance mode.{% else %}<strong>Общие:</strong> название, email администратора, язык и режим обслуживания.{% endif %}</li>
+            <li>{% if is_en %}<strong>Security:</strong> password length, session lifetime, login limits, and 2FA.{% else %}<strong>Безопасность:</strong> длина пароля, время сессии, лимиты входа и 2FA.{% endif %}</li>
+            <li>{% if is_en %}<strong>AR content:</strong> preview quality, content lifetime, and viewer theme.{% else %}<strong>AR-контент:</strong> качество превью, срок жизни контента и тема viewer.{% endif %}</li>
+            <li>{% if is_en %}<strong>Notifications:</strong> SMTP, Telegram bot, and system alerts.{% else %}<strong>Уведомления:</strong> SMTP, Telegram-бот и системные алерты.{% endif %}</li>
+            <li>{% if is_en %}<strong>Storage and backups:</strong> CDN, file limits, and reserve copies.{% else %}<strong>Хранение и бэкапы:</strong> CDN, ограничения файлов и резервные копии.{% endif %}</li>
         </ul>
     </div>
 </section>

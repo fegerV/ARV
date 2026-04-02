@@ -12,15 +12,15 @@
             <div>
                 <h3 class="text-lg leading-6 font-medium text-gray-900 dark:text-white">{{ project.name }}</h3>
                 <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                    Информация о проекте и управление
+                    {{ "Project details and management" if request.state.locale == "en" else "Информация о проекте и управление" }}
                 </p>
             </div>
             <div class="flex space-x-2">
                 <a href="/projects/{{ project.id }}/edit" class="btn btn-primary">
-                    <span class="material-icons mr-2">edit</span> Редактировать
+                    <span class="material-icons mr-2">edit</span> {{ "Edit" if request.state.locale == "en" else "Редактировать" }}
                 </a>
                 <a href="/projects" class="btn btn-secondary">
-                    <span class="material-icons mr-2">arrow_back</span> Назад
+                    <span class="material-icons mr-2">arrow_back</span> {{ "Back" if request.state.locale == "en" else "Назад" }}
                 </a>
             </div>
         </div>
@@ -29,22 +29,22 @@
     <div class="px-4 py-5 sm:p-6">
         <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
-                <h4 class="text-md font-medium text-gray-900 dark:text-white mb-4">Информация о проекте</h4>
+                <h4 class="text-md font-medium text-gray-900 dark:text-white mb-4">{{ "Project information" if request.state.locale == "en" else "Информация о проекте" }}</h4>
                 <dl class="grid grid-cols-1 gap-x-4 gap-y-8 sm:grid-cols-2">
                     <div class="sm:col-span-1">
                         <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">ID</dt>
                         <dd class="mt-1 text-sm text-gray-900 dark:text-white">{{ project.id }}</dd>
                     </div>
                     <div class="sm:col-span-1">
-                        <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">Название</dt>
+                        <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">{{ "Name" if request.state.locale == "en" else "Название" }}</dt>
                         <dd class="mt-1 text-sm text-gray-900 dark:text-white">{{ project.name }}</dd>
                     </div>
                     <div class="sm:col-span-1">
-                        <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">Компания</dt>
+                        <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">{{ "Company" if request.state.locale == "en" else "Компания" }}</dt>
                         <dd class="mt-1 text-sm text-gray-900 dark:text-white">{{ project.company_name or '—' }}</dd>
                     </div>
                     <div class="sm:col-span-1">
-                        <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">Статус</dt>
+                        <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">{{ "Status" if request.state.locale == "en" else "Статус" }}</dt>
                         <dd class="mt-1 text-sm">
                             <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full
                                 {% if project.status == 'active' %}bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-100{% else %}bg-gray-100 text-gray-800 dark:bg-gray-900/40 dark:text-gray-100{% endif %}">
@@ -53,17 +53,17 @@
                         </dd>
                     </div>
                     <div class="sm:col-span-1">
-                        <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">Создан</dt>
+                        <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">{{ "Created" if request.state.locale == "en" else "Создан" }}</dt>
                         <dd class="mt-1 text-sm text-gray-900 dark:text-white">{{ project.created_at|datetime_format if project.created_at else '—' }}</dd>
                     </div>
                 </dl>
             </div>
             
             <div>
-                <h4 class="text-md font-medium text-gray-900 dark:text-white mb-4">Статистика</h4>
+                <h4 class="text-md font-medium text-gray-900 dark:text-white mb-4">{{ "Statistics" if request.state.locale == "en" else "Статистика" }}</h4>
                 <dl class="grid grid-cols-1 gap-x-4 gap-y-8 sm:grid-cols-2">
                     <div class="sm:col-span-1">
-                        <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">AR-контент</dt>
+                        <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">{{ "AR content" if request.state.locale == "en" else "AR-контент" }}</dt>
                         <dd class="mt-1 text-sm text-gray-900 dark:text-white">{{ project.ar_content_count or 0 }}</dd>
                     </div>
                 </dl>
@@ -72,13 +72,12 @@
     </div>
 </div>
 
-<!-- AR Content Section -->
 <div class="card p-0 overflow-hidden">
     <div class="px-4 py-5 sm:px-6 border-b border-gray-200 dark:border-gray-700">
         <div class="flex justify-between items-center">
-            <h3 class="text-lg leading-6 font-medium text-gray-900 dark:text-white">AR-контент</h3>
+            <h3 class="text-lg leading-6 font-medium text-gray-900 dark:text-white">{{ "AR content" if request.state.locale == "en" else "AR-контент" }}</h3>
             <a href="/ar-content/new?project_id={{ project.id }}" class="btn btn-primary">
-                <span class="material-icons mr-2">add</span> Новый AR-контент
+                <span class="material-icons mr-2">add</span> {{ "New AR content" if request.state.locale == "en" else "Новый AR-контент" }}
             </a>
         </div>
     </div>
@@ -89,11 +88,11 @@
             <table class="table">
                 <thead>
                     <tr>
-                        <th>Номер заказа</th>
-                        <th>Статус</th>
-                        <th>Создан</th>
-                        <th>Просмотры</th>
-                        <th>Действия</th>
+                        <th>{{ "Order #" if request.state.locale == "en" else "Номер заказа" }}</th>
+                        <th>{{ "Status" if request.state.locale == "en" else "Статус" }}</th>
+                        <th>{{ "Created" if request.state.locale == "en" else "Создан" }}</th>
+                        <th>{{ "Views" if request.state.locale == "en" else "Просмотры" }}</th>
+                        <th>{{ "Actions" if request.state.locale == "en" else "Действия" }}</th>
                     </tr>
                 </thead>
                 <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
@@ -132,9 +131,9 @@
         </div>
         {% else %}
         <div class="text-center py-8">
-            <p class="text-gray-500 dark:text-gray-400">Для этого проекта AR-контент пока не создан</p>
+            <p class="text-gray-500 dark:text-gray-400">{{ "No AR content has been created for this project yet" if request.state.locale == "en" else "Для этого проекта AR-контент пока не создан" }}</p>
             <a href="/ar-content/new?project_id={{ project.id }}" class="btn btn-primary mt-4">
-                Создать AR-контент
+                {{ "Create AR content" if request.state.locale == "en" else "Создать AR-контент" }}
             </a>
         </div>
         {% endif %}

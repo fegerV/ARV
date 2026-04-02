@@ -1,15 +1,14 @@
 {% extends "base.html" %}
 
-{% block title %}Панель управления - Vertex AR Admin{% endblock %}
+{% set is_en = request.state.locale == "en" %}
 
-{% block page_title %}Панель управления{% endblock %}
+{% block title %}{{ "Dashboard" if is_en else "Панель управления" }} - Vertex AR Admin{% endblock %}
+{% block page_title %}{{ "Dashboard" if is_en else "Панель управления" }}{% endblock %}
 
 {% block body %}
 <div class="p-6">
     <div class="max-w-7xl mx-auto">
-        <!-- Statistics Cards -->
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
-            <!-- Companies -->
             <a href="/companies" class="bg-white dark:bg-gray-900 rounded-lg shadow p-6 hover:shadow-lg transition-shadow">
                 <div class="flex items-center">
                     <div class="p-3 rounded-full bg-blue-100 dark:bg-blue-900 text-blue-500 dark:text-blue-300 mr-4">
@@ -18,14 +17,12 @@
                         </svg>
                     </div>
                     <div class="flex-1">
-                        <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Компании</p>
+                        <p class="text-sm font-medium text-gray-500 dark:text-gray-400">{{ "Companies" if is_en else "Компании" }}</p>
                         <p class="text-2xl font-semibold text-gray-900 dark:text-white">{{ total_companies }}</p>
-                        <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">{{ active_companies }} активных</p>
+                        <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">{{ active_companies }} {{ "active" if is_en else "активных" }}</p>
                     </div>
                 </div>
             </a>
-            
-            <!-- Projects -->
             <a href="/projects" class="bg-white dark:bg-gray-900 rounded-lg shadow p-6 hover:shadow-lg transition-shadow">
                 <div class="flex items-center">
                     <div class="p-3 rounded-full bg-green-100 dark:bg-green-900 text-green-500 dark:text-green-300 mr-4">
@@ -34,14 +31,12 @@
                         </svg>
                     </div>
                     <div class="flex-1">
-                        <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Проекты</p>
+                        <p class="text-sm font-medium text-gray-500 dark:text-gray-400">{{ "Projects" if is_en else "Проекты" }}</p>
                         <p class="text-2xl font-semibold text-gray-900 dark:text-white">{{ total_projects }}</p>
-                        <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">{{ active_projects }} активных</p>
+                        <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">{{ active_projects }} {{ "active" if is_en else "активных" }}</p>
                     </div>
                 </div>
             </a>
-            
-            <!-- AR Content -->
             <a href="/ar-content" class="bg-white dark:bg-gray-900 rounded-lg shadow p-6 hover:shadow-lg transition-shadow">
                 <div class="flex items-center">
                     <div class="p-3 rounded-full bg-purple-100 dark:bg-purple-900 text-purple-500 dark:text-purple-300 mr-4">
@@ -50,14 +45,12 @@
                         </svg>
                     </div>
                     <div class="flex-1">
-                        <p class="text-sm font-medium text-gray-500 dark:text-gray-400">AR-контент</p>
+                        <p class="text-sm font-medium text-gray-500 dark:text-gray-400">{{ "AR content" if is_en else "AR-контент" }}</p>
                         <p class="text-2xl font-semibold text-gray-900 dark:text-white">{{ total_ar_content }}</p>
-                        <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">{{ active_ar_content }} активных</p>
+                        <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">{{ active_ar_content }} {{ "active" if is_en else "активных" }}</p>
                     </div>
                 </div>
             </a>
-            
-            <!-- Total Views -->
             <a href="/analytics" class="bg-white dark:bg-gray-900 rounded-lg shadow p-6 hover:shadow-lg transition-shadow">
                 <div class="flex items-center">
                     <div class="p-3 rounded-full bg-yellow-100 dark:bg-yellow-900 text-yellow-500 dark:text-yellow-300 mr-4">
@@ -67,76 +60,31 @@
                         </svg>
                     </div>
                     <div class="flex-1">
-                        <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Всего просмотров</p>
+                        <p class="text-sm font-medium text-gray-500 dark:text-gray-400">{{ "Total views" if is_en else "Всего просмотров" }}</p>
                         <p class="text-2xl font-semibold text-gray-900 dark:text-white">{{ total_views }}</p>
-                        <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">{{ views_30d }} за 30 дней</p>
+                        <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">{{ views_30d }} {{ "in 30 days" if is_en else "за 30 дней" }}</p>
                     </div>
                 </div>
             </a>
         </div>
-    
-        <!-- Main Content Grid -->
+
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <!-- Quick Actions -->
             <div class="bg-white dark:bg-gray-900 rounded-lg shadow p-6">
-                <h2 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Быстрые действия</h2>
+                <h2 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">{{ "Quick actions" if is_en else "Быстрые действия" }}</h2>
                 <div class="space-y-3">
-                    <a href="/companies/create" class="block w-full px-4 py-2 text-left text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded transition-colors">
-                        <span class="flex items-center">
-                            <svg class="h-5 w-5 mr-2 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
-                            </svg>
-                            Создать компанию
-                        </span>
-                    </a>
-                    <a href="/projects/create" class="block w-full px-4 py-2 text-left text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded transition-colors">
-                        <span class="flex items-center">
-                            <svg class="h-5 w-5 mr-2 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
-                            </svg>
-                            Создать проект
-                        </span>
-                    </a>
-                    <a href="/ar-content/create" class="block w-full px-4 py-2 text-left text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded transition-colors">
-                        <span class="flex items-center">
-                            <svg class="h-5 w-5 mr-2 text-purple-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
-                            </svg>
-                            Создать AR-контент
-                        </span>
-                    </a>
-                    <a href="/analytics" class="block w-full px-4 py-2 text-left text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded transition-colors">
-                        <span class="flex items-center">
-                            <svg class="h-5 w-5 mr-2 text-yellow-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                            </svg>
-                            Перейти к аналитике
-                        </span>
-                    </a>
-                    <a href="/storage" class="block w-full px-4 py-2 text-left text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded transition-colors">
-                        <span class="flex items-center">
-                            <svg class="h-5 w-5 mr-2 text-indigo-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 1.79 4 4 4h8c2.21 0 4-1.79 4-4V7c0-2.21-1.79-4-4-4H8c-2.21 0-4 1.79-4 4z" />
-                            </svg>
-                            Открыть хранилище
-                        </span>
-                    </a>
-                    <a href="/notifications" class="block w-full px-4 py-2 text-left text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded transition-colors">
-                        <span class="flex items-center">
-                            <svg class="h-5 w-5 mr-2 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
-                            </svg>
-                            Уведомления
-                        </span>
-                    </a>
+                    <a href="/companies/create" class="block w-full px-4 py-2 text-left text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded transition-colors">{{ "Создать компанию" if not is_en else "Create company" }}</a>
+                    <a href="/projects/create" class="block w-full px-4 py-2 text-left text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded transition-colors">{{ "Создать проект" if not is_en else "Create project" }}</a>
+                    <a href="/ar-content/create" class="block w-full px-4 py-2 text-left text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded transition-colors">{{ "Создать AR-контент" if not is_en else "Create AR content" }}</a>
+                    <a href="/analytics" class="block w-full px-4 py-2 text-left text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded transition-colors">{{ "Перейти к аналитике" if not is_en else "Open analytics" }}</a>
+                    <a href="/storage" class="block w-full px-4 py-2 text-left text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded transition-colors">{{ "Открыть хранилище" if not is_en else "Open storage" }}</a>
+                    <a href="/notifications" class="block w-full px-4 py-2 text-left text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded transition-colors">{{ "Уведомления" if not is_en else "Notifications" }}</a>
                 </div>
             </div>
-        
-            <!-- Recent AR Content -->
+
             <div class="bg-white dark:bg-gray-900 rounded-lg shadow p-6">
                 <div class="flex items-center justify-between mb-4">
-                    <h2 class="text-lg font-semibold text-gray-900 dark:text-white">Последний AR-контент</h2>
-                    <a href="/ar-content" class="text-sm text-indigo-600 hover:text-indigo-900 dark:text-indigo-400">Все</a>
+                    <h2 class="text-lg font-semibold text-gray-900 dark:text-white">{{ "Recent AR content" if is_en else "Последний AR-контент" }}</h2>
+                    <a href="/ar-content" class="text-sm text-indigo-600 hover:text-indigo-900 dark:text-indigo-400">{{ "All" if is_en else "Все" }}</a>
                 </div>
                 {% if recent_content|length > 0 %}
                 <div class="space-y-3">
@@ -145,28 +93,21 @@
                         <div class="flex items-center justify-between">
                             <div class="flex-1">
                                 <p class="text-sm font-medium text-gray-900 dark:text-white">{{ content.order_number }}</p>
-                                <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                                    {{ content.created_at|datetime_format }}
-                                </p>
+                                <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">{{ content.created_at|datetime_format }}</p>
                             </div>
                             <div class="flex items-center space-x-4">
-                                <span class="px-2 py-1 text-xs rounded {% if content.status == 'active' or content.status == 'ready' %}bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200{% else %}bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300{% endif %}">
-                                    {{ content.status }}
-                                </span>
-                                <span class="text-xs text-gray-500 dark:text-gray-400">
-                                    {{ content.views_count }} views
-                                </span>
+                                <span class="px-2 py-1 text-xs rounded {% if content.status == 'active' or content.status == 'ready' %}bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200{% else %}bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300{% endif %}">{{ content.status }}</span>
+                                <span class="text-xs text-gray-500 dark:text-gray-400">{{ content.views_count }} {{ "views" if is_en else "просмотров" }}</span>
                             </div>
                         </div>
                     </a>
                     {% endfor %}
                 </div>
                 {% else %}
-                <p class="text-sm text-gray-500 dark:text-gray-400 text-center py-4">AR-контент пока не создан</p>
+                <p class="text-sm text-gray-500 dark:text-gray-400 text-center py-4">{{ "No AR content yet" if is_en else "AR-контент пока не создан" }}</p>
                 {% endif %}
             </div>
         </div>
     </div>
 </div>
 {% endblock %}
-

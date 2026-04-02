@@ -1,20 +1,20 @@
+{% set is_en = request.state.locale == "en" %}
+
 <div class="card p-5 mb-6"
      x-show="markerMetrics.file_size_bytes || markerMetrics.features_count || (markerMetrics.image_quality && markerMetrics.image_quality.recognition_probability != null) || (markerMetrics.quality_level && markerMetrics.quality_level !== 'unknown')">
     <div class="flex items-center justify-between mb-4 pb-3 border-b border-gray-200 dark:border-gray-700">
         <div class="flex items-center gap-2">
             <span class="material-icons text-teal-600 dark:text-teal-400">qr_code_2</span>
-            <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Маркер и качество</h3>
+            <h3 class="text-lg font-semibold text-gray-900 dark:text-white">{{ "Marker and quality" if is_en else "Маркер и качество" }}</h3>
         </div>
         <div class="flex items-center gap-2">
             <a :href="arContent.marker_url" target="_blank" class="btn btn-secondary text-sm px-3 py-1.5" x-show="arContent.marker_url">
-                <span class="material-icons text-sm mr-1">download</span>Скачать
+                <span class="material-icons text-sm mr-1">download</span>{{ "Download" if is_en else "Скачать" }}
             </a>
-            <button @click="regenerateMedia()"
-                    :disabled="regeneratingMedia"
-                    class="btn btn-primary text-sm px-3 py-1.5">
+            <button @click="regenerateMedia()" :disabled="regeneratingMedia" class="btn btn-primary text-sm px-3 py-1.5">
                 <span class="material-icons text-sm mr-1" x-show="!regeneratingMedia">auto_fix_high</span>
                 <span class="material-icons text-sm mr-1 animate-spin" x-show="regeneratingMedia">refresh</span>
-                <span x-show="!regeneratingMedia">Обновить</span>
+                <span x-show="!regeneratingMedia">{{ "Refresh" if is_en else "Обновить" }}</span>
                 <span x-show="regeneratingMedia">...</span>
             </button>
         </div>
@@ -34,29 +34,30 @@
                           'text-yellow-600 dark:text-yellow-400': markerMetrics.quality_level === 'fair',
                           'text-red-600 dark:text-red-400': markerMetrics.quality_level === 'poor',
                       }"
-                      x-text="markerMetrics.quality_level === 'good' ? 'check_circle' : markerMetrics.quality_level === 'fair' ? 'warning' : 'error'">
-                </span>
+                      x-text="markerMetrics.quality_level === 'good' ? 'check_circle' : markerMetrics.quality_level === 'fair' ? 'warning' : 'error'"></span>
                 <span class="font-semibold text-sm"
                       :class="{
                           'text-green-800 dark:text-green-300': markerMetrics.quality_level === 'good',
                           'text-yellow-800 dark:text-yellow-300': markerMetrics.quality_level === 'fair',
                           'text-red-800 dark:text-red-300': markerMetrics.quality_level === 'poor',
                       }"
-                      x-text="markerMetrics.quality_level === 'good' ? 'Отличное изображение для AR-распознавания' : markerMetrics.quality_level === 'fair' ? 'Хорошее изображение, но его можно улучшить' : 'Качество изображения низкое, лучше заменить файл'">
-                </span>
+                      x-text="markerMetrics.quality_level === 'good'
+                        ? '{{ "Excellent image for AR recognition" if is_en else "Отличное изображение для AR-распознавания" }}'
+                        : markerMetrics.quality_level === 'fair'
+                          ? '{{ "Good image, but it can be improved" if is_en else "Хорошее изображение, но его можно улучшить" }}'
+                          : '{{ "Image quality is low, it is better to replace the file" if is_en else "Качество изображения низкое, лучше заменить файл" }}'"></span>
             </div>
 
             <div class="mb-3" x-show="markerMetrics.image_quality?.recognition_probability != null">
                 <div class="flex items-center justify-between text-xs mb-1">
-                    <span class="text-gray-600 dark:text-gray-400">Вероятность распознавания</span>
+                    <span class="text-gray-600 dark:text-gray-400">{{ "Recognition probability" if is_en else "Вероятность распознавания" }}</span>
                     <span class="font-semibold"
                           :class="{
                               'text-green-700 dark:text-green-300': markerMetrics.quality_level === 'good',
                               'text-yellow-700 dark:text-yellow-300': markerMetrics.quality_level === 'fair',
                               'text-red-700 dark:text-red-300': markerMetrics.quality_level === 'poor',
                           }"
-                          x-text="formatPercent(markerMetrics.image_quality?.recognition_probability)">
-                    </span>
+                          x-text="formatPercent(markerMetrics.image_quality?.recognition_probability)"></span>
                 </div>
                 <div class="w-full h-2.5 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
                     <div class="h-full rounded-full transition-all duration-500"
@@ -65,8 +66,7 @@
                              'bg-yellow-500': markerMetrics.quality_level === 'fair',
                              'bg-red-500': markerMetrics.quality_level === 'poor',
                          }"
-                         :style="'width:' + Math.round((markerMetrics.image_quality?.recognition_probability || 0) * 100) + '%'">
-                    </div>
+                         :style="'width:' + Math.round((markerMetrics.image_quality?.recognition_probability || 0) * 100) + '%'"></div>
                 </div>
             </div>
 
@@ -104,27 +104,27 @@
 
     <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
         <div class="bg-gray-50 dark:bg-gray-700/50 p-3 rounded-lg" x-show="markerMetrics.image_quality?.contrast != null">
-            <div class="text-xs font-medium text-gray-500 dark:text-gray-400 mb-0.5">Контраст</div>
+            <div class="text-xs font-medium text-gray-500 dark:text-gray-400 mb-0.5">{{ "Contrast" if is_en else "Контраст" }}</div>
             <div class="text-sm font-semibold text-gray-900 dark:text-white" x-text="formatScore(markerMetrics.image_quality?.contrast)"></div>
         </div>
         <div class="bg-gray-50 dark:bg-gray-700/50 p-3 rounded-lg" x-show="markerMetrics.image_quality?.sharpness != null">
-            <div class="text-xs font-medium text-gray-500 dark:text-gray-400 mb-0.5">Резкость</div>
+            <div class="text-xs font-medium text-gray-500 dark:text-gray-400 mb-0.5">{{ "Sharpness" if is_en else "Резкость" }}</div>
             <div class="text-sm font-semibold text-gray-900 dark:text-white" x-text="formatScore(markerMetrics.image_quality?.sharpness)"></div>
         </div>
         <div class="bg-gray-50 dark:bg-gray-700/50 p-3 rounded-lg" x-show="markerMetrics.image_quality?.brightness != null">
-            <div class="text-xs font-medium text-gray-500 dark:text-gray-400 mb-0.5">Яркость</div>
+            <div class="text-xs font-medium text-gray-500 dark:text-gray-400 mb-0.5">{{ "Brightness" if is_en else "Яркость" }}</div>
             <div class="text-sm font-semibold text-gray-900 dark:text-white" x-text="formatScore(markerMetrics.image_quality?.brightness)"></div>
         </div>
         <div class="bg-gray-50 dark:bg-gray-700/50 p-3 rounded-lg" x-show="markerMetrics.image_quality?.edge_density != null">
-            <div class="text-xs font-medium text-gray-500 dark:text-gray-400 mb-0.5">Плотность границ</div>
+            <div class="text-xs font-medium text-gray-500 dark:text-gray-400 mb-0.5">{{ "Edge density" if is_en else "Плотность границ" }}</div>
             <div class="text-sm font-semibold text-gray-900 dark:text-white" x-text="formatScore(markerMetrics.image_quality?.edge_density)"></div>
         </div>
         <div class="bg-gray-50 dark:bg-gray-700/50 p-3 rounded-lg" x-show="markerMetrics.file_size_bytes">
-            <div class="text-xs font-medium text-gray-500 dark:text-gray-400 mb-0.5">Размер файла</div>
+            <div class="text-xs font-medium text-gray-500 dark:text-gray-400 mb-0.5">{{ "File size" if is_en else "Размер файла" }}</div>
             <div class="text-sm font-semibold text-gray-900 dark:text-white" x-text="formatBytes(markerMetrics.file_size_bytes)"></div>
         </div>
         <div class="bg-gray-50 dark:bg-gray-700/50 p-3 rounded-lg" x-show="markerMetrics.generation_time_seconds">
-            <div class="text-xs font-medium text-gray-500 dark:text-gray-400 mb-0.5">Генерация</div>
+            <div class="text-xs font-medium text-gray-500 dark:text-gray-400 mb-0.5">{{ "Generation" if is_en else "Генерация" }}</div>
             <div class="text-sm font-semibold text-gray-900 dark:text-white" x-text="formatSeconds(markerMetrics.generation_time_seconds)"></div>
         </div>
         <div class="bg-gray-50 dark:bg-gray-700/50 p-3 rounded-lg" x-show="markerMetrics.features_count">
@@ -132,13 +132,13 @@
             <div class="text-sm font-semibold text-gray-900 dark:text-white" x-text="markerMetrics.features_count"></div>
         </div>
         <div class="bg-gray-50 dark:bg-gray-700/50 p-3 rounded-lg" x-show="markerMetrics.features_density">
-            <div class="text-xs font-medium text-gray-500 dark:text-gray-400 mb-0.5">Плотность features</div>
+            <div class="text-xs font-medium text-gray-500 dark:text-gray-400 mb-0.5">{{ "Feature density" if is_en else "Плотность features" }}</div>
             <div class="text-sm font-semibold text-gray-900 dark:text-white" x-text="formatDensity(markerMetrics.features_density)"></div>
         </div>
     </div>
 
     <div x-show="!markerMetrics.file_size_bytes && !markerMetrics.features_count && (!markerMetrics.image_quality || markerMetrics.image_quality.recognition_probability == null)" class="text-center py-6 text-gray-400 dark:text-gray-500">
         <span class="material-icons text-3xl mb-2 block">info</span>
-        <p class="text-sm">Метрики маркера появятся после генерации</p>
+        <p class="text-sm">{{ "Marker metrics will appear after generation" if is_en else "Метрики маркера появятся после генерации" }}</p>
     </div>
 </div>

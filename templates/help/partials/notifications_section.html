@@ -1,10 +1,12 @@
+{% set is_en = request.state.locale == "en" %}
+
 <section id="notifications" class="mb-10">
     <h2 class="text-xl font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
         <span class="material-icons text-red-500">notifications</span>
-        Уведомления
+        {{ "Notifications" if is_en else "Уведомления" }}
     </h2>
     <div class="space-y-3 text-gray-700 dark:text-gray-300">
-        <p>Раздел <code class="text-sm bg-gray-100 dark:bg-gray-700 px-1 rounded">/notifications</code> собирает события системы, ошибки, предупреждения и служебные сообщения.</p>
-        <p>На странице настроек можно включить Email и Telegram-каналы, а также выбрать, какие события должны отправляться автоматически.</p>
+        <p>{% if is_en %}The <code class="text-sm bg-gray-100 dark:bg-gray-700 px-1 rounded">/notifications</code> section collects system events, errors, warnings, and service messages.{% else %}Раздел <code class="text-sm bg-gray-100 dark:bg-gray-700 px-1 rounded">/notifications</code> собирает события системы, ошибки, предупреждения и служебные сообщения.{% endif %}</p>
+        <p>{% if is_en %}On the settings page you can enable email and Telegram channels and choose which events should be sent automatically.{% else %}На странице настроек можно включить Email и Telegram-каналы, а также выбрать, какие события должны отправляться автоматически.{% endif %}</p>
     </div>
 </section>

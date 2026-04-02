@@ -15,8 +15,8 @@ def test_projects_form_template_uses_partials():
     assert '{% include "projects/partials/form_actions.html" %}' in template
     assert '{% include "projects/partials/form_info_card.html" %}' in template
 
-    assert "Create New Project" in header
-    assert "Error" in error_alert
+    assert '{{ "New project" if request.state.locale == "en" else "Новый проект" }}' in header
+    assert '{{ "Error" if request.state.locale == "en" else "Ошибка" }}' in error_alert
     assert 'id="company_id"' in fields
-    assert "Back to Projects" in actions
-    assert "Projects organize your AR content" in info_card
+    assert '{{ "Back to projects" if request.state.locale == "en" else "К списку проектов" }}' in actions
+    assert '{{ "About projects" if request.state.locale == "en" else "О проектах" }}' in info_card

@@ -1,21 +1,23 @@
+{% set is_en = request.state.locale == "en" %}
+
 <nav class="mb-10 p-4 bg-gray-50 dark:bg-gray-800/50 rounded-xl border border-gray-200 dark:border-gray-700">
-    <h2 class="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">Содержание</h2>
+    <h2 class="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">{{ "Contents" if is_en else "Содержание" }}</h2>
     <ul class="space-y-1.5 text-sm columns-1 sm:columns-2 gap-4">
-        <li><a href="#intro" class="text-indigo-600 dark:text-indigo-400 hover:underline">Введение</a></li>
-        <li><a href="#how-it-works" class="text-indigo-600 dark:text-indigo-400 hover:underline">Как работает платформа</a></li>
-        <li><a href="#getting-started" class="text-indigo-600 dark:text-indigo-400 hover:underline">С чего начать</a></li>
-        <li><a href="#dashboard" class="text-indigo-600 dark:text-indigo-400 hover:underline">Главная страница</a></li>
-        <li><a href="#companies" class="text-indigo-600 dark:text-indigo-400 hover:underline">Компании</a></li>
-        <li><a href="#projects" class="text-indigo-600 dark:text-indigo-400 hover:underline">Проекты</a></li>
-        <li><a href="#ar-content" class="text-indigo-600 dark:text-indigo-400 hover:underline">AR-контент</a></li>
-        <li><a href="#video-schedule-rotation" class="text-indigo-600 dark:text-indigo-400 hover:underline">Видео и ротация</a></li>
-        <li><a href="#storage" class="text-indigo-600 dark:text-indigo-400 hover:underline">Хранение</a></li>
-        <li><a href="#analytics" class="text-indigo-600 dark:text-indigo-400 hover:underline">Аналитика</a></li>
-        <li><a href="#notifications" class="text-indigo-600 dark:text-indigo-400 hover:underline">Уведомления</a></li>
-        <li><a href="#settings" class="text-indigo-600 dark:text-indigo-400 hover:underline">Настройки</a></li>
-        <li><a href="#backups" class="text-indigo-600 dark:text-indigo-400 hover:underline">Резервные копии</a></li>
-        <li><a href="#tips" class="text-indigo-600 dark:text-indigo-400 hover:underline">Практические советы</a></li>
+        <li><a href="#intro" class="text-indigo-600 dark:text-indigo-400 hover:underline">{{ "Introduction" if is_en else "Введение" }}</a></li>
+        <li><a href="#how-it-works" class="text-indigo-600 dark:text-indigo-400 hover:underline">{{ "How the platform works" if is_en else "Как работает платформа" }}</a></li>
+        <li><a href="#getting-started" class="text-indigo-600 dark:text-indigo-400 hover:underline">{{ "Getting started" if is_en else "С чего начать" }}</a></li>
+        <li><a href="#dashboard" class="text-indigo-600 dark:text-indigo-400 hover:underline">{{ "Dashboard" if is_en else "Главная страница" }}</a></li>
+        <li><a href="#companies" class="text-indigo-600 dark:text-indigo-400 hover:underline">{{ "Companies" if is_en else "Компании" }}</a></li>
+        <li><a href="#projects" class="text-indigo-600 dark:text-indigo-400 hover:underline">{{ "Projects" if is_en else "Проекты" }}</a></li>
+        <li><a href="#ar-content" class="text-indigo-600 dark:text-indigo-400 hover:underline">{{ "AR content" if is_en else "AR-контент" }}</a></li>
+        <li><a href="#video-schedule-rotation" class="text-indigo-600 dark:text-indigo-400 hover:underline">{{ "Video and rotation" if is_en else "Видео и ротация" }}</a></li>
+        <li><a href="#storage" class="text-indigo-600 dark:text-indigo-400 hover:underline">{{ "Storage" if is_en else "Хранение" }}</a></li>
+        <li><a href="#analytics" class="text-indigo-600 dark:text-indigo-400 hover:underline">{{ "Analytics" if is_en else "Аналитика" }}</a></li>
+        <li><a href="#notifications" class="text-indigo-600 dark:text-indigo-400 hover:underline">{{ "Notifications" if is_en else "Уведомления" }}</a></li>
+        <li><a href="#settings" class="text-indigo-600 dark:text-indigo-400 hover:underline">{{ "Settings" if is_en else "Настройки" }}</a></li>
+        <li><a href="#backups" class="text-indigo-600 dark:text-indigo-400 hover:underline">{{ "Backups" if is_en else "Резервные копии" }}</a></li>
+        <li><a href="#tips" class="text-indigo-600 dark:text-indigo-400 hover:underline">{{ "Practical tips" if is_en else "Практические советы" }}</a></li>
         <li><a href="#faq" class="text-indigo-600 dark:text-indigo-400 hover:underline">FAQ</a></li>
-        <li><a href="#contacts" class="text-indigo-600 dark:text-indigo-400 hover:underline">Контакты</a></li>
+        <li><a href="#contacts" class="text-indigo-600 dark:text-indigo-400 hover:underline">{{ "Contacts" if is_en else "Контакты" }}</a></li>
     </ul>
 </nav>

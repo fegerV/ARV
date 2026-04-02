@@ -1,15 +1,21 @@
+{% set is_en = request.state.locale == "en" %}
+
 <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6 pb-4 border-b border-gray-200 dark:border-gray-700">
     <div class="flex-1">
         <div class="flex items-center gap-2 mb-2">
             <span class="material-icons text-red-600 dark:text-red-400">videocam</span>
-            <h3 class="text-xl font-semibold text-gray-900 dark:text-white">Управление видео</h3>
+            <h3 class="text-xl font-semibold text-gray-900 dark:text-white">{{ "Video management" if is_en else "Управление видео" }}</h3>
         </div>
         <p class="text-sm text-gray-600 dark:text-gray-400">
+            {% if is_en %}
+            All videos linked to this order are shown here. The same QR code can lead to different videos depending on playback mode and schedule.
+            {% else %}
             Здесь отображаются все ролики, привязанные к заказу. Один и тот же QR-код может вести на разные видео в зависимости от выбранного режима показа и расписания.
+            {% endif %}
         </p>
     </div>
     <button @click="showUploadDialog = true" class="btn btn-primary">
-        <span class="material-icons mr-2">add</span>Загрузить видео
+        <span class="material-icons mr-2">add</span>{{ "Upload video" if is_en else "Загрузить видео" }}
     </button>
 </div>
 
@@ -17,32 +23,30 @@
     <div class="flex flex-col md:flex-row md:items-end gap-4">
         <div class="flex-1">
             <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
-                <span class="material-icons text-sm align-middle mr-1">settings</span>Режим воспроизведения
+                <span class="material-icons text-sm align-middle mr-1">settings</span>{{ "Playback mode" if is_en else "Режим воспроизведения" }}
             </label>
             <select x-model="playbackMode" class="form-input w-full">
-                <option value="manual">Ручной</option>
-                <option value="sequential">По очереди</option>
-                <option value="cyclic">По кругу</option>
+                <option value="manual">{{ "Manual" if is_en else "Ручной" }}</option>
+                <option value="sequential">{{ "Sequential" if is_en else "По очереди" }}</option>
+                <option value="cyclic">{{ "Cyclic" if is_en else "По кругу" }}</option>
             </select>
             <div class="mt-2 text-xs text-gray-600 dark:text-gray-400 bg-white dark:bg-gray-800 p-2 rounded">
                 <template x-if="playbackMode === 'manual'">
-                    <span>Активное видео выбирается вручную. Этот режим удобен, когда нужен один основной ролик.</span>
+                    <span>{% if is_en %}The active video is selected manually. This mode works best when you need one primary video.{% else %}Активное видео выбирается вручную. Этот режим удобен, когда нужен один основной ролик.{% endif %}</span>
                 </template>
                 <template x-if="playbackMode === 'sequential'">
-                    <span>Видео идут по очереди: после завершения одного ролика активируется следующий.</span>
+                    <span>{% if is_en %}Videos play one by one: when one clip ends, the next becomes active.{% else %}Видео идут по очереди: после завершения одного ролика активируется следующий.{% endif %}</span>
                 </template>
                 <template x-if="playbackMode === 'cyclic'">
-                    <span>Видео переключаются по кругу. Подходит для длинной ротации нескольких материалов.</span>
+                    <span>{% if is_en %}Videos switch in a loop. Best for long rotations of several materials.{% else %}Видео переключаются по кругу. Подходит для длинной ротации нескольких материалов.{% endif %}</span>
                 </template>
             </div>
         </div>
-        <button @click="applyPlaybackMode()"
-                :disabled="playbackModeSaving"
-                class="btn btn-primary whitespace-nowrap">
+        <button @click="applyPlaybackMode()" :disabled="playbackModeSaving" class="btn btn-primary whitespace-nowrap">
             <span class="material-icons mr-2" x-show="!playbackModeSaving">save</span>
             <span class="material-icons mr-2 animate-spin" x-show="playbackModeSaving">refresh</span>
-            <span x-show="!playbackModeSaving">Сохранить</span>
-            <span x-show="playbackModeSaving">Сохранение...</span>
+            <span x-show="!playbackModeSaving">{{ "Save" if is_en else "Сохранить" }}</span>
+            <span x-show="playbackModeSaving">{{ "Saving..." if is_en else "Сохранение..." }}</span>
         </button>
     </div>
 </div>
@@ -52,7 +56,7 @@
         <div class="flex flex-wrap items-center gap-3">
             <span class="material-icons text-green-600 dark:text-green-400">play_circle</span>
             <div class="flex-1 min-w-0">
-                <span class="text-sm font-semibold text-gray-900 dark:text-white">Активное видео:</span>
+                <span class="text-sm font-semibold text-gray-900 dark:text-white">{{ "Active video:" if is_en else "Активное видео:" }}</span>
                 <span class="text-sm text-gray-700 dark:text-gray-300 ml-1 truncate" x-text="activeVideoTitle || '—'"></span>
             </div>
             <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-100" x-text="getActiveVideoSourceLabel()"></span>
@@ -66,9 +70,9 @@
 <template x-if="!videos || videos.length === 0">
     <div class="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-6 text-center">
         <span class="material-icons text-4xl text-yellow-600 dark:text-yellow-400 mb-3 block">videocam_off</span>
-        <p class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Видео ещё не загружены</p>
+        <p class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">{{ "No videos uploaded yet" if is_en else "Видео ещё не загружены" }}</p>
         <button @click="showUploadDialog = true" class="btn btn-primary text-sm px-3 py-1.5">
-            <span class="material-icons mr-2 text-sm">add</span>Загрузить первое видео
+            <span class="material-icons mr-2 text-sm">add</span>{{ "Upload first video" if is_en else "Загрузить первое видео" }}
         </button>
     </div>
 </template>

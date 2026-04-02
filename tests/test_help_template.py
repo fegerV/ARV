@@ -9,7 +9,7 @@ def test_help_template_uses_clean_partials():
     storage = Path("templates/help/partials/storage_section.html").read_text(encoding="utf-8")
 
     assert '{% include "help/partials/toc.html" %}' in template
-    assert "Содержание" in toc
-    assert "Как работает платформа" in how_it_works
-    assert "С чего начать" in getting_started
-    assert "Хранение" in storage
+    assert '{{ "Contents" if is_en else "Содержание" }}' in toc
+    assert '{{ "How the platform works" if is_en else "Как работает платформа" }}' in how_it_works
+    assert '{{ "Getting started" if is_en else "С чего начать" }}' in getting_started
+    assert '{{ "Storage" if is_en else "Хранение" }}' in storage

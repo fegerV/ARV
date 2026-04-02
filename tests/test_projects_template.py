@@ -13,8 +13,8 @@ def test_projects_list_template_uses_partials():
     assert '{% include "projects/partials/list_table.html" %}' in template
     assert '{% include "projects/partials/delete_modal.html" %}' in template
 
-    assert "Manage and organize your AR projects" in header
+    assert '{{ "Projects" if request.state.locale == "en" else "Проекты" }}' in header
     assert 'id="status-filter"' in filters
     assert 'id="company-filter"' in filters
-    assert "No projects found" in table
+    assert '{{ "No projects found" if request.state.locale == "en" else "Проекты не найдены" }}' in table
     assert 'x-text="deleteProject.name"' in delete_modal

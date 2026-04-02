@@ -1,13 +1,15 @@
+{% set is_en = request.state.locale == "en" %}
+
 <section id="tips" class="mb-10">
     <h2 class="text-xl font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
         <span class="material-icons text-emerald-500">tips_and_updates</span>
-        Практические советы
+        {{ "Practical tips" if is_en else "Практические советы" }}
     </h2>
     <ul class="list-disc list-inside space-y-2 text-gray-700 dark:text-gray-300">
-        <li>Используйте контрастные и детализированные изображения-маркеры.</li>
-        <li>Проверяйте публичную ссылку и QR-код после каждой важной правки.</li>
-        <li>Для сезонных кампаний удобнее использовать ротацию видео, а не создавать новые карточки.</li>
-        <li>Следите за квотами хранения, если у компаний подключён Яндекс Диск.</li>
-        <li>Перед публикацией тестируйте контент на реальном телефоне, а не только в браузере.</li>
+        <li>{% if is_en %}Use high-contrast and well-detailed marker images.{% else %}Используйте контрастные и детализированные изображения-маркеры.{% endif %}</li>
+        <li>{% if is_en %}Check the public link and QR code after each important change.{% else %}Проверяйте публичную ссылку и QR-код после каждой важной правки.{% endif %}</li>
+        <li>{% if is_en %}For seasonal campaigns, video rotation is usually better than creating new cards.{% else %}Для сезонных кампаний удобнее использовать ротацию видео, а не создавать новые карточки.{% endif %}</li>
+        <li>{% if is_en %}Watch storage quotas if companies use Yandex Disk integration.{% else %}Следите за квотами хранения, если у компаний подключён Яндекс Диск.{% endif %}</li>
+        <li>{% if is_en %}Before publishing, test content on a real phone, not only in the browser.{% else %}Перед публикацией тестируйте контент на реальном телефоне, а не только в браузере.{% endif %}</li>
     </ul>
 </section>

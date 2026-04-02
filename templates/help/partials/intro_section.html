@@ -1,15 +1,24 @@
-﻿<section id="intro" class="mb-10">
+{% set is_en = request.state.locale == "en" %}
+
+<section id="intro" class="mb-10">
     <h2 class="text-xl font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
         <span class="material-icons text-indigo-500">info</span>
-        Введение
+        {{ "Introduction" if is_en else "Введение" }}
     </h2>
     <div class="prose dark:prose-invert max-w-none text-gray-700 dark:text-gray-300 space-y-3">
         <p>
-            <strong>Vertex AR</strong> — платформа для создания и раздачи AR-контента (дополненной реальности). Администратор загружает в веб-интерфейс изображение-маркер и видео; система выдаёт ссылку и QR-код. Конечный пользователь открывает ссылку в мобильном приложении <strong>Portal AR</strong>, наводит камеру на распечатанный маркер — и поверх изображения воспроизводится видео.
+            {% if is_en %}
+            <strong>Vertex AR</strong> is a platform for creating and delivering AR content. The administrator uploads a marker image and a video in the web interface, and the system generates a public link and QR code. The end user opens the link in the <strong>Portal AR</strong> mobile app, points the camera at the printed marker, and sees the video rendered over the image.
+            {% else %}
+            <strong>Vertex AR</strong> — платформа для создания и раздачи AR-контента. Администратор загружает в веб-интерфейс изображение-маркер и видео, а система выдаёт ссылку и QR-код. Конечный пользователь открывает ссылку в мобильном приложении <strong>Portal AR</strong>, наводит камеру на распечатанный маркер и видит видео поверх изображения.
+            {% endif %}
         </p>
         <p>
-            Платформа подходит для рекламы, образовательных материалов, визиток, упаковки: везде, где нужно «оживить» печатное изображение с помощью видео в AR.
+            {% if is_en %}
+            The platform is suitable for advertising, education, business cards, packaging, and any scenario where a printed image should be brought to life with video in AR.
+            {% else %}
+            Платформа подходит для рекламы, образовательных материалов, визиток, упаковки и любых сценариев, где нужно «оживить» печатное изображение с помощью видео в AR.
+            {% endif %}
         </p>
     </div>
 </section>
-

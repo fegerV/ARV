@@ -1,10 +1,12 @@
+{% set is_en = request.state.locale == "en" %}
+
 <div class="card p-0 overflow-hidden mb-6">
     <div class="px-4 py-5 sm:px-6 border-b border-gray-200 dark:border-gray-700 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-gray-800 dark:to-gray-700">
         <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div class="flex-1">
                 <div class="flex items-center gap-3 mb-2">
                     <h1 class="text-2xl font-bold text-gray-900 dark:text-white">
-                        Заказ {{ ar_content.order_number }}
+                        {{ "Order" if is_en else "Заказ" }} {{ ar_content.order_number }}
                     </h1>
                     <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium"
                           :class="arContent.status === 'ready' ? 'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-100' :
@@ -13,21 +15,21 @@
                           x-text="arContent.status || '—'"></span>
                 </div>
                 <p class="text-sm text-gray-600 dark:text-gray-400">
-                    Карточка AR-контента и публикации
+                    {{ "AR content and publication card" if is_en else "Карточка AR-контента и публикации" }}
                 </p>
             </div>
             <div class="flex flex-wrap gap-2">
                 <a href="/ar-content" class="btn btn-secondary">
-                    <span class="material-icons mr-2">arrow_back</span>Назад
+                    <span class="material-icons mr-2">arrow_back</span>{{ "Back" if is_en else "Назад" }}
                 </a>
                 <a href="/ar-content/{{ ar_content.id }}/edit" class="btn btn-secondary">
-                    <span class="material-icons mr-2">edit</span>Редактировать
+                    <span class="material-icons mr-2">edit</span>{{ "Edit" if is_en else "Редактировать" }}
                 </a>
                 <button @click="showQRDialog = true" class="btn btn-secondary">
-                    <span class="material-icons mr-2">qr_code</span>QR-код
+                    <span class="material-icons mr-2">qr_code</span>{{ "QR code" if is_en else "QR-код" }}
                 </button>
                 <button @click="showDeleteDialog = true" class="btn btn-danger">
-                    <span class="material-icons mr-2">delete</span>Удалить
+                    <span class="material-icons mr-2">delete</span>{{ "Delete" if is_en else "Удалить" }}
                 </button>
             </div>
         </div>
@@ -37,28 +39,28 @@
         <div class="flex flex-wrap gap-3">
             <div class="flex items-center gap-2 text-sm">
                 <span class="material-icons text-blue-600 dark:text-blue-400 text-base">business</span>
-                <span class="text-gray-600 dark:text-gray-400">Компания:</span>
+                <span class="text-gray-600 dark:text-gray-400">{{ "Company:" if is_en else "Компания:" }}</span>
                 <span class="font-medium text-gray-900 dark:text-white" x-text="arContent.company_name || '—'"></span>
             </div>
             <div class="flex items-center gap-2 text-sm">
                 <span class="material-icons text-green-600 dark:text-green-400 text-base">folder</span>
-                <span class="text-gray-600 dark:text-gray-400">Проект:</span>
+                <span class="text-gray-600 dark:text-gray-400">{{ "Project:" if is_en else "Проект:" }}</span>
                 <span class="font-medium text-gray-900 dark:text-white" x-text="arContent.project_name || '—'"></span>
             </div>
             <div class="flex items-center gap-2 text-sm">
                 <span class="material-icons text-gray-600 dark:text-gray-400 text-base">schedule</span>
-                <span class="text-gray-600 dark:text-gray-400">Создан:</span>
+                <span class="text-gray-600 dark:text-gray-400">{{ "Created:" if is_en else "Создан:" }}</span>
                 <span class="font-medium text-gray-900 dark:text-white">{{ ar_content.created_at | datetime_format if ar_content.created_at else '—' }}</span>
             </div>
             <div class="flex items-center gap-2 text-sm">
                 <span class="material-icons text-amber-600 dark:text-amber-400 text-base">tag</span>
                 <span class="text-gray-600 dark:text-gray-400">ID:</span>
-                <button @click="copyText(arContent.order_number, 'Номер заказа скопирован')" class="font-medium text-gray-900 dark:text-white hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors" x-text="arContent.order_number || '—'"></button>
+                <button @click="copyText(arContent.order_number, '{{ "Order number copied" if is_en else "Номер заказа скопирован" }}')" class="font-medium text-gray-900 dark:text-white hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors" x-text="arContent.order_number || '—'"></button>
             </div>
             <div class="flex items-center gap-2 text-sm" x-show="arContent.unique_id">
                 <span class="material-icons text-cyan-600 dark:text-cyan-400 text-base">fingerprint</span>
                 <span class="text-gray-600 dark:text-gray-400">UUID:</span>
-                <button @click="copyText(arContent.unique_id, 'UUID скопирован')" class="font-medium text-gray-900 dark:text-white hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors truncate max-w-[18rem] text-left" x-text="arContent.unique_id || '—'"></button>
+                <button @click="copyText(arContent.unique_id, '{{ "UUID copied" if is_en else "UUID скопирован" }}')" class="font-medium text-gray-900 dark:text-white hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors truncate max-w-[18rem] text-left" x-text="arContent.unique_id || '—'"></button>
             </div>
         </div>
     </div>

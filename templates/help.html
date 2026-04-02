@@ -1,4 +1,6 @@
-﻿{% extends "base.html" %}
+{% extends "base.html" %}
+
+{% set is_en = request.state.locale == "en" %}
 
 {% block title %}{{ t("help.title") }} - Vertex AR Admin{% endblock %}
 {% block page_title %}{{ t("help.title") }}{% endblock %}
@@ -6,7 +8,11 @@
 {% block content %}
 <div class="max-w-4xl mx-auto px-4 pb-16">
     <p class="text-gray-500 dark:text-gray-400 mb-6">
+        {% if is_en %}
+        Full Vertex AR platform guide: from first login to AR content publication, company setup, analytics, and maintenance.
+        {% else %}
         Полная документация по платформе Vertex AR: от первого входа до публикации AR-контента, настройки компаний, аналитики и обслуживания.
+        {% endif %}
     </p>
 
     {% include "help/partials/toc.html" %}
@@ -28,4 +34,3 @@
     {% include "help/partials/contacts_section.html" %}
 </div>
 {% endblock %}
-

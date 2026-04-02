@@ -2,16 +2,16 @@
     <div>
         <h2 class="text-2xl font-semibold text-gray-900 dark:text-white">
             {% if project %}
-                Редактирование проекта
+                {{ "Edit project" if request.state.locale == "en" else "Редактирование проекта" }}
             {% else %}
-                Новый проект
+                {{ "New project" if request.state.locale == "en" else "Новый проект" }}
             {% endif %}
         </h2>
         <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
             {% if project %}
-                Обновите информацию о проекте и его настройки
+                {{ "Update project information and settings" if request.state.locale == "en" else "Обновите информацию о проекте и его настройки" }}
             {% else %}
-                Создайте новый проект для вашей организации
+                {{ "Create a new project for your organization" if request.state.locale == "en" else "Создайте новый проект для вашей организации" }}
             {% endif %}
         </p>
     </div>
