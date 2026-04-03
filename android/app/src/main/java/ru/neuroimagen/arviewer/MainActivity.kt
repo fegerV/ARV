@@ -93,7 +93,6 @@ class MainActivity : AppCompatActivity() {
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        binding.buttonOpen.setOnClickListener { onOpenClicked() }
         binding.buttonScanQr.setOnClickListener { openQrScanner() }
         binding.buttonTryDemo.setOnClickListener { openDemoMode() }
         binding.buttonOpenFromFile.setOnClickListener { pickImageLauncher.launch("image/*") }
@@ -223,16 +222,6 @@ class MainActivity : AppCompatActivity() {
 
     // ── Open viewer ──────────────────────────────────────────────────
 
-    private fun onOpenClicked() {
-        val input = binding.editUniqueId.text.toString().trim()
-        if (input.isEmpty()) {
-            Toast.makeText(this, getString(R.string.enter_unique_id), Toast.LENGTH_SHORT).show()
-            return
-        }
-        val uniqueId = parseInputUniqueId(input) ?: return
-        submitResolvedUniqueId(uniqueId)
-    }
-
     private fun openDemoMode() {
         if (!ArSessionHelper.isArCoreSupported(this)) {
             showDeviceNotSupportedPanel("demo")
@@ -290,9 +279,6 @@ class MainActivity : AppCompatActivity() {
         fromQrScan: Boolean = false,
         updateInputField: Boolean = true,
     ) {
-        if (updateInputField) {
-            binding.editUniqueId.setText(uniqueId)
-        }
         openViewer(uniqueId, fromQrScan = fromQrScan)
     }
 

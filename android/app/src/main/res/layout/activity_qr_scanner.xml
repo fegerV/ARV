@@ -27,7 +27,8 @@
             android:elevation="4dp"
             android:orientation="horizontal"
             android:paddingHorizontal="16dp"
-            android:paddingVertical="12dp">
+            android:paddingTop="40dp"
+            android:paddingBottom="16dp">
 
             <TextView
                 android:layout_width="0dp"

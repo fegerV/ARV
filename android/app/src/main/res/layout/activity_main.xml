@@ -213,53 +213,6 @@
 
             </LinearLayout>
 
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginBottom="12dp"
-                android:fontFamily="sans-serif-medium"
-                android:text="@string/enter_unique_id"
-                android:textColor="@color/text_primary"
-                android:textSize="14sp" />
-
-            <com.google.android.material.textfield.TextInputLayout
-                android:id="@+id/layout_unique_id"
-                style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginBottom="12dp"
-                app:boxCornerRadiusBottomEnd="12dp"
-                app:boxCornerRadiusBottomStart="12dp"
-                app:boxCornerRadiusTopEnd="12dp"
-                app:boxCornerRadiusTopStart="12dp"
-                app:boxStrokeColor="@color/primary"
-                app:hintTextColor="@color/primary">
-
-                <com.google.android.material.textfield.TextInputEditText
-                    android:id="@+id/edit_unique_id"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:hint="@string/unique_id_hint"
-                    android:inputType="text"
-                    android:maxLines="1"
-                    android:singleLine="true"
-                    android:textColor="@color/text_primary"
-                    android:textSize="15sp" />
-
-            </com.google.android.material.textfield.TextInputLayout>
-
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/button_open"
-                android:layout_width="match_parent"
-                android:layout_height="52dp"
-                android:background="@drawable/button_primary_background"
-                android:text="@string/open"
-                android:textAllCaps="false"
-                android:textColor="@color/on_primary"
-                android:textSize="15sp"
-                app:backgroundTint="@null"
-                app:cornerRadius="12dp" />
-
         </LinearLayout>
 
     </LinearLayout>
