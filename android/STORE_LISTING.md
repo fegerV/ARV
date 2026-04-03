@@ -1,14 +1,14 @@
-# Portal AR — Google Play Store Listing
+# V-Portal — Google Play Store Listing
 
 ## App Name
-Portal AR
+V-Portal
 
 ## Short Description (80 chars max)
 Наведите камеру на маркер — и изображение оживёт с видео в дополненной реальности
 
 ## Full Description (4000 chars max)
 
-**Portal AR** — приложение дополненной реальности, которое оживляет печатные изображения. Наведите камеру на маркер — и прямо на нём начнёт воспроизводиться видео. Это настоящий портал между бумажным и цифровым миром.
+**V-Portal** — приложение дополненной реальности, которое оживляет печатные изображения. Наведите камеру на маркер — и прямо на нём начнёт воспроизводиться видео. Это настоящий портал между бумажным и цифровым миром.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━
 
@@ -86,7 +86,7 @@ Point your camera at a marker — and the image comes alive with AR video playba
 
 ### Full Description
 
-**Portal AR** brings printed images to life with augmented reality. Point your camera at a marker — and a video starts playing right on it. A true portal between the printed and digital world.
+**V-Portal** brings printed images to life with augmented reality. Point your camera at a marker — and a video starts playing right on it. A true portal between the printed and digital world.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━
 

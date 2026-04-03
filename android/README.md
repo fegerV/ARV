@@ -183,7 +183,7 @@ cd android
 | `ANDROID_KEY_ALIAS` | Алиас ключа, например `portal-ar` (как в команде keytool `-alias`) |
 | `ANDROID_KEY_PASSWORD` | Пароль ключа, который вы ввели при создании ключа (key password) |
 
-После добавления секретов перезапустите workflow (Actions → Android (Portal AR) → Re-run all jobs) или сделайте пуш в `android/`.
+После добавления секретов перезапустите workflow (Actions → Android (V-Portal) → Re-run all jobs) или сделайте пуш в `android/`.
 
 **Windows (PowerShell):**
 

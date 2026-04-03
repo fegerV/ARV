@@ -71,6 +71,9 @@ android/*.pem
 android/*.zip
 android/java_*.hprof
 
+# Gradle user home (machine cache)
+.gradle-user-home/
+
 # Build artifacts
 frontend/dist/
 frontend/build/
