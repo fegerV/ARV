@@ -33,7 +33,7 @@
                    :class="{'bg-gray-700': window.location.pathname === '/admin' || window.location.pathname.startsWith('/admin/')}"
                    @click="$store.sidebar.closeMobile()">
                     <span class="material-icons mr-3">dashboard</span>
-                    <span class="sidebar-text">Панель</span>
+                    <span class="sidebar-text">{{ t("sidebar.dashboard") }}</span>
                 </a>
             </li>
             <li>
@@ -41,7 +41,7 @@
                    :class="{'bg-gray-700': window.location.pathname === '/companies' || window.location.pathname.startsWith('/companies/')}"
                    @click="$store.sidebar.closeMobile()">
                     <span class="material-icons mr-3">business</span>
-                    <span class="sidebar-text">Компании</span>
+                    <span class="sidebar-text">{{ t("sidebar.companies") }}</span>
                 </a>
             </li>
             <li>
@@ -49,7 +49,7 @@
                    :class="{'bg-gray-700': window.location.pathname === '/projects' || window.location.pathname.startsWith('/projects/')}"
                    @click="$store.sidebar.closeMobile()">
                     <span class="material-icons mr-3">folder</span>
-                    <span class="sidebar-text">Проекты</span>
+                    <span class="sidebar-text">{{ t("sidebar.projects") }}</span>
                 </a>
             </li>
             <li>
@@ -57,7 +57,7 @@
                    :class="{'bg-gray-700': window.location.pathname === '/ar-content' || window.location.pathname.startsWith('/ar-content/')}"
                    @click="$store.sidebar.closeMobile()">
                     <span class="material-icons mr-3">view_in_ar</span>
-                    <span class="sidebar-text">AR-контент</span>
+                    <span class="sidebar-text">{{ t("ar_content.title") }}</span>
                 </a>
             </li>
             <li>
@@ -65,7 +65,7 @@
                    :class="{'bg-gray-700': window.location.pathname === '/storage' || window.location.pathname.startsWith('/storage/')}"
                    @click="$store.sidebar.closeMobile()">
                     <span class="material-icons mr-3">storage</span>
-                    <span class="sidebar-text">Хранилище</span>
+                    <span class="sidebar-text">{{ t("storage.title") }}</span>
                 </a>
             </li>
             <li>
@@ -73,7 +73,7 @@
                    :class="{'bg-gray-700': window.location.pathname === '/analytics' || window.location.pathname.startsWith('/analytics/')}"
                    @click="$store.sidebar.closeMobile()">
                     <span class="material-icons mr-3">analytics</span>
-                    <span class="sidebar-text">Аналитика</span>
+                    <span class="sidebar-text">{{ t("analytics.title") }}</span>
                 </a>
             </li>
             <li>
@@ -81,7 +81,7 @@
                    :class="{'bg-gray-700': window.location.pathname === '/notifications' || window.location.pathname.startsWith('/notifications/')}"
                    @click="$store.sidebar.closeMobile()">
                     <span class="material-icons mr-3">notifications</span>
-                    <span class="sidebar-text">Уведомления</span>
+                    <span class="sidebar-text">{{ t("notifications.title") }}</span>
                 </a>
             </li>
             <li>
@@ -89,7 +89,7 @@
                    :class="{'bg-gray-700': window.location.pathname === '/settings' || window.location.pathname.startsWith('/settings/')}"
                    @click="$store.sidebar.closeMobile()">
                     <span class="material-icons mr-3">settings</span>
-                    <span class="sidebar-text">Настройки</span>
+                    <span class="sidebar-text">{{ t("settings.title") }}</span>
                 </a>
             </li>
             <li>
@@ -97,7 +97,7 @@
                    :class="{'bg-gray-700': window.location.pathname === '/backups'}"
                    @click="$store.sidebar.closeMobile()">
                     <span class="material-icons mr-3">backup</span>
-                    <span class="sidebar-text">Бэкапы</span>
+                    <span class="sidebar-text">{{ t("sidebar.backups") }}</span>
                 </a>
             </li>
             <li>
@@ -105,7 +105,7 @@
                    :class="{'bg-gray-700': window.location.pathname === '/admin/logs'}"
                    @click="$store.sidebar.closeMobile()">
                     <span class="material-icons mr-3">terminal</span>
-                    <span class="sidebar-text">Логи</span>
+                    <span class="sidebar-text">{{ t("sidebar.logs") }}</span>
                 </a>
             </li>
             <li>
@@ -113,10 +113,9 @@
                    :class="{'bg-gray-700': window.location.pathname === '/help'}"
                    @click="$store.sidebar.closeMobile()">
                     <span class="material-icons mr-3">help</span>
-                    <span class="sidebar-text">Справка</span>
+                    <span class="sidebar-text">{{ t("help.title") }}</span>
                 </a>
             </li>
         </ul>
     </div>
 </div>
-
