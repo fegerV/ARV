@@ -150,6 +150,8 @@ function arContentForm() {
             const response = await fetch(url, {
                 method: 'PATCH',
                 body: fd,
+                headers: this.csrfHeaders(),
+                credentials: 'same-origin',
             });
             if (!response.ok) {
                 throw new Error(await this._readError(response));
@@ -193,7 +195,9 @@ function arContentForm() {
                         method: 'PUT',
                         headers: {
                             'Content-Type': 'application/json',
+                            ...this.csrfHeaders(),
                         },
+                        credentials: 'same-origin',
                         body: JSON.stringify(payload),
                     });
 
@@ -269,6 +273,10 @@ function arContentForm() {
                     xhr.addEventListener('abort', () => reject(new Error('{{ t("common.cancel") }}')));
 
                     xhr.open('POST', createUrl);
+                    const csrfToken = window.getCsrfToken ? window.getCsrfToken() : '';
+                    if (csrfToken) {
+                        xhr.setRequestHeader('X-CSRF-Token', csrfToken);
+                    }
                     xhr.send(formData);
                 });
 
@@ -361,6 +369,10 @@ function photoUploader() {
                 const resp = await fetch('/api/ar-content/photo/analyze', {
                     method: 'POST',
                     body: formData,
+                    headers: (window.getCsrfToken && window.getCsrfToken())
+                        ? { 'X-CSRF-Token': window.getCsrfToken() }
+                        : {},
+                    credentials: 'same-origin',
                 });
                 if (!resp.ok) {
                     const err = await resp.json().catch(() => ({}));
@@ -501,3 +513,7 @@ function videoUploader() {
 }
 </script>
 {% endblock %}
+        csrfHeaders() {
+            const token = window.getCsrfToken ? window.getCsrfToken() : '';
+            return token ? { 'X-CSRF-Token': token } : {};
+        },
