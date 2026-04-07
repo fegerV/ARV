@@ -124,7 +124,7 @@
             Техническая информация (Debug)
         </summary>
         <div class="mt-4 grid grid-cols-2 md:grid-cols-4 gap-4 text-xs">
-            <div><span class="font-medium text-gray-600 dark:text-gray-400">Storage:</span><br><span class="text-gray-900 dark:text-white break-all">{{ debug_info.storage_path or '—' }}</span></div>
+            <div><span class="font-medium text-gray-600 dark:text-gray-400">{{ t("storage.title") }}:</span><br><span class="text-gray-900 dark:text-white break-all">{{ debug_info.storage_path or '—' }}</span></div>
             <div><span class="font-medium text-gray-600 dark:text-gray-400">Photo:</span><br><span class="text-gray-900 dark:text-white break-all">{{ debug_info.photo_path or '—' }}</span></div>
             <div><span class="font-medium text-gray-600 dark:text-gray-400">Video:</span><br><span class="text-gray-900 dark:text-white break-all">{{ debug_info.video_path or '—' }}</span></div>
             <div><span class="font-medium text-gray-600 dark:text-gray-400">Marker:</span><br><span class="text-gray-900 dark:text-white break-all">{{ debug_info.marker_path or '—' }}</span></div>
