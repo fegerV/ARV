@@ -182,5 +182,14 @@ V-Portal / Vertex Art<br/><br/>
 <a href="https://vertex-art.ru">https://vertex-art.ru</a><br/><br/>
 Версия: 1.0.0
 ]]></string>
+    <string name="check_ar_core_label">Проверить AR Core</string>
+    <string name="order_ar">Заказать AR</string>
+    <string name="dialog_how_to_use_title">Как использовать</string>
+    <string name="dialog_how_to_use_body"><![CDATA[
+1. Нажмите <b>«Сканировать QR»</b> и наведите камеру на QR-код.<br/><br/>
+2. Или нажмите <b>«Загрузить QR из галереи»</b>, если код сохранен в телефоне.<br/><br/>
+3. После распознавания откроется AR-сцена автоматически.<br/><br/>
+4. Если AR не запускается, нажмите <b>«Проверить AR Core»</b>.
+]]></string>
     <string name="appbar_scrolling_view_behavior" translatable="false">com.google.android.material.appbar.AppBarLayout$ScrollingViewBehavior</string>
 </resources>

@@ -9,8 +9,6 @@ import android.util.Log
 import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
-import android.view.animation.AlphaAnimation
-import android.view.animation.LinearInterpolator
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
@@ -96,14 +94,16 @@ class MainActivity : AppCompatActivity() {
         binding.buttonScanQr.setOnClickListener { openQrScanner() }
         binding.buttonTryDemo.setOnClickListener { openDemoMode() }
         binding.buttonOpenFromFile.setOnClickListener { pickImageLauncher.launch("image/*") }
-        binding.buttonHowItWorks.setOnClickListener { startActivity(Intent(this, HowItWorksActivity::class.java)) }
+        binding.buttonHowItWorks.setOnClickListener {
+            showInfoDialog(R.string.dialog_how_to_use_title, R.string.dialog_how_to_use_body)
+        }
         binding.buttonCheckArSupport.setOnClickListener { openArCorePlayStore() }
+        binding.buttonOrderAr.setOnClickListener { openOrderPage() }
         binding.buttonRetry.setOnClickListener { viewModel.retry() }
         binding.textPrivacy.setOnClickListener { openPrivacyPolicy() }
         binding.textAbout.setOnClickListener { showInfoDialog(R.string.dialog_about_title, R.string.dialog_about_body) }
         binding.textSupport.setOnClickListener { showInfoDialog(R.string.dialog_support_title, R.string.dialog_support_body) }
 
-        startHeroStarAnimation()
         observeUiState()
         requestRequiredPermissions()
         handleIntent(intent)
@@ -234,6 +234,10 @@ class MainActivity : AppCompatActivity() {
         startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(getString(R.string.privacy_url))))
     }
 
+    private fun openOrderPage() {
+        startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://vertex-art.ru")))
+    }
+
     private fun showInfoDialog(titleRes: Int, bodyRes: Int) {
         val dialogBinding = DialogInfoOverlayBinding.inflate(layoutInflater)
         val dialog = AlertDialog.Builder(this, androidx.appcompat.R.style.Theme_AppCompat_Dialog)
@@ -251,7 +255,7 @@ class MainActivity : AppCompatActivity() {
         dialog.setCanceledOnTouchOutside(true)
         dialog.window?.apply {
             setBackgroundDrawableResource(android.R.color.transparent)
-            setDimAmount(0.72f)
+            setDimAmount(0.8f)
             setGravity(Gravity.CENTER)
         }
 
@@ -393,20 +397,6 @@ class MainActivity : AppCompatActivity() {
         binding.buttonRetry.visibility = if (retryable) View.VISIBLE else View.GONE
         binding.buttonRetry.setOnClickListener { viewModel.retry() }
         binding.buttonOpenDeviceList.visibility = View.GONE
-    }
-
-    private fun startHeroStarAnimation() {
-        val stars = listOf(binding.starOne, binding.starTwo, binding.starThree, binding.starFour)
-        stars.forEachIndexed { index, star ->
-            val animation = AlphaAnimation(0.28f, 1f).apply {
-                duration = 3400L + (index * 700L)
-                repeatCount = AlphaAnimation.INFINITE
-                repeatMode = AlphaAnimation.REVERSE
-                interpolator = LinearInterpolator()
-                startOffset = index * 500L
-            }
-            star.startAnimation(animation)
-        }
     }
 
     companion object {

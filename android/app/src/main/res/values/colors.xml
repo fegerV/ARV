@@ -78,4 +78,14 @@
     <!-- Ripple Effects -->
     <color name="ripple_light">#14000000</color>
     <color name="ripple_dark">#1FFFFFFF</color>
+
+    <!-- Home Screen (V-Portal Mockup) -->
+    <color name="home_background">#000000</color>
+    <color name="home_card">#1A1C1F</color>
+    <color name="home_card_stroke">#2A2D31</color>
+    <color name="home_primary">#00F000</color>
+    <color name="home_button_text">#081107</color>
+    <color name="home_row_stroke">#D9D9D9</color>
+    <color name="home_row_icon">#EFEFEF</color>
+    <color name="home_footer_text">#A7A7A7</color>
 </resources>
