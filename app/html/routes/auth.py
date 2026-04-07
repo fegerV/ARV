@@ -70,9 +70,26 @@ async def admin_login_page(request: Request):
 
 
 @router.post("/admin/language", response_class=RedirectResponse)
-async def admin_set_language(request: Request, language: str = Form(...)):
-    """Persist selected admin locale in session and redirect back."""
-    request.session["language"] = normalize_locale(language)
+async def admin_set_language(request: Request, language: str | None = Form(None)):
+    """Persist selected admin locale in session and redirect back.
+
+    Accepts language from form, query string, or JSON body to be resilient to
+    clients that submit POST without form fields.
+    """
+    selected_language = language
+    if not selected_language:
+        selected_language = request.query_params.get("language")
+    if not selected_language:
+        try:
+            payload = await request.json()
+            if isinstance(payload, dict):
+                selected_language = payload.get("language")
+        except Exception:
+            selected_language = None
+    if not selected_language:
+        selected_language = request.session.get("language") or get_request_locale(request)
+
+    request.session["language"] = normalize_locale(str(selected_language))
     request.state.locale = request.session["language"]
     redirect_to = request.headers.get("referer") or "/admin"
     return RedirectResponse(url=redirect_to, status_code=303)
