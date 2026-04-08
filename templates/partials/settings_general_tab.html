@@ -27,9 +27,9 @@
                     <label for="timezone" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">{{ t("settings.general.timezone") }}</label>
                     <select id="timezone" name="timezone" class="form-select">
                         <option value="UTC" {% if settings.general.timezone == 'UTC' %}selected{% endif %}>UTC</option>
-                        <option value="Europe/Moscow" {% if settings.general.timezone == 'Europe/Moscow' %}selected{% endif %}>Москва (UTC+3)</option>
-                        <option value="Europe/London" {% if settings.general.timezone == 'Europe/London' %}selected{% endif %}>Лондон (UTC+0)</option>
-                        <option value="America/New_York" {% if settings.general.timezone == 'America/New_York' %}selected{% endif %}>Нью-Йорк (UTC-5)</option>
+                        <option value="Europe/Moscow" {% if settings.general.timezone == 'Europe/Moscow' %}selected{% endif %}>{{ t("settings.general.timezone_moscow") }}</option>
+                        <option value="Europe/London" {% if settings.general.timezone == 'Europe/London' %}selected{% endif %}>{{ t("settings.general.timezone_london") }}</option>
+                        <option value="America/New_York" {% if settings.general.timezone == 'America/New_York' %}selected{% endif %}>{{ t("settings.general.timezone_new_york") }}</option>
                     </select>
                 </div>
                 <div>
