@@ -19,6 +19,9 @@ class ProjectStatus(str, Enum):
 class ArContentStatus(str, Enum):
     """AR Content status enum"""
     PENDING = "pending"
+    PROCESSING = "processing"
+    READY = "ready"
+    FAILED = "failed"
     ACTIVE = "active"
     ARCHIVED = "archived"
 
