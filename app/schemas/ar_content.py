@@ -17,6 +17,7 @@ class ArContentCreate(BaseModel):
 class ArContentUpdate(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
+    project_id: Optional[int] = None
     customer_name: Optional[str] = None
     customer_phone: Optional[str] = None
     customer_email: Optional[EmailStr] = None

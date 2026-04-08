@@ -937,8 +937,18 @@ async def update_ar_content(
     if ar_content.company_id != company_id or ar_content.project_id != project_id:
         raise HTTPException(status_code=404, detail="AR content not found in specified project")
     
-    # Update only mutable fields
     update_dict = update_data.model_dump(exclude_unset=True)
+
+    # Allow moving content to another project within the same company.
+    new_project_id = update_dict.get("project_id")
+    if new_project_id is not None and new_project_id != ar_content.project_id:
+        new_project = await db.get(Project, new_project_id)
+        if not new_project:
+            raise HTTPException(status_code=404, detail="Project not found")
+        if new_project.company_id != ar_content.company_id:
+            raise HTTPException(status_code=400, detail="Project does not belong to company")
+
+    # Update only mutable fields
     for field, value in update_dict.items():
         setattr(ar_content, field, value)
     

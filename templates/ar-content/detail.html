@@ -7,6 +7,7 @@
 {% block content %}
 {% set is_en = request.state.locale == "en" %}
 <script type="application/json" id="ar-content-data">{{ ar_content_js | tojson }}</script>
+<script type="application/json" id="ar-content-projects">{{ projects_js | default([]) | tojson }}</script>
 <script type="application/json" id="ar-content-videos">{{ videos_js | default([]) | tojson }}</script>
 <script type="application/json" id="ar-content-active-video">{{ active_video_js | default(None) | tojson }}</script>
 <script type="application/json" id="ar-content-rotation-schedule">{{ rotation_schedule_js | default(None) | tojson }}</script>
@@ -58,6 +59,10 @@ document.addEventListener('alpine:init', function() {
         videoUpdatedShort: {{ ("Video updated" if is_en else "Видео обновлено") | tojson }},
         noChanges: {{ ("No changes to save" if is_en else "Нет изменений для сохранения") | tojson }},
         saveChangesFailed: {{ ("Failed to save changes" if is_en else "Не удалось сохранить изменения") | tojson }},
+        saveOrderFailed: {{ ("Failed to save order details" if is_en else "Не удалось сохранить данные заказа") | tojson }},
+        saveOrderSuccess: {{ ("Order details updated" if is_en else "Данные заказа обновлены") | tojson }},
+        customerNameRequired: {{ ("Customer name is required" if is_en else "Имя заказчика обязательно") | tojson }},
+        projectRequired: {{ ("Project is required" if is_en else "Проект обязателен") | tojson }},
         arDeleted: {{ ("AR content deleted successfully" if is_en else "AR-контент успешно удалён") | tojson }},
         deleteArFailed: {{ ("Failed to delete AR content" if is_en else "Не удалось удалить AR-контент") | tojson }},
         fixed: {{ ("Fixed" if is_en else "Фиксированное") | tojson }},
@@ -92,6 +97,7 @@ document.addEventListener('alpine:init', function() {
     }
 
     var arContent = {};
+    var projects = [];
     var videos = [];
     var activeVideoInfo = null;
     var rotationSchedule = null;
@@ -109,6 +115,18 @@ document.addEventListener('alpine:init', function() {
         console.error('Failed to parse ar-content-data:', e);
     }
     
+    try {
+        var projectsEl = document.getElementById('ar-content-projects');
+        if (projectsEl && projectsEl.textContent) {
+            var text = projectsEl.textContent.trim();
+            if (text && text !== 'null' && text !== 'undefined') {
+                projects = JSON.parse(text);
+            }
+        }
+    } catch (e) {
+        console.error('Failed to parse ar-content-projects:', e);
+    }
+
     try {
         var videosEl = document.getElementById('ar-content-videos');
         if (videosEl && videosEl.textContent) {
@@ -170,6 +188,7 @@ document.addEventListener('alpine:init', function() {
 
     Alpine.store('arContentDetail', {
         arContent: arContent || {},
+        projects: Array.isArray(projects) ? projects : [],
         videos: Array.isArray(videos) ? videos : [],
         activeVideoInfo: activeVideoInfo,
         rotationSchedule: rotationSchedule,
@@ -191,6 +210,7 @@ document.addEventListener('alpine:init', function() {
         deleting: false,
         regeneratingMedia: false,
         saving: false,
+        savingOrder: false,
         savingRotationSchedule: false,
         playbackMode: 'manual',
         playbackModeInitialized: false,
@@ -211,6 +231,13 @@ document.addEventListener('alpine:init', function() {
             no_repeat_days: 1,
             notify_before_expiry_days: 7,
             is_active: true,
+        },
+        showOrderEdit: false,
+        orderForm: {
+            project_id: arContent && arContent.project_id ? Number(arContent.project_id) : null,
+            customer_name: (arContent && arContent.customer_name) || '',
+            customer_phone: (arContent && arContent.customer_phone) || '',
+            customer_email: (arContent && arContent.customer_email) || '',
         },
 
         init() {
@@ -259,6 +286,12 @@ document.addEventListener('alpine:init', function() {
 
         get portraitUrlComputed() {
             return portraitUrlFromContent(this.arContent);
+        },
+
+        get projectsForCurrentCompany() {
+            return (this.projects || []).filter(
+                (project) => Number(project.company_id) === Number(this.arContent.company_id)
+            );
         },
 
         get activeVideo() {
@@ -349,6 +382,77 @@ document.addEventListener('alpine:init', function() {
                     return 'bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-100';
                 default:
                     return 'bg-gray-100 text-gray-800 dark:bg-gray-900/40 dark:text-gray-100';
+            }
+        },
+
+        startOrderEdit() {
+            this.orderForm = {
+                project_id: this.arContent.project_id ? Number(this.arContent.project_id) : null,
+                customer_name: this.arContent.customer_name || '',
+                customer_phone: this.arContent.customer_phone || '',
+                customer_email: this.arContent.customer_email || '',
+            };
+            this.showOrderEdit = true;
+        },
+
+        cancelOrderEdit() {
+            this.showOrderEdit = false;
+        },
+
+        async saveOrderDetails() {
+            const projectId = Number(this.orderForm.project_id || 0);
+            const customerName = (this.orderForm.customer_name || '').trim();
+            const customerPhone = (this.orderForm.customer_phone || '').trim();
+            const customerEmail = (this.orderForm.customer_email || '').trim();
+
+            if (!projectId) {
+                this.showToast(i18n.projectRequired, 'error');
+                return;
+            }
+            if (!customerName) {
+                this.showToast(i18n.customerNameRequired, 'error');
+                return;
+            }
+
+            this.savingOrder = true;
+            try {
+                const response = await this.request(
+                    `/api/companies/${this.arContent.company_id}/projects/${this.arContent.project_id}/ar-content/${this.arContent.id}`,
+                    {
+                        method: 'PUT',
+                        body: JSON.stringify({
+                            project_id: projectId,
+                            customer_name: customerName,
+                            customer_phone: customerPhone || null,
+                            customer_email: customerEmail || null,
+                        }),
+                    }
+                );
+
+                if (!response.ok) {
+                    const errorData = await response.json().catch(() => ({ detail: i18n.saveOrderFailed }));
+                    throw new Error(errorData.detail || errorData.message || i18n.saveOrderFailed);
+                }
+
+                const result = await response.json();
+                this.arContent.project_id = result.project_id;
+                this.arContent.customer_name = result.customer_name;
+                this.arContent.customer_phone = result.customer_phone;
+                this.arContent.customer_email = result.customer_email;
+
+                const selectedProject = this.projectsForCurrentCompany.find(
+                    (project) => Number(project.id) === Number(result.project_id)
+                );
+                if (selectedProject) {
+                    this.arContent.project_name = selectedProject.name;
+                }
+
+                this.showOrderEdit = false;
+                this.showToast(i18n.saveOrderSuccess, 'success');
+            } catch (error) {
+                this.showToast((error && error.message) || i18n.saveOrderFailed, 'error');
+            } finally {
+                this.savingOrder = false;
             }
         },
 

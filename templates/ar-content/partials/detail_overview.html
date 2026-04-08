@@ -40,15 +40,24 @@
         <div class="card p-5">
             <div class="flex items-center gap-2 mb-4 pb-3 border-b border-gray-200 dark:border-gray-700">
                 <span class="material-icons text-blue-600 dark:text-blue-400">person</span>
-                <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Заказчик</h3>
+                <h3 class="text-lg font-semibold text-gray-900 dark:text-white">{{ "Customer" if is_en else "Заказчик" }}</h3>
+                <button x-show="!showOrderEdit"
+                        @click="startOrderEdit()"
+                        class="ml-auto btn btn-secondary text-sm px-3 py-1.5">
+                    <span class="material-icons text-sm mr-1">edit</span>{{ "Edit" if is_en else "Редактировать" }}
+                </button>
             </div>
-            <dl class="space-y-4">
+            <dl class="space-y-4" x-show="!showOrderEdit">
                 <div>
-                    <dt class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1">Имя</dt>
+                    <dt class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1">{{ "Project" if is_en else "Проект" }}</dt>
+                    <dd class="text-base text-gray-900 dark:text-white" x-text="arContent.project_name || '—'"></dd>
+                </div>
+                <div>
+                    <dt class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1">{{ "Name" if is_en else "Имя" }}</dt>
                     <dd class="text-base font-medium text-gray-900 dark:text-white" x-text="arContent.customer_name || '—'"></dd>
                 </div>
                 <div>
-                    <dt class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1">Телефон</dt>
+                    <dt class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1">{{ "Phone" if is_en else "Телефон" }}</dt>
                     <dd class="text-base text-gray-900 dark:text-white" x-text="arContent.customer_phone || '—'"></dd>
                 </div>
                 <div>
@@ -56,24 +65,56 @@
                     <dd class="text-base text-gray-900 dark:text-white break-all" x-text="arContent.customer_email || '—'"></dd>
                 </div>
             </dl>
+            <div class="space-y-4" x-show="showOrderEdit" x-cloak>
+                <div>
+                    <label class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1 block">{{ "Project" if is_en else "Проект" }}</label>
+                    <select x-model.number="orderForm.project_id" class="form-input w-full">
+                        <option value="">{{ "Select project" if is_en else "Выберите проект" }}</option>
+                        <template x-for="project in projectsForCurrentCompany" :key="project.id">
+                            <option :value="project.id" x-text="project.name"></option>
+                        </template>
+                    </select>
+                </div>
+                <div>
+                    <label class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1 block">{{ "Name" if is_en else "Имя" }}</label>
+                    <input type="text" x-model.trim="orderForm.customer_name" class="form-input w-full">
+                </div>
+                <div>
+                    <label class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1 block">{{ "Phone" if is_en else "Телефон" }}</label>
+                    <input type="tel" x-model.trim="orderForm.customer_phone" class="form-input w-full">
+                </div>
+                <div class="flex gap-2">
+                    <button type="button"
+                            @click="saveOrderDetails()"
+                            :disabled="savingOrder"
+                            class="btn btn-primary text-sm px-3 py-1.5">
+                        <span class="material-icons text-sm mr-1" x-show="!savingOrder">save</span>
+                        <span x-text="savingOrder ? ({{ 'Saving...'|tojson if is_en else 'Сохранение...'|tojson }}) : ({{ 'Save'|tojson if is_en else 'Сохранить'|tojson }})"></span>
+                    </button>
+                    <button type="button"
+                            @click="cancelOrderEdit()"
+                            :disabled="savingOrder"
+                            class="btn btn-secondary text-sm px-3 py-1.5">{{ "Cancel" if is_en else "Отмена" }}</button>
+                </div>
+            </div>
             <div class="mt-5 pt-4 border-t border-gray-200 dark:border-gray-700 flex flex-wrap gap-2">
                 <a x-show="arContent.customer_phone"
                    :href="'tel:' + arContent.customer_phone"
                    class="btn btn-secondary text-sm px-3 py-1.5">
-                    <span class="material-icons text-sm mr-1">call</span>Позвонить
+                    <span class="material-icons text-sm mr-1">call</span>{{ "Call" if is_en else "Позвонить" }}
                 </a>
                 <a x-show="arContent.customer_email"
                    :href="'mailto:' + arContent.customer_email"
                    class="btn btn-secondary text-sm px-3 py-1.5">
-                    <span class="material-icons text-sm mr-1">mail</span>Написать
+                    <span class="material-icons text-sm mr-1">mail</span>{{ "Email" if is_en else "Написать" }}
                 </a>
                 <button x-show="arContent.customer_phone"
-                        @click="copyText(arContent.customer_phone, 'Телефон скопирован')"
+                        @click="copyText(arContent.customer_phone, {{ 'Phone copied'|tojson if is_en else 'Телефон скопирован'|tojson }})"
                         class="btn btn-secondary text-sm px-3 py-1.5">
-                    <span class="material-icons text-sm mr-1">content_copy</span>Телефон
+                    <span class="material-icons text-sm mr-1">content_copy</span>{{ "Phone" if is_en else "Телефон" }}
                 </button>
                 <button x-show="arContent.customer_email"
-                        @click="copyText(arContent.customer_email, 'Email скопирован')"
+                        @click="copyText(arContent.customer_email, {{ 'Email copied'|tojson if is_en else 'Email скопирован'|tojson }})"
                         class="btn btn-secondary text-sm px-3 py-1.5">
                     <span class="material-icons text-sm mr-1">content_copy</span>Email
                 </button>
@@ -132,4 +173,3 @@
     </details>
 </div>
 {% endif %}
-

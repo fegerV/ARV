@@ -1031,10 +1031,32 @@ async def ar_content_detail(
     if active_video_info:
         _resolve_yadisk_urls(active_video_info, company_id=_cid)
 
+    detail_projects_js: list[dict] = []
+    try:
+        if _cid:
+            from app.models.project import Project
+
+            projects_result = await db.execute(
+                select(Project)
+                .where(Project.company_id == int(_cid))
+                .order_by(Project.name.asc())
+            )
+            detail_projects_js = [
+                {
+                    "id": int(project.id),
+                    "name": project.name,
+                    "company_id": int(project.company_id),
+                }
+                for project in projects_result.scalars().all()
+            ]
+    except Exception as exc:
+        logger.warning("detail_projects_load_failed", error=str(exc), ar_content_id=ar_content_id)
+
     context = {
         "request": request,
         "ar_content": ar_content,
         "ar_content_js": ar_content_js,
+        "projects_js": detail_projects_js,
         "videos_js": videos,
         "active_video_js": active_video_info,
         "rotation_schedule_js": rotation_schedule_js,
