@@ -159,6 +159,11 @@ function arContentForm() {
             return await response.json().catch(() => null);
         },
 
+        csrfHeaders() {
+            const token = window.getCsrfToken ? window.getCsrfToken() : '';
+            return token ? { 'X-CSRF-Token': token } : {};
+        },
+
         async submitForm() {
             if (!this.isValid) {
                 this.showToast('{{ t("ar_content.fill_required") }}', 'error');
@@ -513,7 +518,3 @@ function videoUploader() {
 }
 </script>
 {% endblock %}
-        csrfHeaders() {
-            const token = window.getCsrfToken ? window.getCsrfToken() : '';
-            return token ? { 'X-CSRF-Token': token } : {};
-        },
