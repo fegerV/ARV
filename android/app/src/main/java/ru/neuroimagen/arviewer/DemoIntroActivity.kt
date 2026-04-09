@@ -10,11 +10,9 @@ import android.os.Bundle
 import android.provider.MediaStore
 import android.view.LayoutInflater
 import android.view.View
-import android.view.animation.AlphaAnimation
-import android.view.animation.LinearInterpolator
 import android.widget.GridLayout
-import android.widget.ImageView
 import android.widget.ImageButton
+import android.widget.ImageView
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
@@ -48,7 +46,6 @@ class DemoIntroActivity : AppCompatActivity() {
         textError = findViewById(R.id.text_demo_error)
         findViewById<ImageView>(R.id.button_back).setOnClickListener { finish() }
 
-        startHeroStarAnimation()
         displayDemos(buildLocalDemos())
     }
 
@@ -87,24 +84,6 @@ class DemoIntroActivity : AppCompatActivity() {
             }
             card.layoutParams = params
             container.addView(card)
-        }
-    }
-
-    private fun startHeroStarAnimation() {
-        val stars = listOf(
-            findViewById<View>(R.id.star_one),
-            findViewById<View>(R.id.star_two),
-            findViewById<View>(R.id.star_three),
-        )
-        stars.forEachIndexed { index, star ->
-            val animation = AlphaAnimation(0.28f, 1f).apply {
-                duration = 3300L + (index * 750L)
-                repeatCount = AlphaAnimation.INFINITE
-                repeatMode = AlphaAnimation.REVERSE
-                interpolator = LinearInterpolator()
-                startOffset = index * 420L
-            }
-            star.startAnimation(animation)
         }
     }
 
@@ -221,12 +200,10 @@ class DemoIntroActivity : AppCompatActivity() {
 
     private fun buildLocalDemos(): List<LocalDemo> =
         listOf(
-            LocalDemo("demo_local_1", "Портрет V-Portal", "demo/demo_marker_1.png", "VP-2401-001", 1),
-            LocalDemo("demo_local_2", "Афиша мероприятия", "demo/demo_marker_2.png", "VP-2401-002", 2),
-            LocalDemo("demo_local_3", "Упаковка продукта", "demo/demo_marker_3.png", "VP-2401-003", 3),
-            LocalDemo("demo_local_4", "Меню ресторана", "demo/demo_marker_4.png", "VP-2401-004", 4),
-            LocalDemo("demo_local_5", "Промо-постер", "demo/demo_marker_5.png", "VP-2401-005", 5),
-            LocalDemo("demo_local_6", "Каталог для витрины", "demo/demo_marker_6.png", "VP-2401-006", 6),
+            LocalDemo("demo_local_1", "Demo QR 1", "demo/01_demo.jpg", "VP-2401-001", 1),
+            LocalDemo("demo_local_2", "Demo QR 2", "demo/02_demo.jpg", "VP-2401-002", 2),
+            LocalDemo("demo_local_3", "Demo QR 3", "demo/03_demo.jpg", "VP-2401-003", 3),
+            LocalDemo("demo_local_4", "Demo QR 4", "demo/04_demo.jpg", "VP-2401-004", 4),
         )
 
     private fun dp(value: Int): Int = (value * resources.displayMetrics.density).toInt()
