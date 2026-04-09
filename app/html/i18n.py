@@ -239,7 +239,7 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "help.title": "Справка",
         "ar_content.title": "AR-контент",
         "ar_content.create": "Создать AR-контент",
-        "ar_content.edit": "Редактировать AR-контент",
+        "ar_content.edit": "Редактировать",
         "ar_content.create_short": "Новый материал",
         "ar_content.description": "Управляйте AR-материалами, QR-кодами и публикацией по проектам",
         "ar_content.company": "Компания",
