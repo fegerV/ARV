@@ -119,38 +119,50 @@
         <div class="stores">
             {% if rustore_url %}
             <a href="{{ rustore_url }}" class="store-link" target="_blank" rel="noopener noreferrer">
-                <img src="/static/img/stores/rustore.png" alt="RuStore" class="store-icon" onerror="this.style.display='none'; this.parentElement.querySelector('.store-text').style.display='inline'">
+                <img src="/static/img/stores/rustore.svg" alt="RuStore" class="store-icon" onerror="this.style.display='none'; this.parentElement.querySelector('.store-text').style.display='inline'">
                 <span class="store-text" style="display:none;">RuStore</span>
             </a>
             {% else %}
-            <div class="store-disabled"><span class="store-text">RuStore</span></div>
+            <div class="store-disabled">
+                <img src="/static/img/stores/rustore.svg" alt="RuStore" class="store-icon" onerror="this.style.display='none'; this.parentElement.querySelector('.store-text').style.display='inline'">
+                <span class="store-text" style="display:none;">RuStore</span>
+            </div>
             {% endif %}
 
             {% if app_gallery_url %}
             <a href="{{ app_gallery_url }}" class="store-link" target="_blank" rel="noopener noreferrer">
-                <img src="/static/img/stores/appgallery.png" alt="AppGallery" class="store-icon" onerror="this.style.display='none'; this.parentElement.querySelector('.store-text').style.display='inline'">
+                <img src="/static/img/stores/appgallery.svg" alt="AppGallery" class="store-icon" onerror="this.style.display='none'; this.parentElement.querySelector('.store-text').style.display='inline'">
                 <span class="store-text" style="display:none;">AppGallery</span>
             </a>
             {% else %}
-            <div class="store-disabled"><span class="store-text">AppGallery</span></div>
+            <div class="store-disabled">
+                <img src="/static/img/stores/appgallery.svg" alt="AppGallery" class="store-icon" onerror="this.style.display='none'; this.parentElement.querySelector('.store-text').style.display='inline'">
+                <span class="store-text" style="display:none;">AppGallery</span>
+            </div>
             {% endif %}
 
             {% if play_url %}
             <a href="{{ play_url }}" class="store-link" target="_blank" rel="noopener noreferrer">
-                <img src="/static/img/stores/googleplay.png" alt="Google Play" class="store-icon" onerror="this.style.display='none'; this.parentElement.querySelector('.store-text').style.display='inline'">
+                <img src="/static/img/stores/googleplay.svg" alt="Google Play" class="store-icon" onerror="this.style.display='none'; this.parentElement.querySelector('.store-text').style.display='inline'">
                 <span class="store-text" style="display:none;">Google Play</span>
             </a>
             {% else %}
-            <div class="store-disabled"><span class="store-text">Google Play</span></div>
+            <div class="store-disabled">
+                <img src="/static/img/stores/googleplay.svg" alt="Google Play" class="store-icon" onerror="this.style.display='none'; this.parentElement.querySelector('.store-text').style.display='inline'">
+                <span class="store-text" style="display:none;">Google Play</span>
+            </div>
             {% endif %}
 
             {% if appstore_url %}
             <a href="{{ appstore_url }}" class="store-link" target="_blank" rel="noopener noreferrer">
-                <img src="/static/img/stores/appstore.png" alt="App Store" class="store-icon" onerror="this.style.display='none'; this.parentElement.querySelector('.store-text').style.display='inline'">
+                <img src="/static/img/stores/appstore.svg" alt="App Store" class="store-icon" onerror="this.style.display='none'; this.parentElement.querySelector('.store-text').style.display='inline'">
                 <span class="store-text" style="display:none;">App Store</span>
             </a>
             {% else %}
-            <div class="store-disabled"><span class="store-text">App Store</span></div>
+            <div class="store-disabled">
+                <img src="/static/img/stores/appstore.svg" alt="App Store" class="store-icon" onerror="this.style.display='none'; this.parentElement.querySelector('.store-text').style.display='inline'">
+                <span class="store-text" style="display:none;">App Store</span>
+            </div>
             {% endif %}
         </div>
     </div>
