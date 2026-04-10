@@ -1102,7 +1102,7 @@ async def ar_content_create_post(
         
         # Call API to create AR content
         # Files from form are already UploadFile objects
-        result = await _create_ar_content(
+        await _create_ar_content(
             company_id=company_id,
             project_id=project_id,
             customer_name=customer_name,

@@ -1,8 +1,6 @@
 import base64
 import json
 
-import pytest
-
 from app.utils import token_encryption as mod
 
 

@@ -1,7 +1,7 @@
 """HTML route for the Help / Documentation page."""
 
 from fastapi import APIRouter, Depends, Request
-from fastapi.responses import HTMLResponse, RedirectResponse, PlainTextResponse
+from fastapi.responses import HTMLResponse, PlainTextResponse
 from pathlib import Path
 
 from app.api.routes.auth import get_current_user_optional

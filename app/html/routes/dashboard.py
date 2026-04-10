@@ -1,6 +1,6 @@
 from datetime import datetime, timedelta
 from fastapi import Request, Depends
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse
 from fastapi import APIRouter
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, desc

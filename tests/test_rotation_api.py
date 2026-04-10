@@ -180,9 +180,7 @@ async def test_rotation_calendar_rejects_invalid_month():
 async def test_rotation_calendar_prefers_scheduled_video_then_sequence():
     from app.api.routes import rotation
 
-    january_first = datetime(2025, 1, 1)
     january_second = datetime(2025, 1, 2)
-    january_third = datetime(2025, 1, 3)
     vids = [
         SimpleNamespace(
             id=10,

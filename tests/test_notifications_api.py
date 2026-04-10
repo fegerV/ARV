@@ -1,7 +1,6 @@
 from datetime import datetime, timezone
 from types import SimpleNamespace
 
-import httpx
 import pytest
 from fastapi import BackgroundTasks, HTTPException
 

@@ -15,7 +15,7 @@ from typing import Any
 
 import structlog
 from fastapi import APIRouter, Depends, Request
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse
 from sqlalchemy import cast, Date, case, distinct, func, literal_column, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
