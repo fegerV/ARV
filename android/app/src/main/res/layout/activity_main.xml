@@ -112,7 +112,7 @@
                             android:layout_weight="1"
                             android:includeFontPadding="false"
                             android:text="@string/try_demo"
-                            android:textColor="@color/home_primary"
+                            android:textColor="@color/home_row_text"
                             android:textSize="18sp"
                             android:textStyle="bold" />
 
@@ -154,7 +154,7 @@
                             android:layout_weight="1"
                             android:includeFontPadding="false"
                             android:text="@string/check_ar_core_label"
-                            android:textColor="@color/home_primary"
+                            android:textColor="@color/home_row_text"
                             android:textSize="18sp"
                             android:textStyle="bold" />
 
@@ -196,7 +196,7 @@
                             android:layout_weight="1"
                             android:includeFontPadding="false"
                             android:text="@string/how_it_works"
-                            android:textColor="@color/home_primary"
+                            android:textColor="@color/home_row_text"
                             android:textSize="18sp"
                             android:textStyle="bold" />
 
@@ -222,14 +222,14 @@
                     android:letterSpacing="0.01"
                     android:text="@string/order_ar"
                     android:textAllCaps="false"
-                    android:textColor="@color/home_primary"
+                    android:textColor="@color/home_row_text"
                     android:textSize="18sp"
                     app:backgroundTint="@null"
                     app:cornerRadius="14dp"
                     app:icon="@drawable/ic_add_circle_outline"
                     app:iconGravity="textStart"
                     app:iconPadding="8dp"
-                    app:iconTint="@color/home_primary"
+                    app:iconTint="@color/home_row_text"
                     app:strokeWidth="0dp" />
 
             </LinearLayout>

@@ -370,7 +370,7 @@ struct SupportDialogView: View {
                                 Text("Версия:")
                                     .fontWeight(.medium)
                                     .foregroundStyle(.white)
-                                Text("1.0.0")
+                                Text("1.0.2")
                                     .foregroundStyle(.white.opacity(0.9))
                             }
                         }
@@ -463,3 +463,4 @@ struct MainView_Previews: PreviewProvider {
         MainView()
     }
 }
+

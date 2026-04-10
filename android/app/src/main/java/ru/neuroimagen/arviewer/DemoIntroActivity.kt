@@ -17,9 +17,6 @@ import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import coil.load
-import com.google.gson.Gson
-import ru.neuroimagen.arviewer.data.model.ViewerManifest
-import ru.neuroimagen.arviewer.data.model.ViewerManifestVideo
 import java.io.OutputStream
 
 /**
@@ -34,8 +31,6 @@ class DemoIntroActivity : AppCompatActivity() {
     private lateinit var container: GridLayout
     private lateinit var progressView: View
     private lateinit var textError: TextView
-    private val gson = Gson()
-
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_demo_intro)
@@ -71,8 +66,6 @@ class DemoIntroActivity : AppCompatActivity() {
             badgeView.text = getString(R.string.demo_title_format, index + 1)
             imageView.load("file:///android_asset/${demo.markerAssetPath}")
 
-            card.setOnClickListener { startDemo(demo) }
-            imageView.setOnClickListener { startDemo(demo) }
             buttonSave.setOnClickListener { saveDemoMarker(demo) }
             buttonShare.setOnClickListener { shareDemoMarker(demo) }
 
@@ -80,49 +73,11 @@ class DemoIntroActivity : AppCompatActivity() {
                 width = 0
                 height = GridLayout.LayoutParams.WRAP_CONTENT
                 columnSpec = GridLayout.spec(GridLayout.UNDEFINED, 1f)
-                setMargins(0, 0, 0, dp(16))
+                setMargins(dp(6), 0, dp(6), dp(16))
             }
             card.layoutParams = params
             container.addView(card)
         }
-    }
-
-    private fun startDemo(demo: LocalDemo) {
-        val manifest = ViewerManifest(
-            manifestVersion = "1.0",
-            uniqueId = demo.uniqueId,
-            orderNumber = demo.orderNumber,
-            markerImageUrl = "asset://${demo.markerAssetPath}",
-            photoUrl = "asset://${demo.markerAssetPath}",
-            video = ViewerManifestVideo(
-                id = demo.videoId,
-                title = demo.title,
-                videoUrl = DEMO_VIDEO_URL,
-                thumbnailUrl = null,
-                duration = null,
-                width = 320,
-                height = 180,
-                mimeType = "video/mp4",
-                selectionSource = "demo",
-                scheduleId = null,
-                expiresInDays = null,
-                selectedAt = null,
-                previewUrl = null,
-                isActive = true,
-                rotationType = null,
-                subscriptionEnd = null,
-                videoCreatedAt = null,
-            ),
-            expiresAt = "2099-12-31T23:59:59Z",
-            status = "active",
-        )
-
-        startActivity(
-            Intent(this, ArViewerActivity::class.java).apply {
-                putExtra(ArViewerActivity.EXTRA_MANIFEST_JSON, gson.toJson(manifest))
-                putExtra(ArViewerActivity.EXTRA_UNIQUE_ID, demo.uniqueId)
-            },
-        )
     }
 
     private fun saveDemoMarker(demo: LocalDemo) {
@@ -200,10 +155,10 @@ class DemoIntroActivity : AppCompatActivity() {
 
     private fun buildLocalDemos(): List<LocalDemo> =
         listOf(
-            LocalDemo("demo_local_1", "Demo QR 1", "demo/01_demo.jpg", "VP-2401-001", 1),
-            LocalDemo("demo_local_2", "Demo QR 2", "demo/02_demo.jpg", "VP-2401-002", 2),
-            LocalDemo("demo_local_3", "Demo QR 3", "demo/03_demo.jpg", "VP-2401-003", 3),
-            LocalDemo("demo_local_4", "Demo QR 4", "demo/04_demo.jpg", "VP-2401-004", 4),
+            LocalDemo("demo_local_1", "Demo QR 1", "demo/01_demo.jpg"),
+            LocalDemo("demo_local_2", "Demo QR 2", "demo/02_demo.jpg"),
+            LocalDemo("demo_local_3", "Demo QR 3", "demo/03_demo.jpg"),
+            LocalDemo("demo_local_4", "Demo QR 4", "demo/04_demo.jpg"),
         )
 
     private fun dp(value: Int): Int = (value * resources.displayMetrics.density).toInt()
@@ -212,13 +167,5 @@ class DemoIntroActivity : AppCompatActivity() {
         val uniqueId: String,
         val title: String,
         val markerAssetPath: String,
-        val orderNumber: String,
-        val videoId: Int,
     )
-
-    companion object {
-        // Stable public sample video for the built-in demo mode.
-        private const val DEMO_VIDEO_URL =
-            "https://storage.googleapis.com/exoplayer-test-media-0/BigBuckBunny_320x180.mp4"
-    }
 }

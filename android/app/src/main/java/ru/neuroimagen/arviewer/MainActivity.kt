@@ -235,7 +235,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun openOrderPage() {
-        startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://vertex-art.ru")))
+        startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://vertex-art.ru/ar")))
     }
 
     private fun showInfoDialog(titleRes: Int, bodyRes: Int) {

@@ -86,6 +86,7 @@
     <color name="home_primary">#00F000</color>
     <color name="home_button_text">#081107</color>
     <color name="home_row_stroke">#D9D9D9</color>
+    <color name="home_row_text">#EDEDED</color>
     <color name="home_row_icon">#EFEFEF</color>
     <color name="home_footer_text">#A7A7A7</color>
 </resources>

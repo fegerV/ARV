@@ -238,4 +238,6 @@ cd android
 - `versionName` и `versionCode` в `app/build.gradle.kts`
 - Формат: **MAJOR.MINOR.PATCH** (semver)
 - При каждом релизе: увеличить `versionCode`, обновить `versionName`
-- Текущая версия: **1.0.1** (`versionCode = 2`)
+- Текущая версия: **1.0.2** (`versionCode = 2`)
+
+
