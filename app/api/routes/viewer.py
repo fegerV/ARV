@@ -198,6 +198,26 @@ def _photo_url_from_ar_content(ar_content: ARContent) -> Optional[str]:
     return url
 
 
+def _marker_preview_url_from_ar_content(ar_content: ARContent) -> Optional[str]:
+    """Get lightweight marker preview URL used on landing page."""
+    preview = ar_content.thumbnail_url
+    # For yadisk:// references, return as-is (resolved later).
+    if _is_yadisk_ref(preview):
+        return preview
+
+    if not preview and ar_content.photo_path:
+        try:
+            photo_path = Path(ar_content.photo_path)
+            photo_abs = photo_path if photo_path.is_absolute() else Path(settings.STORAGE_BASE_PATH) / photo_path
+            preview = build_public_url(photo_abs.parent / "thumbnail.webp")
+        except Exception:
+            preview = None
+
+    if not preview:
+        preview = _photo_url_from_ar_content(ar_content)
+    return preview
+
+
 async def get_viewer_landing_data(
     unique_id: str,
     db: AsyncSession,
@@ -218,6 +238,7 @@ async def get_viewer_landing_data(
         video_url = base + _demo_relative_url(video_path)
         return {
             "photo_url": photo_url,
+            "preview_url": photo_url,
             "video_url": video_url,
             "order_number": f"Demo {demo_index}",
         }
@@ -237,11 +258,13 @@ async def get_viewer_landing_data(
     photo_url_rel = _photo_url_from_ar_content(ar_content)
     if not photo_url_rel:
         return None
+    preview_url_rel = _marker_preview_url_from_ar_content(ar_content) or photo_url_rel
     video_result = await get_active_video(ar_content.id, db)
     if not video_result:
         return None
     video = video_result["video"]
     resolved_photo = photo_url_rel
+    resolved_preview = preview_url_rel
     resolved_video = video.video_url
     company: Optional[Company] = None
     if ar_content.company_id:
@@ -249,6 +272,8 @@ async def get_viewer_landing_data(
     if company and company.storage_provider == "yandex_disk":
         if _is_yadisk_ref(resolved_photo):
             resolved_photo = _yadisk_proxy_url(resolved_photo, company.id)
+        if _is_yadisk_ref(resolved_preview):
+            resolved_preview = _yadisk_proxy_url(resolved_preview, company.id)
         if _is_yadisk_ref(resolved_video):
             resolved_video = _yadisk_proxy_url(resolved_video, company.id)
     if _is_yadisk_ref(resolved_photo) or _is_yadisk_ref(resolved_video):
@@ -260,15 +285,18 @@ async def get_viewer_landing_data(
             video_still_yadisk=_is_yadisk_ref(resolved_video or ""),
         )
     photo_url_abs = _absolute_url(resolved_photo)
+    preview_url_abs = _absolute_url(resolved_preview)
     video_url_abs = _absolute_url(resolved_video or "") if resolved_video else None
     logger.info(
         "viewer_landing_data",
         unique_id=unique_id,
         photo_url=photo_url_abs,
+        preview_url=preview_url_abs,
         video_url=video_url_abs,
     )
     return {
         "photo_url": photo_url_abs,
+        "preview_url": preview_url_abs,
         "video_url": video_url_abs,
         "order_number": ar_content.order_number or "AR",
     }

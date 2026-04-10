@@ -140,6 +140,9 @@ class Settings(BaseSettings):
     ANDROID_APP_SHA256_FINGERPRINTS: str = ""
     # iOS: ссылка на приложение в App Store (для страницы /view/; если пусто — кнопка не показывается)
     APP_STORE_URL: str = ""
+    PLAY_STORE_URL: str = "https://play.google.com/store/apps/details?id=ru.neuroimagen.arviewer"
+    RUSTORE_URL: str = ""
+    APP_GALLERY_URL: str = ""
 
     # Yandex OAuth (for Yandex Disk storage)
     YANDEX_OAUTH_CLIENT_ID: str = ""

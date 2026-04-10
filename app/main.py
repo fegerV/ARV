@@ -373,8 +373,10 @@ async def ar_viewer_landing(request: Request, unique_id: str):
             return JSONResponse(status_code=404, content={"detail": "AR content not found or unavailable"})
 
         deep_link = f"arv://view/{unique_id}"
-        play_store_url = "https://play.google.com/store/apps/details?id=ru.neuroimagen.arviewer"
+        play_store_url = (settings.PLAY_STORE_URL or "").strip()
         app_store_url = (settings.APP_STORE_URL or "").strip()
+        rustore_url = (settings.RUSTORE_URL or "").strip()
+        app_gallery_url = (settings.APP_GALLERY_URL or "").strip()
 
         return _viewer_templates.TemplateResponse(
             "viewer.html",
@@ -382,11 +384,14 @@ async def ar_viewer_landing(request: Request, unique_id: str):
                 "request": request,
                 "unique_id": unique_id,
                 "photo_url": data["photo_url"],
+                "preview_url": data.get("preview_url") or data["photo_url"],
                 "video_url": data.get("video_url"),
                 "order_number": data.get("order_number", "AR"),
                 "app_url": deep_link,
                 "play_url": play_store_url,
                 "appstore_url": app_store_url or "",
+                "rustore_url": rustore_url or "",
+                "app_gallery_url": app_gallery_url or "",
             },
         )
     except Exception as exc:

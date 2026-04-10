@@ -4,65 +4,153 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="robots" content="noindex, nofollow">
-    <title>Откройте AR для {{ order_number }}</title>
+    <title>Открыть в V-Portal для {{ order_number }}</title>
     <style>
+        * { box-sizing: border-box; }
         body {
             margin: 0;
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
-            background: #000;
+            background: #050505;
             color: #fff;
             text-align: center;
         }
         .container {
-            max-width: 400px;
-            margin: auto;
-            padding: 20px;
+            max-width: 440px;
+            margin: 0 auto;
+            padding: 20px 16px 28px;
         }
-        h2 {
-            font-size: 1.25rem;
-            margin-bottom: 16px;
+        h1 {
+            font-size: 1.2rem;
+            margin: 0 0 12px;
+            line-height: 1.35;
+            font-weight: 700;
         }
-        .ar-frame {
-            position: relative;
-            width: 100%;
-            background: #000;
+        .subtitle {
+            color: #c9c9c9;
+            font-size: 0.95rem;
+            margin: 0 0 16px;
+            line-height: 1.45;
         }
-        .ar-photo {
+        .marker-frame {
+            border: 1px solid #2a2a2a;
+            border-radius: 12px;
+            overflow: hidden;
+            background: #111;
+        }
+        .marker-preview {
             width: 100%;
             display: block;
+            aspect-ratio: 1 / 1;
+            object-fit: contain;
+            background: #000;
         }
-        .buttons {
-            margin-top: 20px;
+        .actions {
+            margin-top: 16px;
         }
         .btn {
             display: block;
-            margin: 10px auto;
-            padding: 15px;
+            margin: 0 auto;
+            padding: 14px;
             width: 100%;
-            max-width: 320px;
-            background: #00a800;
+            max-width: 360px;
+            background: #13b51b;
             color: #fff;
             text-decoration: none;
             border-radius: 10px;
             font-size: 16px;
+            font-weight: 600;
         }
-        .btn.secondary {
-            background: #212121;
+        .store-title {
+            margin: 20px 0 10px;
+            color: #c8c8c8;
+            font-size: 0.92rem;
+        }
+        .stores {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 10px;
+            max-width: 360px;
+            margin: 0 auto;
+        }
+        .store-link,
+        .store-disabled {
+            min-height: 54px;
+            border-radius: 10px;
+            border: 1px solid #2d2d2d;
+            background: #151515;
+            color: #efefef;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-decoration: none;
+            padding: 8px 10px;
+        }
+        .store-disabled {
+            opacity: 0.45;
+        }
+        .store-icon {
+            max-width: 100%;
+            max-height: 34px;
+            width: auto;
+            height: auto;
+            object-fit: contain;
+        }
+        .store-text {
+            font-size: 0.9rem;
+            font-weight: 600;
+            letter-spacing: 0.01em;
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <h2>Откройте этот маркер</h2>
-        <div class="ar-frame">
-            <img src="{{ photo_url }}" alt="Маркер" class="ar-photo">
+        <h1>Откройте это изображение в приложении V-Portal</h1>
+        <p class="subtitle">Если приложение уже установлено, нажмите кнопку ниже.</p>
+
+        <div class="marker-frame">
+            <img src="{{ preview_url or photo_url }}" alt="Превью маркера" class="marker-preview">
         </div>
-        <div class="buttons">
-            <a href="{{ app_url }}" class="btn">Открыть в AR-приложении</a>
-            <a href="{{ photo_url }}" class="btn secondary" download="marker.jpg">Скачать маркер</a>
-            <a href="{{ play_url }}" class="btn secondary">Скачать Android-приложение</a>
+
+        <div class="actions">
+            <a href="{{ app_url }}" class="btn">Открыть в приложении V-Portal (если оно установлено)</a>
+        </div>
+
+        <p class="store-title">Установить приложение:</p>
+        <div class="stores">
+            {% if rustore_url %}
+            <a href="{{ rustore_url }}" class="store-link" target="_blank" rel="noopener noreferrer">
+                <img src="/static/img/stores/rustore.png" alt="RuStore" class="store-icon" onerror="this.style.display='none'; this.parentElement.querySelector('.store-text').style.display='inline'">
+                <span class="store-text" style="display:none;">RuStore</span>
+            </a>
+            {% else %}
+            <div class="store-disabled"><span class="store-text">RuStore</span></div>
+            {% endif %}
+
+            {% if app_gallery_url %}
+            <a href="{{ app_gallery_url }}" class="store-link" target="_blank" rel="noopener noreferrer">
+                <img src="/static/img/stores/appgallery.png" alt="AppGallery" class="store-icon" onerror="this.style.display='none'; this.parentElement.querySelector('.store-text').style.display='inline'">
+                <span class="store-text" style="display:none;">AppGallery</span>
+            </a>
+            {% else %}
+            <div class="store-disabled"><span class="store-text">AppGallery</span></div>
+            {% endif %}
+
+            {% if play_url %}
+            <a href="{{ play_url }}" class="store-link" target="_blank" rel="noopener noreferrer">
+                <img src="/static/img/stores/googleplay.png" alt="Google Play" class="store-icon" onerror="this.style.display='none'; this.parentElement.querySelector('.store-text').style.display='inline'">
+                <span class="store-text" style="display:none;">Google Play</span>
+            </a>
+            {% else %}
+            <div class="store-disabled"><span class="store-text">Google Play</span></div>
+            {% endif %}
+
             {% if appstore_url %}
-            <a href="{{ appstore_url }}" class="btn secondary">Скачать приложение для iPhone</a>
+            <a href="{{ appstore_url }}" class="store-link" target="_blank" rel="noopener noreferrer">
+                <img src="/static/img/stores/appstore.png" alt="App Store" class="store-icon" onerror="this.style.display='none'; this.parentElement.querySelector('.store-text').style.display='inline'">
+                <span class="store-text" style="display:none;">App Store</span>
+            </a>
+            {% else %}
+            <div class="store-disabled"><span class="store-text">App Store</span></div>
             {% endif %}
         </div>
     </div>
