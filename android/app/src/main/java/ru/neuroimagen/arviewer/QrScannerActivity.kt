@@ -1,4 +1,4 @@
-package ru.neuroimagen.arviewer
+﻿package ru.neuroimagen.arviewer
 
 import android.Manifest
 import android.content.Intent
@@ -16,39 +16,31 @@ import androidx.camera.core.ImageProxy
 import androidx.camera.core.Preview
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.core.content.ContextCompat
-import androidx.lifecycle.lifecycleScope
 import com.google.mlkit.vision.barcode.BarcodeScanner
 import com.google.mlkit.vision.barcode.BarcodeScannerOptions
 import com.google.mlkit.vision.barcode.BarcodeScanning
 import com.google.mlkit.vision.barcode.common.Barcode
 import com.google.mlkit.vision.common.InputImage
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
-import ru.neuroimagen.arviewer.databinding.ActivityQrScannerBinding
 import dagger.hilt.android.AndroidEntryPoint
+import ru.neuroimagen.arviewer.databinding.ActivityQrScannerBinding
 import ru.neuroimagen.arviewer.util.UniqueIdParser
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 
-/**
- * Activity для сканирования QR кодов с AR ссылками.
- * 
- * Поддерживаемые форматы ссылок:
- * - https://ar.neuroimagen.ru/view/{unique_id}
- * - arv://view/{unique_id}
- * - Прямой unique_id (UUID формат)
- */
 @AndroidEntryPoint
 class QrScannerActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityQrScannerBinding
     private lateinit var cameraExecutor: ExecutorService
     private lateinit var barcodeScanner: BarcodeScanner
-    
+
     private var camera: Camera? = null
+    private var cameraProvider: ProcessCameraProvider? = null
+    private var imageAnalyzer: ImageAnalysis? = null
+
     private var isProcessing = false
     private var isFlashEnabled = false
+    private var scannerActive = false
     private var lastInvalidQrShownTime = 0L
     private var lastInvalidQrContent: String? = null
 
@@ -69,7 +61,7 @@ class QrScannerActivity : AppCompatActivity() {
         setContentView(binding.root)
 
         cameraExecutor = Executors.newSingleThreadExecutor()
-        
+
         val options = BarcodeScannerOptions.Builder()
             .setBarcodeFormats(Barcode.FORMAT_QR_CODE)
             .build()
@@ -87,9 +79,12 @@ class QrScannerActivity : AppCompatActivity() {
     }
 
     override fun onDestroy() {
+        scannerActive = false
+        imageAnalyzer?.clearAnalyzer()
+        cameraProvider?.unbindAll()
         super.onDestroy()
         cameraExecutor.shutdown()
-        barcodeScanner.close()
+        runCatching { barcodeScanner.close() }
     }
 
     private fun hasCameraPermission(): Boolean {
@@ -100,10 +95,12 @@ class QrScannerActivity : AppCompatActivity() {
     }
 
     private fun startCamera() {
+        scannerActive = true
         val cameraProviderFuture = ProcessCameraProvider.getInstance(this)
 
         cameraProviderFuture.addListener({
-            val cameraProvider = cameraProviderFuture.get()
+            val provider = cameraProviderFuture.get()
+            cameraProvider = provider
 
             val preview = Preview.Builder()
                 .build()
@@ -111,7 +108,7 @@ class QrScannerActivity : AppCompatActivity() {
                     it.setSurfaceProvider(binding.previewView.surfaceProvider)
                 }
 
-            val imageAnalyzer = ImageAnalysis.Builder()
+            imageAnalyzer = ImageAnalysis.Builder()
                 .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
                 .build()
                 .also {
@@ -123,8 +120,8 @@ class QrScannerActivity : AppCompatActivity() {
             val cameraSelector = CameraSelector.DEFAULT_BACK_CAMERA
 
             try {
-                cameraProvider.unbindAll()
-                camera = cameraProvider.bindToLifecycle(
+                provider.unbindAll()
+                camera = provider.bindToLifecycle(
                     this,
                     cameraSelector,
                     preview,
@@ -132,7 +129,7 @@ class QrScannerActivity : AppCompatActivity() {
                 )
                 updateFlashButton()
             } catch (e: Exception) {
-                Log.e(TAG, "Ошибка привязки камеры", e)
+                Log.e(TAG, "Error binding camera", e)
                 Toast.makeText(this, getString(R.string.camera_error), Toast.LENGTH_LONG).show()
                 finish()
             }
@@ -141,7 +138,7 @@ class QrScannerActivity : AppCompatActivity() {
 
     @androidx.camera.core.ExperimentalGetImage
     private fun processImage(imageProxy: ImageProxy) {
-        if (isProcessing) {
+        if (!scannerActive || isProcessing || isFinishing || isDestroyed) {
             imageProxy.close()
             return
         }
@@ -157,51 +154,46 @@ class QrScannerActivity : AppCompatActivity() {
             imageProxy.imageInfo.rotationDegrees
         )
 
-        barcodeScanner.process(inputImage)
-            .addOnSuccessListener { barcodes ->
-                for (barcode in barcodes) {
-                    barcode.rawValue?.let { value ->
+        try {
+            barcodeScanner.process(inputImage)
+                .addOnSuccessListener { barcodes ->
+                    if (!scannerActive || isFinishing || isDestroyed) return@addOnSuccessListener
+
+                    for (barcode in barcodes) {
+                        val value = barcode.rawValue ?: continue
                         val uniqueId = parseQrContent(value)
                         if (uniqueId != null) {
                             handleScannedCode(uniqueId)
                             return@addOnSuccessListener
-                        } else {
-                            // QR распознан, но не содержит AR-ссылку
-                            // Показываем ошибку не чаще раза в 3 секунды для одного и того же QR
-                            val now = System.currentTimeMillis()
-                            if (value != lastInvalidQrContent || now - lastInvalidQrShownTime > 3000) {
-                                lastInvalidQrContent = value
-                                lastInvalidQrShownTime = now
-                                showInvalidQrMessage(value)
-                            }
+                        }
+
+                        val now = System.currentTimeMillis()
+                        if (value != lastInvalidQrContent || now - lastInvalidQrShownTime > 3000) {
+                            lastInvalidQrContent = value
+                            lastInvalidQrShownTime = now
+                            showInvalidQrMessage(value)
                         }
                     }
                 }
-            }
-            .addOnFailureListener { e ->
-                Log.e(TAG, "Ошибка сканирования", e)
-            }
-            .addOnCompleteListener {
-                imageProxy.close()
-            }
+                .addOnFailureListener { e ->
+                    Log.e(TAG, "Error scanning QR", e)
+                }
+                .addOnCompleteListener {
+                    imageProxy.close()
+                }
+        } catch (e: Exception) {
+            Log.e(TAG, "Scanner processing failed", e)
+            imageProxy.close()
+        }
     }
 
-    /**
-     * Парсит содержимое QR кода и извлекает unique_id.
-     * Делегирует парсинг общему [UniqueIdParser].
-     *
-     * @param content содержимое QR кода (URL или UUID)
-     * @return unique_id или null если формат не распознан
-     */
     private fun parseQrContent(content: String): String? {
         return UniqueIdParser.extractFromInput(content)
     }
 
-    /**
-     * Показывает сообщение об ошибке при сканировании невалидного QR.
-     */
     private fun showInvalidQrMessage(scannedContent: String) {
         runOnUiThread {
+            if (isFinishing || isDestroyed) return@runOnUiThread
             val message = getString(R.string.error_qr_not_recognized) + "\n$scannedContent"
             Toast.makeText(this, message, Toast.LENGTH_LONG).show()
         }
@@ -210,12 +202,13 @@ class QrScannerActivity : AppCompatActivity() {
     private fun handleScannedCode(uniqueId: String) {
         if (isProcessing) return
         isProcessing = true
+        scannerActive = false
 
         runOnUiThread {
+            if (isFinishing || isDestroyed) return@runOnUiThread
             binding.panelProcessing.visibility = View.VISIBLE
         }
 
-        // Return the scan result to MainActivity.
         val resultIntent = Intent().apply {
             putExtra(EXTRA_UNIQUE_ID, uniqueId)
         }
@@ -224,15 +217,15 @@ class QrScannerActivity : AppCompatActivity() {
     }
 
     private fun toggleFlash() {
-        val camera = camera ?: return
-        if (!camera.cameraInfo.hasFlashUnit()) {
+        val boundCamera = camera ?: return
+        if (!boundCamera.cameraInfo.hasFlashUnit()) {
             Toast.makeText(this, getString(R.string.flash_not_available), Toast.LENGTH_SHORT).show()
             binding.buttonToggleFlash.isEnabled = false
             return
         }
 
         isFlashEnabled = !isFlashEnabled
-        camera.cameraControl.enableTorch(isFlashEnabled)
+        boundCamera.cameraControl.enableTorch(isFlashEnabled)
         updateFlashButton()
     }
 
