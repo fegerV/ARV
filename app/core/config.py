@@ -141,7 +141,7 @@ class Settings(BaseSettings):
     # iOS: ссылка на приложение в App Store (для страницы /view/; если пусто — кнопка не показывается)
     APP_STORE_URL: str = ""
     PLAY_STORE_URL: str = "https://play.google.com/store/apps/details?id=ru.neuroimagen.arviewer"
-    RUSTORE_URL: str = "https://www.rustore.ru/"
+    RUSTORE_URL: str = "https://www.rustore.ru/catalog/app/ru.neuroimagen.arviewer"
     APP_GALLERY_URL: str = "https://appgallery.huawei.com/"
 
     # Yandex OAuth (for Yandex Disk storage)
