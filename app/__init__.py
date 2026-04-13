@@ -1,1 +1,1 @@
-# Vertex AR B2B Platform - Backend Application
+# V-Portal B2B Platform - Backend Application

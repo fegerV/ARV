@@ -240,13 +240,13 @@ async def test_notification(email: str, chat_id: str, background_tasks: Backgrou
         _send_email_notification_sync,
         email,
         "Test Email",
-        "<p>Vertex AR test email</p>",
+        "<p>V-Portal test email</p>",
     )
     if settings.TELEGRAM_BOT_TOKEN:
         background_tasks.add_task(
             _send_telegram_notification_async,
             chat_id,
-            "Vertex AR test message",
+            "V-Portal test message",
         )
     return {"status": "queued"}
 
@@ -279,7 +279,7 @@ async def test_telegram_from_settings(
                 f"https://api.telegram.org/bot{bot_token}/sendMessage",
                 json={
                     "chat_id": chat_id,
-                    "text": "✅ <b>Vertex AR</b> — тестовое сообщение.\nУведомления работают!",
+                    "text": "✅ <b>V-Portal</b> — тестовое сообщение.\nУведомления работают!",
                     "parse_mode": "HTML",
                 },
             )
@@ -327,10 +327,10 @@ async def test_email_from_settings(
         return {"status": "error", "detail": "Заполните SMTP-сервер, email отправителя и email пользователя"}
 
     msg = MIMEMultipart()
-    msg["Subject"] = "Vertex AR: test email"
+    msg["Subject"] = "V-Portal: test email"
     msg["From"] = from_email
     msg["To"] = recipient
-    msg.attach(MIMEText("Тестовое письмо Vertex AR. Email-настройки работают.", "plain", "utf-8"))
+    msg.attach(MIMEText("Тестовое письмо V-Portal. Email-настройки работают.", "plain", "utf-8"))
 
     try:
         with smtplib.SMTP(host, port, timeout=15) as server:

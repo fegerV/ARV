@@ -1,5 +1,5 @@
 """
-Yandex Disk storage provider for Vertex AR platform.
+Yandex Disk storage provider for V-Portal platform.
 
 Implements the StorageProvider interface using the Yandex Disk REST API
 (https://yandex.ru/dev/disk-api/doc/ru/).

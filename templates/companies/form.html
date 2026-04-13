@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}{% if company %}{{ "Edit company" if request.state.locale == "en" else "Редактирование компании" }} - {{ company.name }}{% else %}{{ "Create company" if request.state.locale == "en" else "Создание компании" }}{% endif %} - Vertex AR Admin{% endblock %}
+{% block title %}{% if company %}{{ "Edit company" if request.state.locale == "en" else "Редактирование компании" }} - {{ company.name }}{% else %}{{ "Create company" if request.state.locale == "en" else "Создание компании" }}{% endif %} - V-Portal Admin{% endblock %}
 {% block page_title %}{% if company %}{{ "Edit company" if request.state.locale == "en" else "Редактирование компании" }}{% else %}{{ "Create company" if request.state.locale == "en" else "Создание компании" }}{% endif %}{% endblock %}
 
 {% block content %}
@@ -229,7 +229,7 @@
             <span class="material-icons text-blue-600 dark:text-blue-400 flex-shrink-0">info</span>
             <div class="text-sm text-blue-800 dark:text-blue-200">
                 <p class="font-medium">{{ "About companies" if request.state.locale == "en" else "О компаниях" }}</p>
-                <p class="mt-1">{{ "Companies represent organizations working in Vertex AR. Each company can have multiple projects and AR content items." if request.state.locale == "en" else "Компании представляют организации, работающие в Vertex AR. У каждой компании может быть несколько проектов и единиц AR-контента." }}</p>
+                <p class="mt-1">{{ "Companies represent organizations working in V-Portal. Each company can have multiple projects and AR content items." if request.state.locale == "en" else "Компании представляют организации, работающие в V-Portal. У каждой компании может быть несколько проектов и единиц AR-контента." }}</p>
             </div>
         </div>
     </div>

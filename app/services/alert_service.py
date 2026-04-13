@@ -106,12 +106,12 @@ async def send_admin_email(alerts: List[Alert], metrics: dict) -> None:
         smtp_from_email = notification_settings.smtp_from_email
 
     msg = MIMEMultipart()
-    msg["Subject"] = f"Vertex AR Alert: {len(alerts)} critical issues"
+    msg["Subject"] = f"V-Portal Alert: {len(alerts)} critical issues"
     msg["From"] = smtp_from_email
     msg["To"] = settings.ADMIN_EMAIL
 
     html_body = f"""
-    <h2>Vertex AR System Alerts</h2>
+    <h2>V-Portal System Alerts</h2>
     <p><strong>Time:</strong> {_utcnow_naive()}</p>
 
     <h3>Critical Alerts ({len(alerts)}):</h3>
@@ -167,7 +167,7 @@ async def send_telegram_alerts(alerts: List[Alert], metrics: dict) -> None:
         return
 
     message = f"""
-<b>Vertex AR Alerts</b>
+<b>V-Portal Alerts</b>
 
 <strong>Critical ({len(alerts)}):</strong>
 {chr(10).join([f"- {a.title}: {a.message}" for a in alerts])}

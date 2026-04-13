@@ -124,7 +124,7 @@ class SettingsService:
         
         # Build settings objects
         general = GeneralSettings(
-            site_title=settings_dict.get("site_title", "Vertex AR B2B Platform"),
+            site_title=settings_dict.get("site_title", "V-Portal B2B Platform"),
             admin_email=settings_dict.get("admin_email", "admin@vertexar.com"),
             site_description=settings_dict.get("site_description", "B2B SaaS platform for creating AR content based on image recognition (NFT markers)"),
             maintenance_mode=settings_dict.get("maintenance_mode", False),

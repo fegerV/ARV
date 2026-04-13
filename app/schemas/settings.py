@@ -45,7 +45,7 @@ class SystemSettingsResponse(SystemSettingsBase):
 
 # Settings group schemas for frontend
 class GeneralSettings(BaseModel):
-    site_title: str = "Vertex AR B2B Platform"
+    site_title: str = "V-Portal B2B Platform"
     admin_email: str = "admin@vertexar.com"
     site_description: str = "B2B SaaS platform for creating AR content based on image recognition (NFT markers)"
     maintenance_mode: bool = False

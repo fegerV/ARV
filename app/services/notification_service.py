@@ -89,7 +89,7 @@ def send_expiry_warning_email(project_name: str, company_email: str, expires_at_
 
 --
 С уважением,
-Команда Vertex AR
+Команда V-Portal
 """
     msg = MIMEMultipart()
     msg['From'] = settings.SMTP_FROM_EMAIL

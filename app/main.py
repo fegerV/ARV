@@ -154,7 +154,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator:
         logger.error("insecure_defaults_detected", error=str(exc))
         raise
 
-    # Seed defaults (Vertex AR local storage and company)
+    # Seed defaults (V-Portal local storage and company)
     try:
         await seed_defaults()
         logger.info("defaults_seeded")
@@ -197,7 +197,7 @@ _openapi_url = None if settings.is_production else "/openapi.json"
 
 # Create FastAPI application
 app = FastAPI(
-    title="Vertex AR B2B Platform",
+    title="V-Portal B2B Platform",
     description="B2B SaaS platform for creating AR content based on image recognition (NFT markers)",
     version="0.1.0",
     docs_url=_docs_url,
@@ -206,7 +206,7 @@ app = FastAPI(
     lifespan=lifespan,
     default_response_class=ORJSONResponse,
     contact={
-        "name": "Vertex AR Support",
+        "name": "V-Portal Support",
         "url": "https://vertexar.com/support",
         "email": "support@vertexar.com",
     },

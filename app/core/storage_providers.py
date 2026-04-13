@@ -1,5 +1,5 @@
 """
-Storage provider abstraction for Vertex AR platform.
+Storage provider abstraction for V-Portal platform.
 
 This module provides a clean abstraction layer for storage operations,
 currently supporting local file system storage with the ability to

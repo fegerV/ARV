@@ -1,6 +1,6 @@
-п»ї{% extends "base.html" %}
+{% extends "base.html" %}
 
-{% block title %}{{ ar_content.order_number }} - Vertex AR Admin{% endblock %}
+{% block title %}{{ ar_content.order_number }} - V-Portal Admin{% endblock %}
 
 {% block page_title %}{{ ar_content.order_number }}{% endblock %}
 
@@ -17,73 +17,73 @@
 // Use Alpine.store so the same scope is used for all bindings (fixes "X is not defined" with defer + plugins)
 document.addEventListener('alpine:init', function() {
     const i18n = {
-        activeVideoSchedule: {{ ("Source: schedule" if is_en else "РСЃС‚РѕС‡РЅРёРє: СЂР°СЃРїРёСЃР°РЅРёРµ") | tojson }},
-        activeVideoRotation: {{ ("Source: rotation" if is_en else "РСЃС‚РѕС‡РЅРёРє: СЂРѕС‚Р°С†РёСЏ") | tojson }},
-        activeVideoDefault: {{ ("Source: default video" if is_en else "РСЃС‚РѕС‡РЅРёРє: РІРёРґРµРѕ РїРѕ СѓРјРѕР»С‡Р°РЅРёСЋ") | tojson }},
-        activeVideoActive: {{ ("Source: active video" if is_en else "РСЃС‚РѕС‡РЅРёРє: Р°РєС‚РёРІРЅРѕРµ РІРёРґРµРѕ") | tojson }},
-        nothingToCopy: {{ ("Nothing to copy" if is_en else "РќРµС‡РµРіРѕ РєРѕРїРёСЂРѕРІР°С‚СЊ") | tojson }},
-        copyFailed: {{ ("Failed to copy" if is_en else "РќРµ СѓРґР°Р»РѕСЃСЊ СЃРєРѕРїРёСЂРѕРІР°С‚СЊ") | tojson }},
-        secondsSuffix: {{ (" sec" if is_en else " СЃРµРє") | tojson }},
-        densitySuffix: {{ (" / million pixels" if is_en else " / РјР»РЅ РїРёРєСЃРµР»РµР№") | tojson }},
-        selectSourceVideo: {{ ("Select a source video" if is_en else "Р’С‹Р±РµСЂРёС‚Рµ РёСЃС…РѕРґРЅРѕРµ РІРёРґРµРѕ") | tojson }},
-        selectPlaybackMode: {{ ("Select playback mode" if is_en else "Р’С‹Р±РµСЂРёС‚Рµ СЂРµР¶РёРј РїРѕРєР°Р·Р°") | tojson }},
-        saveVideoFailed: {{ ("Failed to save video" if is_en else "РќРµ СѓРґР°Р»РѕСЃСЊ СЃРѕС…СЂР°РЅРёС‚СЊ РІРёРґРµРѕ") | tojson }},
-        videoUpdated: {{ ("Video updated successfully" if is_en else "Р’РёРґРµРѕ СѓСЃРїРµС€РЅРѕ РѕР±РЅРѕРІР»РµРЅРѕ") | tojson }},
-        saveModeFailed: {{ ("Failed to save mode" if is_en else "РќРµ СѓРґР°Р»РѕСЃСЊ СЃРѕС…СЂР°РЅРёС‚СЊ СЂРµР¶РёРј") | tojson }},
-        singleActiveOnly: {{ ("Only one active video is allowed in this mode" if is_en else "Р’ СЌС‚РѕРј СЂРµР¶РёРјРµ Р°РєС‚РёРІРЅС‹Рј РјРѕР¶РµС‚ Р±С‹С‚СЊ С‚РѕР»СЊРєРѕ РѕРґРЅРѕ РІРёРґРµРѕ") | tojson }},
-        previewUpdateFailed: {{ ("Failed to update preview" if is_en else "РћС€РёР±РєР° РѕР±РЅРѕРІР»РµРЅРёСЏ РїСЂРµРІСЊСЋ") | tojson }},
-        previewUpdatedSoon: {{ ("Preview updated, the page will reload soon" if is_en else "РџСЂРµРІСЊСЋ РѕР±РЅРѕРІР»РµРЅРѕ, СЃС‚СЂР°РЅРёС†Р° СЃРєРѕСЂРѕ РїРµСЂРµР·Р°РіСЂСѓР·РёС‚СЃСЏ") | tojson }},
-        deleteVideoFailed: {{ ("Failed to delete video" if is_en else "РќРµ СѓРґР°Р»РѕСЃСЊ СѓРґР°Р»РёС‚СЊ РІРёРґРµРѕ") | tojson }},
-        videoDeleted: {{ ("Video deleted" if is_en else "Р’РёРґРµРѕ СѓРґР°Р»РµРЅРѕ") | tojson }},
-        videoMissing: {{ ("Video for deletion was not found" if is_en else "Р’РёРґРµРѕ РґР»СЏ СѓРґР°Р»РµРЅРёСЏ РЅРµ РЅР°Р№РґРµРЅРѕ") | tojson }},
-        setActiveFailed: {{ ("Failed to set active video" if is_en else "РќРµ СѓРґР°Р»РѕСЃСЊ СѓСЃС‚Р°РЅРѕРІРёС‚СЊ Р°РєС‚РёРІРЅРѕРµ РІРёРґРµРѕ") | tojson }},
-        activeVideoUpdated: {{ ("Active video updated" if is_en else "РђРєС‚РёРІРЅРѕРµ РІРёРґРµРѕ РѕР±РЅРѕРІР»РµРЅРѕ") | tojson }},
-        linkMissing: {{ ("Link is missing" if is_en else "РЎСЃС‹Р»РєР° РѕС‚СЃСѓС‚СЃС‚РІСѓРµС‚") | tojson }},
-        linkCopied: {{ ("Link copied to clipboard" if is_en else "РЎСЃС‹Р»РєР° СЃРєРѕРїРёСЂРѕРІР°РЅР° РІ Р±СѓС„РµСЂ РѕР±РјРµРЅР°") | tojson }},
-        qrReadyPrefix: {{ ("QR code is ready in " if is_en else "QR-РєРѕРґ РіРѕС‚РѕРІ РІ С„РѕСЂРјР°С‚Рµ ") | tojson }},
-        downloadQrFailed: {{ ("Failed to download QR code" if is_en else "РќРµ СѓРґР°Р»РѕСЃСЊ СЃРєР°С‡Р°С‚СЊ QR-РєРѕРґ") | tojson }},
-        photoMarkerUpdated: {{ ("Photo and marker updated" if is_en else "Р¤РѕС‚Рѕ Рё РјР°СЂРєРµСЂ РѕР±РЅРѕРІР»РµРЅС‹") | tojson }},
-        photoMarkerFailed: {{ ("Failed to update photo or marker" if is_en else "РќРµ СѓРґР°Р»РѕСЃСЊ РѕР±РЅРѕРІРёС‚СЊ С„РѕС‚Рѕ РёР»Рё РјР°СЂРєРµСЂ") | tojson }},
-        selectVideoFiles: {{ ("Please select video files" if is_en else "РџРѕР¶Р°Р»СѓР№СЃС‚Р°, РІС‹Р±РµСЂРёС‚Рµ РІРёРґРµРѕС„Р°Р№Р»С‹") | tojson }},
-        selectVideo: {{ ("Please select a video" if is_en else "РџРѕР¶Р°Р»СѓР№СЃС‚Р°, РІС‹Р±РµСЂРёС‚Рµ РІРёРґРµРѕ") | tojson }},
-        videoUploaded: {{ ("Video uploaded successfully" if is_en else "Р’РёРґРµРѕ СѓСЃРїРµС€РЅРѕ Р·Р°РіСЂСѓР¶РµРЅРѕ") | tojson }},
-        uploadVideoFailed: {{ ("Failed to upload video" if is_en else "РќРµ СѓРґР°Р»РѕСЃСЊ Р·Р°РіСЂСѓР·РёС‚СЊ РІРёРґРµРѕ") | tojson }},
-        unknownError: {{ ("unknown error" if is_en else "РЅРµРёР·РІРµСЃС‚РЅР°СЏ РѕС€РёР±РєР°") | tojson }},
-        selectImage: {{ ("Please select an image" if is_en else "РџРѕР¶Р°Р»СѓР№СЃС‚Р°, РІС‹Р±РµСЂРёС‚Рµ РёР·РѕР±СЂР°Р¶РµРЅРёРµ") | tojson }},
-        photoUploaded: {{ ("Photo uploaded successfully" if is_en else "Р¤РѕС‚Рѕ СѓСЃРїРµС€РЅРѕ Р·Р°РіСЂСѓР¶РµРЅРѕ") | tojson }},
-        uploadPhotoFailed: {{ ("Failed to upload photo" if is_en else "РќРµ СѓРґР°Р»РѕСЃСЊ Р·Р°РіСЂСѓР·РёС‚СЊ С„РѕС‚Рѕ") | tojson }},
-        selectMarkerFile: {{ ("Please select a marker file" if is_en else "РџРѕР¶Р°Р»СѓР№СЃС‚Р°, РІС‹Р±РµСЂРёС‚Рµ С„Р°Р№Р» РјР°СЂРєРµСЂР°") | tojson }},
-        updatePhotoFailed: {{ ("Failed to update photo" if is_en else "РќРµ СѓРґР°Р»РѕСЃСЊ РѕР±РЅРѕРІРёС‚СЊ С„РѕС‚Рѕ") | tojson }},
-        photoUpdated: {{ ("Photo updated" if is_en else "Р¤РѕС‚Рѕ РѕР±РЅРѕРІР»РµРЅРѕ") | tojson }},
-        updateMarkerFailed: {{ ("Failed to update marker" if is_en else "РќРµ СѓРґР°Р»РѕСЃСЊ РѕР±РЅРѕРІРёС‚СЊ РјР°СЂРєРµСЂ") | tojson }},
-        videoUpdatedShort: {{ ("Video updated" if is_en else "Р’РёРґРµРѕ РѕР±РЅРѕРІР»РµРЅРѕ") | tojson }},
-        noChanges: {{ ("No changes to save" if is_en else "РќРµС‚ РёР·РјРµРЅРµРЅРёР№ РґР»СЏ СЃРѕС…СЂР°РЅРµРЅРёСЏ") | tojson }},
-        saveChangesFailed: {{ ("Failed to save changes" if is_en else "РќРµ СѓРґР°Р»РѕСЃСЊ СЃРѕС…СЂР°РЅРёС‚СЊ РёР·РјРµРЅРµРЅРёСЏ") | tojson }},
-        saveOrderFailed: {{ ("Failed to save order details" if is_en else "РќРµ СѓРґР°Р»РѕСЃСЊ СЃРѕС…СЂР°РЅРёС‚СЊ РґР°РЅРЅС‹Рµ Р·Р°РєР°Р·Р°") | tojson }},
-        saveOrderSuccess: {{ ("Order details updated" if is_en else "Р”Р°РЅРЅС‹Рµ Р·Р°РєР°Р·Р° РѕР±РЅРѕРІР»РµРЅС‹") | tojson }},
-        customerNameRequired: {{ ("Customer name is required" if is_en else "РРјСЏ Р·Р°РєР°Р·С‡РёРєР° РѕР±СЏР·Р°С‚РµР»СЊРЅРѕ") | tojson }},
-        projectRequired: {{ ("Project is required" if is_en else "РџСЂРѕРµРєС‚ РѕР±СЏР·Р°С‚РµР»РµРЅ") | tojson }},
-        arDeleted: {{ ("AR content deleted successfully" if is_en else "AR-РєРѕРЅС‚РµРЅС‚ СѓСЃРїРµС€РЅРѕ СѓРґР°Р»С‘РЅ") | tojson }},
-        deleteArFailed: {{ ("Failed to delete AR content" if is_en else "РќРµ СѓРґР°Р»РѕСЃСЊ СѓРґР°Р»РёС‚СЊ AR-РєРѕРЅС‚РµРЅС‚") | tojson }},
-        fixed: {{ ("Fixed" if is_en else "Р¤РёРєСЃРёСЂРѕРІР°РЅРЅРѕРµ") | tojson }},
-        dateSpecific: {{ ("By dates" if is_en else "РџРѕ РґР°С‚Р°Рј") | tojson }},
-        dailyCycle: {{ ("Daily cycle" if is_en else "Р•Р¶РµРґРЅРµРІРЅС‹Р№ С†РёРєР»") | tojson }},
-        weeklyCycle: {{ ("Weekly cycle" if is_en else "РќРµРґРµР»СЊРЅС‹Р№ С†РёРєР»") | tojson }},
-        randomDaily: {{ ("Random playback" if is_en else "РЎР»СѓС‡Р°Р№РЅС‹Р№ РїРѕРєР°Р·") | tojson }},
-        videoLabel: {{ ("Video" if is_en else "Р’РёРґРµРѕ") | tojson }},
-        scheduleSaveFailed: {{ ("Failed to save schedule" if is_en else "РќРµ СѓРґР°Р»РѕСЃСЊ СЃРѕС…СЂР°РЅРёС‚СЊ СЂР°СЃРїРёСЃР°РЅРёРµ") | tojson }},
-        scheduleSaved: {{ ("Schedule saved" if is_en else "Р Р°СЃРїРёСЃР°РЅРёРµ СЃРѕС…СЂР°РЅРµРЅРѕ") | tojson }},
-        errorPrefix: {{ ("Error: " if is_en else "РћС€РёР±РєР°: ") | tojson }},
-        deleteScheduleConfirm: {{ ("Delete video schedule?" if is_en else "РЈРґР°Р»РёС‚СЊ СЂР°СЃРїРёСЃР°РЅРёРµ РІРёРґРµРѕ?") | tojson }},
-        deleteScheduleFailed: {{ ("Failed to delete schedule" if is_en else "РќРµ СѓРґР°Р»РѕСЃСЊ СѓРґР°Р»РёС‚СЊ СЂР°СЃРїРёСЃР°РЅРёРµ") | tojson }},
-        scheduleDeleted: {{ ("Schedule deleted" if is_en else "Р Р°СЃРїРёСЃР°РЅРёРµ СѓРґР°Р»РµРЅРѕ") | tojson }},
-        activeVideoDateRule: {{ ("Source: date rule" if is_en else "РСЃС‚РѕС‡РЅРёРє: РїСЂР°РІРёР»Рѕ РїРѕ РґР°С‚Рµ") | tojson }},
-        activeVideoRotationRule: {{ ("Source: rotation rule" if is_en else "РСЃС‚РѕС‡РЅРёРє: РїСЂР°РІРёР»Рѕ СЂРѕС‚Р°С†РёРё") | tojson }},
-        activeVideoFallback: {{ ("Source: fallback video" if is_en else "РСЃС‚РѕС‡РЅРёРє: СЂРµР·РµСЂРІРЅРѕРµ РІРёРґРµРѕ") | tojson }},
-        videoNotSelected: {{ ("Video not selected" if is_en else "Р’РёРґРµРѕ РЅРµ РІС‹Р±СЂР°РЅРѕ") | tojson }},
-        recurringSuffix: {{ (" (yearly)" if is_en else " (РµР¶РµРіРѕРґРЅРѕ)") | tojson }},
-        addDateRule: {{ ("Add at least one date rule" if is_en else "Р”РѕР±Р°РІСЊС‚Рµ С…РѕС‚СЏ Р±С‹ РѕРґРЅРѕ РїСЂР°РІРёР»Рѕ РїРѕ РґР°С‚Рµ") | tojson }},
-        technicalInfo: {{ ("Technical information" if is_en else "РўРµС…РЅРёС‡РµСЃРєР°СЏ РёРЅС„РѕСЂРјР°С†РёСЏ") | tojson }}
+        activeVideoSchedule: {{ ("Source: schedule" if is_en else "Источник: расписание") | tojson }},
+        activeVideoRotation: {{ ("Source: rotation" if is_en else "Источник: ротация") | tojson }},
+        activeVideoDefault: {{ ("Source: default video" if is_en else "Источник: видео по умолчанию") | tojson }},
+        activeVideoActive: {{ ("Source: active video" if is_en else "Источник: активное видео") | tojson }},
+        nothingToCopy: {{ ("Nothing to copy" if is_en else "Нечего копировать") | tojson }},
+        copyFailed: {{ ("Failed to copy" if is_en else "Не удалось скопировать") | tojson }},
+        secondsSuffix: {{ (" sec" if is_en else " сек") | tojson }},
+        densitySuffix: {{ (" / million pixels" if is_en else " / млн пикселей") | tojson }},
+        selectSourceVideo: {{ ("Select a source video" if is_en else "Выберите исходное видео") | tojson }},
+        selectPlaybackMode: {{ ("Select playback mode" if is_en else "Выберите режим показа") | tojson }},
+        saveVideoFailed: {{ ("Failed to save video" if is_en else "Не удалось сохранить видео") | tojson }},
+        videoUpdated: {{ ("Video updated successfully" if is_en else "Видео успешно обновлено") | tojson }},
+        saveModeFailed: {{ ("Failed to save mode" if is_en else "Не удалось сохранить режим") | tojson }},
+        singleActiveOnly: {{ ("Only one active video is allowed in this mode" if is_en else "В этом режиме активным может быть только одно видео") | tojson }},
+        previewUpdateFailed: {{ ("Failed to update preview" if is_en else "Ошибка обновления превью") | tojson }},
+        previewUpdatedSoon: {{ ("Preview updated, the page will reload soon" if is_en else "Превью обновлено, страница скоро перезагрузится") | tojson }},
+        deleteVideoFailed: {{ ("Failed to delete video" if is_en else "Не удалось удалить видео") | tojson }},
+        videoDeleted: {{ ("Video deleted" if is_en else "Видео удалено") | tojson }},
+        videoMissing: {{ ("Video for deletion was not found" if is_en else "Видео для удаления не найдено") | tojson }},
+        setActiveFailed: {{ ("Failed to set active video" if is_en else "Не удалось установить активное видео") | tojson }},
+        activeVideoUpdated: {{ ("Active video updated" if is_en else "Активное видео обновлено") | tojson }},
+        linkMissing: {{ ("Link is missing" if is_en else "Ссылка отсутствует") | tojson }},
+        linkCopied: {{ ("Link copied to clipboard" if is_en else "Ссылка скопирована в буфер обмена") | tojson }},
+        qrReadyPrefix: {{ ("QR code is ready in " if is_en else "QR-код готов в формате ") | tojson }},
+        downloadQrFailed: {{ ("Failed to download QR code" if is_en else "Не удалось скачать QR-код") | tojson }},
+        photoMarkerUpdated: {{ ("Photo and marker updated" if is_en else "Фото и маркер обновлены") | tojson }},
+        photoMarkerFailed: {{ ("Failed to update photo or marker" if is_en else "Не удалось обновить фото или маркер") | tojson }},
+        selectVideoFiles: {{ ("Please select video files" if is_en else "Пожалуйста, выберите видеофайлы") | tojson }},
+        selectVideo: {{ ("Please select a video" if is_en else "Пожалуйста, выберите видео") | tojson }},
+        videoUploaded: {{ ("Video uploaded successfully" if is_en else "Видео успешно загружено") | tojson }},
+        uploadVideoFailed: {{ ("Failed to upload video" if is_en else "Не удалось загрузить видео") | tojson }},
+        unknownError: {{ ("unknown error" if is_en else "неизвестная ошибка") | tojson }},
+        selectImage: {{ ("Please select an image" if is_en else "Пожалуйста, выберите изображение") | tojson }},
+        photoUploaded: {{ ("Photo uploaded successfully" if is_en else "Фото успешно загружено") | tojson }},
+        uploadPhotoFailed: {{ ("Failed to upload photo" if is_en else "Не удалось загрузить фото") | tojson }},
+        selectMarkerFile: {{ ("Please select a marker file" if is_en else "Пожалуйста, выберите файл маркера") | tojson }},
+        updatePhotoFailed: {{ ("Failed to update photo" if is_en else "Не удалось обновить фото") | tojson }},
+        photoUpdated: {{ ("Photo updated" if is_en else "Фото обновлено") | tojson }},
+        updateMarkerFailed: {{ ("Failed to update marker" if is_en else "Не удалось обновить маркер") | tojson }},
+        videoUpdatedShort: {{ ("Video updated" if is_en else "Видео обновлено") | tojson }},
+        noChanges: {{ ("No changes to save" if is_en else "Нет изменений для сохранения") | tojson }},
+        saveChangesFailed: {{ ("Failed to save changes" if is_en else "Не удалось сохранить изменения") | tojson }},
+        saveOrderFailed: {{ ("Failed to save order details" if is_en else "Не удалось сохранить данные заказа") | tojson }},
+        saveOrderSuccess: {{ ("Order details updated" if is_en else "Данные заказа обновлены") | tojson }},
+        customerNameRequired: {{ ("Customer name is required" if is_en else "Имя заказчика обязательно") | tojson }},
+        projectRequired: {{ ("Project is required" if is_en else "Проект обязателен") | tojson }},
+        arDeleted: {{ ("AR content deleted successfully" if is_en else "AR-контент успешно удалён") | tojson }},
+        deleteArFailed: {{ ("Failed to delete AR content" if is_en else "Не удалось удалить AR-контент") | tojson }},
+        fixed: {{ ("Fixed" if is_en else "Фиксированное") | tojson }},
+        dateSpecific: {{ ("By dates" if is_en else "По датам") | tojson }},
+        dailyCycle: {{ ("Daily cycle" if is_en else "Ежедневный цикл") | tojson }},
+        weeklyCycle: {{ ("Weekly cycle" if is_en else "Недельный цикл") | tojson }},
+        randomDaily: {{ ("Random playback" if is_en else "Случайный показ") | tojson }},
+        videoLabel: {{ ("Video" if is_en else "Видео") | tojson }},
+        scheduleSaveFailed: {{ ("Failed to save schedule" if is_en else "Не удалось сохранить расписание") | tojson }},
+        scheduleSaved: {{ ("Schedule saved" if is_en else "Расписание сохранено") | tojson }},
+        errorPrefix: {{ ("Error: " if is_en else "Ошибка: ") | tojson }},
+        deleteScheduleConfirm: {{ ("Delete video schedule?" if is_en else "Удалить расписание видео?") | tojson }},
+        deleteScheduleFailed: {{ ("Failed to delete schedule" if is_en else "Не удалось удалить расписание") | tojson }},
+        scheduleDeleted: {{ ("Schedule deleted" if is_en else "Расписание удалено") | tojson }},
+        activeVideoDateRule: {{ ("Source: date rule" if is_en else "Источник: правило по дате") | tojson }},
+        activeVideoRotationRule: {{ ("Source: rotation rule" if is_en else "Источник: правило ротации") | tojson }},
+        activeVideoFallback: {{ ("Source: fallback video" if is_en else "Источник: резервное видео") | tojson }},
+        videoNotSelected: {{ ("Video not selected" if is_en else "Видео не выбрано") | tojson }},
+        recurringSuffix: {{ (" (yearly)" if is_en else " (ежегодно)") | tojson }},
+        addDateRule: {{ ("Add at least one date rule" if is_en else "Добавьте хотя бы одно правило по дате") | tojson }},
+        technicalInfo: {{ ("Technical information" if is_en else "Техническая информация") | tojson }}
     };
     function fullArUrlFromContent(c) {
         var url = (c && (c.public_url || c.unique_link)) || '';
@@ -1415,13 +1415,13 @@ document.addEventListener('alpine:init', function() {
         <details class="cursor-pointer">
             <summary class="text-sm font-medium text-gray-700 dark:text-gray-300 flex items-center gap-2">
                 <span class="material-icons text-base">bug_report</span>
-                {{ "Technical information" if is_en else "РўРµС…РЅРёС‡РµСЃРєР°СЏ РёРЅС„РѕСЂРјР°С†РёСЏ" }}
+                {{ "Technical information" if is_en else "Техническая информация" }}
             </summary>
             <div class="mt-4 grid grid-cols-2 md:grid-cols-4 gap-4 text-xs">
-                <div><span class="font-medium text-gray-600 dark:text-gray-400">Storage:</span><br><span class="text-gray-900 dark:text-white break-all">{{ debug_info.storage_path or 'вЂ”' }}</span></div>
-                <div><span class="font-medium text-gray-600 dark:text-gray-400">Photo:</span><br><span class="text-gray-900 dark:text-white break-all">{{ debug_info.photo_path or 'вЂ”' }}</span></div>
-                <div><span class="font-medium text-gray-600 dark:text-gray-400">Video:</span><br><span class="text-gray-900 dark:text-white break-all">{{ debug_info.video_path or 'вЂ”' }}</span></div>
-                <div><span class="font-medium text-gray-600 dark:text-gray-400">Marker:</span><br><span class="text-gray-900 dark:text-white break-all">{{ debug_info.marker_path or 'вЂ”' }}</span></div>
+                <div><span class="font-medium text-gray-600 dark:text-gray-400">Storage:</span><br><span class="text-gray-900 dark:text-white break-all">{{ debug_info.storage_path or '—' }}</span></div>
+                <div><span class="font-medium text-gray-600 dark:text-gray-400">Photo:</span><br><span class="text-gray-900 dark:text-white break-all">{{ debug_info.photo_path or '—' }}</span></div>
+                <div><span class="font-medium text-gray-600 dark:text-gray-400">Video:</span><br><span class="text-gray-900 dark:text-white break-all">{{ debug_info.video_path or '—' }}</span></div>
+                <div><span class="font-medium text-gray-600 dark:text-gray-400">Marker:</span><br><span class="text-gray-900 dark:text-white break-all">{{ debug_info.marker_path or '—' }}</span></div>
             </div>
         </details>
     </div>

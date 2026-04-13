@@ -1,5 +1,5 @@
 """
-Simplified Storage Service for Vertex AR platform.
+Simplified Storage Service for V-Portal platform.
 
 This module provides a simplified storage interface with only LocalStorageAdapter.
 All MinIO/Yandex Disk functionality has been removed.

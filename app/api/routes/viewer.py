@@ -814,7 +814,7 @@ def _parse_user_agent(ua_string: str) -> tuple[str, str, str]:
 
     # Browser
     if "vertexar" in ua_lower or "arcore" in ua_lower:
-        browser_name = "Vertex AR App"
+        browser_name = "V-Portal App"
     elif "chrome" in ua_lower and "safari" in ua_lower:
         browser_name = "Chrome"
     elif "firefox" in ua_lower:

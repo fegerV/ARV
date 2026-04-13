@@ -1,5 +1,5 @@
 [Unit]
-Description=Vertex AR FastAPI Application
+Description=V-Portal FastAPI Application
 After=network.target postgresql.service
 Wants=postgresql.service
 

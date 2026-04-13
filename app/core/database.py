@@ -147,7 +147,7 @@ async def seed_defaults() -> None:
                     admin_user = User(
                         email=settings.ADMIN_EMAIL,
                         hashed_password=get_password_hash(settings.ADMIN_DEFAULT_PASSWORD),
-                        full_name="Vertex AR Admin",
+                        full_name="V-Portal Admin",
                         role="admin",
                         is_active=True,
                     )
@@ -175,7 +175,7 @@ async def seed_defaults() -> None:
                     logger.info("local_storage_structure_created", base_path=str(storage_path))
 
                 # Default company
-                DEFAULT_COMPANY_NAMES = ["Vertex AR", "VertexAR", "vertex-ar", "vertexar"]
+                DEFAULT_COMPANY_NAMES = ["V-Portal", "Vertex AR", "VertexAR", "v-portal", "vertex-ar", "vertexar"]
                 res_company = await session.execute(
                     select(Company).where(
                         (func.lower(Company.name).in_([n.lower() for n in DEFAULT_COMPANY_NAMES]))
@@ -185,7 +185,7 @@ async def seed_defaults() -> None:
                 default_company = res_company.scalar_one_or_none()
                 if not default_company:
                     default_company = Company(
-                        name="Vertex AR",
+                        name="V-Portal",
                         slug="vertex-ar",
                         contact_email=settings.ADMIN_EMAIL,
                         status=CompanyStatus.ACTIVE,
@@ -194,7 +194,7 @@ async def seed_defaults() -> None:
                     await session.flush()
                     logger.info("default_company_created", company_id=default_company.id)
                 else:
-                    default_company.name = "Vertex AR"
+                    default_company.name = "V-Portal"
                     default_company.slug = "vertex-ar"
                     default_company.contact_email = settings.ADMIN_EMAIL
                     default_company.status = CompanyStatus.ACTIVE

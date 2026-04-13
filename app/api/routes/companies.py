@@ -176,7 +176,7 @@ async def create_company(
     logger = structlog.get_logger()
     
     # Prevent creating duplicate default company
-    DEFAULT_COMPANY_NAMES = ["Vertex AR", "VertexAR", "vertex-ar", "vertexar"]
+    DEFAULT_COMPANY_NAMES = ["V-Portal", "Vertex AR", "VertexAR", "v-portal", "vertex-ar", "vertexar"]
     company_name_normalized = company_data.name.strip()
     
     # Check if trying to create default company
@@ -190,7 +190,7 @@ async def create_company(
         if existing_default.scalar_one_or_none():
             raise HTTPException(
                 status_code=400,
-                detail="Default company 'Vertex AR' already exists. You cannot create duplicate default companies."
+                detail="Default company 'V-Portal' already exists. You cannot create duplicate default companies."
             )
     
     # Check for duplicate name (case-insensitive)

@@ -70,7 +70,7 @@ async def send_admin_notification(
     await send_email(
         background_tasks=background_tasks,
         to_email=settings.ADMIN_EMAIL,
-        subject=f"[Vertex AR] {subject}",
+        subject=f"[V-Portal] {subject}",
         template_name="admin_notification.html",
         context=context
     )

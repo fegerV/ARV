@@ -199,7 +199,7 @@ async def login_form(
                             f"https://api.telegram.org/bot{bot_token}/sendMessage",
                             json={
                                 "chat_id": chat_id,
-                                "text": f"Код для входа в Vertex AR Admin: {code}\nДействует 5 минут.",
+                                "text": f"Код для входа в V-Portal Admin: {code}\nДействует 5 минут.",
                                 "disable_web_page_preview": True,
                             },
                             timeout=10.0,

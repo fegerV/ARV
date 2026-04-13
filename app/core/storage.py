@@ -1,5 +1,5 @@
 """
-Storage module for Vertex AR platform.
+Storage module for V-Portal platform.
 
 This module provides backward compatibility while redirecting to the new
 storage provider abstraction. The old MinIO-specific functionality has been

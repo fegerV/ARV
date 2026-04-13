@@ -31,7 +31,7 @@ class Settings(BaseSettings):
         return self.ENVIRONMENT.lower() == "production"
     
     # Project info
-    PROJECT_NAME: str = "Vertex AR with Mind AR"
+    PROJECT_NAME: str = "V-Portal Backend"
     VERSION: str = "2.0.0"
     API_V1_PREFIX: str = "/api"
     
@@ -109,7 +109,7 @@ class Settings(BaseSettings):
     SMTP_USERNAME: str = ""
     SMTP_PASSWORD: str = ""
     SMTP_FROM_EMAIL: str = "noreply@vertexar.com"
-    SMTP_FROM_NAME: str = "Vertex AR Platform"
+    SMTP_FROM_NAME: str = "V-Portal Platform"
     
     # Telegram
     TELEGRAM_BOT_TOKEN: str = ""

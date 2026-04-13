@@ -3,7 +3,7 @@ from datetime import datetime
 MOCK_COMPANIES = [
     {
         "id": "1",
-        "name": "Vertex AR Solutions",
+        "name": "V-Portal Solutions",
         "contact_email": "contact@vertexar.com",
         "storage_provider": "Local",
         "status": "active",
@@ -26,7 +26,7 @@ MOCK_PROJECTS = [
         "id": "1",
         "name": "Q4 Marketing Campaign",
         "status": "active",
-        "company_name": "Vertex AR Solutions",
+        "company_name": "V-Portal Solutions",
         "created_at": datetime(2023, 1, 15, 10, 30),
         "ar_content_count": 5
     },
@@ -44,7 +44,7 @@ MOCK_AR_CONTENT = [
     {
         "id": "1",
         "order_number": "AR-001",
-        "company_name": "Vertex AR Solutions",
+        "company_name": "V-Portal Solutions",
         "created_at": datetime(2023, 1, 15, 10, 30),
         "status": "ready",
         "thumbnail_url": "/storage/thumbnails/sample.jpg",
@@ -87,7 +87,7 @@ DASHBOARD_MOCK_DATA = {
 AR_CONTENT_DETAIL_MOCK_DATA = {
     "id": "1",
     "order_number": "AR-001",
-    "company_name": "Vertex AR Solutions",
+    "company_name": "V-Portal Solutions",
     "project_name": "Q4 Marketing Campaign",
     "created_at": datetime(2023, 1, 15, 10, 30),
     "status": "ready",
@@ -110,7 +110,7 @@ AR_CONTENT_DETAIL_MOCK_DATA = {
 
 PROJECT_CREATE_MOCK_DATA = {
     "companies": [
-        {"id": "1", "name": "Vertex AR Solutions", "status": "active"},
+        {"id": "1", "name": "V-Portal Solutions", "status": "active"},
         {"id": "2", "name": "AR Tech Innovations", "status": "active"}
     ],
     "projects": [
@@ -136,7 +136,7 @@ STORAGE_MOCK_DATA = {
         "companies": [
             {
                 "id": "1",
-                "name": "Vertex AR Solutions",
+                "name": "V-Portal Solutions",
                 "storage_used": "15.2 GB",
                 "files_count": 142
             },
@@ -164,7 +164,7 @@ ANALYTICS_MOCK_DATA = {
             {
                 "id": "1",
                 "title": "Product Demo AR",
-                "company_name": "Vertex AR Solutions",
+                "company_name": "V-Portal Solutions",
                 "views_count": 1240
             },
             {
@@ -181,10 +181,10 @@ NOTIFICATIONS_MOCK_DATA = [
     {
         "id": "1",
         "title": "New AR Content Created",
-        "message": "A new AR content item 'Product Demo' was created for Vertex AR Solutions",
+        "message": "A new AR content item 'Product Demo' was created for V-Portal Solutions",
         "created_at": datetime(2023, 1, 15, 10, 30),
         "is_read": False,
-        "company_name": "Vertex AR Solutions",
+        "company_name": "V-Portal Solutions",
         "project_name": "Q4 Campaign",
         "ar_content_name": "Product Demo"
     },
@@ -202,7 +202,7 @@ NOTIFICATIONS_MOCK_DATA = [
 
 SETTINGS_MOCK_DATA = {
     "settings": {
-        "site_title": "Vertex AR B2B Platform",
+        "site_title": "V-Portal B2B Platform",
         "admin_email": "admin@vertexar.com",
         "site_description": "B2B SaaS platform for creating AR content based on image recognition (NFT markers)",
         "password_min_length": 8,
@@ -213,6 +213,6 @@ SETTINGS_MOCK_DATA = {
 }
 
 UNIQUE_VALUES_MOCK_DATA = {
-    "unique_companies": ["Vertex AR Solutions", "AR Tech Innovations"],
+    "unique_companies": ["V-Portal Solutions", "AR Tech Innovations"],
     "unique_statuses": ["ready", "processing", "pending", "failed"]
 }

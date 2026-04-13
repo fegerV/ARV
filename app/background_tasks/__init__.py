@@ -1,5 +1,5 @@
 """
-Background tasks for the Vertex AR application.
+Background tasks for the V-Portal application.
 
 This module contains background tasks that were previously handled by Celery.
 """

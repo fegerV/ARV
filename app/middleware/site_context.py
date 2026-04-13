@@ -10,7 +10,7 @@ from fastapi import Request
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 from starlette.responses import Response
 
-_DEFAULT_TITLE = "Vertex AR Admin"
+_DEFAULT_TITLE = "V-Portal Admin"
 _cache: dict[str, tuple[str, float]] = {}
 _CACHE_TTL = 30.0
 

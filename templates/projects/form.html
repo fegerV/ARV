@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}{% if project %}{{ "Edit project" if request.state.locale == "en" else "Редактирование проекта" }} - {{ project.name }}{% else %}{{ "Create project" if request.state.locale == "en" else "Создание проекта" }}{% endif %} - Vertex AR Admin{% endblock %}
+{% block title %}{% if project %}{{ "Edit project" if request.state.locale == "en" else "Редактирование проекта" }} - {{ project.name }}{% else %}{{ "Create project" if request.state.locale == "en" else "Создание проекта" }}{% endif %} - V-Portal Admin{% endblock %}
 {% block page_title %}{% if project %}{{ "Edit project" if request.state.locale == "en" else "Редактирование проекта" }}{% else %}{{ "Create project" if request.state.locale == "en" else "Создание проекта" }}{% endif %}{% endblock %}
 
 {% block content %}
