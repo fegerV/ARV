@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources xmlns:tools="http://schemas.android.com/tools">
     <!-- Dark Theme (Night Mode) -->
-    <style name="Theme.ArViewer" parent="Theme.Material3.Dark.NoActionBar">
+    <style name="Theme.VPortal" parent="Theme.Material3.Dark.NoActionBar">
         <!-- Primary brand color -->
         <item name="colorPrimary">@color/primary</item>
         <item name="colorPrimaryVariant">@color/primary_variant</item>
@@ -30,7 +30,7 @@
     </style>
     
     <!-- Dark Theme for AR Mode -->
-    <style name="Theme.ArViewer.Dark" parent="Theme.Material3.Dark.NoActionBar">
+    <style name="Theme.VPortal.Dark" parent="Theme.Material3.Dark.NoActionBar">
         <item name="colorPrimary">@color/ar_accent</item>
         <item name="colorPrimaryVariant">@color/ar_accent_variant</item>
         <item name="colorOnPrimary">@color/ar_background</item>
@@ -49,15 +49,15 @@
     </style>
     
     <!-- Splash Screen Theme -->
-    <style name="Theme.ArViewer.Splash" parent="Theme.SplashScreen">
+    <style name="Theme.VPortal.Splash" parent="Theme.SplashScreen">
         <item name="windowSplashScreenBackground">@color/ic_launcher_background</item>
         <item name="windowSplashScreenAnimatedIcon">@mipmap/ic_launcher</item>
         <item name="windowSplashScreenAnimationDuration">1000</item>
-        <item name="postSplashScreenTheme">@style/Theme.ArViewer</item>
+        <item name="postSplashScreenTheme">@style/Theme.VPortal</item>
     </style>
     
     <!-- QR Scanner Full Screen Theme -->
-    <style name="Theme.ArViewer.NoActionBar" parent="Theme.Material3.Dark.NoActionBar">
+    <style name="Theme.VPortal.NoActionBar" parent="Theme.Material3.Dark.NoActionBar">
         <item name="android:statusBarColor">@android:color/transparent</item>
         <item name="android:navigationBarColor">@color/ar_background</item>
         <item name="android:windowTranslucentStatus">true</item>

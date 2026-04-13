@@ -19,7 +19,7 @@ object CrashReporter {
 
     /**
      * Initialize Crashlytics settings.
-     * Call from [ru.neuroimagen.arviewer.ArViewerApp.onCreate].
+     * Call from [ru.neuroimagen.arviewer.VPortalApp.onCreate].
      *
      * @param enabled `true` for release builds, `false` to disable during development.
      */

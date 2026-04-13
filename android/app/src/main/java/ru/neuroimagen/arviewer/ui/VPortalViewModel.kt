@@ -26,13 +26,13 @@ import javax.inject.Inject
 import kotlin.math.max
 
 /**
- * ViewModel for [ru.neuroimagen.arviewer.ArViewerActivity].
+ * ViewModel for [ru.neuroimagen.arviewer.VPortalActivity].
  *
  * Manages manifest parsing/loading and marker bitmap retrieval.
  * AR session, ExoPlayer, and recording remain in the Activity.
  */
 @HiltViewModel
-class ArViewerViewModel @Inject constructor(
+class VPortalViewModel @Inject constructor(
     @ApplicationContext private val appContext: Context,
     private val viewerRepository: ViewerRepository,
     private val viewerApi: ViewerApi,
@@ -193,7 +193,7 @@ class ArViewerViewModel @Inject constructor(
     }
 
     companion object {
-        private const val TAG = "ArViewerViewModel"
+        private const val TAG = "VPortalViewModel"
 
         /**
          * Maximum marker image dimension (in pixels) for ARCore.

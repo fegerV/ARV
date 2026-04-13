@@ -12,7 +12,7 @@ import ru.neuroimagen.arviewer.util.CrashReporter
  * Initializes Firebase Crashlytics for crash reporting.
  */
 @HiltAndroidApp
-class ArViewerApp : Application() {
+class VPortalApp : Application() {
 
     override fun onCreate() {
         super.onCreate()

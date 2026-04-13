@@ -49,7 +49,7 @@ import ru.neuroimagen.arviewer.ar.RecordableEGLConfigChooser
 import ru.neuroimagen.arviewer.data.cache.VideoCache
 import ru.neuroimagen.arviewer.data.model.ViewerManifest
 import dagger.hilt.android.AndroidEntryPoint
-import ru.neuroimagen.arviewer.ui.ArViewerViewModel
+import ru.neuroimagen.arviewer.ui.VPortalViewModel
 import ru.neuroimagen.arviewer.util.CrashReporter
 import java.io.File
 import java.io.FileInputStream
@@ -59,15 +59,15 @@ import java.io.OutputStream
  * AR viewer scene: camera, ARCore Augmented Image, video overlay,
  * photo capture, and video recording (with optional microphone audio).
  *
- * Manifest parsing and marker bitmap loading are delegated to [ArViewerViewModel].
+ * Manifest parsing and marker bitmap loading are delegated to [VPortalViewModel].
  * This activity manages the AR session, GL surface, ExoPlayer, and recording.
  *
  * Receives either [EXTRA_MANIFEST_JSON] (pre-loaded) or [EXTRA_UNIQUE_ID] (will load manifest).
  */
 @AndroidEntryPoint
-class ArViewerActivity : AppCompatActivity() {
+class VPortalActivity : AppCompatActivity() {
 
-    private val viewModel: ArViewerViewModel by viewModels()
+    private val viewModel: VPortalViewModel by viewModels()
 
     private var arSession: Session? = null
     private var exoPlayer: ExoPlayer? = null
@@ -149,17 +149,17 @@ class ArViewerActivity : AppCompatActivity() {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
                 viewModel.uiState.collect { state ->
                     when (state) {
-                        is ArViewerViewModel.UiState.Loading -> { /* tips are cycling */ }
-                        is ArViewerViewModel.UiState.Ready -> onManifestAndBitmapReady(
+                        is VPortalViewModel.UiState.Loading -> { /* tips are cycling */ }
+                        is VPortalViewModel.UiState.Ready -> onManifestAndBitmapReady(
                             state.manifest,
                             state.markerBitmap,
                         )
-                        is ArViewerViewModel.UiState.MarkerLoadFailed -> {
-                            Toast.makeText(this@ArViewerActivity, R.string.error_marker_not_available, Toast.LENGTH_LONG).show()
+                        is VPortalViewModel.UiState.MarkerLoadFailed -> {
+                            Toast.makeText(this@VPortalActivity, R.string.error_marker_not_available, Toast.LENGTH_LONG).show()
                             finish()
                         }
-                        is ArViewerViewModel.UiState.ManifestLoadFailed -> {
-                            Toast.makeText(this@ArViewerActivity, R.string.error_unknown, Toast.LENGTH_LONG).show()
+                        is VPortalViewModel.UiState.ManifestLoadFailed -> {
+                            Toast.makeText(this@VPortalActivity, R.string.error_unknown, Toast.LENGTH_LONG).show()
                             finish()
                         }
                     }
@@ -191,7 +191,7 @@ class ArViewerActivity : AppCompatActivity() {
      */
     private fun tryStartArFromViewModelState() {
         val state = viewModel.uiState.value
-        if (state is ArViewerViewModel.UiState.Ready) {
+        if (state is VPortalViewModel.UiState.Ready) {
             startArWithPermission(state.manifest, state.markerBitmap)
         }
     }
@@ -507,9 +507,9 @@ class ArViewerActivity : AppCompatActivity() {
                 }
             }
             if (saved) {
-                Toast.makeText(this@ArViewerActivity, R.string.video_saved, Toast.LENGTH_SHORT).show()
+                Toast.makeText(this@VPortalActivity, R.string.video_saved, Toast.LENGTH_SHORT).show()
             } else {
-                Toast.makeText(this@ArViewerActivity, R.string.video_save_failed, Toast.LENGTH_SHORT).show()
+                Toast.makeText(this@VPortalActivity, R.string.video_save_failed, Toast.LENGTH_SHORT).show()
             }
         }
     }
@@ -562,7 +562,7 @@ class ArViewerActivity : AppCompatActivity() {
                 CrashReporter.recordException(error)
                 runOnUiThread {
                     Toast.makeText(
-                        this@ArViewerActivity,
+                        this@VPortalActivity,
                         getString(R.string.error_video_playback, error.errorCodeName),
                         Toast.LENGTH_LONG
                     ).show()
@@ -654,7 +654,7 @@ class ArViewerActivity : AppCompatActivity() {
     }
 
     companion object {
-        private const val TAG = "ArViewerActivity"
+        private const val TAG = "VPortalActivity"
         const val EXTRA_MANIFEST_JSON = "manifest_json"
         const val EXTRA_UNIQUE_ID = "unique_id"
         private const val MIN_ZOOM = 1.0f

@@ -123,7 +123,7 @@ class MainActivity : AppCompatActivity() {
                             showErrorPanel(message, state.retryable)
                         }
                         is MainViewModel.UiState.NavigateToAr -> {
-                            navigateToArViewer(state.manifestJson, state.uniqueId)
+                            navigateToVPortal(state.manifestJson, state.uniqueId)
                             viewModel.onNavigated()
                         }
                     }
@@ -342,11 +342,11 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun navigateToArViewer(manifestJson: String, uniqueId: String) {
+    private fun navigateToVPortal(manifestJson: String, uniqueId: String) {
         startActivity(
-            Intent(this, ArViewerActivity::class.java).apply {
-                putExtra(ArViewerActivity.EXTRA_MANIFEST_JSON, manifestJson)
-                putExtra(ArViewerActivity.EXTRA_UNIQUE_ID, uniqueId)
+            Intent(this, VPortalActivity::class.java).apply {
+                putExtra(VPortalActivity.EXTRA_MANIFEST_JSON, manifestJson)
+                putExtra(VPortalActivity.EXTRA_UNIQUE_ID, uniqueId)
             },
         )
     }

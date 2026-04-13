@@ -30,9 +30,9 @@ Deep link (запасной): `arv://view/{unique_id}`
 ## Архитектура
 
 ```
-MainActivity                   ArViewerActivity
+MainActivity                   VPortalActivity
   │                               │
-  ├─ MainViewModel                ├─ ArViewerViewModel
+  ├─ MainViewModel                ├─ VPortalViewModel
   │    └─ ViewerRepository        │    └─ MarkerCache (disk, по uniqueId)
   │         ├─ ViewerApi          │
   │         └─ ManifestCache      ├─ ArRenderer (OpenGL)
@@ -55,10 +55,10 @@ MainActivity                   ArViewerActivity
 
 ```
 app/src/main/java/ru/neuroimagen/arviewer/
-├── ArViewerApp.kt                  # @HiltAndroidApp, Firebase init
+├── VPortalApp.kt                  # @HiltAndroidApp, Firebase init
 ├── MainActivity.kt                 # Ввод ID / QR / deep link → загрузка манифеста → AR
 ├── QrScannerActivity.kt            # CameraX + ML Kit Barcode
-├── ArViewerActivity.kt             # ARCore + ExoPlayer + фото/видео запись
+├── VPortalActivity.kt             # ARCore + ExoPlayer + фото/видео запись
 ├── ar/
 │   ├── ArRenderer.kt               # GLSurfaceView.Renderer, видео + камера + запись
 │   ├── ArSessionHelper.kt          # Создание ARCore Session, Augmented Image DB
@@ -85,7 +85,7 @@ app/src/main/java/ru/neuroimagen/arviewer/
 │   └── NetworkModule.kt            # OkHttp, Retrofit, Gson (Hilt @Module)
 ├── ui/
 │   ├── MainViewModel.kt            # Загрузка манифеста, навигация
-│   ├── ArViewerViewModel.kt        # Загрузка маркера (bitmap)
+│   ├── VPortalViewModel.kt        # Загрузка маркера (bitmap)
 │   └── ViewerErrorMessages.kt      # Локализованные сообщения об ошибках
 └── util/
     ├── UniqueIdParser.kt            # Парсинг UUID из URL / строки
@@ -231,7 +231,7 @@ cd android
    - Кнопка «Снимок» (PixelCopy → MediaStore)
    - Ошибки: неверный ID, истёкшая подписка, нет видео, нет ARCore. На устройствах без AR Core — экран с кнопками «Проверить снова» и «Список поддерживаемых устройств».
 3. **Google Play:** чтобы приложение было доступно на всех устройствах (а не только с AR Core), в консоли разработчика не следует ограничивать установку по «AR Core supported devices». Тогда пользователи смогут установить приложение на любой телефон; AR будет работать только на устройствах из списка Google.
-4. Логи по тегам: `ArViewerActivity`, `ArRenderer`, `VideoQuadRenderer`, `ArSessionHelper`, `ViewerRepository`.
+4. Логи по тегам: `VPortalActivity`, `ArRenderer`, `VideoQuadRenderer`, `ArSessionHelper`, `ViewerRepository`.
 
 ## Версионирование
 
