@@ -17,8 +17,8 @@ android {
         applicationId = "ru.neuroimagen.arviewer"
         minSdk = 24
         targetSdk = 35
-        versionCode = 3
-        versionName = "1.0.3"
+        versionCode = 4
+        versionName = "1.0.4"
         buildConfigField("String", "API_BASE_URL", "\"https://ar.neuroimagen.ru\"")
     }
 
@@ -117,10 +117,9 @@ dependencies {
     // ML Kit Barcode Scanning
     implementation("com.google.mlkit:barcode-scanning:17.3.0")
 
-    // Firebase Crashlytics & Analytics
+    // Firebase Crashlytics
     implementation(platform("com.google.firebase:firebase-bom:33.6.0"))
     implementation("com.google.firebase:firebase-crashlytics-ktx")
-    implementation("com.google.firebase:firebase-analytics-ktx")
 
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.9.0")
