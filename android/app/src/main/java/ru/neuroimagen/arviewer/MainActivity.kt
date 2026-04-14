@@ -17,6 +17,8 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.core.text.HtmlCompat
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
@@ -90,6 +92,7 @@ class MainActivity : AppCompatActivity() {
 
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
+        applySystemInsets()
 
         binding.buttonScanQr.setOnClickListener { openQrScanner() }
         binding.buttonTryDemo.setOnClickListener { openDemoMode() }
@@ -107,6 +110,25 @@ class MainActivity : AppCompatActivity() {
         observeUiState()
         requestRequiredPermissions()
         handleIntent(intent)
+    }
+
+    /**
+     * Adds bottom safe-area padding so footer links are not clipped by
+     * gesture/navigation bars on modern devices (e.g., Samsung One UI).
+     */
+    private fun applySystemInsets() {
+        val footerBaseBottomPadding = binding.footerLinksRow.paddingBottom
+        ViewCompat.setOnApplyWindowInsetsListener(binding.footerLinksRow) { view, insets ->
+            val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
+            view.setPadding(
+                view.paddingLeft,
+                view.paddingTop,
+                view.paddingRight,
+                footerBaseBottomPadding + systemBars.bottom,
+            )
+            insets
+        }
+        ViewCompat.requestApplyInsets(binding.root)
     }
 
     // ── State observation ────────────────────────────────────────────
