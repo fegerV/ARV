@@ -5,18 +5,6 @@
 {% block body %}
 <div x-data class="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 py-16 px-4 sm:px-6 lg:px-8">
     <div class="max-w-md w-full">
-        <div class="mb-6 flex justify-end">
-            <form method="post" action="/admin/language" class="m-0">
-                <input type="hidden" name="csrf_token" value="{{ request.state.csrf_token|default('') }}">
-                <select name="language"
-                        onchange="this.form.submit()"
-                        class="text-sm rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-gray-700 dark:text-gray-200">
-                    <option value="ru" {% if request.state.locale == 'ru' %}selected{% endif %}>{{ t("common.russian") }}</option>
-                    <option value="en" {% if request.state.locale == 'en' %}selected{% endif %}>{{ t("common.english") }}</option>
-                </select>
-            </form>
-        </div>
-
         <div class="text-center mb-10">
             <h1 class="text-3xl font-extrabold text-gray-900 dark:text-white tracking-tight">
                 {{ t("auth.login_heading") }}

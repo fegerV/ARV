@@ -8,18 +8,6 @@
     </div>
 
     <div class="ml-auto flex items-center space-x-2 sm:space-x-3">
-        <form method="post" action="/admin/language" class="m-0">
-            <input type="hidden" name="csrf_token" value="{{ request.state.csrf_token|default('') }}">
-            <label for="admin-language" class="sr-only">{{ t("common.language") }}</label>
-            <select id="admin-language"
-                    name="language"
-                    onchange="this.form.submit()"
-                    class="text-sm rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-2 py-1 text-gray-700 dark:text-gray-200">
-                <option value="ru" {% if request.state.locale == 'ru' %}selected{% endif %}>{{ t("common.russian") }}</option>
-                <option value="en" {% if request.state.locale == 'en' %}selected{% endif %}>{{ t("common.english") }}</option>
-            </select>
-        </form>
-
         <div x-data>
             <button @click="$store.darkMode.toggle()"
                     class="text-gray-600 hover:text-gray-700 dark:text-gray-300 dark:hover:text-white p-1"
