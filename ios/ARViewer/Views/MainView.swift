@@ -20,6 +20,7 @@ struct MainView: View {
     @State private var showQRScanner = false
     @State private var showWebAR = false
     @State private var loadedManifest: ViewerManifest?
+    @State private var useNativeARViewer = true
     @State private var showPhotoPicker = false
     @State private var showHowToUseDialog = false
     @State private var showDemoPicker = false
@@ -36,14 +37,28 @@ struct MainView: View {
                 Color(.systemGroupedBackground).ignoresSafeArea()
                 
                 if showWebAR, let manifest = loadedManifest {
-                    WebARView(
-                        uniqueId: manifest.uniqueId,
-                        orderNumber: manifest.orderNumber,
-                        onClose: {
-                            showWebAR = false
-                            loadedManifest = nil
-                        }
-                    )
+                    if useNativeARViewer {
+                        NativeARViewerView(
+                            manifest: manifest,
+                            onClose: {
+                                showWebAR = false
+                                loadedManifest = nil
+                            },
+                            onFallbackRequested: {
+                                useNativeARViewer = false
+                            }
+                        )
+                    } else {
+                        WebARView(
+                            uniqueId: manifest.uniqueId,
+                            orderNumber: manifest.orderNumber,
+                            onClose: {
+                                showWebAR = false
+                                loadedManifest = nil
+                                useNativeARViewer = true
+                            }
+                        )
+                    }
                 } else if showQRScanner {
                     QRScannerView(
                         onScanned: { id in
@@ -249,6 +264,7 @@ struct MainView: View {
                 let manifest = try await ViewerService.shared.loadManifest(uniqueId: uniqueId)
                 await MainActor.run {
                     loadedManifest = manifest
+                    useNativeARViewer = true
                     showWebAR = true
                     isLoading = false
                 }

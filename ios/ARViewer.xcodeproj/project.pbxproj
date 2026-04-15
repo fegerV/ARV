@@ -16,6 +16,7 @@
 		A1000007 /* WebARView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000007 /* WebARView.swift */; };
 		A1000008 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A2000008 /* Assets.xcassets */; };
 		A1000009 /* PhotoQRPickerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000010 /* PhotoQRPickerView.swift */; };
+		A1000010 /* NativeARViewerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000011 /* NativeARViewerView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -30,6 +31,7 @@
 		A2000008 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		A2000009 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		A2000010 /* PhotoQRPickerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhotoQRPickerView.swift; sourceTree = "<group>"; };
+		A2000011 /* NativeARViewerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeARViewerView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -80,6 +82,7 @@
 				A2000006 /* QRScannerView.swift */,
 				A2000007 /* WebARView.swift */,
 				A2000010 /* PhotoQRPickerView.swift */,
+				A2000011 /* NativeARViewerView.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -181,6 +184,7 @@
 				A1000006 /* QRScannerView.swift in Sources */,
 				A1000007 /* WebARView.swift in Sources */,
 				A1000009 /* PhotoQRPickerView.swift in Sources */,
+				A1000010 /* NativeARViewerView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

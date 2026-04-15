@@ -1,5 +1,5 @@
 # iOS Release — сборка и загрузка в App Store Connect (TestFlight).
-# Триггер: push в main, тег v*, или ручной запуск (workflow_dispatch).
+# Триггер: тег v*-ios или ручной запуск (workflow_dispatch).
 name: iOS Release
 
 on:
@@ -132,7 +132,7 @@ jobs:
           retention-days: 90
 
       - name: Upload to TestFlight
-        if: inputs.upload_to_testflight == true
+        if: ${{ (startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.upload_to_testflight == true)) && secrets.APPLE_API_KEY_ID != '' && secrets.APPLE_API_ISSUER_ID != '' }}
         env:
           APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
           APPLE_API_ISSUER_ID: ${{ secrets.APPLE_API_ISSUER_ID }}
