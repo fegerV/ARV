@@ -142,7 +142,7 @@ class Settings(BaseSettings):
     APP_STORE_URL: str = ""
     PLAY_STORE_URL: str = "https://play.google.com/store/apps/details?id=ru.neuroimagen.arviewer"
     RUSTORE_URL: str = "https://www.rustore.ru/catalog/app/ru.neuroimagen.arviewer"
-    APP_GALLERY_URL: str = "https://appgallery.huawei.com/"
+    APP_GALLERY_URL: str = "https://appgallery.huawei.com/#/app/C117404839"
 
     # Yandex OAuth (for Yandex Disk storage)
     YANDEX_OAUTH_CLIENT_ID: str = ""
