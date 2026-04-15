@@ -67,3 +67,22 @@ struct ViewerManifest: Codable {
         case expiresAt = "expires_at"
     }
 }
+
+// MARK: - Demo list (GET /api/viewer/demo/list)
+struct DemoListResponse: Codable {
+    let demos: [DemoItem]
+}
+
+struct DemoItem: Codable, Identifiable {
+    let uniqueId: String
+    let title: String
+    let markerImageUrl: String?
+
+    var id: String { uniqueId }
+
+    enum CodingKeys: String, CodingKey {
+        case uniqueId = "unique_id"
+        case title
+        case markerImageUrl = "marker_image_url"
+    }
+}

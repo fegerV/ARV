@@ -74,8 +74,8 @@ GitHub → Repository → **Settings** → **Secrets and variables** → **Actio
 
 ### Через тег:
 ```bash
-git tag v1.0.0
-git push origin v1.0.0
+git tag v1.0.0-ios
+git push origin v1.0.0-ios
 ```
 
 ### Вручную:
@@ -98,7 +98,7 @@ GitHub → **Actions** → **iOS Release** → **Run workflow** → version: `1.
 2. App Store Connect → API Key (.p8)
 3. GitHub Secrets → 8 секретов
 4. App Store Connect → Создать App
-5. git tag v1.0.0 && git push origin v1.0.0
+5. git tag v1.0.0-ios && git push origin v1.0.0-ios
 6. GitHub Actions → сборка → TestFlight
 7. TestFlight → протестировать
 8. App Store → заполнить metadata → Submit for Review

@@ -7,14 +7,23 @@
 
 import SwiftUI
 import SafariServices
+import CoreImage
+import UIKit
 
 struct MainView: View {
+    @Environment(\.openURL) private var openURL
+    @AppStorage("privacy_consent_accepted_v1") private var privacyConsentAccepted = false
+
     @State private var uniqueIdInput: String = ""
     @State private var isLoading = false
     @State private var errorMessage: String?
     @State private var showQRScanner = false
     @State private var showWebAR = false
     @State private var loadedManifest: ViewerManifest?
+    @State private var showPhotoPicker = false
+    @State private var showHowToUseDialog = false
+    @State private var showDemoPicker = false
+    @State private var demoItems: [DemoItem] = []
 
     // Dialog states
     @State private var showAboutDialog = false
@@ -50,7 +59,7 @@ struct MainView: View {
                     mainContent
                 }
             }
-            .navigationTitle("AR Viewer")
+            .navigationTitle("V-Portal")
             .navigationBarTitleDisplayMode(.inline)
         }
         .fullScreenCover(isPresented: $showAboutDialog) {
@@ -62,6 +71,39 @@ struct MainView: View {
         .fullScreenCover(isPresented: $showPrivacyPolicy) {
             PrivacyPolicyView()
         }
+        .fullScreenCover(isPresented: $showHowToUseDialog) {
+            HowToUseDialogView()
+        }
+        .sheet(isPresented: $showPhotoPicker) {
+            PhotoQRPickerView(
+                onPicked: { image in
+                    handlePickedImage(image)
+                },
+                onCancel: {}
+            )
+        }
+        .sheet(isPresented: $showDemoPicker) {
+            DemoPickerSheetView(
+                demos: demoItems,
+                onSelect: { uniqueId in
+                    showDemoPicker = false
+                    openViewer(uniqueId: uniqueId)
+                },
+                onClose: {
+                    showDemoPicker = false
+                }
+            )
+        }
+        .fullScreenCover(
+            isPresented: Binding(
+                get: { !privacyConsentAccepted },
+                set: { _ in }
+            )
+        ) {
+            PrivacyConsentView(onAccept: {
+                privacyConsentAccepted = true
+            })
+        }
     }
     
     private var mainContent: some View {
@@ -69,7 +111,9 @@ struct MainView: View {
             VStack(spacing: 24) {
                 logoSection
                 scanButton
+                galleryButton
                 manualInputSection
+                quickActionSection
                 if let msg = errorMessage {
                     Text(msg)
                         .font(.subheadline)
@@ -124,6 +168,19 @@ struct MainView: View {
         .buttonStyle(.borderedProminent)
         .tint(Color("AccentColor"))
     }
+
+    private var galleryButton: some View {
+        Button {
+            showPhotoPicker = true
+        } label: {
+            Label("Загрузить QR из галереи", systemImage: "photo.on.rectangle")
+                .font(.headline)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 14)
+        }
+        .buttonStyle(.bordered)
+        .tint(Color("AccentColor"))
+    }
     
     private var manualInputSection: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -141,6 +198,35 @@ struct MainView: View {
             .buttonStyle(.bordered)
             .frame(maxWidth: .infinity)
         }
+    }
+
+    private var quickActionSection: some View {
+        VStack(spacing: 10) {
+            Button {
+                loadDemoAndOpenPicker()
+            } label: {
+                Label("Попробовать демо", systemImage: "sparkles.rectangle.stack")
+                    .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.bordered)
+
+            Button {
+                showHowToUseDialog = true
+            } label: {
+                Label("Как использовать", systemImage: "questionmark.circle")
+                    .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.bordered)
+
+            Button {
+                openOrderPage()
+            } label: {
+                Label("Заказать AR", systemImage: "plus.circle")
+                    .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.bordered)
+        }
+        .tint(.primary)
     }
     
     private func openFromInput() {
@@ -178,6 +264,78 @@ struct MainView: View {
                 }
             }
         }
+    }
+
+    private func loadDemoAndOpenPicker() {
+        errorMessage = nil
+        isLoading = true
+        Task {
+            do {
+                let demos = try await ViewerService.shared.loadDemoList()
+                await MainActor.run {
+                    isLoading = false
+                    demoItems = demos
+                    if demos.isEmpty {
+                        errorMessage = "Демо пока недоступны."
+                    } else {
+                        showDemoPicker = true
+                    }
+                }
+            } catch {
+                await MainActor.run {
+                    isLoading = false
+                    errorMessage = "Не удалось загрузить демо. Проверьте интернет."
+                }
+            }
+        }
+    }
+
+    private func openOrderPage() {
+        guard let url = URL(string: "https://vertex-art.ru/ar") else { return }
+        openURL(url)
+    }
+
+    private func handlePickedImage(_ image: UIImage) {
+        errorMessage = nil
+
+        guard let payload = parseQRCodePayload(from: image) else {
+            errorMessage = "Не удалось найти QR-код на изображении."
+            return
+        }
+
+        guard let uniqueId = UniqueIdParser.extractFromInput(payload) else {
+            errorMessage = "QR-код распознан, но ссылка или ID не относятся к V-Portal."
+            return
+        }
+
+        uniqueIdInput = uniqueId
+        openViewer(uniqueId: uniqueId)
+    }
+
+    private func parseQRCodePayload(from image: UIImage) -> String? {
+        var ciImage: CIImage?
+        if let cg = image.cgImage {
+            ciImage = CIImage(cgImage: cg)
+        } else if let data = image.pngData() {
+            ciImage = CIImage(data: data)
+        }
+        guard let sourceImage = ciImage else { return nil }
+
+        let detector = CIDetector(
+            ofType: CIDetectorTypeQRCode,
+            context: nil,
+            options: [CIDetectorAccuracy: CIDetectorAccuracyHigh]
+        )
+        let features = detector?.features(in: sourceImage) ?? []
+
+        for feature in features {
+            guard let qrFeature = feature as? CIQRCodeFeature,
+                  let payload = qrFeature.messageString else { continue }
+            if UniqueIdParser.extractFromInput(payload) != nil {
+                return payload
+            }
+        }
+        return nil
     }
     
     private func messageForError(_ e: ViewerError) -> String {
@@ -308,6 +466,12 @@ struct AboutDialogView: View {
 
 struct SupportDialogView: View {
     @Environment(\.dismiss) private var dismiss
+    
+    private var appVersion: String {
+        let shortVersion = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "-"
+        let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "-"
+        return "\(shortVersion) (\(build))"
+    }
 
     var body: some View {
         ZStack {
@@ -370,7 +534,7 @@ struct SupportDialogView: View {
                                 Text("Версия:")
                                     .fontWeight(.medium)
                                     .foregroundStyle(.white)
-                                Text("1.0.2")
+                                Text(appVersion)
                                     .foregroundStyle(.white.opacity(0.9))
                             }
                         }
@@ -410,6 +574,130 @@ struct PrivacyPolicyView: View {
                 .padding()
 
                 SafariView(url: url)
+            }
+        }
+    }
+}
+
+struct HowToUseDialogView: View {
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        ZStack {
+            Color.black.opacity(0.8).ignoresSafeArea()
+
+            ScrollView {
+                VStack(alignment: .leading, spacing: 14) {
+                    HStack {
+                        Text("Как использовать")
+                            .font(.title2)
+                            .fontWeight(.bold)
+                            .foregroundStyle(.white)
+                        Spacer()
+                        Button {
+                            dismiss()
+                        } label: {
+                            Image(systemName: "xmark.circle.fill")
+                                .font(.title2)
+                                .foregroundStyle(.white.opacity(0.7))
+                        }
+                    }
+
+                    Text("1. Купите подарок с QR-кодом")
+                    Text("2. Установите приложение")
+                    Text("3. Нажмите «Сканировать QR-код»")
+                    Text("4. Наведите камеру на QR-код")
+                    Text("5. Смотрите, как изображение оживает")
+                }
+                .foregroundStyle(.white.opacity(0.94))
+                .padding(24)
+                .background(Color(hex: "121212"))
+                .cornerRadius(20)
+                .padding(.horizontal, 32)
+            }
+        }
+    }
+}
+
+struct PrivacyConsentView: View {
+    @Environment(\.openURL) private var openURL
+    let onAccept: () -> Void
+
+    var body: some View {
+        ZStack {
+            Color.black.ignoresSafeArea()
+
+            VStack(alignment: .leading, spacing: 16) {
+                Text("Политика конфиденциальности")
+                    .font(.title2)
+                    .fontWeight(.bold)
+                    .foregroundStyle(.white)
+
+                Text("Перед первым использованием приложения ознакомьтесь с политикой конфиденциальности и подтвердите согласие на обработку данных.")
+                    .foregroundStyle(.white.opacity(0.9))
+
+                Button("Открыть политику") {
+                    guard let url = URL(string: "https://vertex-art.ru/privacy-v-portal") else { return }
+                    openURL(url)
+                }
+                .buttonStyle(.bordered)
+
+                Button("Принимаю и продолжить") {
+                    onAccept()
+                }
+                .buttonStyle(.borderedProminent)
+            }
+            .padding(24)
+        }
+        .interactiveDismissDisabled(true)
+    }
+}
+
+struct DemoPickerSheetView: View {
+    let demos: [DemoItem]
+    let onSelect: (String) -> Void
+    let onClose: () -> Void
+
+    var body: some View {
+        NavigationView {
+            List(demos) { demo in
+                Button {
+                    onSelect(demo.uniqueId)
+                } label: {
+                    HStack(spacing: 12) {
+                        if let marker = demo.markerImageUrl, let url = URL(string: marker) {
+                            AsyncImage(url: url) { image in
+                                image
+                                    .resizable()
+                                    .scaledToFill()
+                            } placeholder: {
+                                Color.gray.opacity(0.2)
+                            }
+                            .frame(width: 64, height: 64)
+                            .clipShape(RoundedRectangle(cornerRadius: 8))
+                        } else {
+                            RoundedRectangle(cornerRadius: 8)
+                                .fill(Color.gray.opacity(0.2))
+                                .frame(width: 64, height: 64)
+                        }
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(demo.title)
+                                .font(.headline)
+                            Text(demo.uniqueId)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                }
+                .buttonStyle(.plain)
+            }
+            .navigationTitle("Демо AR")
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Закрыть") {
+                        onClose()
+                    }
+                }
             }
         }
     }

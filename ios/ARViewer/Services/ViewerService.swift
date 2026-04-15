@@ -53,6 +53,18 @@ final class ViewerService {
         try validateResponse(response, data: data, url: url)
         return try JSONDecoder().decode(ViewerManifest.self, from: data)
     }
+
+    // MARK: - Demo list
+
+    /// GET /api/viewer/demo/list
+    func loadDemoList() async throws -> [DemoItem] {
+        guard let url = URL(string: "\(rstripSlash(baseURL))/api/viewer/demo/list") else {
+            throw ViewerError.invalidId
+        }
+        let (data, response) = try await session.data(from: url)
+        try validateResponse(response, data: data, url: url)
+        return try JSONDecoder().decode(DemoListResponse.self, from: data).demos
+    }
     
     // MARK: - Analytics: создать сессию (POST /api/mobile/sessions), затем обновить (POST /api/mobile/analytics)
     

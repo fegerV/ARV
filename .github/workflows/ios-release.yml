@@ -4,9 +4,8 @@ name: iOS Release
 
 on:
   push:
-    branches: [main]
     tags:
-      - "v*"
+      - "v*-ios"
   workflow_dispatch:
     inputs:
       version:
@@ -26,6 +25,7 @@ defaults:
 jobs:
   build-and-upload:
     name: Build & Upload to App Store Connect
+    if: ${{ secrets.IOS_CERTIFICATE_P12_BASE64 != '' && secrets.IOS_PROVISIONING_PROFILE_BASE64 != '' && secrets.APPLE_TEAM_ID != '' }}
     runs-on: macos-14
     timeout-minutes: 45
 
@@ -40,9 +40,10 @@ jobs:
       - name: Set version from tag or input
         id: version
         run: |
-          if [ -n "${{ github.ref_name }}" ] && [[ "${{ github.ref_name }}" == v* ]]; then
+          if [ -n "${{ github.ref_name }}" ] && [[ "${{ github.ref_name }}" == v*-ios ]]; then
             VERSION="${{ github.ref_name }}"
             VERSION="${VERSION#v}"
+            VERSION="${VERSION%-ios}"
           else
             VERSION="${{ inputs.version || '1.0.0' }}"
           fi
