@@ -13,6 +13,7 @@ import com.google.ar.core.Session
 import com.google.ar.core.TrackingState
 import ru.neuroimagen.arviewer.data.model.ViewerManifest
 import ru.neuroimagen.arviewer.recording.ArRecorder
+import ru.neuroimagen.arviewer.recording.ArRecorder.RecordingConfig
 import java.io.File
 import javax.microedition.khronos.egl.EGLConfig
 import javax.microedition.khronos.opengles.GL10
@@ -30,6 +31,7 @@ class ArRenderer(
     private val manifest: ViewerManifest,
     private val onVideoSurfaceReady: (android.view.Surface) -> Unit,
     private val onMarkerTrackingChanged: (Boolean) -> Unit = {},
+    private val onRecordingConfigFallback: (RecordingConfig) -> Unit = {},
     private val getDisplayRotation: () -> Int = { 0 },
 ) : GLSurfaceView.Renderer {
 
@@ -83,6 +85,8 @@ class ArRenderer(
 
     @Volatile
     private var pendingAudioEnabled = false
+    @Volatile
+    private var pendingRecordingConfig: RecordingConfig = RecordingConfig.DEFAULT
     private var onRecordingStopped: ((String?) -> Unit)? = null
 
     /** Whether the recorder is currently capturing frames. */
@@ -96,9 +100,15 @@ class ArRenderer(
      * @param onStopped   callback invoked on the UI thread when recording finishes;
      *                    receives the output file path or null on failure
      */
-    fun startRecording(outputFile: File, enableAudio: Boolean = false, onStopped: (String?) -> Unit) {
+    fun startRecording(
+        outputFile: File,
+        config: RecordingConfig = RecordingConfig.DEFAULT,
+        enableAudio: Boolean = false,
+        onStopped: (String?) -> Unit
+    ) {
         onRecordingStopped = onStopped
         pendingAudioEnabled = enableAudio
+        pendingRecordingConfig = config
         pendingRecordStart = outputFile
     }
 
@@ -227,11 +237,36 @@ class ArRenderer(
         pendingRecordStart?.let { file ->
             pendingRecordStart = null
             val audio = pendingAudioEnabled
+            val config = pendingRecordingConfig
             try {
-                recorder.prepare(file, surfaceWidth, surfaceHeight, enableAudio = audio)
+                recorder.prepare(
+                    outputFile = file,
+                    width = surfaceWidth,
+                    height = surfaceHeight,
+                    config = config,
+                    enableAudio = audio
+                )
             } catch (e: Exception) {
-                Log.e(TAG, "Failed to start recording", e)
-                mainHandler.post { onRecordingStopped?.invoke(null) }
+                val fallbackConfig = fallbackConfigFor(config)
+                if (fallbackConfig != null) {
+                    try {
+                        recorder.prepare(
+                            outputFile = file,
+                            width = surfaceWidth,
+                            height = surfaceHeight,
+                            config = fallbackConfig,
+                            enableAudio = audio
+                        )
+                        pendingRecordingConfig = fallbackConfig
+                        mainHandler.post { onRecordingConfigFallback(fallbackConfig) }
+                    } catch (fallbackError: Exception) {
+                        Log.e(TAG, "Failed to start recording with fallback config", fallbackError)
+                        mainHandler.post { onRecordingStopped?.invoke(null) }
+                    }
+                } else {
+                    Log.e(TAG, "Failed to start recording", e)
+                    mainHandler.post { onRecordingStopped?.invoke(null) }
+                }
             }
         }
 
@@ -244,5 +279,15 @@ class ArRenderer(
 
     companion object {
         private const val TAG = "ArRenderer"
+    }
+
+    private fun fallbackConfigFor(config: RecordingConfig): RecordingConfig? {
+        if (config.key == ArRecorder.PRESET_FHD_60.key) {
+            return ArRecorder.PRESET_FHD_30
+        }
+        if (config.key == ArRecorder.PRESET_FHD_30.key) {
+            return ArRecorder.PRESET_HD_30
+        }
+        return null
     }
 }

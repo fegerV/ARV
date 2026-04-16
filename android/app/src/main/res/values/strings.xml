@@ -87,6 +87,11 @@
     <!-- AR Controls -->
     <string name="capture_photo">Снимок</string>
     <string name="record_video">Запись</string>
+    <string name="record_quality_hd30">HD 30</string>
+    <string name="record_quality_fhd30">FHD 30</string>
+    <string name="record_quality_fhd60">FHD 60</string>
+    <string name="record_quality_changed">Качество записи: %1$s</string>
+    <string name="record_quality_unsupported_fallback">60 fps не поддерживается на этом устройстве. Переключено на %1$s.</string>
     <string name="stop_recording">Стоп</string>
     <string name="recording">● Запись…</string>
     <string name="photo_saved">Фото сохранено</string>

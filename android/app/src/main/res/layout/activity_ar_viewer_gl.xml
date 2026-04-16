@@ -20,13 +20,26 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginEnd="8dp"
-            android:text="@string/capture_photo" />
+            android:background="@drawable/ar_gl_control_button_background"
+            android:text="@string/capture_photo"
+            android:textColor="@android:color/white" />
 
         <Button
             android:id="@+id/button_record_video"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="@string/record_video" />
+            android:layout_marginEnd="8dp"
+            android:background="@drawable/ar_gl_control_button_background"
+            android:text="@string/record_video"
+            android:textColor="@android:color/white" />
+
+        <Button
+            android:id="@+id/button_record_quality"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:background="@drawable/ar_gl_control_button_background"
+            android:text="@string/record_quality_hd30"
+            android:textColor="@android:color/white" />
 
     </LinearLayout>
 </FrameLayout>

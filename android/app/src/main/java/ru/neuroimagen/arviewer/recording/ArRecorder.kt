@@ -33,6 +33,24 @@ import java.nio.ByteBuffer
  * 3. [stop] — signals end-of-stream, drains, and releases resources
  */
 class ArRecorder {
+    data class RecordingConfig(
+        val key: String,
+        val label: String,
+        val frameRate: Int,
+        val videoBitRate: Int,
+        val maxLongEdge: Int,
+        val iFrameIntervalSec: Int = 2
+    ) {
+        companion object {
+            val DEFAULT = RecordingConfig(
+                key = "hd_30",
+                label = "HD 30",
+                frameRate = 30,
+                videoBitRate = 6_000_000,
+                maxLongEdge = 1280
+            )
+        }
+    }
 
     // ── Video ────────────────────────────────────────────────────────
     private var videoEncoder: MediaCodec? = null
@@ -44,6 +62,7 @@ class ArRecorder {
     private var recordWidth = 0
     private var recordHeight = 0
     private var startTimestampNs = -1L
+    private var currentConfig = RecordingConfig.DEFAULT
 
     // ── Audio ────────────────────────────────────────────────────────
     private var audioEncoder: MediaCodec? = null
@@ -80,10 +99,18 @@ class ArRecorder {
      * @param enableAudio if true, records microphone audio alongside video
      */
     @SuppressLint("MissingPermission") // permission is checked in Activity before calling
-    fun prepare(outputFile: File, width: Int, height: Int, enableAudio: Boolean = false) {
+    fun prepare(
+        outputFile: File,
+        width: Int,
+        height: Int,
+        config: RecordingConfig = RecordingConfig.DEFAULT,
+        enableAudio: Boolean = false
+    ) {
+        currentConfig = config
+        val (resolvedWidth, resolvedHeight) = resolveOutputSize(width, height, config.maxLongEdge)
         // H.264 encoders require even dimensions
-        recordWidth = (width / 2) * 2
-        recordHeight = (height / 2) * 2
+        recordWidth = (resolvedWidth / 2) * 2
+        recordHeight = (resolvedHeight / 2) * 2
         require(recordWidth > 0 && recordHeight > 0) {
             "Invalid recording dimensions: ${width}x$height"
         }
@@ -96,7 +123,11 @@ class ArRecorder {
         audioTrackIndex = -1
         muxerStarted = false
 
-        Log.d(TAG, "Preparing recorder: ${recordWidth}x$recordHeight, audio=$enableAudio -> $outputPath")
+        Log.d(
+            TAG,
+            "Preparing recorder: ${recordWidth}x$recordHeight ${config.frameRate}fps " +
+                "${config.videoBitRate}bps, audio=$enableAudio -> $outputPath"
+        )
 
         setupVideoEncoder()
         createEncoderEglSurface()
@@ -214,9 +245,9 @@ class ArRecorder {
                 MediaFormat.KEY_COLOR_FORMAT,
                 MediaCodecInfo.CodecCapabilities.COLOR_FormatSurface
             )
-            setInteger(MediaFormat.KEY_BIT_RATE, VIDEO_BIT_RATE)
-            setInteger(MediaFormat.KEY_FRAME_RATE, FRAME_RATE)
-            setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, I_FRAME_INTERVAL)
+            setInteger(MediaFormat.KEY_BIT_RATE, currentConfig.videoBitRate)
+            setInteger(MediaFormat.KEY_FRAME_RATE, currentConfig.frameRate)
+            setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, currentConfig.iFrameIntervalSec)
         }
 
         val codec = MediaCodec.createEncoderByType(MediaFormat.MIMETYPE_VIDEO_AVC)
@@ -591,10 +622,27 @@ class ArRecorder {
     companion object {
         private const val TAG = "ArRecorder"
 
-        // Video encoding
-        private const val VIDEO_BIT_RATE = 6_000_000     // 6 Mbps
-        private const val FRAME_RATE = 30
-        private const val I_FRAME_INTERVAL = 2            // keyframe every 2 s
+        val PRESET_HD_30 = RecordingConfig(
+            key = "hd_30",
+            label = "HD 30",
+            frameRate = 30,
+            videoBitRate = 6_000_000,
+            maxLongEdge = 1280
+        )
+        val PRESET_FHD_30 = RecordingConfig(
+            key = "fhd_30",
+            label = "FHD 30",
+            frameRate = 30,
+            videoBitRate = 10_000_000,
+            maxLongEdge = 1920
+        )
+        val PRESET_FHD_60 = RecordingConfig(
+            key = "fhd_60",
+            label = "FHD 60",
+            frameRate = 60,
+            videoBitRate = 14_000_000,
+            maxLongEdge = 1920
+        )
 
         // Audio encoding
         private const val AUDIO_SAMPLE_RATE = 44_100
@@ -608,5 +656,17 @@ class ArRecorder {
 
         /** EGL_RECORDABLE_ANDROID — not in android.opengl.EGL14 constants. */
         private const val EGL_RECORDABLE_ANDROID = 0x3142
+    }
+
+    private fun resolveOutputSize(width: Int, height: Int, maxLongEdge: Int): Pair<Int, Int> {
+        if (width <= 0 || height <= 0) return width to height
+        val longEdge = maxOf(width, height)
+        if (longEdge <= maxLongEdge) {
+            return width to height
+        }
+        val scale = maxLongEdge.toFloat() / longEdge.toFloat()
+        val scaledWidth = (width * scale).toInt().coerceAtLeast(2)
+        val scaledHeight = (height * scale).toInt().coerceAtLeast(2)
+        return scaledWidth to scaledHeight
     }
 }

@@ -4,6 +4,8 @@ import android.Manifest
 import android.content.ContentValues
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.hardware.camera2.CameraCharacteristics
+import android.hardware.camera2.CameraManager
 import android.net.Uri
 import android.graphics.Bitmap
 import android.opengl.GLSurfaceView
@@ -51,6 +53,7 @@ import ru.neuroimagen.arviewer.data.model.ViewerManifest
 import dagger.hilt.android.AndroidEntryPoint
 import ru.neuroimagen.arviewer.ui.VPortalViewModel
 import ru.neuroimagen.arviewer.util.CrashReporter
+import ru.neuroimagen.arviewer.recording.ArRecorder
 import java.io.File
 import java.io.FileInputStream
 import java.io.OutputStream
@@ -73,9 +76,12 @@ class VPortalActivity : AppCompatActivity() {
     private var exoPlayer: ExoPlayer? = null
     private var arRenderer: ArRenderer? = null
     private var recordButton: Button? = null
+    private var recordQualityButton: Button? = null
     private var currentZoom = 1.0f
     private var scaleDetector: ScaleGestureDetector? = null
     private var activityCreateTime = 0L
+    private var availableRecordingConfigs: List<ArRecorder.RecordingConfig> = emptyList()
+    private var selectedRecordingConfig: ArRecorder.RecordingConfig = ArRecorder.PRESET_HD_30
 
     // ── Loading tips ─────────────────────────────────────────────────
     private var tipsHandler: Handler? = null
@@ -334,6 +340,7 @@ class VPortalActivity : AppCompatActivity() {
             manifest = manifest,
             onVideoSurfaceReady = { surface -> prepareVideoPlayer(surface, manifest) },
             onMarkerTrackingChanged = { isTracking -> onMarkerTrackingChanged(isTracking) },
+            onRecordingConfigFallback = { fallback -> onRecordingConfigFallback(fallback) },
             getDisplayRotation = {
                 @Suppress("DEPRECATION")
                 windowManager.defaultDisplay.rotation
@@ -367,6 +374,10 @@ class VPortalActivity : AppCompatActivity() {
         recordButton = root.findViewById<Button>(R.id.button_record_video).apply {
             setOnClickListener { toggleRecording() }
         }
+        recordQualityButton = root.findViewById<Button>(R.id.button_record_quality).apply {
+            setOnClickListener { cycleRecordingQuality() }
+        }
+        initRecordingQuality()
         setContentView(root)
     }
 
@@ -444,8 +455,12 @@ class VPortalActivity : AppCompatActivity() {
     private fun doStartRecording(renderer: ArRenderer, enableAudio: Boolean) {
         val tempFile = File(cacheDir, "ar_record_${System.currentTimeMillis()}.mp4")
         recordButton?.text = getString(R.string.stop_recording)
-        renderer.startRecording(tempFile, enableAudio) { outputPath ->
+        recordQualityButton?.isEnabled = false
+        recordQualityButton?.alpha = 0.7f
+        renderer.startRecording(tempFile, selectedRecordingConfig, enableAudio) { outputPath ->
             recordButton?.text = getString(R.string.record_video)
+            recordQualityButton?.isEnabled = true
+            recordQualityButton?.alpha = 1f
             if (outputPath != null) {
                 saveVideoToGallery(File(outputPath))
             } else {
@@ -625,6 +640,113 @@ class VPortalActivity : AppCompatActivity() {
     private fun hasPermission(permission: String): Boolean =
         ContextCompat.checkSelfPermission(this, permission) == PackageManager.PERMISSION_GRANTED
 
+    private fun initRecordingQuality() {
+        val maxSupportedFps = detectMaxBackCameraFps()
+        availableRecordingConfigs = buildSupportedConfigs(maxSupportedFps)
+        val preferredDefault = if (maxSupportedFps >= 60) ArRecorder.PRESET_FHD_60 else ArRecorder.PRESET_FHD_30
+        val stored = getSharedPreferences(PREFS_RECORDING, MODE_PRIVATE).getString(
+            PREF_RECORDING_QUALITY,
+            preferredDefault.key
+        )
+        selectedRecordingConfig = availableRecordingConfigs.firstOrNull { it.key == stored }
+            ?: preferredDefault
+
+        if (stored == ArRecorder.PRESET_FHD_60.key && maxSupportedFps < 60) {
+            Toast.makeText(
+                this,
+                getString(R.string.record_quality_unsupported_fallback, qualityLabel(selectedRecordingConfig)),
+                Toast.LENGTH_SHORT
+            ).show()
+        }
+        updateRecordingQualityButton()
+    }
+
+    private fun buildSupportedConfigs(maxFps: Int): List<ArRecorder.RecordingConfig> {
+        val configs = mutableListOf(
+            ArRecorder.PRESET_HD_30,
+            ArRecorder.PRESET_FHD_30
+        )
+        if (maxFps >= 60) {
+            configs.add(ArRecorder.PRESET_FHD_60)
+        }
+        return configs
+    }
+
+    private fun detectMaxBackCameraFps(): Int {
+        return try {
+            val cameraManager = getSystemService(CameraManager::class.java) ?: return 30
+            var maxFps = 30
+            for (cameraId in cameraManager.cameraIdList) {
+                val chars = cameraManager.getCameraCharacteristics(cameraId)
+                val lensFacing = chars.get(CameraCharacteristics.LENS_FACING)
+                if (lensFacing != CameraCharacteristics.LENS_FACING_BACK) continue
+                val ranges = chars.get(CameraCharacteristics.CONTROL_AE_AVAILABLE_TARGET_FPS_RANGES) ?: continue
+                for (range in ranges) {
+                    if (range.upper > maxFps) {
+                        maxFps = range.upper
+                    }
+                }
+            }
+            maxFps
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to detect camera FPS capabilities", e)
+            30
+        }
+    }
+
+    private fun cycleRecordingQuality() {
+        val renderer = arRenderer ?: return
+        if (renderer.isRecording || availableRecordingConfigs.isEmpty()) {
+            return
+        }
+        val currentIndex = availableRecordingConfigs.indexOfFirst { it.key == selectedRecordingConfig.key }
+            .takeIf { it >= 0 } ?: 0
+        val nextIndex = (currentIndex + 1) % availableRecordingConfigs.size
+        selectedRecordingConfig = availableRecordingConfigs[nextIndex]
+        getSharedPreferences(PREFS_RECORDING, MODE_PRIVATE)
+            .edit()
+            .putString(PREF_RECORDING_QUALITY, selectedRecordingConfig.key)
+            .apply()
+        updateRecordingQualityButton()
+        Toast.makeText(
+            this,
+            getString(R.string.record_quality_changed, qualityLabel(selectedRecordingConfig)),
+            Toast.LENGTH_SHORT
+        ).show()
+    }
+
+    private fun qualityLabel(config: ArRecorder.RecordingConfig): String {
+        val labelRes = when (config.key) {
+            ArRecorder.PRESET_HD_30.key -> R.string.record_quality_hd30
+            ArRecorder.PRESET_FHD_30.key -> R.string.record_quality_fhd30
+            ArRecorder.PRESET_FHD_60.key -> R.string.record_quality_fhd60
+            else -> R.string.record_quality_hd30
+        }
+        return getString(labelRes)
+    }
+
+    private fun updateRecordingQualityButton() {
+        recordQualityButton?.apply {
+            text = qualityLabel(selectedRecordingConfig)
+            isEnabled = availableRecordingConfigs.size > 1
+            alpha = if (isEnabled) 1f else 0.7f
+        }
+    }
+
+    private fun onRecordingConfigFallback(fallback: ArRecorder.RecordingConfig) {
+        selectedRecordingConfig = fallback
+        getSharedPreferences(PREFS_RECORDING, MODE_PRIVATE)
+            .edit()
+            .putString(PREF_RECORDING_QUALITY, fallback.key)
+            .apply()
+        updateRecordingQualityButton()
+        Toast.makeText(
+            this,
+            getString(R.string.record_quality_unsupported_fallback, qualityLabel(fallback)),
+            Toast.LENGTH_SHORT
+        ).show()
+    }
+
     @Suppress("ClickableViewAccessibility")
     private fun onGlSurfaceTouch(event: MotionEvent): Boolean {
         scaleDetector?.onTouchEvent(event)
@@ -661,5 +783,7 @@ class VPortalActivity : AppCompatActivity() {
         private const val MAX_ZOOM = 5.0f
         private const val TIP_ROTATION_INTERVAL_MS = 3_000L
         private const val TIP_FADE_DURATION_MS = 300L
+        private const val PREFS_RECORDING = "recording_settings"
+        private const val PREF_RECORDING_QUALITY = "recording_quality"
     }
 }
