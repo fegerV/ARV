@@ -188,7 +188,7 @@ async def login_form(
                 json.dumps({"user_id": user.id, "email": user.email, "code": code}),
                 ex=300,
             )
-            chat_id = (getattr(all_settings.security, "telegram_2fa_chat_id", None) or "455847500").strip()
+            chat_id = (getattr(all_settings.security, "telegram_2fa_chat_id", None) or "").strip()
             bot_token = getattr(all_settings.notifications, "telegram_bot_token", None) or settings.TELEGRAM_BOT_TOKEN
             if bot_token and chat_id:
                 try:

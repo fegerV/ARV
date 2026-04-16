@@ -110,7 +110,6 @@ def setup_rate_limiting(app: FastAPI) -> None:
             await _refresh_rate_limit_cache()
 
         response = await _call_next_with_disconnect_guard(request, call_next)
-        response.headers["X-Client-IP"] = _get_real_ip(request)
         return response
 
 
