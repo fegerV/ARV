@@ -23,9 +23,72 @@ defaults:
     shell: bash
 
 jobs:
+  preflight:
+    name: Check iOS release secrets
+    runs-on: ubuntu-latest
+    outputs:
+      has_signing: ${{ steps.secrets.outputs.has_signing }}
+      has_testflight: ${{ steps.secrets.outputs.has_testflight }}
+    steps:
+      - name: Check required secrets
+        id: secrets
+        env:
+          IOS_CERTIFICATE_P12_BASE64: ${{ secrets.IOS_CERTIFICATE_P12_BASE64 }}
+          IOS_CERTIFICATE_PASSWORD: ${{ secrets.IOS_CERTIFICATE_PASSWORD }}
+          IOS_PROVISIONING_PROFILE_BASE64: ${{ secrets.IOS_PROVISIONING_PROFILE_BASE64 }}
+          IOS_PROVISIONING_PROFILE_NAME: ${{ secrets.IOS_PROVISIONING_PROFILE_NAME }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+          APPLE_API_ISSUER_ID: ${{ secrets.APPLE_API_ISSUER_ID }}
+          APPLE_API_KEY_CONTENT: ${{ secrets.APPLE_API_KEY_CONTENT }}
+        run: |
+          set -euo pipefail
+
+          missing_signing=()
+          [ -n "${IOS_CERTIFICATE_P12_BASE64:-}" ] || missing_signing+=("IOS_CERTIFICATE_P12_BASE64")
+          [ -n "${IOS_CERTIFICATE_PASSWORD:-}" ] || missing_signing+=("IOS_CERTIFICATE_PASSWORD")
+          [ -n "${IOS_PROVISIONING_PROFILE_BASE64:-}" ] || missing_signing+=("IOS_PROVISIONING_PROFILE_BASE64")
+          [ -n "${IOS_PROVISIONING_PROFILE_NAME:-}" ] || missing_signing+=("IOS_PROVISIONING_PROFILE_NAME")
+          [ -n "${APPLE_TEAM_ID:-}" ] || missing_signing+=("APPLE_TEAM_ID")
+
+          missing_testflight=()
+          [ -n "${APPLE_API_KEY_ID:-}" ] || missing_testflight+=("APPLE_API_KEY_ID")
+          [ -n "${APPLE_API_ISSUER_ID:-}" ] || missing_testflight+=("APPLE_API_ISSUER_ID")
+          [ -n "${APPLE_API_KEY_CONTENT:-}" ] || missing_testflight+=("APPLE_API_KEY_CONTENT")
+
+          if [ "${#missing_signing[@]}" -eq 0 ]; then
+            echo "has_signing=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_signing=false" >> "$GITHUB_OUTPUT"
+          fi
+
+          if [ "${#missing_testflight[@]}" -eq 0 ]; then
+            echo "has_testflight=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_testflight=false" >> "$GITHUB_OUTPUT"
+          fi
+
+          {
+            echo "### iOS Release readiness"
+            echo
+            if [ "${#missing_signing[@]}" -eq 0 ]; then
+              echo "- Signing secrets: ready"
+            else
+              echo "- Signing secrets: missing ${missing_signing[*]}"
+              echo "- Archive and IPA export will be skipped until signing secrets are configured."
+            fi
+            if [ "${#missing_testflight[@]}" -eq 0 ]; then
+              echo "- TestFlight upload secrets: ready"
+            else
+              echo "- TestFlight upload secrets: missing ${missing_testflight[*]}"
+              echo "- IPA upload to TestFlight will be skipped until App Store Connect API secrets are configured."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
   build-and-upload:
     name: Build & Upload to App Store Connect
-    if: ${{ secrets.IOS_CERTIFICATE_P12_BASE64 != '' && secrets.IOS_PROVISIONING_PROFILE_BASE64 != '' && secrets.APPLE_TEAM_ID != '' }}
+    needs: preflight
+    if: ${{ needs.preflight.outputs.has_signing == 'true' }}
     runs-on: macos-14
     timeout-minutes: 45
 
@@ -131,8 +194,17 @@ jobs:
           path: ${{ runner.temp }}/export/ARViewer.ipa
           retention-days: 90
 
+      - name: Prepare App Store Connect API key
+        if: ${{ (startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.upload_to_testflight == true)) && needs.preflight.outputs.has_testflight == 'true' }}
+        env:
+          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+          APPLE_API_KEY_CONTENT: ${{ secrets.APPLE_API_KEY_CONTENT }}
+        run: |
+          mkdir -p "$HOME/.appstoreconnect/private_keys"
+          printf '%s' "$APPLE_API_KEY_CONTENT" > "$HOME/.appstoreconnect/private_keys/AuthKey_${APPLE_API_KEY_ID}.p8"
+
       - name: Upload to TestFlight
-        if: ${{ (startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.upload_to_testflight == true)) && secrets.APPLE_API_KEY_ID != '' && secrets.APPLE_API_ISSUER_ID != '' }}
+        if: ${{ (startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.upload_to_testflight == true)) && needs.preflight.outputs.has_testflight == 'true' }}
         env:
           APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
           APPLE_API_ISSUER_ID: ${{ secrets.APPLE_API_ISSUER_ID }}
@@ -142,6 +214,16 @@ jobs:
             -t ios \
             --apiKey "$APPLE_API_KEY_ID" \
             --apiIssuer "$APPLE_API_ISSUER_ID"
+
+      - name: Explain TestFlight upload skip
+        if: ${{ (startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.upload_to_testflight == true)) && needs.preflight.outputs.has_testflight != 'true' }}
+        run: |
+          {
+            echo "### TestFlight upload skipped"
+            echo
+            echo "IPA was built, but App Store Connect API secrets are not fully configured yet."
+            echo "Add APPLE_API_KEY_ID, APPLE_API_ISSUER_ID, and APPLE_API_KEY_CONTENT to enable upload."
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload build log
         if: always()

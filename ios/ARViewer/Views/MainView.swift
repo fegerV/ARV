@@ -20,6 +20,7 @@ struct MainView: View {
     @State private var showQRScanner = false
     @State private var showWebAR = false
     @State private var loadedManifest: ViewerManifest?
+    @State private var forceRefreshAssets = false
     @State private var useNativeARViewer = true
     @State private var showPhotoPicker = false
     @State private var showHowToUseDialog = false
@@ -40,9 +41,11 @@ struct MainView: View {
                     if useNativeARViewer {
                         NativeARViewerView(
                             manifest: manifest,
+                            forceRefreshAssets: forceRefreshAssets,
                             onClose: {
                                 showWebAR = false
                                 loadedManifest = nil
+                                forceRefreshAssets = false
                             },
                             onFallbackRequested: {
                                 useNativeARViewer = false
@@ -55,6 +58,7 @@ struct MainView: View {
                             onClose: {
                                 showWebAR = false
                                 loadedManifest = nil
+                                forceRefreshAssets = false
                                 useNativeARViewer = true
                             }
                         )
@@ -64,7 +68,7 @@ struct MainView: View {
                         onScanned: { id in
                             uniqueIdInput = id
                             showQRScanner = false
-                            openViewer(uniqueId: id)
+                            openViewer(uniqueId: id, forceRefresh: true)
                         },
                         onCancel: {
                             showQRScanner = false
@@ -153,7 +157,7 @@ struct MainView: View {
         .onOpenURL { url in
             if let id = UniqueIdParser.parseFromURL(url) {
                 uniqueIdInput = id
-                openViewer(uniqueId: id)
+                openViewer(uniqueId: id, forceRefresh: true)
             }
         }
     }
@@ -255,15 +259,18 @@ struct MainView: View {
         openViewer(uniqueId: id)
     }
     
-    private func openViewer(uniqueId: String) {
+    private func openViewer(uniqueId: String, forceRefresh: Bool = false) {
         errorMessage = nil
         isLoading = true
         Task {
             do {
-                _ = try await ViewerService.shared.checkContent(uniqueId: uniqueId)
-                let manifest = try await ViewerService.shared.loadManifest(uniqueId: uniqueId)
+                let manifest = try await ViewerService.shared.prepareManifest(
+                    uniqueId: uniqueId,
+                    forceRefresh: forceRefresh
+                )
                 await MainActor.run {
                     loadedManifest = manifest
+                    forceRefreshAssets = forceRefresh
                     useNativeARViewer = true
                     showWebAR = true
                     isLoading = false
@@ -325,7 +332,7 @@ struct MainView: View {
         }
 
         uniqueIdInput = uniqueId
-        openViewer(uniqueId: uniqueId)
+        openViewer(uniqueId: uniqueId, forceRefresh: true)
     }
 
     private func parseQRCodePayload(from image: UIImage) -> String? {

@@ -12,6 +12,7 @@ import SwiftUI
 
 struct NativeARViewerView: View {
     let manifest: ViewerManifest
+    let forceRefreshAssets: Bool
     let onClose: () -> Void
     let onFallbackRequested: () -> Void
 
@@ -37,6 +38,7 @@ struct NativeARViewerView: View {
             ZStack(alignment: .bottom) {
                 NativeARContainerView(
                     manifest: manifest,
+                    forceRefreshAssets: forceRefreshAssets,
                     onError: { message in
                         runtimeError = message
                     },
@@ -60,12 +62,14 @@ struct NativeARViewerView: View {
 
 private struct NativeARContainerView: UIViewControllerRepresentable {
     let manifest: ViewerManifest
+    let forceRefreshAssets: Bool
     let onError: (String) -> Void
     let onFallbackRequested: () -> Void
 
     func makeUIViewController(context: Context) -> NativeARViewController {
         NativeARViewController(
             manifest: manifest,
+            forceRefreshAssets: forceRefreshAssets,
             onError: onError,
             onFallbackRequested: onFallbackRequested
         )
@@ -76,21 +80,26 @@ private struct NativeARContainerView: UIViewControllerRepresentable {
 
 private final class NativeARViewController: UIViewController, ARSCNViewDelegate {
     private let manifest: ViewerManifest
+    private let forceRefreshAssets: Bool
     private let onError: (String) -> Void
     private let onFallbackRequested: () -> Void
 
     private let sceneView = ARSCNView(frame: .zero)
     private var player: AVPlayer?
     private var loopObserver: NSObjectProtocol?
+    private var videoCacheTask: Task<Void, Never>?
+    private var cachedVideoURL: URL?
     private var hasShownVideo = false
     private var fallbackRequested = false
 
     init(
         manifest: ViewerManifest,
+        forceRefreshAssets: Bool,
         onError: @escaping (String) -> Void,
         onFallbackRequested: @escaping () -> Void
     ) {
         self.manifest = manifest
+        self.forceRefreshAssets = forceRefreshAssets
         self.onError = onError
         self.onFallbackRequested = onFallbackRequested
         super.init(nibName: nil, bundle: nil)
@@ -114,6 +123,7 @@ private final class NativeARViewController: UIViewController, ARSCNViewDelegate 
 
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
+        warmVideoCache()
         Task { [weak self] in
             await self?.startTrackingSession()
         }
@@ -123,6 +133,7 @@ private final class NativeARViewController: UIViewController, ARSCNViewDelegate 
         super.viewWillDisappear(animated)
         sceneView.session.pause()
         player?.pause()
+        videoCacheTask?.cancel()
         if let loopObserver {
             NotificationCenter.default.removeObserver(loopObserver)
         }
@@ -140,8 +151,12 @@ private final class NativeARViewController: UIViewController, ARSCNViewDelegate 
         }
 
         do {
-            let (data, _) = try await URLSession.shared.data(from: markerURL)
-            guard let image = UIImage(data: data), let cgImage = image.cgImage else {
+            let image = try await ViewerService.shared.loadMarkerImage(
+                uniqueId: manifest.uniqueId,
+                markerURL: markerURL.absoluteString,
+                forceRefresh: forceRefreshAssets
+            )
+            guard let cgImage = image.cgImage else {
                 reportFatalError("Не удалось загрузить изображение маркера.")
                 return
             }
@@ -164,7 +179,7 @@ private final class NativeARViewController: UIViewController, ARSCNViewDelegate 
         if hasShownVideo { return }
         hasShownVideo = true
 
-        guard let videoURL = URL(string: manifest.video.videoUrl) else {
+        guard let videoURL = cachedVideoURL ?? URL(string: manifest.video.videoUrl) else {
             reportError("Некорректная ссылка видео.")
             return
         }
@@ -202,6 +217,31 @@ private final class NativeARViewController: UIViewController, ARSCNViewDelegate 
 
         DispatchQueue.main.async {
             player.play()
+        }
+    }
+
+    private func warmVideoCache() {
+        if !forceRefreshAssets {
+            cachedVideoURL = ViewerService.shared.cachedVideoURLIfAvailable(
+                uniqueId: manifest.uniqueId,
+                video: manifest.video
+            )
+        }
+
+        videoCacheTask?.cancel()
+        let manifest = self.manifest
+        let forceRefresh = self.forceRefreshAssets
+        videoCacheTask = Task { [weak self] in
+            guard let localURL = try? await ViewerService.shared.cacheVideo(
+                uniqueId: manifest.uniqueId,
+                video: manifest.video,
+                forceRefresh: forceRefresh
+            ), !Task.isCancelled else {
+                return
+            }
+            DispatchQueue.main.async {
+                self?.cachedVideoURL = localURL
+            }
         }
     }
 
