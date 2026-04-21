@@ -334,9 +334,19 @@ async def _create_ar_content(
     
     # Generate QR code
     if is_yd:
-        qr_code_url = await generate_qr_code(unique_id, Path(yd_relative_prefix), provider=provider)
+        qr_code_url = await generate_qr_code(
+            unique_id,
+            Path(yd_relative_prefix),
+            provider=provider,
+            order_number=order_number,
+        )
     else:
-        qr_code_url = await generate_qr_code(unique_id, storage_path, provider=provider)
+        qr_code_url = await generate_qr_code(
+            unique_id,
+            storage_path,
+            provider=provider,
+            order_number=order_number,
+        )
     logger.info(
         "ar_content_create_storage_ready",
         elapsed_s=round(time.perf_counter() - t0, 2),

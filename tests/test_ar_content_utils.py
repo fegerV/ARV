@@ -1,5 +1,6 @@
 from pathlib import Path
 from types import SimpleNamespace
+import io
 import shutil
 import uuid
 
@@ -111,9 +112,16 @@ async def test_generate_qr_code_and_save_uploaded_file_local(monkeypatch):
         provider = SimpleNamespace(get_public_url=lambda rel: f"/public/{rel}")
 
         qr_dir = workdir / "VertexAR" / "demo" / "001"
-        qr_url = await mod.generate_qr_code("unique-id", qr_dir, provider=provider)
+        qr_url = await mod.generate_qr_code(
+            "unique-id",
+            qr_dir,
+            provider=provider,
+            order_number="ORD-20260211-1004",
+        )
         assert qr_url == "/public/VertexAR/demo/001/qr_code.png"
         assert (qr_dir / "qr_code.png").exists()
+        with Image.open(qr_dir / "qr_code.png") as qr_image:
+            assert qr_image.size == (600, 600)
 
         upload = _UploadFile([b"hello ", b"world"])
         destination = workdir / "VertexAR" / "demo" / "001" / "marker.bin"
@@ -141,9 +149,16 @@ async def test_generate_qr_code_save_uploaded_file_and_thumbnail_remote(monkeypa
     monkeypatch.setattr(mod.settings, "PUBLIC_URL", "https://example.com")
 
     provider = FakeYandexProvider()
-    qr_result = await mod.generate_qr_code("uid-1", Path("VertexAR/demo/002"), provider=provider)
+    qr_result = await mod.generate_qr_code(
+        "uid-1",
+        Path("VertexAR/demo/002"),
+        provider=provider,
+        order_number="ORD-20260211-1004",
+    )
     assert qr_result == "yadisk://VertexAR/demo/002/qr_code.png"
     assert "VertexAR/demo/002/qr_code.png" in saved
+    with Image.open(io.BytesIO(saved["VertexAR/demo/002/qr_code.png"])) as qr_image:
+        assert qr_image.size == (600, 600)
 
     upload = _UploadFile([b"remote-bytes"])
     remote_result = await mod.save_uploaded_file(

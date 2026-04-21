@@ -9,7 +9,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Optional, TYPE_CHECKING
 import qrcode
-from PIL import Image
+from PIL import Image, ImageDraw, ImageFont
 import io
 import aiofiles
 import re
@@ -201,6 +201,7 @@ async def generate_qr_code(
     unique_id: str,
     storage_path: Path,
     provider: Optional["StorageProvider"] = None,
+    order_number: Optional[str] = None,
 ) -> str:
     """Generate QR code for AR content and save it to storage.
 
@@ -208,6 +209,7 @@ async def generate_qr_code(
         unique_id: The unique UUID for the AR content.
         storage_path: The storage directory path for the AR content.
         provider: Explicit storage provider (uses local if ``None``).
+        order_number: Optional order number to print above the QR code.
 
     Returns:
         Public URL of the generated QR code.
@@ -216,14 +218,15 @@ async def generate_qr_code(
     unique_url = f"{settings.PUBLIC_URL.rstrip('/')}{unique_link}"
     qr = qrcode.QRCode(
         version=1,
-        error_correction=qrcode.constants.ERROR_CORRECT_L,
+        error_correction=qrcode.constants.ERROR_CORRECT_M,
         box_size=10,
         border=4,
     )
     qr.add_data(unique_url)
     qr.make(fit=True)
 
-    qr_img = qr.make_image(fill_color="black", back_color="white")
+    qr_img = qr.make_image(fill_color="black", back_color="white").convert("RGB")
+    qr_img = compose_printable_qr(qr_img, order_number=order_number)
 
     # Render to bytes
     img_byte_arr = io.BytesIO()
@@ -244,6 +247,70 @@ async def generate_qr_code(
         await f.write(qr_bytes)
 
     return build_public_url(qr_code_path, provider=provider)
+
+
+def _load_qr_font(size: int) -> ImageFont.ImageFont:
+    """Load a bold system font for printable QR labels."""
+    font_candidates = [
+        "DejaVuSans-Bold.ttf",
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+        "/usr/local/share/fonts/dejavu/DejaVuSans-Bold.ttf",
+        "C:/Windows/Fonts/arialbd.ttf",
+        "C:/Windows/Fonts/Arialbd.ttf",
+    ]
+    for font_path in font_candidates:
+        try:
+            return ImageFont.truetype(font_path, size=size)
+        except OSError:
+            continue
+    return ImageFont.load_default()
+
+
+def _draw_centered_text(
+    draw: ImageDraw.ImageDraw,
+    text: str,
+    y: int,
+    font: ImageFont.ImageFont,
+    canvas_width: int,
+) -> None:
+    bbox = draw.textbbox((0, 0), text, font=font)
+    text_width = bbox[2] - bbox[0]
+    draw.text(((canvas_width - text_width) / 2, y), text, fill="black", font=font)
+
+
+def compose_printable_qr(
+    qr_img: Image.Image,
+    order_number: Optional[str] = None,
+    site_label: str = "VERTEX-ART.RU",
+) -> Image.Image:
+    """Compose a print-ready QR label with order number and site text."""
+    canvas_size = 600
+    qr_size = 390
+    frame_left = 54
+    frame_top = 52
+    frame_size = 492
+
+    canvas = Image.new("RGB", (canvas_size, canvas_size), "white")
+    draw = ImageDraw.Draw(canvas)
+
+    top_label = (order_number or "").strip()
+    if top_label:
+        _draw_centered_text(draw, top_label, 7, _load_qr_font(40), canvas_size)
+
+    draw.rectangle(
+        [
+            (frame_left, frame_top),
+            (frame_left + frame_size, frame_top + frame_size),
+        ],
+        outline="black",
+        width=1,
+    )
+
+    qr_resized = qr_img.convert("RGB").resize((qr_size, qr_size), Image.Resampling.NEAREST)
+    canvas.paste(qr_resized, ((canvas_size - qr_size) // 2, 101))
+
+    _draw_centered_text(draw, site_label.upper(), 551, _load_qr_font(36), canvas_size)
+    return canvas
 
 
 async def save_uploaded_file(

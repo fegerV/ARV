@@ -11,6 +11,7 @@ import qrcode
 
 from app.core.config import settings
 from app.core.redis import redis_client
+from app.utils.ar_content import compose_printable_qr
 from app.html.deps import get_html_db, CurrentActiveUser
 from app.api.routes.ar_content import (
     get_ar_content_by_id,
@@ -81,9 +82,21 @@ async def get_ar_content_qr_code(
     if cached:
         img_b64 = cached
     else:
-        qr = qrcode.make(public_url, image_factory=qrcode.image.pil.PilImage)
+        qr = qrcode.QRCode(
+            version=1,
+            error_correction=qrcode.constants.ERROR_CORRECT_M,
+            box_size=10,
+            border=4,
+        )
+        qr.add_data(public_url)
+        qr.make(fit=True)
+        qr_img = qr.make_image(fill_color="black", back_color="white").convert("RGB")
+        qr_img = compose_printable_qr(
+            qr_img,
+            order_number=content_data.get("order_number"),
+        )
         buf = io.BytesIO()
-        qr.save(buf, format="PNG")
+        qr_img.save(buf, format="PNG")
         buf.seek(0)
         img_b64 = base64.b64encode(buf.read()).decode()
         try:
