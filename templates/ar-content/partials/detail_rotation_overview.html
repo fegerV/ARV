@@ -13,6 +13,18 @@
             Здесь можно настроить, какое видео показывать по конкретным датам, циклам и правилам. Если расписание не задано, будет использоваться обычное активное видео.
             {% endif %}
         </p>
+        <div class="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-900/20 dark:text-amber-100">
+            <div class="flex items-start gap-2">
+                <span class="material-icons text-base text-amber-600 dark:text-amber-300 mt-0.5">priority_high</span>
+                <p>
+                    {% if is_en %}
+                    Active schedule rules have priority over manual video selection. To return to manual mode only, disable or delete the schedule.
+                    {% else %}
+                    Активное расписание имеет приоритет над ручным выбором видео. Чтобы вернуться только к ручному режиму, отключите или удалите расписание.
+                    {% endif %}
+                </p>
+            </div>
+        </div>
     </div>
     <button @click="showRotationScheduleDialog = true" class="btn btn-primary">
         <span class="material-icons mr-2">add</span>

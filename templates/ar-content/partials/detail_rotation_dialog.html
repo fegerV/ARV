@@ -12,6 +12,14 @@
         <p class="text-sm text-gray-500 dark:text-gray-400 mb-4">
             Выберите правила, по которым система будет переключать видео для этого AR-контента.
         </p>
+        <div class="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-900/20 dark:text-amber-100">
+            <div class="flex items-start gap-2">
+                <span class="material-icons text-base text-amber-600 dark:text-amber-300 mt-0.5">priority_high</span>
+                <p>
+                    <strong>Важно:</strong> если расписание активно, оно имеет приоритет над ручным выбором видео. Ручной выбор снова будет главным только после отключения или удаления расписания.
+                </p>
+            </div>
+        </div>
 
         <form @submit.prevent="saveRotationSchedule()" x-init="initRotationScheduleForm()">
             <div class="space-y-4">

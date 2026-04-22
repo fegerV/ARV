@@ -52,3 +52,11 @@ def test_ar_content_detail_template_reuses_embedded_videos_before_refetch():
     assert "this.loadVideos();" in template
     assert "normalizeDateRules" in template
     assert "payload.date_rules" in template
+
+
+def test_rotation_schedule_priority_warning_is_visible():
+    rotation_overview = Path("templates/ar-content/partials/detail_rotation_overview.html").read_text(encoding="utf-8")
+    rotation_dialog = Path("templates/ar-content/partials/detail_rotation_dialog.html").read_text(encoding="utf-8")
+
+    assert "Active schedule rules have priority over manual video selection" in rotation_overview
+    assert "если расписание активно, оно имеет приоритет над ручным выбором видео" in rotation_dialog
