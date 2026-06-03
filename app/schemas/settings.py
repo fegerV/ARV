@@ -72,6 +72,7 @@ class StorageSettings(BaseModel):
     
 class NotificationSettings(BaseModel):
     email_enabled: bool = True
+    notification_recipient_email: str = "admin@vertexar.com"
     smtp_host: Optional[str] = None
     smtp_port: int = 587
     smtp_username: Optional[str] = None

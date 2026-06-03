@@ -1,6 +1,7 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from typing import Any, Optional, List
+from app.core.config import settings as app_settings
 from app.models.settings import SystemSettings
 from app.schemas.settings import (
     AllSettings, GeneralSettings, SecuritySettings, StorageSettings,
@@ -154,6 +155,7 @@ class SettingsService:
         
         notifications = NotificationSettings(
             email_enabled=settings_dict.get("email_enabled", True),
+            notification_recipient_email=settings_dict.get("notification_recipient_email", app_settings.ADMIN_EMAIL),
             smtp_host=settings_dict.get("smtp_host"),
             smtp_port=settings_dict.get("smtp_port", 587),
             smtp_username=settings_dict.get("smtp_username"),
@@ -259,6 +261,7 @@ class SettingsService:
     async def update_notification_settings(self, settings: NotificationSettings) -> NotificationSettings:
         """Update notification settings."""
         await self.set_setting("email_enabled", settings.email_enabled, "boolean", "notifications", commit=False)
+        await self.set_setting("notification_recipient_email", settings.notification_recipient_email, "string", "notifications", commit=False)
         await self.set_setting("smtp_host", settings.smtp_host, "string", "notifications", commit=False)
         await self.set_setting("smtp_port", settings.smtp_port, "integer", "notifications", commit=False)
         await self.set_setting("smtp_username", settings.smtp_username, "string", "notifications", commit=False)

@@ -308,22 +308,30 @@ async def test_email_from_settings(
     smtp_username: str = Form(""),
     smtp_password: str = Form(""),
     smtp_from_email: str = Form(""),
+    recipient_email: str = Form(""),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
 ):
     """Send a test email using current form values, falling back to saved settings."""
     from app.services.settings_service import SettingsService
 
+    def _clean_text(value: object) -> str:
+        return value.strip() if isinstance(value, str) else ""
+
+    def _clean_port(value: object) -> int:
+        return value if isinstance(value, int) else 587
+
     try:
         svc = SettingsService(db)
         all_settings = await svc.get_all_settings()
         notifications = all_settings.notifications
-        host = smtp_host.strip() or (notifications.smtp_host or "").strip()
-        port = smtp_port or notifications.smtp_port
-        username = smtp_username.strip() or (notifications.smtp_username or "").strip()
-        password = smtp_password if smtp_password else (notifications.smtp_password or "")
-        from_email = smtp_from_email.strip() or notifications.smtp_from_email.strip()
-        recipient = (current_user.email or "").strip()
+        host = _clean_text(smtp_host) or _clean_text(notifications.smtp_host)
+        port = _clean_port(smtp_port) or _clean_port(notifications.smtp_port)
+        username = _clean_text(smtp_username) or _clean_text(notifications.smtp_username)
+        password = _clean_text(smtp_password) or _clean_text(notifications.smtp_password)
+        from_email = _clean_text(smtp_from_email) or _clean_text(notifications.smtp_from_email)
+        recipient_setting = _clean_text(getattr(notifications, "notification_recipient_email", ""))
+        recipient = _clean_text(recipient_email) or recipient_setting or _clean_text(current_user.email)
     except Exception as exc:
         return {"status": "error", "detail": f"Не удалось загрузить настройки: {exc}"}
 
@@ -338,6 +346,6 @@ async def test_email_from_settings(
 
     try:
         send_smtp_message(msg, host, port, username or None, password or None, timeout=15, smtp_module=smtplib)
-        return {"status": "ok", "detail": f"???????? ?????? ?????????? ?? {recipient}"}
+        return {"status": "ok", "detail": f"Тестовое письмо отправлено на {recipient}"}
     except Exception as exc:
-        return {"status": "error", "detail": f"SMTP ??????: {exc}"}
+        return {"status": "error", "detail": f"SMTP ошибка: {exc}"}
