@@ -159,6 +159,7 @@ async def test_send_admin_email_prefers_db_notification_settings(monkeypatch):
             return SimpleNamespace(
                 notifications=SimpleNamespace(
                     email_enabled=True,
+                    notification_recipient_email="alerts@example.com",
                     smtp_host="db.smtp.example.com",
                     smtp_port=2025,
                     smtp_username="db-user",
@@ -186,6 +187,7 @@ async def test_send_admin_email_prefers_db_notification_settings(monkeypatch):
 
         def send_message(self, msg):
             sent["from"] = msg["From"]
+            sent["to"] = msg["To"]
 
     monkeypatch.setitem(
         __import__("sys").modules,
@@ -218,6 +220,7 @@ async def test_send_admin_email_prefers_db_notification_settings(monkeypatch):
     assert sent["port"] == 2025
     assert sent["login"] == ("db-user", "db-pass")
     assert sent["from"] == "db@example.com"
+    assert sent["to"] == "alerts@example.com"
 
 
 @pytest.mark.asyncio

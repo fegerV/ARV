@@ -342,6 +342,7 @@ async def update_notification_settings(
     current_user=Depends(get_current_user_optional),
     db: AsyncSession = Depends(get_html_db),
     email_enabled: str = Form("off"),
+    notification_recipient_email: str = Form(""),
     smtp_host: str = Form(""),
     smtp_port: int = Form(587),
     smtp_username: str = Form(""),
@@ -370,6 +371,7 @@ async def update_notification_settings(
         await settings_service.update_notification_settings(
             NotificationSettings(
                 email_enabled=(email_enabled == "on"),
+                notification_recipient_email=notification_recipient_email.strip() or current.notifications.notification_recipient_email,
                 smtp_host=smtp_host.strip() or None,
                 smtp_port=smtp_port,
                 smtp_username=smtp_username.strip() or None,

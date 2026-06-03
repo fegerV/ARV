@@ -170,6 +170,7 @@ async def test_get_all_settings_combines_defaults_and_db_values():
     assert result.security.telegram_2fa_chat_id is None
     assert result.security.session_timeout == 60
     assert result.storage.default_storage == "local"
+    assert result.notifications.notification_recipient_email == "admin@vertexar.com"
     assert result.notifications.smtp_password is None
     assert result.notifications.telegram_alerts_enabled is False
     assert result.api.cors_origins == ["https://app.example.com"]
@@ -250,6 +251,7 @@ async def test_get_all_settings_combines_defaults_and_db_values():
             "update_notification_settings",
             NotificationSettings(
                 email_enabled=False,
+                notification_recipient_email="alerts@example.com",
                 smtp_host="smtp.example.com",
                 smtp_port=2525,
                 smtp_username="mailer",
@@ -267,6 +269,7 @@ async def test_get_all_settings_combines_defaults_and_db_values():
             ),
             [
                 ("email_enabled", False, "boolean", "notifications"),
+                ("notification_recipient_email", "alerts@example.com", "string", "notifications"),
                 ("smtp_host", "smtp.example.com", "string", "notifications"),
                 ("smtp_port", 2525, "integer", "notifications"),
                 ("smtp_username", "mailer", "string", "notifications"),

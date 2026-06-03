@@ -98,6 +98,7 @@ async def send_admin_email(alerts: List[Alert], metrics: dict) -> None:
     smtp_username = settings.SMTP_USERNAME
     smtp_password = settings.SMTP_PASSWORD
     smtp_from_email = settings.SMTP_FROM_EMAIL
+    recipient_email = settings.ADMIN_EMAIL
 
     if notification_settings and not getattr(notification_settings, "email_enabled", True):
         logger.info("critical_alert_email_skipped_by_settings", reason="disabled")
@@ -109,11 +110,12 @@ async def send_admin_email(alerts: List[Alert], metrics: dict) -> None:
         smtp_username = getattr(notification_settings, "smtp_username", "") or ""
         smtp_password = getattr(notification_settings, "smtp_password", "") or ""
         smtp_from_email = notification_settings.smtp_from_email
+        recipient_email = getattr(notification_settings, "notification_recipient_email", "") or recipient_email
 
     msg = MIMEMultipart()
     msg["Subject"] = f"V-Portal Alert: {len(alerts)} critical issues"
     msg["From"] = smtp_from_email
-    msg["To"] = settings.ADMIN_EMAIL
+    msg["To"] = recipient_email
 
     html_body = f"""
     <h2>V-Portal System Alerts</h2>
