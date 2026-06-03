@@ -11,6 +11,7 @@ from app.core.config import settings
 from app.core.database import get_db
 from app.models.notification import Notification
 from app.api.routes.auth import get_current_active_user
+from app.services.email_transport import send_smtp_message
 from app.schemas.notifications import (
     NotificationItem,
     NotificationListResponse,
@@ -43,11 +44,14 @@ def _send_email_notification_sync(to_email: str, subject: str, html_body: str) -
     msg["To"] = to_email
     msg.attach(MIMEText(html_body, "html"))
 
-    with smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT) as server:
-        server.starttls()
-        if settings.SMTP_USERNAME and settings.SMTP_PASSWORD:
-            server.login(settings.SMTP_USERNAME, settings.SMTP_PASSWORD)
-        server.send_message(msg)
+    send_smtp_message(
+        msg,
+        settings.SMTP_HOST,
+        settings.SMTP_PORT,
+        settings.SMTP_USERNAME or None,
+        settings.SMTP_PASSWORD or None,
+        smtp_module=smtplib,
+    )
 
 
 async def _send_telegram_notification_async(chat_id: str, message: str) -> None:
@@ -333,13 +337,7 @@ async def test_email_from_settings(
     msg.attach(MIMEText("Тестовое письмо V-Portal. Email-настройки работают.", "plain", "utf-8"))
 
     try:
-        with smtplib.SMTP(host, port, timeout=15) as server:
-            server.starttls()
-            if username and password:
-                server.login(username, password)
-            server.send_message(msg)
-        return {"status": "ok", "detail": f"Тестовое письмо отправлено на {recipient}"}
-    except smtplib.SMTPException as exc:
-        return {"status": "error", "detail": f"SMTP ошибка: {exc}"}
-    except OSError as exc:
-        return {"status": "error", "detail": f"Ошибка подключения: {exc}"}
+        send_smtp_message(msg, host, port, username or None, password or None, timeout=15, smtp_module=smtplib)
+        return {"status": "ok", "detail": f"???????? ?????? ?????????? ?? {recipient}"}
+    except Exception as exc:
+        return {"status": "error", "detail": f"SMTP ??????: {exc}"}

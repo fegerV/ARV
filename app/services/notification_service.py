@@ -1,13 +1,14 @@
-import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 import httpx
+import smtplib
 import structlog
 from typing import Optional, Dict, Any
 from datetime import datetime, UTC
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
+from app.services.email_transport import send_smtp_message
 from app.models.notification import Notification
 
 logger = structlog.get_logger()
@@ -97,11 +98,14 @@ def send_expiry_warning_email(project_name: str, company_email: str, expires_at_
     msg['Subject'] = subject
     msg.attach(MIMEText(body, 'plain', 'utf-8'))
     try:
-        with smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT) as server:
-            server.starttls()
-            if settings.SMTP_USERNAME and settings.SMTP_PASSWORD:
-                server.login(settings.SMTP_USERNAME, settings.SMTP_PASSWORD)
-            server.send_message(msg)
+        send_smtp_message(
+            msg,
+            settings.SMTP_HOST,
+            settings.SMTP_PORT,
+            settings.SMTP_USERNAME or None,
+            settings.SMTP_PASSWORD or None,
+            smtp_module=smtplib,
+        )
         logger.info("expiry_warning_email_sent", project=project_name)
         return True
     except Exception as e:

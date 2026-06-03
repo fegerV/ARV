@@ -9,6 +9,7 @@ import smtplib
 import structlog
 
 from app.core.config import settings
+from app.services.email_transport import send_smtp_message
 
 logger = structlog.get_logger()
 
@@ -98,7 +99,11 @@ async def send_admin_email(alerts: List[Alert], metrics: dict) -> None:
     smtp_password = settings.SMTP_PASSWORD
     smtp_from_email = settings.SMTP_FROM_EMAIL
 
-    if notification_settings and getattr(notification_settings, "email_enabled", False) and getattr(notification_settings, "smtp_host", None):
+    if notification_settings and not getattr(notification_settings, "email_enabled", True):
+        logger.info("critical_alert_email_skipped_by_settings", reason="disabled")
+        return
+
+    if notification_settings and getattr(notification_settings, "smtp_host", None):
         smtp_host = notification_settings.smtp_host
         smtp_port = notification_settings.smtp_port
         smtp_username = getattr(notification_settings, "smtp_username", "") or ""
@@ -129,11 +134,14 @@ async def send_admin_email(alerts: List[Alert], metrics: dict) -> None:
     msg.attach(MIMEText(html_body, "html"))
 
     try:
-        with smtplib.SMTP(smtp_host, smtp_port) as server:
-            server.starttls()
-            if smtp_username and smtp_password:
-                server.login(smtp_username, smtp_password)
-            server.send_message(msg)
+        send_smtp_message(
+            msg,
+            smtp_host,
+            smtp_port,
+            smtp_username or None,
+            smtp_password or None,
+            smtp_module=smtplib,
+        )
         logger.info("critical_alert_email_sent", count=len(alerts))
     except Exception as exc:
         logger.error("critical_alert_email_failed", error=str(exc))
@@ -167,7 +175,7 @@ async def send_telegram_alerts(alerts: List[Alert], metrics: dict) -> None:
         return
 
     message = f"""
-<b>V-Portal Alerts</b>
+<b>Vertex AR Alerts</b>
 
 <strong>Critical ({len(alerts)}):</strong>
 {chr(10).join([f"- {a.title}: {a.message}" for a in alerts])}
