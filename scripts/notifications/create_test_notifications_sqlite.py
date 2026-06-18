@@ -28,10 +28,10 @@ async def create_test_notifications():
                 ar_content_id=1,
                 notification_type="ar_content_created",
                 subject="New AR Content Created",
-                message="A new AR content item 'Product Demo' was created for Vertex AR Solutions",
+                message="A new AR content item 'Product Demo' was created for V-Portal Solutions",
                 notification_metadata={
                     "is_read": False,
-                    "company_name": "Vertex AR Solutions",
+                    "company_name": "V-Portal Solutions",
                     "project_name": "Q4 Campaign",
                     "ar_content_name": "Product Demo"
                 },
@@ -43,11 +43,11 @@ async def create_test_notifications():
                 ar_content_id=2,
                 notification_type="storage_alert",
                 subject="Storage Alert",
-                message="Storage usage for Vertex AR Solutions has reached 80% of allocated space",
+                message="Storage usage for V-Portal Solutions has reached 80% of allocated space",
                 notification_metadata={
                     "is_read": True,
                     "read_at": "2024-12-24T15:45:00",
-                    "company_name": "Vertex AR Solutions",
+                    "company_name": "V-Portal Solutions",
                     "project_name": "Summer Sale",
                     "ar_content_name": None
                 },
@@ -62,7 +62,7 @@ async def create_test_notifications():
                 message="Video processing for 'Marketing Video' has been completed successfully",
                 notification_metadata={
                     "is_read": False,
-                    "company_name": "Vertex AR Solutions",
+                    "company_name": "V-Portal Solutions",
                     "project_name": "Product Launch",
                     "ar_content_name": "Marketing Video"
                 },
@@ -77,7 +77,7 @@ async def create_test_notifications():
                 message="MindAR marker for 'Customer Portrait' has been generated and is ready for use",
                 notification_metadata={
                     "is_read": False,
-                    "company_name": "Vertex AR Solutions",
+                    "company_name": "V-Portal Solutions",
                     "project_name": "Portrait Sessions",
                     "ar_content_name": "Customer Portrait"
                 },
@@ -93,7 +93,7 @@ async def create_test_notifications():
                 notification_metadata={
                     "is_read": True,
                     "read_at": "2024-12-23T12:30:00",
-                    "company_name": "Vertex AR Solutions",
+                    "company_name": "V-Portal Solutions",
                     "project_name": "Demo Project",
                     "ar_content_name": "Demo Content"
                 },

@@ -43,7 +43,7 @@ async def create_test_data():
             admin = User(
                 email="admin@vertexar.com",
                 hashed_password=get_password_hash("admin123"),
-                full_name="Vertex AR Admin",
+                full_name="V-Portal Admin",
                 role="admin",
                 is_active=True,
             )

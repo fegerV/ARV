@@ -274,8 +274,16 @@ fi
 nginx -t && systemctl restart nginx
 systemctl enable nginx
 
-# Set up auto-renewal
+# Set up auto-renewal and certificate safeguards
 systemctl enable certbot.timer 2>/dev/null || true
+
+install -D -m 755 "$APP_DIR/deploy/certbot/reload-nginx" /etc/letsencrypt/renewal-hooks/deploy/reload-nginx
+install -D -m 755 "$APP_DIR/deploy/certbot/check-ar-cert-renewal" /usr/local/sbin/check-ar-cert-renewal
+install -D -m 644 "$APP_DIR/deploy/certbot/ar-cert-check.cron" /etc/cron.d/ar-cert-check
+
+log "Certbot auto-renewal configured. Timer: $(systemctl is-enabled certbot.timer 2>/dev/null || echo unknown)"
+log "Renewal hook added: /etc/letsencrypt/renewal-hooks/deploy/reload-nginx"
+log "Daily served-certificate check added: /etc/cron.d/ar-cert-check"
 
 log "Nginx configured."
 
@@ -300,7 +308,7 @@ fi
 # ========================= SUMMARY ==========================================
 echo ""
 echo "============================================================"
-echo -e "${GREEN}  Vertex AR — Deployment Complete!${NC}"
+echo -e "${GREEN}  V-Portal — Deployment Complete!${NC}"
 echo "============================================================"
 echo ""
 echo "  Domain:    https://${DOMAIN}"

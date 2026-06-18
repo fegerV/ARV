@@ -1,6 +1,6 @@
 #!/bin/sh
 
-# Docker Network Diagnostics Script for Vertex AR Platform
+# Docker Network Diagnostics Script for V-Portal Platform
 # POSIX-compliant comprehensive network diagnostics for Docker Compose setup
 
 set -euo pipefail
@@ -31,7 +31,7 @@ log_error() {
 
 # Main diagnostic function
 main() {
-    log_info "Starting Docker Network Diagnostics for Vertex AR Platform"
+    log_info "Starting Docker Network Diagnostics for V-Portal Platform"
     echo "==========================================================="
     
     # 1. Check Docker daemon status

@@ -47,7 +47,7 @@ async def create_admin_user():
             admin_user = User(
                 email="admin@vertexar.com",
                 hashed_password=hash_password("admin123"),
-                full_name="Vertex AR Admin",
+                full_name="V-Portal Admin",
                 role="admin",
                 is_active=True,
                 created_at=datetime.now(),

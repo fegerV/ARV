@@ -28,7 +28,7 @@ def create_admin_user():
                 UPDATE users 
                 SET hashed_password = ?, full_name = ?, role = ?, is_active = 1
                 WHERE email = ?
-            """, (password_hash, "Vertex AR Admin", "admin", "admin@vertexar.com"))
+            """, (password_hash, "V-Portal Admin", "admin", "admin@vertexar.com"))
         else:
             print("Creating new admin user...")
             cursor.execute("""
@@ -37,7 +37,7 @@ def create_admin_user():
             """, (
                 "admin@vertexar.com",
                 password_hash,
-                "Vertex AR Admin",
+                "V-Portal Admin",
                 "admin",
                 1,
                 datetime.utcnow().isoformat(),

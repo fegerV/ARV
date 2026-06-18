@@ -1,7 +1,7 @@
 """Maintenance mode middleware.
 
 When ``maintenance_mode`` is enabled in system settings, all public-facing
-requests return 503 Service Unavailable.  Admin routes (``/admin``,
+requests return 503 Service Unavailable. Admin routes (``/admin``,
 ``/settings``, ``/api/auth``, ``/api/health``) remain accessible so the
 operator can disable the flag.
 
@@ -38,14 +38,14 @@ _MAINTENANCE_HTML = """<!DOCTYPE html>
 <style>
   body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;
        font-family:system-ui,-apple-system,sans-serif;background:#0f172a;color:#e2e8f0}
-  .c{text-align:center;padding:2rem}
+  .c{max-width:32rem;text-align:center;padding:2rem}
   h1{font-size:1.5rem;margin-bottom:.5rem}
-  p{color:#94a3b8;font-size:.95rem}
+  p{color:#94a3b8;font-size:.95rem;line-height:1.6}
   .icon{font-size:3rem;margin-bottom:1rem}
 </style></head>
-<body><div class="c"><div class="icon">🔧</div>
-<h1>Платформа на обслуживании</h1>
-<p>Ведутся технические работы. Пожалуйста, попробуйте позже.</p>
+<body><div class="c"><div class="icon">🛠</div>
+<h1>Платформа временно недоступна</h1>
+<p>На сайте проводятся технические работы. Пожалуйста, попробуйте открыть страницу немного позже.</p>
 </div></body></html>"""
 
 # In-memory cache: (value, fetched_at)
