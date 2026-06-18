@@ -1,0 +1,32 @@
+#!/bin/sh
+set -eu
+
+DOMAIN="ar.neuroimagen.ru"
+CONNECT_HOST="127.0.0.1"
+WARN_DAYS="30"
+CRITICAL_DAYS="14"
+LOG_TAG="ar-cert-check"
+TMP_CERT="$(mktemp)"
+trap 'rm -f "$TMP_CERT"' EXIT
+
+if ! timeout 20 openssl s_client -connect "${CONNECT_HOST}:443" -servername "$DOMAIN" </dev/null 2>/dev/null | openssl x509 -outform PEM >"$TMP_CERT"; then
+    logger -t "$LOG_TAG" "failed to read nginx-served certificate for $DOMAIN via $CONNECT_HOST"
+    exit 1
+fi
+
+end_epoch="$(openssl x509 -in "$TMP_CERT" -noout -enddate | cut -d= -f2 | xargs -I{} date -d {} +%s)"
+now_epoch="$(date +%s)"
+days_left="$(( (end_epoch - now_epoch) / 86400 ))"
+not_after="$(openssl x509 -in "$TMP_CERT" -noout -enddate | cut -d= -f2)"
+issuer="$(openssl x509 -in "$TMP_CERT" -noout -issuer | sed 's/^issuer=//')"
+
+logger -t "$LOG_TAG" "$DOMAIN nginx-served cert expires in ${days_left} days (${not_after}); issuer: ${issuer}"
+
+if [ "$days_left" -le "$WARN_DAYS" ]; then
+    logger -t "$LOG_TAG" "$DOMAIN is within ${WARN_DAYS} days of expiry; running certbot renew"
+    certbot renew --quiet --deploy-hook /etc/letsencrypt/renewal-hooks/deploy/reload-nginx
+fi
+
+if [ "$days_left" -le "$CRITICAL_DAYS" ]; then
+    logger -p daemon.warning -t "$LOG_TAG" "$DOMAIN certificate is critical: ${days_left} days left"
+fi
