@@ -19,6 +19,7 @@ import android.view.MotionEvent
 import android.view.PixelCopy
 import android.view.ScaleGestureDetector
 import android.view.Surface
+import android.view.TextureView
 import android.view.View
 import android.view.WindowManager
 import android.widget.Button
@@ -76,6 +77,9 @@ class VPortalActivity : AppCompatActivity() {
     private var arSession: Session? = null
     private var exoPlayer: ExoPlayer? = null
     private var arRenderer: ArRenderer? = null
+    private var floatingVideoOverlay: TextureView? = null
+    private var arVideoSurface: Surface? = null
+    private var isMarkerTracking = false
     private var recordButton: Button? = null
     private var recordQualityButton: Button? = null
     private var currentZoom = 1.0f
@@ -138,6 +142,8 @@ class VPortalActivity : AppCompatActivity() {
     override fun onDestroy() {
         stopLoadingTipsCycle()
         stopRecordingIfActive()
+        arVideoSurface?.release()
+        arVideoSurface = null
         exoPlayer?.release()
         exoPlayer = null
         arSession?.close()
@@ -370,6 +376,21 @@ class VPortalActivity : AppCompatActivity() {
             setRenderer(renderer)
             setOnTouchListener { _, event -> onGlSurfaceTouch(event) }
         }
+        floatingVideoOverlay = root.findViewById<TextureView>(R.id.floating_video_overlay).apply {
+            surfaceTextureListener = object : TextureView.SurfaceTextureListener {
+                override fun onSurfaceTextureAvailable(surface: android.graphics.SurfaceTexture, width: Int, height: Int) {
+                    if (!isMarkerTracking) {
+                        attachFloatingVideoSurfaceIfNeeded()
+                    }
+                }
+
+                override fun onSurfaceTextureSizeChanged(surface: android.graphics.SurfaceTexture, width: Int, height: Int) = Unit
+
+                override fun onSurfaceTextureDestroyed(surface: android.graphics.SurfaceTexture): Boolean = true
+
+                override fun onSurfaceTextureUpdated(surface: android.graphics.SurfaceTexture) = Unit
+            }
+        }
         root.findViewById<Button>(R.id.button_capture_photo).setOnClickListener {
             capturePhoto(glView)
         }
@@ -544,6 +565,8 @@ class VPortalActivity : AppCompatActivity() {
     @OptIn(UnstableApi::class)
     private fun prepareVideoPlayer(surface: Surface, manifest: ViewerManifest) {
         exoPlayer?.release()
+        arVideoSurface?.release()
+        arVideoSurface = surface
 
         val player = ExoPlayer.Builder(this)
             .setLoadControl(
@@ -627,15 +650,29 @@ class VPortalActivity : AppCompatActivity() {
      */
     private fun onMarkerTrackingChanged(isTracking: Boolean) {
         val player = exoPlayer ?: return
+        isMarkerTracking = isTracking
         if (isTracking) {
+            floatingVideoOverlay?.visibility = View.GONE
+            player.clearVideoTextureView(floatingVideoOverlay)
+            arVideoSurface?.let { player.setVideoSurface(it) }
             player.volume = 1f
             player.playWhenReady = true
             Log.d(TAG, "Marker tracked — video playing, unmuted")
         } else {
-            player.volume = 0f
+            attachFloatingVideoSurfaceIfNeeded()
+            player.volume = 1f
             player.playWhenReady = true
             Log.d(TAG, "Marker lost — video continues in floating mode")
         }
+    }
+
+    private fun attachFloatingVideoSurfaceIfNeeded() {
+        val player = exoPlayer ?: return
+        val overlay = floatingVideoOverlay ?: return
+        if (!overlay.isAvailable) return
+        overlay.visibility = View.VISIBLE
+        player.clearVideoSurface()
+        player.setVideoTextureView(overlay)
     }
 
     // ── Utilities ────────────────────────────────────────────────────
