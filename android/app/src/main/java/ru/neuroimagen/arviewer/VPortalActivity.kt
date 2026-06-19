@@ -40,6 +40,7 @@ import androidx.media3.common.util.UnstableApi
 import androidx.media3.datasource.DefaultDataSource
 import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.source.MediaSource
 import androidx.media3.exoplayer.source.ProgressiveMediaSource
 import com.google.ar.core.Session
 import kotlinx.coroutines.Dispatchers
@@ -76,6 +77,7 @@ class VPortalActivity : AppCompatActivity() {
 
     private var arSession: Session? = null
     private var exoPlayer: ExoPlayer? = null
+    private var floatingVideoPlayer: ExoPlayer? = null
     private var arRenderer: ArRenderer? = null
     private var floatingVideoOverlay: TextureView? = null
     private var arVideoSurface: Surface? = null
@@ -143,8 +145,11 @@ class VPortalActivity : AppCompatActivity() {
     override fun onDestroy() {
         stopLoadingTipsCycle()
         stopRecordingIfActive()
+        hideFloatingVideoOverlay()
         arVideoSurface?.release()
         arVideoSurface = null
+        floatingVideoPlayer?.release()
+        floatingVideoPlayer = null
         exoPlayer?.release()
         exoPlayer = null
         arSession?.close()
@@ -381,7 +386,7 @@ class VPortalActivity : AppCompatActivity() {
             surfaceTextureListener = object : TextureView.SurfaceTextureListener {
                 override fun onSurfaceTextureAvailable(surface: android.graphics.SurfaceTexture, width: Int, height: Int) {
                     if (hasTrackedMarkerOnce && !isMarkerTracking) {
-                        attachFloatingVideoSurfaceIfNeeded()
+                        showFloatingVideoOverlay()
                     }
                 }
 
@@ -566,6 +571,7 @@ class VPortalActivity : AppCompatActivity() {
     @OptIn(UnstableApi::class)
     private fun prepareVideoPlayer(surface: Surface, manifest: ViewerManifest) {
         exoPlayer?.release()
+        floatingVideoPlayer?.release()
         arVideoSurface?.release()
         arVideoSurface = surface
 
@@ -612,6 +618,25 @@ class VPortalActivity : AppCompatActivity() {
         })
 
         val videoUrl = manifest.video.videoUrl
+        player.setMediaSource(buildVideoMediaSource(manifest))
+        player.setVideoSurface(surface)
+        player.volume = 0f
+        player.prepare()
+        player.playWhenReady = false
+
+        floatingVideoPlayer = ExoPlayer.Builder(this).build().apply {
+            repeatMode = Player.REPEAT_MODE_ALL
+            volume = 0f
+            setMediaSource(buildVideoMediaSource(manifest))
+            floatingVideoOverlay?.takeIf { it.isAvailable }?.let { setVideoTextureView(it) }
+            prepare()
+            playWhenReady = false
+        }
+        Log.d(TAG, "Video player prepared (source: ${if (videoUrl.startsWith("asset://")) "asset" else "cache"}, waiting for marker)")
+    }
+
+    private fun buildVideoMediaSource(manifest: ViewerManifest): MediaSource {
+        val videoUrl = manifest.video.videoUrl
         val assetUri = when {
             videoUrl.startsWith("asset://") -> {
                 val path = videoUrl.removePrefix("asset://").trimStart('/')
@@ -634,14 +659,8 @@ class VPortalActivity : AppCompatActivity() {
         } else {
             VideoCache.getDataSourceFactory(this)
         }
-        val mediaSource = ProgressiveMediaSource.Factory(dataSourceFactory)
+        return ProgressiveMediaSource.Factory(dataSourceFactory)
             .createMediaSource(mediaItem)
-        player.setMediaSource(mediaSource)
-        player.setVideoSurface(surface)
-        player.volume = 0f
-        player.prepare()
-        player.playWhenReady = false
-        Log.d(TAG, "Video player prepared (source: ${if (videoUrl.startsWith("asset://")) "asset" else "cache"}, waiting for marker)")
     }
 
     /**
@@ -654,8 +673,7 @@ class VPortalActivity : AppCompatActivity() {
         isMarkerTracking = isTracking
         if (isTracking) {
             hasTrackedMarkerOnce = true
-            floatingVideoOverlay?.visibility = View.GONE
-            player.clearVideoTextureView(floatingVideoOverlay)
+            hideFloatingVideoOverlay()
             arVideoSurface?.let { player.setVideoSurface(it) }
             player.volume = 1f
             player.playWhenReady = true
@@ -664,20 +682,32 @@ class VPortalActivity : AppCompatActivity() {
             if (!hasTrackedMarkerOnce) {
                 return
             }
-            attachFloatingVideoSurfaceIfNeeded()
-            player.volume = 1f
+            showFloatingVideoOverlay()
             player.playWhenReady = true
             Log.d(TAG, "Marker lost — video continues in floating mode")
         }
     }
 
-    private fun attachFloatingVideoSurfaceIfNeeded() {
-        val player = exoPlayer ?: return
+    private fun showFloatingVideoOverlay() {
+        val mainPlayer = exoPlayer ?: return
+        val overlayPlayer = floatingVideoPlayer ?: return
         val overlay = floatingVideoOverlay ?: return
-        if (!overlay.isAvailable) return
         overlay.visibility = View.VISIBLE
-        player.clearVideoSurface()
-        player.setVideoTextureView(overlay)
+        if (!overlay.isAvailable) return
+        overlayPlayer.setVideoTextureView(overlay)
+        overlayPlayer.seekTo(mainPlayer.currentPosition)
+        overlayPlayer.volume = 1f
+        overlayPlayer.playWhenReady = true
+        mainPlayer.volume = 0f
+    }
+
+    private fun hideFloatingVideoOverlay() {
+        floatingVideoPlayer?.apply {
+            exoPlayer?.seekTo(currentPosition)
+            playWhenReady = false
+            volume = 0f
+        }
+        floatingVideoOverlay?.visibility = View.GONE
     }
 
     // ── Utilities ────────────────────────────────────────────────────
