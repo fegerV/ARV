@@ -71,7 +71,28 @@ App Links: `/.well-known/assetlinks.json` для домена `ar.neuroimagen.ru
 
 ---
 
-## 5. Версионирование
+## 5. Поведение AR Tracking
+
+### Поведение в версии 1.0.6
+
+- Видео воспроизводится поверх маркера при `ARCore Augmented Images` tracking.
+- При потере маркера видео не ставится на паузу и продолжает playback по центру экрана.
+- При повторном обнаружении маркера видео снова привязывается к изображению без рестарта ролика.
+- Логика playback отделена от логики рендера: потеря tracking больше не останавливает сам плеер.
+
+### Детали режима
+
+- при распознанном маркере видео отображается на маркере;
+- при потере маркера видео отображается как screen-centered floating overlay;
+- при возврате tracking приложение возвращает отображение на `AugmentedImage.centerPose`.
+
+Это изменение относится только к Android ARCore viewer и не требует изменения backend API.
+
+Подробный план внедрения: [ARCORE_FLOATING_PLAYBACK_PLAN.md](ARCORE_FLOATING_PLAYBACK_PLAN.md).
+
+---
+
+## 6. Версионирование
 
 Используется **семантическое версионирование** в формате `MAJOR.MINOR.PATCH`.
 
@@ -90,7 +111,7 @@ App Links: `/.well-known/assetlinks.json` для домена `ar.neuroimagen.ru
 
 ---
 
-## 6. Роадмап
+## 7. Роадмап
 
 ### Реализовано (v1.0.x)
 
@@ -98,6 +119,7 @@ App Links: `/.well-known/assetlinks.json` для домена `ar.neuroimagen.ru
 - [x] Deep links и App Links.
 - [x] QR-сканер (AR-ссылки и UUID).
 - [x] AR Viewer: маркер + видео, снимок экрана.
+- [x] Floating playback при потере маркера и возврат привязки при восстановлении tracking.
 - [x] Кэш маркера (диск, 7 дней).
 - [x] Офлайн: кэш манифеста и медиа (манифест при сетевой ошибке, видео через ExoPlayer cache).
 - [x] Splash Screen при старте.
@@ -114,7 +136,7 @@ App Links: `/.well-known/assetlinks.json` для домена `ar.neuroimagen.ru
 
 ---
 
-## 7. Сборка и CI
+## 8. Сборка и CI
 
 **Локально (из корня репозитория):**
 
@@ -135,10 +157,10 @@ APK: `android/app/build/outputs/apk/debug/app-debug.apk`.
 
 ---
 
-## 8. Тестирование и отладка
+## 9. Тестирование и отладка
 
 - Устройство из [списка ARCore](https://developers.google.com/ar/devices); эмулятор для AR не подходит.
-- Сценарии: запуск по иконке (splash → главный экран); открытие по ссылке; ввод ID и по QR; офлайн после первого просмотра; снимок; обработка ошибок (нет сети, неверный ID).
+- Сценарии: запуск по иконке (splash → главный экран); открытие по ссылке; ввод ID и по QR; офлайн после первого просмотра; снимок; обработка ошибок (нет сети, неверный ID); потеря и восстановление трекинга маркера.
 - Логи: теги по компонентам (например ArSessionHelper, ViewerRepository); при необходимости диагностика как в веб-viewer.
 
 Дополнительно: [AR_VIEWER_TROUBLESHOOTING.md](AR_VIEWER_TROUBLESHOOTING.md), [ANDROID_STUDIO_SETUP.md](ANDROID_STUDIO_SETUP.md).

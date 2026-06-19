@@ -35,6 +35,11 @@ class ArRenderer(
     private val getDisplayRotation: () -> Int = { 0 },
 ) : GLSurfaceView.Renderer {
 
+    private enum class RenderMode {
+        MARKER_ATTACHED,
+        SCREEN_CENTER_FLOATING,
+    }
+
     private val mainHandler = Handler(Looper.getMainLooper())
 
     private lateinit var backgroundRenderer: BackgroundRenderer
@@ -51,6 +56,7 @@ class ArRenderer(
 
     /** Previous tracking state — used to detect transitions. */
     private var wasTracking = false
+    private var renderMode = RenderMode.MARKER_ATTACHED
 
     // ── Zoom ─────────────────────────────────────────────────────────
     @Volatile
@@ -64,6 +70,8 @@ class ArRenderer(
     // ── Video readiness ──────────────────────────────────────────────
     @Volatile
     private var videoReady = false
+
+    private val floatingAspectRatio = calculateAspectRatio()
 
     /**
      * Signal whether the video player has decoded at least one frame.
@@ -167,10 +175,11 @@ class ArRenderer(
         // Notify activity when marker tracking starts or stops
         if (hasTracking != wasTracking) {
             wasTracking = hasTracking
+            renderMode = if (hasTracking) RenderMode.MARKER_ATTACHED else RenderMode.SCREEN_CENTER_FLOATING
             mainHandler.post { onMarkerTrackingChanged(hasTracking) }
         }
 
-        if (hasTracking && isReady && st != null) {
+        if (isReady && st != null) {
             st.updateTexImage()
         }
 
@@ -215,17 +224,34 @@ class ArRenderer(
             projectionMatrix[5] *= zoom   // vertical FOV
         }
 
-        for (image in images) {
-            if (image.trackingState == TrackingState.TRACKING && isVideoReady) {
-                videoQuadRenderer.draw(
-                    videoTextureId,
-                    image.centerPose,
-                    image.extentX,
-                    image.extentZ,
-                    viewMatrix,
-                    projectionMatrix
-                )
-            }
+        if (!isVideoReady) {
+            return
+        }
+
+        val trackedImage = images.firstOrNull { it.trackingState == TrackingState.TRACKING }
+        if (trackedImage != null) {
+            renderMode = RenderMode.MARKER_ATTACHED
+            videoQuadRenderer.draw(
+                videoTextureId,
+                trackedImage.centerPose,
+                trackedImage.extentX,
+                trackedImage.extentZ,
+                viewMatrix,
+                projectionMatrix
+            )
+            return
+        }
+
+        if (renderMode == RenderMode.SCREEN_CENTER_FLOATING) {
+            val floatingWidth = FLOATING_VIDEO_WIDTH_METERS
+            val floatingHeight = floatingWidth / floatingAspectRatio
+            videoQuadRenderer.drawCentered(
+                textureId = videoTextureId,
+                projectionMatrixArray = projectionMatrix,
+                widthMeters = floatingWidth,
+                heightMeters = floatingHeight,
+                distanceMeters = FLOATING_VIDEO_DISTANCE_METERS
+            )
         }
     }
 
@@ -279,6 +305,18 @@ class ArRenderer(
 
     companion object {
         private const val TAG = "ArRenderer"
+        private const val FLOATING_VIDEO_WIDTH_METERS = 0.9f
+        private const val FLOATING_VIDEO_DISTANCE_METERS = 1.6f
+        private const val DEFAULT_VIDEO_ASPECT_RATIO = 16f / 9f
+    }
+
+    private fun calculateAspectRatio(): Float {
+        val width = manifest.video.width ?: 0
+        val height = manifest.video.height ?: 0
+        if (width > 0 && height > 0) {
+            return width.toFloat() / height.toFloat()
+        }
+        return DEFAULT_VIDEO_ASPECT_RATIO
     }
 
     private fun fallbackConfigFor(config: RecordingConfig): RecordingConfig? {

@@ -23,6 +23,7 @@ class VideoQuadRenderer {
 
     private var vertexBuffer: FloatBuffer? = null
     private var texCoordBuffer: FloatBuffer? = null
+    private var centeredVertexBuffer: FloatBuffer? = null
 
     private val modelMatrix = FloatArray(16)
     private val viewMatrix = FloatArray(16)
@@ -65,10 +66,14 @@ class VideoQuadRenderer {
         val quadVertices = floatArrayOf(
             -0.5f, 0f, -0.5f,  0.5f, 0f, -0.5f,  -0.5f, 0f, 0.5f,  0.5f, 0f, 0.5f
         )
+        val centeredQuadVertices = floatArrayOf(
+            -0.5f, -0.5f, 0f,  0.5f, -0.5f, 0f,  -0.5f, 0.5f, 0f,  0.5f, 0.5f, 0f
+        )
         val quadTexCoords = floatArrayOf(
             0f, 0f,  1f, 0f,  0f, 1f,  1f, 1f
         )
         vertexBuffer = ByteBuffer.allocateDirect(quadVertices.size * 4).order(ByteOrder.nativeOrder()).asFloatBuffer().apply { put(quadVertices); position(0) }
+        centeredVertexBuffer = ByteBuffer.allocateDirect(centeredQuadVertices.size * 4).order(ByteOrder.nativeOrder()).asFloatBuffer().apply { put(centeredQuadVertices); position(0) }
         texCoordBuffer = ByteBuffer.allocateDirect(quadTexCoords.size * 4).order(ByteOrder.nativeOrder()).asFloatBuffer().apply { put(quadTexCoords); position(0) }
 
         ShaderUtil.checkGLError(TAG, "VideoQuadRenderer create")
@@ -115,6 +120,46 @@ class VideoQuadRenderer {
         GLES20.glDisableVertexAttribArray(texCoordAttrib)
         GLES20.glDisable(GLES20.GL_BLEND)
         ShaderUtil.checkGLError(TAG, "VideoQuadRenderer draw")
+    }
+
+    /**
+     * Draw video quad as a camera-centered overlay in front of the user.
+     * Uses camera-space coordinates, so the quad stays centered on screen.
+     */
+    fun drawCentered(
+        textureId: Int,
+        projectionMatrixArray: FloatArray,
+        widthMeters: Float,
+        heightMeters: Float,
+        distanceMeters: Float
+    ) {
+        Matrix.setIdentityM(modelMatrix, 0)
+        Matrix.translateM(modelMatrix, 0, 0f, 0f, -distanceMeters)
+        Matrix.scaleM(modelMatrix, 0, widthMeters, heightMeters, 1f)
+        Matrix.multiplyMM(mvpMatrix, 0, projectionMatrixArray, 0, modelMatrix, 0)
+
+        GLES20.glEnable(GLES20.GL_BLEND)
+        GLES20.glBlendFunc(GLES20.GL_SRC_ALPHA, GLES20.GL_ONE_MINUS_SRC_ALPHA)
+        GLES20.glUseProgram(program)
+        GLES20.glUniformMatrix4fv(mvpUniform, 1, false, mvpMatrix, 0)
+        GLES20.glActiveTexture(GLES20.GL_TEXTURE0)
+        GLES20.glBindTexture(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, textureId)
+        GLES20.glUniform1i(textureUniform, 0)
+        centeredVertexBuffer?.let { buf ->
+            buf.position(0)
+            GLES20.glVertexAttribPointer(positionAttrib, 3, GLES20.GL_FLOAT, false, 0, buf)
+            GLES20.glEnableVertexAttribArray(positionAttrib)
+        }
+        texCoordBuffer?.let { buf ->
+            buf.position(0)
+            GLES20.glVertexAttribPointer(texCoordAttrib, 2, GLES20.GL_FLOAT, false, 0, buf)
+            GLES20.glEnableVertexAttribArray(texCoordAttrib)
+        }
+        GLES20.glDrawArrays(GLES20.GL_TRIANGLE_STRIP, 0, 4)
+        GLES20.glDisableVertexAttribArray(positionAttrib)
+        GLES20.glDisableVertexAttribArray(texCoordAttrib)
+        GLES20.glDisable(GLES20.GL_BLEND)
+        ShaderUtil.checkGLError(TAG, "VideoQuadRenderer drawCentered")
     }
 
     companion object {

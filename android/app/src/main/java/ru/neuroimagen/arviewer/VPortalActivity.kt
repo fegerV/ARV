@@ -620,7 +620,8 @@ class VPortalActivity : AppCompatActivity() {
 
     /**
      * Called from ArRenderer when marker tracking starts or stops.
-     * Plays and unmutes video when marker is visible; immediately mutes and pauses when lost.
+     * Keeps playback running across tracking loss so renderer can switch
+     * between marker-attached and floating screen-centered modes.
      */
     private fun onMarkerTrackingChanged(isTracking: Boolean) {
         val player = exoPlayer ?: return
@@ -630,8 +631,8 @@ class VPortalActivity : AppCompatActivity() {
             Log.d(TAG, "Marker tracked — video playing, unmuted")
         } else {
             player.volume = 0f
-            player.playWhenReady = false
-            Log.d(TAG, "Marker lost — video muted + paused")
+            player.playWhenReady = true
+            Log.d(TAG, "Marker lost — video continues in floating mode")
         }
     }
 
