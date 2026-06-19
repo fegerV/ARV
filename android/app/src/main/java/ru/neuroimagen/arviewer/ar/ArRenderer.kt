@@ -35,11 +35,6 @@ class ArRenderer(
     private val getDisplayRotation: () -> Int = { 0 },
 ) : GLSurfaceView.Renderer {
 
-    private enum class RenderMode {
-        MARKER_ATTACHED,
-        SCREEN_CENTER_FLOATING,
-    }
-
     private val mainHandler = Handler(Looper.getMainLooper())
 
     private lateinit var backgroundRenderer: BackgroundRenderer
@@ -56,7 +51,6 @@ class ArRenderer(
 
     /** Previous tracking state — used to detect transitions. */
     private var wasTracking = false
-    private var renderMode = RenderMode.MARKER_ATTACHED
 
     // ── Zoom ─────────────────────────────────────────────────────────
     @Volatile
@@ -175,7 +169,6 @@ class ArRenderer(
         // Notify activity when marker tracking starts or stops
         if (hasTracking != wasTracking) {
             wasTracking = hasTracking
-            renderMode = if (hasTracking) RenderMode.MARKER_ATTACHED else RenderMode.SCREEN_CENTER_FLOATING
             mainHandler.post { onMarkerTrackingChanged(hasTracking) }
         }
 
@@ -230,7 +223,6 @@ class ArRenderer(
 
         val trackedImage = images.firstOrNull { it.trackingState == TrackingState.TRACKING }
         if (trackedImage != null) {
-            renderMode = RenderMode.MARKER_ATTACHED
             videoQuadRenderer.draw(
                 videoTextureId,
                 trackedImage.centerPose,
@@ -239,17 +231,7 @@ class ArRenderer(
                 viewMatrix,
                 projectionMatrix
             )
-            return
         }
-
-        renderMode = RenderMode.SCREEN_CENTER_FLOATING
-        val floatingWidth = FLOATING_VIDEO_WIDTH_FRACTION
-        val floatingHeight = (floatingWidth / floatingAspectRatio).coerceAtMost(FLOATING_VIDEO_MAX_HEIGHT_FRACTION)
-        videoQuadRenderer.drawCentered(
-            textureId = videoTextureId,
-            widthFraction = floatingWidth,
-            heightFraction = floatingHeight
-        )
     }
 
     /**
@@ -302,8 +284,6 @@ class ArRenderer(
 
     companion object {
         private const val TAG = "ArRenderer"
-        private const val FLOATING_VIDEO_WIDTH_FRACTION = 0.72f
-        private const val FLOATING_VIDEO_MAX_HEIGHT_FRACTION = 0.58f
         private const val DEFAULT_VIDEO_ASPECT_RATIO = 16f / 9f
     }
 

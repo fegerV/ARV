@@ -80,6 +80,7 @@ class VPortalActivity : AppCompatActivity() {
     private var floatingVideoOverlay: TextureView? = null
     private var arVideoSurface: Surface? = null
     private var isMarkerTracking = false
+    private var hasTrackedMarkerOnce = false
     private var recordButton: Button? = null
     private var recordQualityButton: Button? = null
     private var currentZoom = 1.0f
@@ -379,7 +380,7 @@ class VPortalActivity : AppCompatActivity() {
         floatingVideoOverlay = root.findViewById<TextureView>(R.id.floating_video_overlay).apply {
             surfaceTextureListener = object : TextureView.SurfaceTextureListener {
                 override fun onSurfaceTextureAvailable(surface: android.graphics.SurfaceTexture, width: Int, height: Int) {
-                    if (!isMarkerTracking) {
+                    if (hasTrackedMarkerOnce && !isMarkerTracking) {
                         attachFloatingVideoSurfaceIfNeeded()
                     }
                 }
@@ -652,6 +653,7 @@ class VPortalActivity : AppCompatActivity() {
         val player = exoPlayer ?: return
         isMarkerTracking = isTracking
         if (isTracking) {
+            hasTrackedMarkerOnce = true
             floatingVideoOverlay?.visibility = View.GONE
             player.clearVideoTextureView(floatingVideoOverlay)
             arVideoSurface?.let { player.setVideoSurface(it) }
@@ -659,6 +661,9 @@ class VPortalActivity : AppCompatActivity() {
             player.playWhenReady = true
             Log.d(TAG, "Marker tracked — video playing, unmuted")
         } else {
+            if (!hasTrackedMarkerOnce) {
+                return
+            }
             attachFloatingVideoSurfaceIfNeeded()
             player.volume = 1f
             player.playWhenReady = true
