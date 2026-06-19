@@ -20,6 +20,7 @@ import android.view.PixelCopy
 import android.view.ScaleGestureDetector
 import android.view.Surface
 import android.view.View
+import android.view.WindowManager
 import android.widget.Button
 import android.widget.TextView
 import android.widget.Toast
@@ -110,6 +111,7 @@ class VPortalActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         activityCreateTime = System.currentTimeMillis()
+        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         setContentView(R.layout.activity_ar_viewer)
         supportActionBar?.setDisplayHomeAsUpEnabled(true)
 

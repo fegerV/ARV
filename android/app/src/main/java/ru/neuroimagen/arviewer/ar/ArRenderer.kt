@@ -242,17 +242,14 @@ class ArRenderer(
             return
         }
 
-        if (renderMode == RenderMode.SCREEN_CENTER_FLOATING) {
-            val floatingWidth = FLOATING_VIDEO_WIDTH_METERS
-            val floatingHeight = floatingWidth / floatingAspectRatio
-            videoQuadRenderer.drawCentered(
-                textureId = videoTextureId,
-                projectionMatrixArray = projectionMatrix,
-                widthMeters = floatingWidth,
-                heightMeters = floatingHeight,
-                distanceMeters = FLOATING_VIDEO_DISTANCE_METERS
-            )
-        }
+        renderMode = RenderMode.SCREEN_CENTER_FLOATING
+        val floatingWidth = FLOATING_VIDEO_WIDTH_FRACTION
+        val floatingHeight = (floatingWidth / floatingAspectRatio).coerceAtMost(FLOATING_VIDEO_MAX_HEIGHT_FRACTION)
+        videoQuadRenderer.drawCentered(
+            textureId = videoTextureId,
+            widthFraction = floatingWidth,
+            heightFraction = floatingHeight
+        )
     }
 
     /**
@@ -305,8 +302,8 @@ class ArRenderer(
 
     companion object {
         private const val TAG = "ArRenderer"
-        private const val FLOATING_VIDEO_WIDTH_METERS = 0.9f
-        private const val FLOATING_VIDEO_DISTANCE_METERS = 1.6f
+        private const val FLOATING_VIDEO_WIDTH_FRACTION = 0.72f
+        private const val FLOATING_VIDEO_MAX_HEIGHT_FRACTION = 0.58f
         private const val DEFAULT_VIDEO_ASPECT_RATIO = 16f / 9f
     }
 

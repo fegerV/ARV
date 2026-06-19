@@ -29,6 +29,7 @@ class VideoQuadRenderer {
     private val viewMatrix = FloatArray(16)
     private val projectionMatrix = FloatArray(16)
     private val mvpMatrix = FloatArray(16)
+    private val centeredOverlayMatrix = FloatArray(16)
 
     /**
      * Call on GL thread. Creates OES texture and SurfaceTexture for Media3 player.
@@ -128,20 +129,24 @@ class VideoQuadRenderer {
      */
     fun drawCentered(
         textureId: Int,
-        projectionMatrixArray: FloatArray,
-        widthMeters: Float,
-        heightMeters: Float,
-        distanceMeters: Float
+        widthFraction: Float,
+        heightFraction: Float
     ) {
-        Matrix.setIdentityM(modelMatrix, 0)
-        Matrix.translateM(modelMatrix, 0, 0f, 0f, -distanceMeters)
-        Matrix.scaleM(modelMatrix, 0, widthMeters, heightMeters, 1f)
-        Matrix.multiplyMM(mvpMatrix, 0, projectionMatrixArray, 0, modelMatrix, 0)
+        Matrix.setIdentityM(centeredOverlayMatrix, 0)
+        Matrix.scaleM(
+            centeredOverlayMatrix,
+            0,
+            widthFraction.coerceIn(0.05f, 1.0f),
+            heightFraction.coerceIn(0.05f, 1.0f),
+            1f
+        )
 
+        GLES20.glDisable(GLES20.GL_DEPTH_TEST)
+        GLES20.glDepthMask(false)
         GLES20.glEnable(GLES20.GL_BLEND)
         GLES20.glBlendFunc(GLES20.GL_SRC_ALPHA, GLES20.GL_ONE_MINUS_SRC_ALPHA)
         GLES20.glUseProgram(program)
-        GLES20.glUniformMatrix4fv(mvpUniform, 1, false, mvpMatrix, 0)
+        GLES20.glUniformMatrix4fv(mvpUniform, 1, false, centeredOverlayMatrix, 0)
         GLES20.glActiveTexture(GLES20.GL_TEXTURE0)
         GLES20.glBindTexture(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, textureId)
         GLES20.glUniform1i(textureUniform, 0)
@@ -159,6 +164,8 @@ class VideoQuadRenderer {
         GLES20.glDisableVertexAttribArray(positionAttrib)
         GLES20.glDisableVertexAttribArray(texCoordAttrib)
         GLES20.glDisable(GLES20.GL_BLEND)
+        GLES20.glDepthMask(true)
+        GLES20.glEnable(GLES20.GL_DEPTH_TEST)
         ShaderUtil.checkGLError(TAG, "VideoQuadRenderer drawCentered")
     }
 
