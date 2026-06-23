@@ -23,6 +23,32 @@ _DEFAULT_TIMEOUT = 60.0
 _UPLOAD_TIMEOUT = 600.0  # 10 min for large video uploads
 
 
+def _exception_details(exc: Exception) -> dict[str, object]:
+    """Build structured log details for Yandex Disk exceptions."""
+    details: dict[str, object] = {
+        "error": str(exc) or repr(exc),
+        "error_type": type(exc).__name__,
+        "error_repr": repr(exc),
+    }
+    response = getattr(exc, "response", None)
+    if response is not None:
+        status_code = getattr(response, "status_code", None)
+        if status_code is not None:
+            details["response_status"] = status_code
+        text = getattr(response, "text", None)
+        if text:
+            details["response_text"] = text[:500]
+    request = getattr(exc, "request", None)
+    if request is not None:
+        url = getattr(request, "url", None)
+        method = getattr(request, "method", None)
+        if url is not None:
+            details["request_url"] = str(url)
+        if method:
+            details["request_method"] = method
+    return details
+
+
 class YandexDiskStorageProvider(StorageProvider):
     """Storage provider backed by Yandex Disk REST API."""
 
@@ -266,8 +292,15 @@ class YandexDiskStorageProvider(StorageProvider):
                     offset += limit
                     if offset >= items_total:
                         break
-                except Exception:
-                    break
+                except Exception as exc:
+                    logger.warning(
+                        "yd_folder_size_iteration_failed",
+                        path=dir_path,
+                        offset=offset,
+                        limit=limit,
+                        **_exception_details(exc),
+                    )
+                    raise
             return total, count
 
         try:
@@ -275,8 +308,13 @@ class YandexDiskStorageProvider(StorageProvider):
                 total_bytes, file_count = await _sum_dir(disk_path, client)
             return {"total_bytes": total_bytes, "file_count": file_count}
         except Exception as exc:
-            logger.error("yd_folder_size_failed", path=disk_path, error=str(exc))
-            return {"total_bytes": 0, "file_count": 0, "error": str(exc)}
+            logger.error("yd_folder_size_failed", path=disk_path, **_exception_details(exc))
+            return {
+                "total_bytes": 0,
+                "file_count": 0,
+                "error": str(exc) or repr(exc),
+                "error_type": type(exc).__name__,
+            }
 
     async def get_usage_stats(self, path: str = "") -> Dict[str, Any]:
         """Return Yandex Disk quota information."""
