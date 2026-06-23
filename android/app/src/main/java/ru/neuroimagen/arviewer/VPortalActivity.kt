@@ -397,6 +397,10 @@ class VPortalActivity : AppCompatActivity() {
                 override fun onSurfaceTextureUpdated(surface: android.graphics.SurfaceTexture) = Unit
             }
         }
+        root.findViewById<Button>(R.id.button_ar_back).setOnClickListener {
+            stopAllVideoPlayback()
+            finish()
+        }
         root.findViewById<Button>(R.id.button_capture_photo).setOnClickListener {
             capturePhoto(glView)
         }
@@ -683,8 +687,10 @@ class VPortalActivity : AppCompatActivity() {
                 return
             }
             showFloatingVideoOverlay()
+            player.volume = 0f
+            floatingVideoPlayer?.volume = 0f
             player.playWhenReady = true
-            Log.d(TAG, "Marker lost — video continues in floating mode")
+            Log.d(TAG, "Marker lost — video continues muted in floating mode")
         }
     }
 
@@ -696,7 +702,7 @@ class VPortalActivity : AppCompatActivity() {
         if (!overlay.isAvailable) return
         overlayPlayer.setVideoTextureView(overlay)
         overlayPlayer.seekTo(mainPlayer.currentPosition)
-        overlayPlayer.volume = 1f
+        overlayPlayer.volume = 0f
         overlayPlayer.playWhenReady = true
         mainPlayer.volume = 0f
     }
@@ -708,6 +714,19 @@ class VPortalActivity : AppCompatActivity() {
             volume = 0f
         }
         floatingVideoOverlay?.visibility = View.GONE
+    }
+
+    private fun stopAllVideoPlayback() {
+        exoPlayer?.apply {
+            volume = 0f
+            playWhenReady = false
+            pause()
+        }
+        floatingVideoPlayer?.apply {
+            volume = 0f
+            playWhenReady = false
+            pause()
+        }
     }
 
     // ── Utilities ────────────────────────────────────────────────────
