@@ -23,6 +23,7 @@ import android.view.TextureView
 import android.view.View
 import android.view.WindowManager
 import android.widget.Button
+import android.widget.ImageButton
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
@@ -397,7 +398,7 @@ class VPortalActivity : AppCompatActivity() {
                 override fun onSurfaceTextureUpdated(surface: android.graphics.SurfaceTexture) = Unit
             }
         }
-        root.findViewById<Button>(R.id.button_ar_back).setOnClickListener {
+        root.findViewById<ImageButton>(R.id.button_ar_back).setOnClickListener {
             stopAllVideoPlayback()
             finish()
         }

@@ -164,7 +164,10 @@ class ArRenderer(
         val st = videoSurfaceTexture
         val isReady = videoReady
         val allImages = session.getAllTrackables(AugmentedImage::class.java)
-        val hasTracking = allImages.any { it.trackingState == TrackingState.TRACKING }
+        val hasTracking = allImages.any {
+            it.trackingState == TrackingState.TRACKING &&
+                it.trackingMethod == AugmentedImage.TrackingMethod.FULL_TRACKING
+        }
 
         // Notify activity when marker tracking starts or stops
         if (hasTracking != wasTracking) {
@@ -221,7 +224,10 @@ class ArRenderer(
             return
         }
 
-        val trackedImage = images.firstOrNull { it.trackingState == TrackingState.TRACKING }
+        val trackedImage = images.firstOrNull {
+            it.trackingState == TrackingState.TRACKING &&
+                it.trackingMethod == AugmentedImage.TrackingMethod.FULL_TRACKING
+        }
         if (trackedImage != null) {
             videoQuadRenderer.draw(
                 videoTextureId,

@@ -17,7 +17,7 @@
         android:keepScreenOn="true"
         android:visibility="gone" />
 
-    <Button
+    <ImageButton
         android:id="@+id/button_ar_back"
         android:layout_width="48dp"
         android:layout_height="48dp"
@@ -26,9 +26,10 @@
         android:layout_marginTop="16dp"
         android:background="@drawable/ar_gl_control_button_background"
         android:contentDescription="@string/ar_error_go_back"
-        android:text="‹"
-        android:textColor="@android:color/white"
-        android:textSize="32sp" />
+        android:padding="12dp"
+        android:scaleType="center"
+        android:src="@drawable/ic_arrow_back"
+        android:tint="@android:color/white" />
 
     <LinearLayout
         android:layout_width="wrap_content"
