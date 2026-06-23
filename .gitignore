@@ -34,6 +34,7 @@ env/
 
 # Local deps
 deps/
+.kilo/
 
 # Environment variables
 .env
@@ -65,11 +66,19 @@ android/app/google-services.json
 android/app/keystore.properties
 android/app/*.jks
 android/app/*.keystore
+android/app/*.pem
+android/app/*.zip
 # Large files and artifacts
 android/*.jar
 android/*.pem
 android/*.zip
 android/java_*.hprof
+
+# Local demo image copies (canonical copies live under android/app/src/main/assets/demo/)
+/01_demo.jpg
+/02_demo.jpg
+/03_demo.jpg
+/04_demo.jpg
 
 # Gradle user home (machine cache)
 .gradle-user-home/

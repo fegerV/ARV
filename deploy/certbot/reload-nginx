@@ -1,0 +1,10 @@
+#!/bin/sh
+set -eu
+
+if nginx -t >/dev/null 2>&1; then
+    systemctl reload nginx
+    logger -t certbot-renew "nginx reloaded after certificate renewal"
+else
+    logger -t certbot-renew "nginx config test failed after certificate renewal"
+    exit 1
+fi

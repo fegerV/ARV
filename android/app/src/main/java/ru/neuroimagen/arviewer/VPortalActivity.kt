@@ -19,8 +19,13 @@ import android.view.MotionEvent
 import android.view.PixelCopy
 import android.view.ScaleGestureDetector
 import android.view.Surface
+import android.view.TextureView
 import android.view.View
+import android.view.ViewGroup
+import android.view.WindowManager
 import android.widget.Button
+import android.widget.FrameLayout
+import android.widget.ImageButton
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
@@ -34,10 +39,12 @@ import androidx.lifecycle.repeatOnLifecycle
 import androidx.media3.common.MediaItem
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
+import androidx.media3.common.VideoSize
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.datasource.DefaultDataSource
 import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.source.MediaSource
 import androidx.media3.exoplayer.source.ProgressiveMediaSource
 import com.google.ar.core.Session
 import kotlinx.coroutines.Dispatchers
@@ -74,7 +81,13 @@ class VPortalActivity : AppCompatActivity() {
 
     private var arSession: Session? = null
     private var exoPlayer: ExoPlayer? = null
+    private var floatingVideoPlayer: ExoPlayer? = null
     private var arRenderer: ArRenderer? = null
+    private var floatingVideoOverlay: TextureView? = null
+    private var arVideoSurface: Surface? = null
+    private var floatingVideoAspectRatio = DEFAULT_FLOATING_VIDEO_ASPECT_RATIO
+    private var isMarkerTracking = false
+    private var hasTrackedMarkerOnce = false
     private var recordButton: Button? = null
     private var recordQualityButton: Button? = null
     private var currentZoom = 1.0f
@@ -110,6 +123,7 @@ class VPortalActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         activityCreateTime = System.currentTimeMillis()
+        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         setContentView(R.layout.activity_ar_viewer)
         supportActionBar?.setDisplayHomeAsUpEnabled(true)
 
@@ -136,6 +150,11 @@ class VPortalActivity : AppCompatActivity() {
     override fun onDestroy() {
         stopLoadingTipsCycle()
         stopRecordingIfActive()
+        hideFloatingVideoOverlay()
+        arVideoSurface?.release()
+        arVideoSurface = null
+        floatingVideoPlayer?.release()
+        floatingVideoPlayer = null
         exoPlayer?.release()
         exoPlayer = null
         arSession?.close()
@@ -334,6 +353,7 @@ class VPortalActivity : AppCompatActivity() {
      * ARCore session creation.  Must be called on the main thread.
      */
     private fun setupArScene(session: Session, manifest: ViewerManifest) {
+        floatingVideoAspectRatio = resolveVideoAspectRatio(manifest)
         val renderer = ArRenderer(
             appContext = applicationContext,
             session = session,
@@ -367,6 +387,25 @@ class VPortalActivity : AppCompatActivity() {
             preserveEGLContextOnPause = true
             setRenderer(renderer)
             setOnTouchListener { _, event -> onGlSurfaceTouch(event) }
+        }
+        floatingVideoOverlay = root.findViewById<TextureView>(R.id.floating_video_overlay).apply {
+            surfaceTextureListener = object : TextureView.SurfaceTextureListener {
+                override fun onSurfaceTextureAvailable(surface: android.graphics.SurfaceTexture, width: Int, height: Int) {
+                    if (hasTrackedMarkerOnce && !isMarkerTracking) {
+                        showFloatingVideoOverlay()
+                    }
+                }
+
+                override fun onSurfaceTextureSizeChanged(surface: android.graphics.SurfaceTexture, width: Int, height: Int) = Unit
+
+                override fun onSurfaceTextureDestroyed(surface: android.graphics.SurfaceTexture): Boolean = true
+
+                override fun onSurfaceTextureUpdated(surface: android.graphics.SurfaceTexture) = Unit
+            }
+        }
+        root.findViewById<ImageButton>(R.id.button_ar_back).setOnClickListener {
+            stopAllVideoPlayback()
+            finish()
         }
         root.findViewById<Button>(R.id.button_capture_photo).setOnClickListener {
             capturePhoto(glView)
@@ -542,6 +581,9 @@ class VPortalActivity : AppCompatActivity() {
     @OptIn(UnstableApi::class)
     private fun prepareVideoPlayer(surface: Surface, manifest: ViewerManifest) {
         exoPlayer?.release()
+        floatingVideoPlayer?.release()
+        arVideoSurface?.release()
+        arVideoSurface = surface
 
         val player = ExoPlayer.Builder(this)
             .setLoadControl(
@@ -559,6 +601,10 @@ class VPortalActivity : AppCompatActivity() {
 
         player.repeatMode = Player.REPEAT_MODE_ALL
         player.addListener(object : Player.Listener {
+            override fun onVideoSizeChanged(videoSize: VideoSize) {
+                updateFloatingVideoAspectRatio(videoSize)
+            }
+
             override fun onPlaybackStateChanged(playbackState: Int) {
                 val stateName = when (playbackState) {
                     Player.STATE_IDLE -> "IDLE"
@@ -586,6 +632,30 @@ class VPortalActivity : AppCompatActivity() {
         })
 
         val videoUrl = manifest.video.videoUrl
+        player.setMediaSource(buildVideoMediaSource(manifest))
+        player.setVideoSurface(surface)
+        player.volume = 0f
+        player.prepare()
+        player.playWhenReady = false
+
+        floatingVideoPlayer = ExoPlayer.Builder(this).build().apply {
+            repeatMode = Player.REPEAT_MODE_ALL
+            volume = 0f
+            addListener(object : Player.Listener {
+                override fun onVideoSizeChanged(videoSize: VideoSize) {
+                    updateFloatingVideoAspectRatio(videoSize)
+                }
+            })
+            setMediaSource(buildVideoMediaSource(manifest))
+            floatingVideoOverlay?.takeIf { it.isAvailable }?.let { setVideoTextureView(it) }
+            prepare()
+            playWhenReady = false
+        }
+        Log.d(TAG, "Video player prepared (source: ${if (videoUrl.startsWith("asset://")) "asset" else "cache"}, waiting for marker)")
+    }
+
+    private fun buildVideoMediaSource(manifest: ViewerManifest): MediaSource {
+        val videoUrl = manifest.video.videoUrl
         val assetUri = when {
             videoUrl.startsWith("asset://") -> {
                 val path = videoUrl.removePrefix("asset://").trimStart('/')
@@ -608,30 +678,118 @@ class VPortalActivity : AppCompatActivity() {
         } else {
             VideoCache.getDataSourceFactory(this)
         }
-        val mediaSource = ProgressiveMediaSource.Factory(dataSourceFactory)
+        return ProgressiveMediaSource.Factory(dataSourceFactory)
             .createMediaSource(mediaItem)
-        player.setMediaSource(mediaSource)
-        player.setVideoSurface(surface)
-        player.volume = 0f
-        player.prepare()
-        player.playWhenReady = false
-        Log.d(TAG, "Video player prepared (source: ${if (videoUrl.startsWith("asset://")) "asset" else "cache"}, waiting for marker)")
     }
 
     /**
      * Called from ArRenderer when marker tracking starts or stops.
-     * Plays and unmutes video when marker is visible; immediately mutes and pauses when lost.
+     * Keeps playback running across tracking loss so renderer can switch
+     * between marker-attached and floating screen-centered modes.
      */
     private fun onMarkerTrackingChanged(isTracking: Boolean) {
         val player = exoPlayer ?: return
+        isMarkerTracking = isTracking
         if (isTracking) {
+            hasTrackedMarkerOnce = true
+            hideFloatingVideoOverlay()
+            arVideoSurface?.let { player.setVideoSurface(it) }
             player.volume = 1f
             player.playWhenReady = true
             Log.d(TAG, "Marker tracked — video playing, unmuted")
         } else {
+            if (!hasTrackedMarkerOnce) {
+                return
+            }
+            showFloatingVideoOverlay()
             player.volume = 0f
-            player.playWhenReady = false
-            Log.d(TAG, "Marker lost — video muted + paused")
+            floatingVideoPlayer?.volume = 0f
+            player.playWhenReady = true
+            Log.d(TAG, "Marker lost — video continues muted in floating mode")
+        }
+    }
+
+    private fun showFloatingVideoOverlay() {
+        val mainPlayer = exoPlayer ?: return
+        val overlayPlayer = floatingVideoPlayer ?: return
+        val overlay = floatingVideoOverlay ?: return
+        updateFloatingVideoOverlaySize(overlay)
+        overlay.visibility = View.VISIBLE
+        if (!overlay.isAvailable) return
+        overlayPlayer.setVideoTextureView(overlay)
+        overlayPlayer.seekTo(mainPlayer.currentPosition)
+        overlayPlayer.volume = 0f
+        overlayPlayer.playWhenReady = true
+        mainPlayer.volume = 0f
+    }
+
+    private fun hideFloatingVideoOverlay() {
+        floatingVideoPlayer?.apply {
+            exoPlayer?.seekTo(currentPosition)
+            playWhenReady = false
+            volume = 0f
+        }
+        floatingVideoOverlay?.visibility = View.GONE
+    }
+
+    private fun resolveVideoAspectRatio(manifest: ViewerManifest): Float {
+        val width = manifest.video.width ?: 0
+        val height = manifest.video.height ?: 0
+        if (width > 0 && height > 0) {
+            return width.toFloat() / height.toFloat()
+        }
+        return DEFAULT_FLOATING_VIDEO_ASPECT_RATIO
+    }
+
+    private fun updateFloatingVideoAspectRatio(videoSize: VideoSize) {
+        if (videoSize.width <= 0 || videoSize.height <= 0) return
+        val pixelRatio = videoSize.pixelWidthHeightRatio.takeIf { it > 0f } ?: 1f
+        val aspectRatio = (videoSize.width.toFloat() * pixelRatio) / videoSize.height.toFloat()
+        floatingVideoAspectRatio = aspectRatio
+        floatingVideoOverlay?.takeIf { it.visibility == View.VISIBLE }?.let { overlay ->
+            updateFloatingVideoOverlaySize(overlay)
+        }
+    }
+
+    private fun updateFloatingVideoOverlaySize(overlay: TextureView) {
+        val root = overlay.parent as? View ?: return
+        val availableWidth = root.width.takeIf { it > 0 } ?: resources.displayMetrics.widthPixels
+        val availableHeight = root.height.takeIf { it > 0 } ?: resources.displayMetrics.heightPixels
+        val horizontalMargin = (availableWidth * FLOATING_VIDEO_HORIZONTAL_MARGIN_RATIO).toInt()
+        val verticalMargin = (availableHeight * FLOATING_VIDEO_VERTICAL_MARGIN_RATIO).toInt()
+        val maxWidth = (availableWidth - horizontalMargin * 2).coerceAtLeast(MIN_FLOATING_VIDEO_EDGE_PX)
+        val maxHeight = (availableHeight - verticalMargin * 2).coerceAtLeast(MIN_FLOATING_VIDEO_EDGE_PX)
+        val aspectRatio = floatingVideoAspectRatio.coerceIn(
+            MIN_FLOATING_VIDEO_ASPECT_RATIO,
+            MAX_FLOATING_VIDEO_ASPECT_RATIO,
+        )
+
+        var targetWidth = maxWidth
+        var targetHeight = (targetWidth / aspectRatio).toInt()
+        if (targetHeight > maxHeight) {
+            targetHeight = maxHeight
+            targetWidth = (targetHeight * aspectRatio).toInt()
+        }
+
+        val params = (overlay.layoutParams as? FrameLayout.LayoutParams)
+            ?: FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT)
+        if (params.width == targetWidth && params.height == targetHeight) return
+        params.width = targetWidth
+        params.height = targetHeight
+        params.gravity = android.view.Gravity.CENTER
+        overlay.layoutParams = params
+    }
+
+    private fun stopAllVideoPlayback() {
+        exoPlayer?.apply {
+            volume = 0f
+            playWhenReady = false
+            pause()
+        }
+        floatingVideoPlayer?.apply {
+            volume = 0f
+            playWhenReady = false
+            pause()
         }
     }
 
@@ -781,6 +939,12 @@ class VPortalActivity : AppCompatActivity() {
         const val EXTRA_UNIQUE_ID = "unique_id"
         private const val MIN_ZOOM = 1.0f
         private const val MAX_ZOOM = 5.0f
+        private const val DEFAULT_FLOATING_VIDEO_ASPECT_RATIO = 9f / 16f
+        private const val MIN_FLOATING_VIDEO_ASPECT_RATIO = 0.35f
+        private const val MAX_FLOATING_VIDEO_ASPECT_RATIO = 2.4f
+        private const val FLOATING_VIDEO_HORIZONTAL_MARGIN_RATIO = 0.08f
+        private const val FLOATING_VIDEO_VERTICAL_MARGIN_RATIO = 0.10f
+        private const val MIN_FLOATING_VIDEO_EDGE_PX = 120
         private const val TIP_ROTATION_INTERVAL_MS = 3_000L
         private const val TIP_FADE_DURATION_MS = 300L
         private const val PREFS_RECORDING = "recording_settings"

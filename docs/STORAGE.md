@@ -164,6 +164,32 @@ url = await provider.save_file(
 - Низкая стоимость
 - Интеграция с Yandex Cloud
 
+### Yandex Disk storage provider (текущая реализация)
+
+**Описание**: Компания может использовать Яндекс Диск как удалённое хранилище. Подключение выполняется через OAuth и сохраняется в записи компании.
+
+**Как подключить**:
+1. Откройте страницу компании в админке.
+2. Выберите провайдер хранения **Yandex Disk**.
+3. Нажмите **Connect Yandex Disk**.
+4. Админка откроет страницу авторизации Яндекса.
+5. Авторизуйте приложение и скопируйте код подтверждения.
+6. Вставьте код в форму и подтвердите подключение.
+
+**Что нужно на сервере**:
+- `YANDEX_OAUTH_CLIENT_ID` - идентификатор OAuth-приложения Яндекса
+- `YANDEX_OAUTH_CLIENT_SECRET` - секрет OAuth-приложения Яндекса
+
+**Как это работает**:
+- `GET /api/companies/{company_id}/yandex-auth-url` формирует ссылку авторизации
+- `POST /api/companies/{company_id}/yandex-auth-code` меняет код на токен и сохраняет его в компании
+- `DELETE /api/companies/{company_id}/yandex-token` отключает Яндекс Диск для компании
+
+**Поведeние токена**:
+- токен хранится на уровне компании
+- перед сохранением он шифруется
+- если подключение перестало работать, его можно отключить и подключить заново из той же формы
+
 ## API провайдеров
 
 ### StorageProvider (абстрактный класс)
@@ -398,6 +424,10 @@ LOCAL_STORAGE_PUBLIC_URL=http://localhost:8000/storage
 
 # Публичный URL приложения
 PUBLIC_URL=http://localhost:8000
+
+# Yandex OAuth для подключения компаний к Яндекс Диску
+YANDEX_OAUTH_CLIENT_ID=your-client-id
+YANDEX_OAUTH_CLIENT_SECRET=your-client-secret
 ```
 
 ### Настройки в config.py
@@ -415,6 +445,10 @@ ALLOWED_FILE_EXTENSIONS_PHOTO: list[str] = ["jpeg", "jpg", "png"]
 ALLOWED_FILE_EXTENSIONS_VIDEO: list[str] = ["mp4", "webm", "mov"]
 MAX_FILE_SIZE_PHOTO: int = 10 * 1024 * 1024  # 10MB
 MAX_FILE_SIZE_VIDEO: int = 100 * 1024 * 1024  # 100MB
+
+# Yandex OAuth
+YANDEX_OAUTH_CLIENT_ID: str = ""
+YANDEX_OAUTH_CLIENT_SECRET: str = ""
 ```
 
 ## Публичный доступ

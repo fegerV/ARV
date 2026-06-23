@@ -1,0 +1,5 @@
+SHELL=/bin/sh
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+
+# Daily guard for the certificate actually served by nginx.
+20 7 * * * root /usr/local/sbin/check-ar-cert-renewal

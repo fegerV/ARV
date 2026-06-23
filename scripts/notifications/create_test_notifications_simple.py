@@ -31,13 +31,13 @@ async def create_test_notifications():
                 db=session,
                 notification_type="ar_content_created",
                 subject="New AR Content Created",
-                message="A new AR content item 'Product Demo' was created for Vertex AR Solutions",
+                message="A new AR content item 'Product Demo' was created for V-Portal Solutions",
                 company_id=1,
                 project_id=1,
                 ar_content_id=1,
                 metadata={
                     "is_read": False,
-                    "company_name": "Vertex AR Solutions",
+                    "company_name": "V-Portal Solutions",
                     "project_name": "Q4 Campaign",
                     "ar_content_name": "Product Demo"
                 }
@@ -52,12 +52,12 @@ async def create_test_notifications():
                 db=session,
                 notification_type="storage_alert",
                 subject="Storage Alert",
-                message="Storage usage for Vertex AR Solutions has reached 80% of allocated space",
+                message="Storage usage for V-Portal Solutions has reached 80% of allocated space",
                 company_id=1,
                 metadata={
                     "is_read": True,
                     "read_at": datetime.now(timezone.utc).isoformat(),
-                    "company_name": "Vertex AR Solutions"
+                    "company_name": "V-Portal Solutions"
                 }
             )
             print(f"[OK] Created notification: {notification2.id} - {notification2.subject}")
@@ -76,7 +76,7 @@ async def create_test_notifications():
                 ar_content_id=2,
                 metadata={
                     "is_read": False,
-                    "company_name": "Vertex AR Solutions",
+                    "company_name": "V-Portal Solutions",
                     "project_name": "Portrait Sessions",
                     "ar_content_name": "Customer Portrait"
                 }
@@ -97,7 +97,7 @@ async def create_test_notifications():
                 ar_content_id=3,
                 metadata={
                     "is_read": False,
-                    "company_name": "Vertex AR Solutions",
+                    "company_name": "V-Portal Solutions",
                     "project_name": "Demo Project",
                     "ar_content_name": "Demo Content"
                 }
@@ -118,7 +118,7 @@ async def create_test_notifications():
                 ar_content_id=4,
                 metadata={
                     "is_read": False,
-                    "company_name": "Vertex AR Solutions",
+                    "company_name": "V-Portal Solutions",
                     "project_name": "Test Project",
                     "ar_content_name": "Test Content"
                 }

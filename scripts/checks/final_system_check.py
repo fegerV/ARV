@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Финальная проверка системы Vertex AR B2B Platform
+Финальная проверка системы V-Portal B2B Platform
 """
 
 import asyncio
@@ -23,7 +23,7 @@ import json
 
 async def final_system_check():
     """Финальная проверка всей системы"""
-    print("🔍 ФИНАЛЬНАЯ ПРОВЕРКА СИСТЕМЫ VERTEX AR B2B PLATFORM")
+    print("🔍 ФИНАЛЬНАЯ ПРОВЕРКА СИСТЕМЫ V-PORTAL B2B PLATFORM")
     print("=" * 60)
     
     async with AsyncSessionLocal() as session:

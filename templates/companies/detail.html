@@ -65,6 +65,11 @@
                                 {{ "Local storage" if request.state.locale == "en" else "Локальное хранилище" }}
                             {% endif %}
                         </dd>
+                        {% if company.storage_provider == 'yandex_disk' %}
+                        <p class="mt-2 text-xs text-gray-500 dark:text-gray-400 leading-5">
+                            {{ "Yandex Disk is connected per company. If it stops working, edit the company, click Connect Yandex Disk, authorize the organization app, and paste the verification code. The token is encrypted and stored with the company." if request.state.locale == "en" else "Яндекс Диск подключается отдельно для каждой компании. Если подключение перестало работать, откройте редактирование компании, нажмите «Подключить Яндекс Диск», авторизуйте приложение организации и вставьте код подтверждения. Токен шифруется и хранится вместе с компанией." }}
+                        </p>
+                        {% endif %}
                     </div>
                     <div class="sm:col-span-1">
                         <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">{{ "Created" if request.state.locale == "en" else "Создана" }}</dt>

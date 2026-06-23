@@ -65,6 +65,8 @@ class ArRenderer(
     @Volatile
     private var videoReady = false
 
+    private val floatingAspectRatio = calculateAspectRatio()
+
     /**
      * Signal whether the video player has decoded at least one frame.
      * When false, the video quad is not drawn to avoid a black rectangle.
@@ -162,7 +164,10 @@ class ArRenderer(
         val st = videoSurfaceTexture
         val isReady = videoReady
         val allImages = session.getAllTrackables(AugmentedImage::class.java)
-        val hasTracking = allImages.any { it.trackingState == TrackingState.TRACKING }
+        val hasTracking = allImages.any {
+            it.trackingState == TrackingState.TRACKING &&
+                it.trackingMethod == AugmentedImage.TrackingMethod.FULL_TRACKING
+        }
 
         // Notify activity when marker tracking starts or stops
         if (hasTracking != wasTracking) {
@@ -170,7 +175,7 @@ class ArRenderer(
             mainHandler.post { onMarkerTrackingChanged(hasTracking) }
         }
 
-        if (hasTracking && isReady && st != null) {
+        if (isReady && st != null) {
             st.updateTexImage()
         }
 
@@ -215,17 +220,23 @@ class ArRenderer(
             projectionMatrix[5] *= zoom   // vertical FOV
         }
 
-        for (image in images) {
-            if (image.trackingState == TrackingState.TRACKING && isVideoReady) {
-                videoQuadRenderer.draw(
-                    videoTextureId,
-                    image.centerPose,
-                    image.extentX,
-                    image.extentZ,
-                    viewMatrix,
-                    projectionMatrix
-                )
-            }
+        if (!isVideoReady) {
+            return
+        }
+
+        val trackedImage = images.firstOrNull {
+            it.trackingState == TrackingState.TRACKING &&
+                it.trackingMethod == AugmentedImage.TrackingMethod.FULL_TRACKING
+        }
+        if (trackedImage != null) {
+            videoQuadRenderer.draw(
+                videoTextureId,
+                trackedImage.centerPose,
+                trackedImage.extentX,
+                trackedImage.extentZ,
+                viewMatrix,
+                projectionMatrix
+            )
         }
     }
 
@@ -279,6 +290,16 @@ class ArRenderer(
 
     companion object {
         private const val TAG = "ArRenderer"
+        private const val DEFAULT_VIDEO_ASPECT_RATIO = 16f / 9f
+    }
+
+    private fun calculateAspectRatio(): Float {
+        val width = manifest.video.width ?: 0
+        val height = manifest.video.height ?: 0
+        if (width > 0 && height > 0) {
+            return width.toFloat() / height.toFloat()
+        }
+        return DEFAULT_VIDEO_ASPECT_RATIO
     }
 
     private fun fallbackConfigFor(config: RecordingConfig): RecordingConfig? {

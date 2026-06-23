@@ -20,6 +20,7 @@ V-Portal — приложение дополненной реальности д
 - Демо-режим с готовыми QR-примерами.
 - Сохранение фото AR-сцены в галерею.
 - Поддержка deep links для быстрого открытия контента.
+- Новое поведение AR-видео: если маркер временно пропал из кадра, видео продолжает воспроизводиться по центру экрана и снова привязывается к изображению при повторном наведении.
 
 Для корректной работы нужны:
 - Android 7.0+.
@@ -55,6 +56,13 @@ Key features:
 - Built-in demo mode with ready QR samples.
 - Save AR photos to gallery.
 - Deep link support for quick content opening.
+- Improved AR playback: if the marker temporarily leaves the frame, the video keeps playing in the center of the screen and reattaches when the marker is detected again.
+
+## RuStore Release Notes (RU)
+- Улучшено воспроизведение AR-видео при потере маркера.
+- Видео больше не останавливается сразу, если изображение временно вышло из кадра.
+- При повторном наведении камеры видео снова привязывается к маркеру.
+- Повышена плавность пользовательского сценария во время AR-просмотра.
 
 Requirements:
 - Android 7.0+.

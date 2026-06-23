@@ -1,6 +1,7 @@
 """Страница просмотра логов сервера в админке."""
 
 import asyncio
+import json
 import re
 from pathlib import Path
 
@@ -30,12 +31,38 @@ _LEVEL_WARNING = re.compile(
 _LEVEL_DEBUG = re.compile(
     r'"level"\s*:\s*"debug"|\bDEBUG\b',
 )
+_LEVEL_INFO = re.compile(
+    r'"level"\s*:\s*"info"|\bINFO\b|Started server process|Application startup complete|'
+    r'Listening at:|Booting worker|Waiting for application startup|Handling signal|Shutting down|'
+    r'GET /.* HTTP/1\.[01]" (?:200|201|202|204|304)\b|POST /.* HTTP/1\.[01]" (?:200|201|202|204)\b',
+    re.IGNORECASE,
+)
+_ACCESS_LOG = re.compile(r'\b(?:GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS) /.* HTTP/1\.[01]" \d{3}\b')
+_NOISE_LOG = re.compile(
+    r'phpunit|eval-stdin\.php|pearcmd|/containers/json|think\\app|allow_url_include|auto_prepend_file|/vendor/',
+    re.IGNORECASE,
+)
+
+
+def _format_log_line(line: str) -> str:
+    """Pretty-print JSON log lines when possible."""
+    stripped = line.strip()
+    if not stripped.startswith("{") or not stripped.endswith("}"):
+        return line
+    try:
+        parsed = json.loads(stripped)
+    except (TypeError, ValueError, json.JSONDecodeError):
+        return line
+    try:
+        return json.dumps(parsed, ensure_ascii=False, indent=2)
+    except (TypeError, ValueError):
+        return line
 
 
 def _classify_log_line(line: str) -> str:
     """
     Определяет уровень строки лога для подсветки.
-    Возвращает: "error", "warning", "info", "debug", "default".
+    Возвращает: "error", "warning", "info", "debug", "access", "noise", "default".
     """
     if not line or not line.strip():
         return "default"
@@ -45,14 +72,26 @@ def _classify_log_line(line: str) -> str:
         return "warning"
     if _LEVEL_DEBUG.search(line):
         return "debug"
-    if '"level": "info"' in line or '"level" : "info"' in line:
+    if _NOISE_LOG.search(line):
+        return "noise"
+    if _ACCESS_LOG.search(line):
+        return "access"
+    if _LEVEL_INFO.search(line):
         return "info"
     return "default"
 
 
 def classify_log_lines(lines: list[str]) -> list[dict[str, str]]:
     """Превращает список строк в список { "text", "level" } для цветного вывода."""
-    return [{"text": line, "level": _classify_log_line(line)} for line in lines]
+    entries: list[dict[str, str]] = []
+    for index, line in enumerate(lines):
+        entries.append({
+            "id": str(index),
+            "raw_text": line,
+            "text": _format_log_line(line),
+            "level": _classify_log_line(line),
+        })
+    return entries
 
 
 def summarize_log_entries(entries: list[dict[str, str]]) -> dict[str, int]:
@@ -62,6 +101,8 @@ def summarize_log_entries(entries: list[dict[str, str]]) -> dict[str, int]:
         "warning": 0,
         "info": 0,
         "debug": 0,
+        "access": 0,
+        "noise": 0,
         "default": 0,
         "total": 0,
     }
@@ -127,7 +168,7 @@ async def _read_log_lines_from_journalctl(unit: str, max_lines: int) -> tuple[li
         return [], str(e)
 
 
-async def _get_log_lines(lines_param: int | None) -> tuple[list[str], str, str]:
+async def _get_log_lines(lines_param: int | None) -> tuple[list[str], str, str, str]:
     """
     Определяет источник логов (файл или journalctl), читает данные.
     Возвращает (список строк, источник для отображения, сообщение об ошибке или пусто).
@@ -138,19 +179,19 @@ async def _get_log_lines(lines_param: int | None) -> tuple[list[str], str, str]:
     if settings.LOG_FILE and Path(settings.LOG_FILE).exists():
         lines, err = _read_log_lines_from_file(settings.LOG_FILE, max_lines)
         if err:
-            return [], "file", err
-        return lines, "file", ""
+            return [], "file", settings.LOG_FILE, err
+        return lines, "file", settings.LOG_FILE, ""
 
     lines, err = await _read_log_lines_from_journalctl(
         settings.LOG_JOURNALCTL_UNIT, max_lines
     )
     if err:
-        return [], "journalctl", err
-    return lines, "journalctl", ""
+        return [], "journalctl", settings.LOG_JOURNALCTL_UNIT, err
+    return lines, "journalctl", settings.LOG_JOURNALCTL_UNIT, ""
 
 
-async def get_log_content(lines_param: int | None = None) -> tuple[list[str], str, str]:
-    """Читает логи и возвращает (строки, источник, ошибка)."""
+async def get_log_content(lines_param: int | None = None) -> tuple[list[str], str, str, str]:
+    """Читает логи и возвращает (строки, источник, label источника, ошибка)."""
     return await _get_log_lines(lines_param)
 
 
@@ -163,7 +204,7 @@ async def admin_logs_page(
     if not current_user or not current_user.is_active:
         return RedirectResponse(url="/admin/login", status_code=303)
 
-    lines, source, error = await get_log_content(None)
+    lines, source, source_label, error = await get_log_content(None)
     log_entries = classify_log_lines(lines)
     log_summary = summarize_log_entries(log_entries)
     context = {
@@ -172,6 +213,7 @@ async def admin_logs_page(
         "log_entries": log_entries,
         "log_summary": log_summary,
         "log_source": source,
+        "log_source_label": source_label,
         "log_error": error,
         "max_lines": settings.LOG_MAX_LINES,
     }
@@ -189,13 +231,14 @@ async def api_admin_logs(
             status_code=401,
             content={"detail": "Unauthorized"},
         )
-    log_lines, source, error = await get_log_content(lines)
+    log_lines, source, source_label, error = await get_log_content(lines)
     items = classify_log_lines(log_lines)
     summary = summarize_log_entries(items)
     return {
         "items": items,
         "summary": summary,
         "source": source,
+        "source_label": source_label,
         "error": error or None,
         "count": len(items),
     }

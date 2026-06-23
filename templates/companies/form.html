@@ -157,6 +157,11 @@
                             {{ "Connect Yandex Disk" if request.state.locale == "en" else "Подключить Яндекс Диск" }}
                         </button>
 
+                        <div class="text-xs text-gray-500 dark:text-gray-400 leading-5 space-y-1">
+                            <p>{{ "1) Create an OAuth app in Yandex. 2) Set YANDEX_OAUTH_CLIENT_ID and YANDEX_OAUTH_CLIENT_SECRET on the server. 3) Click connect, authorize, and paste the verification code." if request.state.locale == "en" else "1) Создайте OAuth-приложение в Яндексе. 2) Укажите на сервере YANDEX_OAUTH_CLIENT_ID и YANDEX_OAUTH_CLIENT_SECRET. 3) Нажмите подключение, авторизуйтесь и вставьте код подтверждения." }}</p>
+                            <p>{{ "The token is stored per company and encrypted before saving." if request.state.locale == "en" else "Токен хранится отдельно для каждой компании и шифруется перед сохранением." }}</p>
+                        </div>
+
                         <div x-show="showCodeInput" x-cloak class="space-y-2">
                             <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
                                 {{ "Enter authorization code" if request.state.locale == "en" else "Введите код авторизации" }}

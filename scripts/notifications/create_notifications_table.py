@@ -42,10 +42,10 @@ def create_notifications_table():
         notifications = [
             (1, 1, 1, "ar_content_created", False, None, None, False, None, None,
              "New AR Content Created", 
-             "A new AR content item 'Product Demo' was created for Vertex AR Solutions",
+             "A new AR content item 'Product Demo' was created for V-Portal Solutions",
              json.dumps({
                  "is_read": False,
-                 "company_name": "Vertex AR Solutions",
+                 "company_name": "V-Portal Solutions",
                  "project_name": "Q4 Campaign",
                  "ar_content_name": "Product Demo"
              }),
@@ -53,11 +53,11 @@ def create_notifications_table():
             
             (1, 1, 2, "storage_alert", False, None, None, False, None, None,
              "Storage Alert",
-             "Storage usage for Vertex AR Solutions has reached 80% of allocated space",
+             "Storage usage for V-Portal Solutions has reached 80% of allocated space",
              json.dumps({
                  "is_read": True,
                  "read_at": "2024-12-24T15:45:00",
-                 "company_name": "Vertex AR Solutions",
+                 "company_name": "V-Portal Solutions",
                  "project_name": "Summer Sale",
                  "ar_content_name": None
              }),
@@ -68,7 +68,7 @@ def create_notifications_table():
              "Video processing for 'Marketing Video' has been completed successfully",
              json.dumps({
                  "is_read": False,
-                 "company_name": "Vertex AR Solutions",
+                 "company_name": "V-Portal Solutions",
                  "project_name": "Product Launch",
                  "ar_content_name": "Marketing Video"
              }),
@@ -79,7 +79,7 @@ def create_notifications_table():
              "MindAR marker for 'Customer Portrait' has been generated and is ready for use",
              json.dumps({
                  "is_read": False,
-                 "company_name": "Vertex AR Solutions",
+                 "company_name": "V-Portal Solutions",
                  "project_name": "Portrait Sessions",
                  "ar_content_name": "Customer Portrait"
              }),
@@ -91,7 +91,7 @@ def create_notifications_table():
              json.dumps({
                  "is_read": True,
                  "read_at": "2024-12-23T12:30:00",
-                 "company_name": "Vertex AR Solutions",
+                 "company_name": "V-Portal Solutions",
                  "project_name": "Demo Project",
                  "ar_content_name": "Demo Content"
              }),

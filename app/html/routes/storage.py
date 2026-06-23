@@ -39,6 +39,33 @@ _STORAGE_INFO_CACHE: dict[str, object] = {
 _YD_FOLDER_CACHE: dict[int, dict[str, object]] = {}
 
 
+def _exception_log_payload(exc: Exception) -> dict[str, object]:
+    """Return a structured, non-empty payload for exception logging."""
+    payload: dict[str, object] = {
+        "error": str(exc) or repr(exc),
+        "error_type": type(exc).__name__,
+        "error_repr": repr(exc),
+    }
+    response = getattr(exc, "response", None)
+    if response is not None:
+        status_code = getattr(response, "status_code", None)
+        if status_code is not None:
+            payload["response_status"] = status_code
+        text = getattr(response, "text", None)
+        if text:
+            payload["response_text"] = text[:500]
+    request = getattr(exc, "request", None)
+    if request is not None:
+        url = getattr(request, "url", None)
+        method = getattr(request, "method", None)
+        if url is not None:
+            payload["request_url"] = str(url)
+        if method:
+            payload["request_method"] = method
+    payload["traceback"] = traceback.format_exc()
+    return payload
+
+
 def format_bytes(bytes_value: int) -> str:
     """Format bytes to human-readable format."""
     try:
@@ -146,7 +173,11 @@ async def _refresh_yandex_folder_cache(company_id: int, provider) -> None:
         entry["timestamp"] = time.monotonic()
         logger.info("yd_company_folder_cache_refresh", company_id=company_id)
     except Exception as exc:
-        logger.warning("yd_company_folder_cache_refresh_failed", company_id=company_id, error=str(exc))
+        logger.warning(
+            "yd_company_folder_cache_refresh_failed",
+            company_id=company_id,
+            **_exception_log_payload(exc),
+        )
     finally:
         entry["refresh_task"] = None
 
@@ -282,7 +313,11 @@ async def _build_storage_info(db: AsyncSession) -> dict:
                                                 timeout=_STORAGE_INFO_PROVIDER_TIMEOUT,
                                             )
                     except Exception as exc:
-                        logger.warning("yd_company_usage_failed", company_id=company.id, error=str(exc))
+                        logger.warning(
+                            "yd_company_usage_failed",
+                            company_id=company.id,
+                            **_exception_log_payload(exc),
+                        )
                 else:
                     try:
                         company_dir = Path(settings.STORAGE_BASE_PATH) / (getattr(company, "slug", None) or "")
