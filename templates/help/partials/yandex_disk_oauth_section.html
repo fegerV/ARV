@@ -1,0 +1,49 @@
+{% set is_en = request.state.locale == "en" %}
+
+<section id="yandex-disk-oauth" class="mb-10">
+    <h2 class="text-xl font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+        <span class="material-icons text-red-500">cloud</span>
+        {{ "How to connect Yandex Disk" if is_en else "Как подключить Яндекс Диск" }}
+    </h2>
+
+    <div class="space-y-5 text-gray-700 dark:text-gray-300">
+        <div class="bg-gray-50 dark:bg-gray-800/60 border border-gray-200 dark:border-gray-700 rounded-xl p-4">
+            <h3 class="font-medium text-gray-900 dark:text-white mb-2">{{ "1. Create an OAuth application" if is_en else "1. Создайте OAuth-приложение" }}</h3>
+            <ol class="list-decimal list-inside space-y-2 text-sm leading-6">
+                <li>{% if is_en %}Open <code class="text-sm bg-gray-100 dark:bg-gray-700 px-1 rounded">https://oauth.yandex.ru/client/new</code>.{% else %}Откройте <code class="text-sm bg-gray-100 dark:bg-gray-700 px-1 rounded">https://oauth.yandex.ru/client/new</code>.{% endif %}</li>
+                <li>{% if is_en %}Create a server-side OAuth application for your organization account.{% else %}Создайте серверное OAuth-приложение для учётной записи организации.{% endif %}</li>
+                <li>{% if is_en %}Save it and copy the <code class="text-sm bg-gray-100 dark:bg-gray-700 px-1 rounded">Client ID</code> and <code class="text-sm bg-gray-100 dark:bg-gray-700 px-1 rounded">Client Secret</code>.{% else %}Сохраните его и скопируйте <code class="text-sm bg-gray-100 dark:bg-gray-700 px-1 rounded">Client ID</code> и <code class="text-sm bg-gray-100 dark:bg-gray-700 px-1 rounded">Client Secret</code>.{% endif %}</li>
+            </ol>
+        </div>
+
+        <div class="bg-gray-50 dark:bg-gray-800/60 border border-gray-200 dark:border-gray-700 rounded-xl p-4">
+            <h3 class="font-medium text-gray-900 dark:text-white mb-2">{{ "2. Configure the server" if is_en else "2. Настройте сервер" }}</h3>
+            <p class="text-sm leading-6 mb-3">{% if is_en %}Set the OAuth credentials in the backend environment and restart the app.{% else %}Укажите OAuth-данные в переменных окружения backend и перезапустите приложение.{% endif %}</p>
+            <div class="space-y-2 text-sm">
+                <p><code class="text-sm bg-gray-100 dark:bg-gray-700 px-1 rounded">YANDEX_OAUTH_CLIENT_ID</code> — {{ "client ID from Yandex" if is_en else "Client ID из Yandex" }}</p>
+                <p><code class="text-sm bg-gray-100 dark:bg-gray-700 px-1 rounded">YANDEX_OAUTH_CLIENT_SECRET</code> — {{ "client secret from Yandex" if is_en else "Client Secret из Yandex" }}</p>
+            </div>
+            <p class="text-sm leading-6 mt-3">{% if is_en %}Without these values the connection button cannot generate the authorization link.{% else %}Без этих значений кнопка подключения не сможет сгенерировать ссылку авторизации.{% endif %}</p>
+        </div>
+
+        <div class="bg-gray-50 dark:bg-gray-800/60 border border-gray-200 dark:border-gray-700 rounded-xl p-4">
+            <h3 class="font-medium text-gray-900 dark:text-white mb-2">{{ "3. Connect the company" if is_en else "3. Подключите компанию" }}</h3>
+            <ol class="list-decimal list-inside space-y-2 text-sm leading-6">
+                <li>{% if is_en %}Open <strong>Companies</strong> in the admin panel and edit the company.{% else %}Откройте <strong>Компании</strong> в админке и отредактируйте компанию.{% endif %}</li>
+                <li>{% if is_en %}Select <strong>Yandex Disk</strong> as the storage provider.{% else %}Выберите <strong>Яндекс Диск</strong> как хранилище.{% endif %}</li>
+                <li>{% if is_en %}Click <strong>Connect Yandex Disk</strong>. The admin panel will open the Yandex authorization page.{% else %}Нажмите <strong>Подключить Яндекс Диск</strong>. Админка откроет страницу авторизации Yandex.{% endif %}</li>
+                <li>{% if is_en %}Authorize access for the organization account and copy the verification code from Yandex.{% else %}Разрешите доступ под учётной записью организации и скопируйте код подтверждения из Yandex.{% endif %}</li>
+                <li>{% if is_en %}Paste the code into the admin form and confirm the connection.{% else %}Вставьте код в форму админки и подтвердите подключение.{% endif %}</li>
+            </ol>
+        </div>
+
+        <div class="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-xl p-4 text-sm leading-6 text-blue-900 dark:text-blue-100">
+            <p class="font-medium mb-2">{{ "Important details" if is_en else "Важные детали" }}</p>
+            <ul class="list-disc list-inside space-y-2">
+                <li>{% if is_en %}The token is stored per company, so each organization can have its own Yandex Disk connection.{% else %}Токен хранится отдельно для каждой компании, поэтому у каждой организации может быть своё подключение к Яндекс.Диску.{% endif %}</li>
+                <li>{% if is_en %}The token is encrypted before saving.{% else %}Перед сохранением токен шифруется.{% endif %}</li>
+                <li>{% if is_en %}If the connection stops working, disconnect and reconnect the company from the same screen.{% else %}Если подключение перестало работать, отключите и снова подключите компанию на этой же странице.{% endif %}</li>
+            </ul>
+        </div>
+    </div>
+</section>
