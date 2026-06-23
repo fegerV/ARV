@@ -21,8 +21,10 @@ import android.view.ScaleGestureDetector
 import android.view.Surface
 import android.view.TextureView
 import android.view.View
+import android.view.ViewGroup
 import android.view.WindowManager
 import android.widget.Button
+import android.widget.FrameLayout
 import android.widget.ImageButton
 import android.widget.TextView
 import android.widget.Toast
@@ -82,6 +84,7 @@ class VPortalActivity : AppCompatActivity() {
     private var arRenderer: ArRenderer? = null
     private var floatingVideoOverlay: TextureView? = null
     private var arVideoSurface: Surface? = null
+    private var floatingVideoAspectRatio = DEFAULT_FLOATING_VIDEO_ASPECT_RATIO
     private var isMarkerTracking = false
     private var hasTrackedMarkerOnce = false
     private var recordButton: Button? = null
@@ -349,6 +352,7 @@ class VPortalActivity : AppCompatActivity() {
      * ARCore session creation.  Must be called on the main thread.
      */
     private fun setupArScene(session: Session, manifest: ViewerManifest) {
+        floatingVideoAspectRatio = resolveVideoAspectRatio(manifest)
         val renderer = ArRenderer(
             appContext = applicationContext,
             session = session,
@@ -699,6 +703,7 @@ class VPortalActivity : AppCompatActivity() {
         val mainPlayer = exoPlayer ?: return
         val overlayPlayer = floatingVideoPlayer ?: return
         val overlay = floatingVideoOverlay ?: return
+        updateFloatingVideoOverlaySize(overlay)
         overlay.visibility = View.VISIBLE
         if (!overlay.isAvailable) return
         overlayPlayer.setVideoTextureView(overlay)
@@ -715,6 +720,42 @@ class VPortalActivity : AppCompatActivity() {
             volume = 0f
         }
         floatingVideoOverlay?.visibility = View.GONE
+    }
+
+    private fun resolveVideoAspectRatio(manifest: ViewerManifest): Float {
+        val width = manifest.video.width ?: 0
+        val height = manifest.video.height ?: 0
+        if (width > 0 && height > 0) {
+            return width.toFloat() / height.toFloat()
+        }
+        return DEFAULT_FLOATING_VIDEO_ASPECT_RATIO
+    }
+
+    private fun updateFloatingVideoOverlaySize(overlay: TextureView) {
+        val root = overlay.parent as? View ?: return
+        val availableWidth = root.width.takeIf { it > 0 } ?: resources.displayMetrics.widthPixels
+        val availableHeight = root.height.takeIf { it > 0 } ?: resources.displayMetrics.heightPixels
+        val maxWidth = (availableWidth * FLOATING_VIDEO_MAX_WIDTH_RATIO).toInt()
+        val maxHeight = (availableHeight * FLOATING_VIDEO_MAX_HEIGHT_RATIO).toInt()
+        val aspectRatio = floatingVideoAspectRatio.coerceIn(
+            MIN_FLOATING_VIDEO_ASPECT_RATIO,
+            MAX_FLOATING_VIDEO_ASPECT_RATIO,
+        )
+
+        var targetWidth = maxWidth
+        var targetHeight = (targetWidth / aspectRatio).toInt()
+        if (targetHeight > maxHeight) {
+            targetHeight = maxHeight
+            targetWidth = (targetHeight * aspectRatio).toInt()
+        }
+
+        val params = (overlay.layoutParams as? FrameLayout.LayoutParams)
+            ?: FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT)
+        if (params.width == targetWidth && params.height == targetHeight) return
+        params.width = targetWidth
+        params.height = targetHeight
+        params.gravity = android.view.Gravity.CENTER
+        overlay.layoutParams = params
     }
 
     private fun stopAllVideoPlayback() {
@@ -876,6 +917,11 @@ class VPortalActivity : AppCompatActivity() {
         const val EXTRA_UNIQUE_ID = "unique_id"
         private const val MIN_ZOOM = 1.0f
         private const val MAX_ZOOM = 5.0f
+        private const val DEFAULT_FLOATING_VIDEO_ASPECT_RATIO = 9f / 16f
+        private const val MIN_FLOATING_VIDEO_ASPECT_RATIO = 0.35f
+        private const val MAX_FLOATING_VIDEO_ASPECT_RATIO = 2.4f
+        private const val FLOATING_VIDEO_MAX_WIDTH_RATIO = 0.82f
+        private const val FLOATING_VIDEO_MAX_HEIGHT_RATIO = 0.62f
         private const val TIP_ROTATION_INTERVAL_MS = 3_000L
         private const val TIP_FADE_DURATION_MS = 300L
         private const val PREFS_RECORDING = "recording_settings"

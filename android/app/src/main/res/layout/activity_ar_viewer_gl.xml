@@ -10,8 +10,8 @@
 
     <TextureView
         android:id="@+id/floating_video_overlay"
-        android:layout_width="280dp"
-        android:layout_height="158dp"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
         android:layout_gravity="center"
         android:alpha="1"
         android:keepScreenOn="true"
