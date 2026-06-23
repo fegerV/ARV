@@ -39,6 +39,7 @@ import androidx.lifecycle.repeatOnLifecycle
 import androidx.media3.common.MediaItem
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
+import androidx.media3.common.VideoSize
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.datasource.DefaultDataSource
 import androidx.media3.exoplayer.DefaultLoadControl
@@ -600,6 +601,10 @@ class VPortalActivity : AppCompatActivity() {
 
         player.repeatMode = Player.REPEAT_MODE_ALL
         player.addListener(object : Player.Listener {
+            override fun onVideoSizeChanged(videoSize: VideoSize) {
+                updateFloatingVideoAspectRatio(videoSize)
+            }
+
             override fun onPlaybackStateChanged(playbackState: Int) {
                 val stateName = when (playbackState) {
                     Player.STATE_IDLE -> "IDLE"
@@ -636,6 +641,11 @@ class VPortalActivity : AppCompatActivity() {
         floatingVideoPlayer = ExoPlayer.Builder(this).build().apply {
             repeatMode = Player.REPEAT_MODE_ALL
             volume = 0f
+            addListener(object : Player.Listener {
+                override fun onVideoSizeChanged(videoSize: VideoSize) {
+                    updateFloatingVideoAspectRatio(videoSize)
+                }
+            })
             setMediaSource(buildVideoMediaSource(manifest))
             floatingVideoOverlay?.takeIf { it.isAvailable }?.let { setVideoTextureView(it) }
             prepare()
@@ -731,12 +741,24 @@ class VPortalActivity : AppCompatActivity() {
         return DEFAULT_FLOATING_VIDEO_ASPECT_RATIO
     }
 
+    private fun updateFloatingVideoAspectRatio(videoSize: VideoSize) {
+        if (videoSize.width <= 0 || videoSize.height <= 0) return
+        val pixelRatio = videoSize.pixelWidthHeightRatio.takeIf { it > 0f } ?: 1f
+        val aspectRatio = (videoSize.width.toFloat() * pixelRatio) / videoSize.height.toFloat()
+        floatingVideoAspectRatio = aspectRatio
+        floatingVideoOverlay?.takeIf { it.visibility == View.VISIBLE }?.let { overlay ->
+            updateFloatingVideoOverlaySize(overlay)
+        }
+    }
+
     private fun updateFloatingVideoOverlaySize(overlay: TextureView) {
         val root = overlay.parent as? View ?: return
         val availableWidth = root.width.takeIf { it > 0 } ?: resources.displayMetrics.widthPixels
         val availableHeight = root.height.takeIf { it > 0 } ?: resources.displayMetrics.heightPixels
-        val maxWidth = (availableWidth * FLOATING_VIDEO_MAX_WIDTH_RATIO).toInt()
-        val maxHeight = (availableHeight * FLOATING_VIDEO_MAX_HEIGHT_RATIO).toInt()
+        val horizontalMargin = (availableWidth * FLOATING_VIDEO_HORIZONTAL_MARGIN_RATIO).toInt()
+        val verticalMargin = (availableHeight * FLOATING_VIDEO_VERTICAL_MARGIN_RATIO).toInt()
+        val maxWidth = (availableWidth - horizontalMargin * 2).coerceAtLeast(MIN_FLOATING_VIDEO_EDGE_PX)
+        val maxHeight = (availableHeight - verticalMargin * 2).coerceAtLeast(MIN_FLOATING_VIDEO_EDGE_PX)
         val aspectRatio = floatingVideoAspectRatio.coerceIn(
             MIN_FLOATING_VIDEO_ASPECT_RATIO,
             MAX_FLOATING_VIDEO_ASPECT_RATIO,
@@ -920,8 +942,9 @@ class VPortalActivity : AppCompatActivity() {
         private const val DEFAULT_FLOATING_VIDEO_ASPECT_RATIO = 9f / 16f
         private const val MIN_FLOATING_VIDEO_ASPECT_RATIO = 0.35f
         private const val MAX_FLOATING_VIDEO_ASPECT_RATIO = 2.4f
-        private const val FLOATING_VIDEO_MAX_WIDTH_RATIO = 0.82f
-        private const val FLOATING_VIDEO_MAX_HEIGHT_RATIO = 0.62f
+        private const val FLOATING_VIDEO_HORIZONTAL_MARGIN_RATIO = 0.08f
+        private const val FLOATING_VIDEO_VERTICAL_MARGIN_RATIO = 0.10f
+        private const val MIN_FLOATING_VIDEO_EDGE_PX = 120
         private const val TIP_ROTATION_INTERVAL_MS = 3_000L
         private const val TIP_FADE_DURATION_MS = 300L
         private const val PREFS_RECORDING = "recording_settings"
