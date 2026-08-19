@@ -63,9 +63,9 @@ async def _get_html_session_timeout_minutes(db: AsyncSession) -> int:
 
 
 @router.get("/admin/login", response_class=HTMLResponse)
+@limiter.limit("5/minute")
 async def admin_login_page(request: Request):
     """Admin login page."""
-    limiter.limit("5/minute")
     return _render_login(request)
 
 

@@ -27,6 +27,7 @@ async def create_notification(
     project_id: Optional[int] = None,
     ar_content_id: Optional[int] = None,
     metadata: Optional[Dict[str, Any]] = None,
+    user_id: Optional[int] = None,
 ) -> Notification:
     """Create a notification in the database.
     
@@ -51,6 +52,7 @@ async def create_notification(
             company_id=company_id,
             project_id=project_id,
             ar_content_id=ar_content_id,
+            user_id=user_id,
             notification_metadata=metadata or {},
             created_at=_utcnow_naive()
         )
@@ -161,10 +163,11 @@ class NotificationService:
         project_id: Optional[int] = None,
         ar_content_id: Optional[int] = None,
         metadata: Optional[Dict[str, Any]] = None,
+        user_id: Optional[int] = None,
     ) -> Notification:
         return await create_notification(
             db, notification_type, subject, message,
-            company_id, project_id, ar_content_id, metadata
+            company_id, project_id, ar_content_id, metadata, user_id
         )
 
     def send_expiry_warning_email(self, project_name: str, company_email: str, expires_at_str: str, ar_items_count: int) -> bool:

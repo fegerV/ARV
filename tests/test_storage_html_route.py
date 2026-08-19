@@ -17,8 +17,8 @@ async def test_get_storage_info_reuses_fresh_cache(monkeypatch):
     monkeypatch.setattr(storage_route, "_STORAGE_INFO_CACHE", {"value": None, "timestamp": 0.0})
     monkeypatch.setattr(storage_route.time, "monotonic", lambda: 100.0)
 
-    first = await storage_route.get_storage_info(SimpleNamespace())
-    second = await storage_route.get_storage_info(SimpleNamespace())
+    first = await storage_route.get_storage_info(SimpleNamespace(is_super_admin=False, company_id=None))
+    second = await storage_route.get_storage_info(SimpleNamespace(is_super_admin=False, company_id=None))
 
     assert calls["count"] == 1
     assert first == second
@@ -29,7 +29,7 @@ async def test_get_storage_info_reuses_fresh_cache(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_get_yandex_folder_snapshot_reuses_fresh_cache(monkeypatch):
-    provider = SimpleNamespace()
+    provider = SimpleNamespace(is_super_admin=False, company_id=None)
     monkeypatch.setattr(
         storage_route,
         "_YD_FOLDER_CACHE",
@@ -52,7 +52,7 @@ async def test_get_yandex_folder_snapshot_reuses_fresh_cache(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_get_yandex_folder_snapshot_returns_stale_and_schedules_refresh(monkeypatch):
-    provider = SimpleNamespace()
+    provider = SimpleNamespace(is_super_admin=False, company_id=None)
     scheduled = {"count": 0}
 
     def _fake_schedule(company_id, scheduled_provider):
@@ -82,7 +82,7 @@ async def test_get_yandex_folder_snapshot_returns_stale_and_schedules_refresh(mo
 
 @pytest.mark.asyncio
 async def test_get_yandex_folder_snapshot_cold_miss_schedules_refresh(monkeypatch):
-    provider = SimpleNamespace()
+    provider = SimpleNamespace(is_super_admin=False, company_id=None)
     scheduled = {"count": 0}
 
     def _fake_schedule(company_id, scheduled_provider):
@@ -153,8 +153,8 @@ async def test_get_storage_info_returns_stale_cache_after_ttl(monkeypatch):
     )
     monkeypatch.setattr(storage_route.time, "monotonic", _fake_monotonic)
 
-    first = await storage_route.get_storage_info(SimpleNamespace())
-    second = await storage_route.get_storage_info(SimpleNamespace())
+    first = await storage_route.get_storage_info(SimpleNamespace(is_super_admin=False, company_id=None))
+    second = await storage_route.get_storage_info(SimpleNamespace(is_super_admin=False, company_id=None))
 
     assert calls["count"] == 1
     assert calls["scheduled"] == 1
@@ -182,7 +182,7 @@ async def test_get_storage_info_returns_stale_cache_and_schedules_refresh(monkey
     )
     monkeypatch.setattr(storage_route.time, "monotonic", lambda: 100.0)
 
-    result = await storage_route.get_storage_info(SimpleNamespace())
+    result = await storage_route.get_storage_info(SimpleNamespace(is_super_admin=False, company_id=None))
 
     assert result == stale_value
     assert scheduled["called"] == 1

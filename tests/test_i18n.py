@@ -30,7 +30,7 @@ def test_get_request_locale_prefers_session_and_syncs_state():
     assert request.state.locale == "ru"
 
     request = SimpleNamespace(
-        state=SimpleNamespace(),
+        state=SimpleNamespace(is_super_admin=False, company_id=None),
         session={"language": "en"},
     )
     assert get_request_locale(request) == "en"

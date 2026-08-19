@@ -18,8 +18,8 @@ async def test_get_analytics_data_uses_cache(monkeypatch):
     monkeypatch.setattr(analytics_route, "_ANALYTICS_CACHE", {})
     monkeypatch.setattr(analytics_route.time, "monotonic", lambda: 100.0)
 
-    first = await analytics_route.get_analytics_data(SimpleNamespace(), period=30)
-    second = await analytics_route.get_analytics_data(SimpleNamespace(), period=30)
+    first = await analytics_route.get_analytics_data(SimpleNamespace(is_super_admin=False, company_id=None), period=30)
+    second = await analytics_route.get_analytics_data(SimpleNamespace(is_super_admin=False, company_id=None), period=30)
 
     assert calls["count"] == 1
     assert first == second

@@ -284,7 +284,7 @@ async def test_generate_video_thumbnail_uses_provider_and_returns_failure_on_ext
     result = await service.generate_video_thumbnail(
         video_path="sample.mp4",
         thumbnail_name="sample_thumb.webp",
-        provider=SimpleNamespace(),
+        provider=SimpleNamespace(is_super_admin=False, company_id=None),
         company_id=17,
     )
 

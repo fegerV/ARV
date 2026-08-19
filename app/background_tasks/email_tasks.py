@@ -7,7 +7,7 @@ from typing import Dict, List, Optional, Union
 from fastapi import BackgroundTasks
 
 from app.core.config import settings
-from app.services.email_service import send_email as _send_email
+from app.services.email_transport import send_email as _send_email
 from . import run_background_task
 
 logger = logging.getLogger(__name__)

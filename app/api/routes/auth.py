@@ -2,7 +2,7 @@ from fastapi import APIRouter, HTTPException, Depends, status, Request, Form, Re
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 from app.middleware.rate_limiter import rate_limit
-from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
+from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from datetime import datetime, timedelta, UTC
@@ -23,11 +23,9 @@ router = APIRouter(tags=["auth"])
 
 # Export the functions that will be imported in main.py
 __all__ = [
-    "get_current_user",
     "get_current_active_user",
     "get_current_user_optional"
 ]
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="login")
 logger = structlog.get_logger()
 
 # Rate limiting constants
@@ -61,29 +59,6 @@ async def _get_user_from_token(db: AsyncSession, token: str | None) -> User | No
         return None
     result = await db.execute(select(User).where(User.email == email))
     return result.scalar_one_or_none()
-
-async def get_current_user(
-    request: Request,
-    token: str = None,
-    db: AsyncSession = Depends(get_db)
-) -> User:
-    """Get current authenticated user from either token or cookie"""
-    credentials_exception = HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Could not validate credentials",
-        headers={"WWW-Authenticate": "Bearer"},
-    )
-    user = await _get_user_from_token(db, _extract_request_token(request, token))
-    if user:
-        return user
-    raise credentials_exception
-
-async def get_current_user_from_cookie(
-    request: Request,
-    db: AsyncSession = Depends(get_db)
-) -> User:
-    """Get current authenticated user from cookie"""
-    return await _get_user_from_token(db, request.cookies.get("access_token"))
 
 async def get_current_user_optional(
     request: Request,

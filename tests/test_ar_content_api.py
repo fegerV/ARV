@@ -2,7 +2,9 @@ from types import SimpleNamespace
 from uuid import uuid4
 
 import pytest
-from fastapi import HTTPException
+from fastapi import HTTPException, Request as _FastAPIRequest
+
+_MOCK_REQUEST = _FastAPIRequest(scope={"type": "http", "headers": [], "query_string": b"", "path": "/"})
 
 
 def test_ar_content_helper_functions_cover_basic_validation():
@@ -156,6 +158,7 @@ async def test_validate_marker_requires_existing_photo_path():
     content = SimpleNamespace(
         id=50,
         order_number="ORD-50",
+        company_id=1,
         marker_path=None,
         photo_path=None,
         marker_url=None,
@@ -164,7 +167,7 @@ async def test_validate_marker_requires_existing_photo_path():
     db = _FakeDb(get_map={(ar_content.ARContent, 50): content})
 
     with pytest.raises(HTTPException) as exc_info:
-        await ar_content.validate_marker(50, db)
+        await ar_content.validate_marker(ar_content_id=50, request=_MOCK_REQUEST, db=db, current_user=SimpleNamespace(is_super_admin=False, company_id=None))
 
     assert exc_info.value.status_code == 400
     assert exc_info.value.detail == "Marker (photo) not set. Please upload photo or regenerate media."
@@ -177,6 +180,7 @@ async def test_validate_marker_reports_missing_file(monkeypatch):
     content = SimpleNamespace(
         id=51,
         order_number="ORD-51",
+        company_id=1,
         marker_path="missing/marker.jpg",
         photo_path=None,
         marker_url="/storage/missing/marker.jpg",
@@ -186,7 +190,7 @@ async def test_validate_marker_reports_missing_file(monkeypatch):
     monkeypatch.setattr(ar_content.settings, "STORAGE_BASE_PATH", "e:/Project/ARV/.pytest-temp-storage")
 
     with pytest.raises(HTTPException) as exc_info:
-        await ar_content.validate_marker(51, db)
+        await ar_content.validate_marker(ar_content_id=51, request=_MOCK_REQUEST, db=db, current_user=SimpleNamespace(is_super_admin=False, company_id=None))
 
     assert exc_info.value.status_code == 404
     assert exc_info.value.detail == "Marker image not found at missing/marker.jpg"

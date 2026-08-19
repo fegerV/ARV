@@ -47,14 +47,14 @@ async def test_get_user_from_token_loads_user_by_email(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_get_current_user_raises_for_missing_credentials():
-    from app.api.routes.auth import get_current_user
+async def test_get_current_active_user_raises_for_missing_credentials():
+    from app.api.routes.auth import get_current_active_user
 
     with pytest.raises(HTTPException) as exc_info:
-        await get_current_user(request=_make_request(), db=_FakeDb())
+        await get_current_active_user(request=_make_request(), db=_FakeDb())
 
     assert exc_info.value.status_code == 401
-    assert exc_info.value.detail == "Could not validate credentials"
+    assert exc_info.value.detail == "Inactive user or not authenticated"
 
 
 @pytest.mark.asyncio

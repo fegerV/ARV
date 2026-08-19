@@ -89,7 +89,7 @@
                     throw new Error('AR-маркер ещё не готов');
                 }
 
-                const videoRes = await fetch(`${API_BASE}/api/ar/${PORTRAIT_UID}/active-video`);
+                const videoRes = await fetch(`${API_BASE}/api/viewer/ar/${PORTRAIT_UID}/active-video`);
                 const videoData = await videoRes.json();
 
                 const mindarThree = new window.MINDAR.IMAGE.MindARThree({
@@ -131,7 +131,7 @@
 
                 async function loadNextVideo() {
                     try {
-                        const nextVideoRes = await fetch(`${API_BASE}/api/ar/${PORTRAIT_UID}/active-video`);
+                        const nextVideoRes = await fetch(`${API_BASE}/api/viewer/ar/${PORTRAIT_UID}/active-video`);
                         const nextVideoData = await nextVideoRes.json();
 
                         if (nextVideoData.video_url && nextVideoData.video_url !== video.src) {
@@ -196,7 +196,7 @@
             const sessionId = generateUUID();
             const startTime = Date.now();
 
-            fetch(`${API_BASE}/api/mobile/sessions`, {
+            fetch(`${API_BASE}/api/analytics/mobile/sessions`, {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify({
@@ -210,7 +210,7 @@
             window.addEventListener('beforeunload', () => {
                 const duration = Math.round((Date.now() - startTime) / 1000);
                 navigator.sendBeacon(
-                    `${API_BASE}/api/mobile/analytics`,
+                    `${API_BASE}/api/analytics/mobile/analytics`,
                     JSON.stringify({
                         session_id: sessionId,
                         duration_seconds: duration,

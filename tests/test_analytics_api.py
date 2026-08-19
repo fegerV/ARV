@@ -3,6 +3,16 @@ from uuid import uuid4
 
 import pytest
 from fastapi import HTTPException
+from fastapi import Request as _FastAPIRequest
+
+
+def _mock_request():
+    scope = {"type": "http", "headers": [], "query_string": b"", "path": "/"}
+    return _FastAPIRequest(scope=scope)
+
+
+def _mock_user():
+    return SimpleNamespace(id=1, email="test@example.com", is_active=True, is_super_admin=False, company_id=None)
 
 
 @pytest.mark.asyncio
@@ -20,7 +30,7 @@ async def test_analytics_overview_uses_distinct_fallback_when_needed():
         ]
     )
 
-    result = await analytics.analytics_overview(db)
+    result = await analytics.analytics_overview(request=_mock_request(), db=db, current_user=_mock_user())
 
     assert result == {
         "total_views": 120,
@@ -48,7 +58,7 @@ async def test_analytics_summary_delegates_to_overview():
         ]
     )
 
-    result = await analytics.analytics_summary(db)
+    result = await analytics.analytics_summary(request=_mock_request(), db=db, current_user=_mock_user())
 
     assert result["total_views"] == 1
     assert result["unique_sessions"] == 1
@@ -59,10 +69,12 @@ async def test_company_and_project_analytics_return_30_day_views():
     from app.api.routes import analytics
 
     company_db = _FakeDb(execute_results=[_FakeScalarResult(8)])
-    project_db = _FakeDb(execute_results=[_FakeScalarResult(5)])
+    project = SimpleNamespace(id=9, company_id=1)
+    project_db = _FakeDb(execute_results=[_FakeScalarResult(5)], get_map={analytics.Project: project})
 
-    company_result = await analytics.analytics_company(4, company_db)
-    project_result = await analytics.analytics_project(9, project_db)
+    company_result = await analytics.analytics_company(4, request=_mock_request(), db=company_db, current_user=_mock_user())
+    project = SimpleNamespace(id=9, company_id=1)
+    project_result = await analytics.analytics_project(9, request=_mock_request(), db=project_db, current_user=_mock_user())
 
     assert company_result == {"company_id": 4, "views_30_days": 8}
     assert project_result == {"project_id": 9, "views_30_days": 5}
@@ -72,9 +84,9 @@ async def test_company_and_project_analytics_return_30_day_views():
 async def test_analytics_content_returns_30_day_views():
     from app.api.routes import analytics
 
-    db = _FakeDb(execute_results=[_FakeScalarResult(12)])
+    db = _FakeDb(execute_results=[_FakeScalarResult(12)], get_map={analytics.ARContent: SimpleNamespace(id=77, company_id=1)})
 
-    result = await analytics.analytics_content(77, db)
+    result = await analytics.analytics_content(77, request=_mock_request(), db=db, current_user=_mock_user())
 
     assert result == {"ar_content_id": 77, "views_30_days": 12}
 
@@ -83,9 +95,9 @@ async def test_analytics_content_returns_30_day_views():
 async def test_analytics_content_alias_delegates_to_same_payload():
     from app.api.routes import analytics
 
-    db = _FakeDb(execute_results=[_FakeScalarResult(9)])
+    db = _FakeDb(execute_results=[_FakeScalarResult(9)], get_map={analytics.ARContent: SimpleNamespace(id=21, company_id=1)})
 
-    result = await analytics.analytics_content_alias(21, db)
+    result = await analytics.analytics_content_alias(21, request=_mock_request(), db=db, current_user=_mock_user())
 
     assert result == {"ar_content_id": 21, "views_30_days": 9}
 
@@ -206,8 +218,9 @@ class _FakeScalarOneOrNoneResult:
 
 
 class _FakeDb:
-    def __init__(self, execute_results=None):
+    def __init__(self, execute_results=None, get_map=None):
         self.execute_results = list(execute_results or [])
+        self.get_map = get_map or {}
         self.added = None
         self.commit_calls = 0
 
@@ -216,6 +229,12 @@ class _FakeDb:
         if isinstance(result, Exception):
             raise result
         return result
+
+    async def get(self, model, pk):
+        for key, value in self.get_map.items():
+            if key == model and getattr(value, 'id', None) == pk:
+                return value
+        return None
 
     def add(self, obj):
         self.added = obj

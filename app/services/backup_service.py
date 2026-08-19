@@ -168,6 +168,7 @@ class BackupService:
         session: AsyncSession,
         limit: int = 20,
         offset: int = 0,
+        company_ids: Optional[set[int]] = None,
     ) -> list[BackupHistory]:
         """Return recent backup records ordered by newest first."""
         stmt = (
@@ -176,11 +177,13 @@ class BackupService:
             .limit(limit)
             .offset(offset)
         )
+        if company_ids is not None:
+            stmt = stmt.where(BackupHistory.company_id.in_(company_ids))
         result = await session.execute(stmt)
         return list(result.scalars().all())
 
     async def get_last_status(
-        self, session: AsyncSession
+        self, session: AsyncSession, company_ids: Optional[set[int]] = None
     ) -> Optional[BackupHistory]:
         """Return the most recent backup record."""
         stmt = (
@@ -188,6 +191,8 @@ class BackupService:
             .order_by(BackupHistory.started_at.desc())
             .limit(1)
         )
+        if company_ids is not None:
+            stmt = stmt.where(BackupHistory.company_id.in_(company_ids))
         result = await session.execute(stmt)
         return result.scalar_one_or_none()
 
@@ -195,10 +200,14 @@ class BackupService:
         self,
         session: AsyncSession,
         backup_id: int,
+        company_ids: Optional[set[int]] = None,
     ) -> bool:
         """Delete a backup record and the file on Yandex Disk."""
         record = await session.get(BackupHistory, backup_id)
         if not record:
+            return False
+
+        if company_ids is not None and record.company_id not in company_ids:
             return False
 
         # Try deleting from YD if we know the path and company
