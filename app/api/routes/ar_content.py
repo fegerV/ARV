@@ -39,6 +39,9 @@ from app.utils.ar_content import (
     save_uploaded_file,
 )
 from app.core.storage_providers import get_provider_for_company
+from app.api.deps_authz import require_company_access, require_resource_access
+from app.api.routes.auth import get_current_active_user
+from app.models.user import User
 
 import json
 
@@ -135,9 +138,11 @@ def validate_file_size(file_size: int, max_size: int) -> bool:
 
 @router.get("/ar-content", response_model=ARContentList, tags=["AR Content"])
 async def list_all_ar_content(
+    request: Request,
     page: int = Query(1, ge=1, description="Page number"),
     page_size: int = Query(100, ge=1, le=1000, description="Number of items per page"),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
 ):
     """List all AR content across all companies and projects."""
     # Calculate offset from page and page_size
@@ -145,17 +150,21 @@ async def list_all_ar_content(
     
     # Count total items
     count_stmt = select(func.count(ARContent.id))
+    if not getattr(current_user, 'is_super_admin', False) and getattr(current_user, 'company_id', None) is not None:
+        count_stmt = count_stmt.where(ARContent.company_id == getattr(current_user, 'company_id', None))
     count_result = await db.execute(count_stmt)
     total = count_result.scalar_one()
-    
+
     # Calculate total pages
     total_pages = (total + page_size - 1) // page_size  # Ceiling division
-    
+
     # Get items with pagination, sorted by created_at DESC (newest first)
     stmt = select(ARContent).options(
         selectinload(ARContent.company), 
         selectinload(ARContent.project)
     ).order_by(ARContent.created_at.desc()).offset(skip).limit(page_size)
+    if not getattr(current_user, 'is_super_admin', False) and getattr(current_user, 'company_id', None) is not None:
+        stmt = stmt.where(ARContent.company_id == getattr(current_user, 'company_id', None))
     result = await db.execute(stmt)
     items = result.scalars().all()
     
@@ -170,9 +179,11 @@ async def list_all_ar_content(
 
 @router.get("/ar-content/", response_model=ARContentList, tags=["AR Content"])
 async def list_all_ar_content_no_slash(
+    request: Request,
     page: int = Query(1, ge=1, description="Page number"),
     page_size: int = Query(100, ge=1, le=1000, description="Number of items per page"),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
 ):
     """List all AR content across all companies and projects (route with trailing slash)."""
     # This is just a redirect to the main function
@@ -181,11 +192,14 @@ async def list_all_ar_content_no_slash(
 
 @router.get("/companies/{company_id}/projects/{project_id}/ar-content", response_model=ARContentList, tags=["AR Content"])
 async def list_ar_content(
+    request: Request,
     company_id: int,
     project_id: int,
     page: int = Query(1, ge=1, description="Page number"),
     page_size: int = Query(100, ge=1, le=1000, description="Number of items per page"),
-    db: AsyncSession = Depends(get_db)
+    company: Company = Depends(require_company_access),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
 ):
     """List AR content for a specific project within a company."""
     # Validate company and project relationship
@@ -552,16 +566,21 @@ async def _create_ar_content(
 
 @router.post("/ar-content/{ar_content_id}/regenerate-media", tags=["AR Content"])
 async def regenerate_media(
+    request: Request,
     ar_content_id: int,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
 ):
     """Regenerate preview thumbnail and marker for AR content."""
-    try:
-        ar_content = await db.get(ARContent, ar_content_id)
-        if not ar_content:
-            logger.error("ar_content_not_found", ar_content_id=ar_content_id)
-            raise HTTPException(status_code=404, detail="AR content not found")
+    ar_content = await db.get(ARContent, ar_content_id)
+    if not ar_content:
+        raise HTTPException(status_code=404, detail="AR content not found")
 
+    if not getattr(current_user, 'is_super_admin', False) and getattr(current_user, 'company_id', None) is not None:
+        if ar_content.company_id != getattr(current_user, 'company_id', None):
+            raise HTTPException(status_code=403, detail="Access denied to this AR content")
+
+    try:
         if not ar_content.photo_path:
             logger.error("photo_not_found", ar_content_id=ar_content_id)
             raise HTTPException(status_code=400, detail="Photo not found for AR content")
@@ -644,6 +663,7 @@ async def regenerate_media(
 
 @router.post("/ar-content", response_model=ARContentCreateResponse, tags=["AR Content"])
 async def create_ar_content(
+    request: Request,
     company_id: int = Form(...),
     project_id: int = Form(...),
     customer_name: Optional[str] = Form(None),
@@ -655,8 +675,12 @@ async def create_ar_content(
     video_file: UploadFile = File(...),
     background_tasks: BackgroundTasks = None,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
 ):
     """Create new AR content with photo and video files."""
+    if not getattr(current_user, 'is_super_admin', False) and getattr(current_user, 'company_id', None) is not None:
+        if company_id != getattr(current_user, 'company_id', None):
+            raise HTTPException(status_code=403, detail="Access denied to this company")
     return await _create_ar_content(
         company_id=company_id,
         project_id=project_id,
@@ -760,11 +784,13 @@ async def parse_ar_content_data(request: Request):
 
 @router.post("/companies/{company_id}/projects/{project_id}/ar-content", response_model=ARContentCreateResponse, tags=["AR Content"])
 async def create_ar_content_hierarchical(
+    request: Request,
     company_id: int,
     project_id: int,
     data: dict = Depends(parse_ar_content_data),
     background_tasks: BackgroundTasks = None,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
 ):
     """Create new AR content within a specific company and project with photo and video files."""
     log = structlog.get_logger()
@@ -780,6 +806,9 @@ async def create_ar_content_hierarchical(
         photo_filename=data["photo_file"].filename if data.get("photo_file") else None,
         video_filename=data["video_file"].filename if data.get("video_file") else None,
     )
+    if not getattr(current_user, 'is_super_admin', False) and getattr(current_user, 'company_id', None) is not None:
+        if company_id != getattr(current_user, 'company_id', None):
+            raise HTTPException(status_code=403, detail="Access denied to this company")
     try:
         return await _create_ar_content(
             company_id=company_id,
@@ -812,6 +841,7 @@ async def create_ar_content_hierarchical(
 
 @router.post("/companies/{company_id}/projects/{project_id}/ar-content-legacy", response_model=ARContentCreateResponse, tags=["AR Content"])
 async def create_ar_content_legacy(
+    request: Request,
     company_id: int,
     project_id: int,
     content_metadata: str = Form(...),
@@ -820,6 +850,7 @@ async def create_ar_content_legacy(
     description: str = Form(""),
     background_tasks: BackgroundTasks = None,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
 ):
     """Create new AR content with legacy format (image/video files and JSON metadata string)."""
     logger = structlog.get_logger()
@@ -856,7 +887,11 @@ async def create_ar_content_legacy(
         video_filename=video.filename if video else None,
         metadata=metadata
     )
-    
+
+    if not getattr(current_user, 'is_super_admin', False) and getattr(current_user, 'company_id', None) is not None:
+        if company_id != getattr(current_user, 'company_id', None):
+            raise HTTPException(status_code=403, detail="Access denied to this company")
+
     # Call the internal function with the extracted values
     return await _create_ar_content(
         company_id=company_id,
@@ -877,15 +912,18 @@ async def create_ar_content_legacy(
 
 @router.get("/companies/{company_id}/projects/{project_id}/ar-content/{content_id}", response_model=ARContentWithLinks, tags=["AR Content"])
 async def get_ar_content(
+    request: Request,
     company_id: int,
     project_id: int,
     content_id: int,
-    db: AsyncSession = Depends(get_db)
+    company: Company = Depends(require_company_access),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
 ):
     """Get full AR content metadata including all URLs and videos."""
     # Validate company and project relationship
     await validate_company_project(company_id, project_id, db)
-    
+
     # Get AR content with related videos, company, and project
     stmt = select(ARContent).options(
         selectinload(ARContent.videos),
@@ -930,18 +968,25 @@ async def get_ar_content(
 
 @router.put("/companies/{company_id}/projects/{project_id}/ar-content/{content_id}", response_model=ARContentSchema, tags=["AR Content"])
 async def update_ar_content(
+    request: Request,
     company_id: int,
     project_id: int,
     content_id: int,
     update_data: ARContentUpdate,
-    db: AsyncSession = Depends(get_db)
+    company: Company = Depends(require_company_access),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
 ):
     """Update mutable AR content metadata (never changes unique_id or QR code)."""
     # Validate company and project relationship
     await validate_company_project(company_id, project_id, db)
-    
+
     # Get AR content
     ar_content = await get_ar_content_or_404(content_id, db)
+
+    if not getattr(current_user, 'is_super_admin', False) and getattr(current_user, 'company_id', None) is not None:
+        if ar_content.company_id != getattr(current_user, 'company_id', None):
+            raise HTTPException(status_code=403, detail="Access denied to this AR content")
     
     # Verify it belongs to the specified company and project
     if ar_content.company_id != company_id or ar_content.project_id != project_id:
@@ -970,11 +1015,13 @@ async def update_ar_content(
 
 @router.patch("/companies/{company_id}/projects/{project_id}/ar-content/{content_id}/photo", response_model=ARContentSchema, tags=["AR Content"])
 async def update_ar_content_photo(
+    request: Request,
     company_id: int,
     project_id: int,
     content_id: int,
     photo: UploadFile = File(...),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
 ):
     """Replace the photo for AR content and re-generate dependent assets (thumbnail, marker)."""
     # Validate company and project relationship
@@ -1033,11 +1080,13 @@ async def update_ar_content_photo(
 
 @router.patch("/companies/{company_id}/projects/{project_id}/ar-content/{content_id}/video", response_model=ARContentSchema, tags=["AR Content"])
 async def update_ar_content_video(
+    request: Request,
     company_id: int,
     project_id: int,
     content_id: int,
     video: UploadFile = File(...),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
 ):
     """Replace the video for AR content without changing unique_id or QR code."""
     # Validate company and project relationship
@@ -1075,18 +1124,25 @@ async def update_ar_content_video(
 
 @router.delete("/companies/{company_id}/projects/{project_id}/ar-content/{content_id}", tags=["AR Content"])
 async def delete_ar_content(
+    request: Request,
     company_id: int,
     project_id: int,
     content_id: int,
     background_tasks: BackgroundTasks,
-    db: AsyncSession = Depends(get_db)
+    company: Company = Depends(require_company_access),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
 ):
     """Delete AR content and its storage folder."""
     # Validate company and project relationship
     await validate_company_project(company_id, project_id, db)
-    
+
     # Get AR content with relations
     ar_content = await get_ar_content_or_404(content_id, db, load_relations=True)
+
+    if not getattr(current_user, 'is_super_admin', False) and getattr(current_user, 'company_id', None) is not None:
+        if ar_content.company_id != getattr(current_user, 'company_id', None):
+            raise HTTPException(status_code=403, detail="Access denied to this AR content")
     
     # Verify it belongs to the specified company and project
     if ar_content.company_id != company_id or ar_content.project_id != project_id:
@@ -1132,8 +1188,10 @@ async def delete_ar_content(
 
 @router.get("/ar-content/{content_id}", response_model=ARContentWithLinks, tags=["AR Content"])
 async def get_ar_content_by_id(
+    request: Request,
     content_id: int,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
 ):
     """Get AR content by ID without requiring company/project context"""
     # Get AR content with related videos, company, and project
@@ -1145,9 +1203,13 @@ async def get_ar_content_by_id(
     ).where(ARContent.id == content_id)
     result = await db.execute(stmt)
     ar_content = result.scalar()
-    
+
     if not ar_content:
         raise HTTPException(status_code=404, detail="AR content not found")
+
+    if not getattr(current_user, 'is_super_admin', False) and getattr(current_user, 'company_id', None) is not None:
+        if ar_content.company_id != getattr(current_user, 'company_id', None):
+            raise HTTPException(status_code=403, detail="Access denied to this AR content")
 
     # Ensure unique_id exists (legacy records may lack it)
     uid = (ar_content.unique_id or "").strip()
@@ -1186,13 +1248,19 @@ async def get_ar_content_by_id(
 
 @router.delete("/ar-content/{content_id}", tags=["AR Content"])
 async def delete_ar_content_by_id(
+    request: Request,
     content_id: int,
     background_tasks: BackgroundTasks,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
 ):
     """Delete AR content by ID without requiring company/project context"""
     # Get AR content with relations for building proper storage path
     ar_content = await get_ar_content_or_404(content_id, db, load_relations=True)
+
+    if not getattr(current_user, 'is_super_admin', False) and getattr(current_user, 'company_id', None) is not None:
+        if ar_content.company_id != getattr(current_user, 'company_id', None):
+            raise HTTPException(status_code=403, detail="Access denied to this AR content")
     
     # Get storage path
     from app.utils.ar_content import get_ar_content_storage_path
@@ -1234,17 +1302,24 @@ async def delete_ar_content_by_id(
 
 @router.get("/ar-content/{ar_content_id}/marker/validate", tags=["AR Content"])
 async def validate_marker(
+    request: Request,
     ar_content_id: int,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
 ):
     """
     Validate AR marker (photo image) availability and basic quality for ARCore.
     No .mind file validation; marker = photo image.
     """
+    ar_content = await db.get(ARContent, ar_content_id)
+    if not ar_content:
+        raise HTTPException(status_code=404, detail="AR content not found")
+
+    if not getattr(current_user, 'is_super_admin', False) and getattr(current_user, 'company_id', None) is not None:
+        if ar_content.company_id != getattr(current_user, 'company_id', None):
+            raise HTTPException(status_code=403, detail="Access denied to this AR content")
+
     try:
-        ar_content = await db.get(ARContent, ar_content_id)
-        if not ar_content:
-            raise HTTPException(status_code=404, detail="AR content not found")
         image_path = ar_content.marker_path or ar_content.photo_path
         if not image_path:
             raise HTTPException(
@@ -1348,9 +1423,48 @@ async def get_ar_image(unique_id: str, db: AsyncSession = Depends(get_db)):
         raise HTTPException(status_code=400, detail="Invalid unique_id format")
 
 
+@router.get("/ar-content/by-unique/{unique_id}", tags=["AR Content"])
+async def get_ar_content_by_unique_id(
+    request: Request,
+    unique_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """Get AR content data by unique_id for the standalone AR viewer template.
+
+    Returns marker_status and marker_url as JSON (the by-unique compatibility
+    endpoint that templates/ar_viewer.html expects).
+    """
+    try:
+        UUID(unique_id)
+    except (ValueError, TypeError):
+        raise HTTPException(status_code=400, detail="Invalid unique_id format")
+
+    stmt = select(ARContent).where(ARContent.unique_id == unique_id)
+    result = await db.execute(stmt)
+    ar_content = result.scalar_one_or_none()
+
+    if not ar_content:
+        raise HTTPException(status_code=404, detail="AR content not found")
+
+    return {
+        "id": ar_content.id,
+        "unique_id": str(ar_content.unique_id),
+        "order_number": ar_content.order_number,
+        "status": ar_content.status,
+        "marker_status": ar_content.marker_status,
+        "marker_url": ar_content.marker_url,
+        "photo_url": ar_content.photo_url,
+        "thumbnail_url": ar_content.thumbnail_url,
+        "video_url": ar_content.video_url,
+    }
+
+
 @router.post("/ar-content/photo/analyze", tags=["AR Content"])
 async def analyze_photo_quality(
+    request: Request,
     photo_file: UploadFile = File(...),
+    current_user: User = Depends(get_current_active_user),
 ) -> dict:
     """Analyze uploaded photo for AR marker tracking quality.
 

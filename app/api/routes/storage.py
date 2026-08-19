@@ -13,6 +13,9 @@ from app.core.storage import get_storage_provider_instance
 from app.core.storage_providers import get_provider_for_company
 from app.models.storage import StorageConnection
 from app.models.company import Company
+from app.models.user import User
+from app.api.deps_authz import require_company_access
+from app.api.routes.auth import get_current_active_user
 from app.schemas.storage import StorageConnectionCreate, StorageUsageStats
 
 logger = structlog.get_logger()
@@ -26,7 +29,9 @@ def _utcnow_naive() -> datetime:
 @router.post("/connections")
 async def create_connection(
     connection_data: StorageConnectionCreate,
-    db: AsyncSession = Depends(get_db)
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
 ):
     """Create a new local storage connection."""
     conn = StorageConnection(
@@ -45,7 +50,12 @@ async def create_connection(
 
 
 @router.post("/connections/{connection_id}/test")
-async def test_connection(connection_id: int, db: AsyncSession = Depends(get_db)):
+async def test_connection(
+    connection_id: int,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
     """Test a storage connection."""
     conn = await db.get(StorageConnection, connection_id)
     if not conn:
@@ -104,7 +114,13 @@ async def test_connection(connection_id: int, db: AsyncSession = Depends(get_db)
 
 
 @router.get("/connections/{connection_id}/stats")
-async def get_storage_stats(connection_id: int, path: str = "", db: AsyncSession = Depends(get_db)):
+async def get_storage_stats(
+    connection_id: int,
+    request: Request,
+    path: str = "",
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
     """Get storage usage statistics for a connection."""
     conn = await db.get(StorageConnection, connection_id)
     if not conn:
@@ -119,15 +135,16 @@ async def get_storage_stats(connection_id: int, path: str = "", db: AsyncSession
 
 @router.put("/companies/{company_id}/storage")
 async def set_company_storage(
-    company_id: int, 
+    company_id: int,
+    request: Request,
     storage_connection_id: int = None,
     storage_path: str = None,
-    db: AsyncSession = Depends(get_db)
+    company: Company = Depends(require_company_access),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
 ):
     """Set storage configuration for a company."""
-    company = await db.get(Company, company_id)
-    if not company:
-        raise HTTPException(status_code=404, detail="Company not found")
+    company = company
 
     if storage_connection_id is not None:
         company.storage_connection_id = storage_connection_id
@@ -140,8 +157,10 @@ async def set_company_storage(
 
 @router.get("/connections")
 async def list_storage_connections(
+    request: Request,
     is_active: Optional[bool] = Query(None, description="Filter by active status"),
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
 ):
     """
     List local storage connections with optional filtering.
@@ -201,6 +220,7 @@ async def proxy_yandex_disk_file(
     path: str = Query(..., description="Relative file path on Yandex Disk"),
     company_id: int = Query(..., description="Company ID that owns the file"),
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
 ):
     """Proxy-stream a file from Yandex Disk for the admin panel.
 
@@ -214,6 +234,10 @@ async def proxy_yandex_disk_file(
     company = await db.get(Company, company_id)
     if not company:
         raise HTTPException(status_code=404, detail="Company not found")
+
+    if not getattr(current_user, 'is_super_admin', False) and getattr(current_user, 'company_id', None) is not None:
+        if company_id != getattr(current_user, 'company_id', None):
+            raise HTTPException(status_code=403, detail="Access denied to this company")
 
     if company.storage_provider != "yandex_disk" or not company.yandex_disk_token:
         raise HTTPException(

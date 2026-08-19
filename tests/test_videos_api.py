@@ -32,7 +32,7 @@ async def test_regenerate_video_thumbnail_requires_existing_video():
     db = _FakeDb(get_map={})
 
     with pytest.raises(HTTPException) as exc_info:
-        await videos.regenerate_video_thumbnail(99, BackgroundTasks(), db)
+        await videos.regenerate_video_thumbnail(request=SimpleNamespace(), video_id=99, background_tasks=BackgroundTasks(), db=db, current_user=SimpleNamespace(id=1))
 
     assert exc_info.value.status_code == 404
     assert exc_info.value.detail == "Video not found"
@@ -42,11 +42,11 @@ async def test_regenerate_video_thumbnail_requires_existing_video():
 async def test_regenerate_video_thumbnail_queues_background_task():
     from app.api.routes import videos
 
-    video = SimpleNamespace(id=10, video_path="/storage/videos/clip.mp4", status=None)
+    video = SimpleNamespace(id=10, video_path="/storage/videos/clip.mp4", status=None, ar_content_id=10)
     db = _FakeDb(get_map={(videos.Video, 10): video})
     background_tasks = BackgroundTasks()
 
-    result = await videos.regenerate_video_thumbnail(10, background_tasks, db)
+    result = await videos.regenerate_video_thumbnail(request=SimpleNamespace(), video_id=10, background_tasks=background_tasks, db=db, current_user=SimpleNamespace(id=1))
 
     assert result == {"status": "processing", "video_id": 10}
     assert video.status == videos.VideoStatus.PROCESSING
@@ -67,7 +67,7 @@ async def test_set_video_active_switches_active_video_and_resets_rotation_state(
         }
     )
 
-    result = await videos.set_video_active("5", "12", db)
+    result = await videos.set_video_active(request=SimpleNamespace(), content_id="5", video_id="12", db=db, current_user=SimpleNamespace(id=1, company_id=1, is_super_admin=True))
 
     assert result.status == "success"
     assert result.active_video_id == 12
@@ -91,7 +91,7 @@ async def test_update_video_subscription_deactivates_expired_active_video():
     )
     payload = VideoSubscriptionUpdate(subscription="2000-01-01T00:00:00Z")
 
-    result = await videos.update_video_subscription("8", "21", payload, db)
+    result = await videos.update_video_subscription(request=SimpleNamespace(), content_id="8", video_id="21", subscription_data=payload, db=db, current_user=SimpleNamespace(id=1, company_id=1, is_super_admin=True))
 
     assert result["status"] == "updated"
     assert result["is_active"] is False
@@ -114,7 +114,7 @@ async def test_update_playback_mode_manual_requires_target_video():
     )
     payload = VideoPlaybackModeUpdate(mode="manual", active_video_id=31)
 
-    result = await videos.update_playback_mode("3", payload, db)
+    result = await videos.update_playback_mode(request=SimpleNamespace(), content_id="3", mode_data=payload, db=db, current_user=SimpleNamespace(id=1, company_id=1, is_super_admin=True))
 
     assert result == {
         "status": "updated",
@@ -145,7 +145,7 @@ async def test_update_playback_mode_rejects_unknown_automatic_video_ids():
     payload = VideoPlaybackModeUpdate(mode="cyclic", active_video_ids=[41, 99])
 
     with pytest.raises(HTTPException) as exc_info:
-        await videos.update_playback_mode("4", payload, db)
+        await videos.update_playback_mode(request=SimpleNamespace(), content_id="4", mode_data=payload, db=db, current_user=SimpleNamespace(id=1, company_id=1, is_super_admin=True))
 
     assert exc_info.value.status_code == 404
     assert exc_info.value.detail == "Unknown video IDs: [99]"
@@ -164,7 +164,7 @@ async def test_update_video_active_flag_clears_active_video_reference():
         }
     )
 
-    result = await videos.update_video_active_flag("6", "16", VideoActiveUpdate(is_active=False), db)
+    result = await videos.update_video_active_flag(request=SimpleNamespace(), content_id="6", video_id="16", active_data=VideoActiveUpdate(is_active=False), db=db, current_user=SimpleNamespace(id=1, company_id=1, is_super_admin=True))
 
     assert result == {"status": "updated", "video_id": 16, "is_active": False}
     assert ar_content.active_video_id is None

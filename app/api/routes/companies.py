@@ -16,6 +16,7 @@ from app.schemas.company_api import (
     CompanyCreate, CompanyUpdate, CompanyListItem, CompanyDetail,
     CompanyLinks, PaginatedCompaniesResponse
 )
+from app.api.deps_authz import require_company_access
 from app.api.routes.auth import get_current_active_user
 from app.utils.slug_utils import generate_slug
 from app.utils.token_encryption import token_encryption
@@ -52,7 +53,11 @@ async def list_companies(
     # Build base query
     query = select(Company)
     count_query = select(func.count()).select_from(Company)
-    
+
+    if not getattr(current_user, 'is_super_admin', False) and getattr(current_user, 'company_id', None) is not None:
+        query = query.where(Company.id == getattr(current_user, 'company_id', None))
+        count_query = count_query.where(Company.id == getattr(current_user, 'company_id', None))
+
     # Apply filters
     where_conditions = []
     
@@ -128,15 +133,13 @@ async def list_companies(
 @router.get("/companies/{company_id}", response_model=CompanyDetail)
 async def get_company(
     company_id: int,
+    company: Company = Depends(require_company_access),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
 ):
     """Get detailed company information"""
-    # Get company
-    company = await db.get(Company, company_id)
-    if not company:
-        raise HTTPException(status_code=404, detail="Company not found")
-    
+    company = company
+
     # Get projects count
     projects_count_query = select(func.count()).select_from(Project).where(Project.company_id == company.id)
     projects_count_result = await db.execute(projects_count_query)
@@ -248,16 +251,13 @@ async def create_company(
 async def update_company(
     company_id: int,
     company_data: CompanyUpdate,
+    company: Company = Depends(require_company_access),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
 ):
     """Update company information"""
     logger = structlog.get_logger()
-    
-    # Get company
-    company = await db.get(Company, company_id)
-    if not company:
-        raise HTTPException(status_code=404, detail="Company not found")
+    company = company
     
     # Update fields
     update_data = company_data.dict(exclude_unset=True)
@@ -300,16 +300,13 @@ async def update_company(
 @router.delete("/companies/{company_id}")
 async def delete_company(
     company_id: int,
+    company: Company = Depends(require_company_access),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
 ):
     """Delete a company (with dependency checks)"""
     logger = structlog.get_logger()
-    
-    # Get company
-    company = await db.get(Company, company_id)
-    if not company:
-        raise HTTPException(status_code=404, detail="Company not found")
+    company = company
     
     # Check for dependencies
     projects_count_query = select(func.count()).select_from(Project).where(Project.company_id == company.id)
@@ -338,6 +335,7 @@ async def delete_company(
 @router.get("/companies/{company_id}/yandex-auth-url")
 async def get_yandex_auth_url(
     company_id: int,
+    company: Company = Depends(require_company_access),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
 ):
@@ -346,9 +344,7 @@ async def get_yandex_auth_url(
     The user opens this URL in a new tab, authorizes, and copies the
     verification code back into the admin panel form.
     """
-    company = await db.get(Company, company_id)
-    if not company:
-        raise HTTPException(status_code=404, detail="Company not found")
+    company = company
 
     cfg = get_settings()
     if not cfg.YANDEX_OAUTH_CLIENT_ID:
@@ -376,6 +372,7 @@ class YandexAuthCodePayload(BaseModel):
 async def exchange_yandex_auth_code(
     company_id: int,
     payload: YandexAuthCodePayload,
+    company: Company = Depends(require_company_access),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
 ):
@@ -385,9 +382,7 @@ async def exchange_yandex_auth_code(
     column.  Yandex OAuth tokens are permanent — no refresh needed.
     """
     logger = structlog.get_logger()
-    company = await db.get(Company, company_id)
-    if not company:
-        raise HTTPException(status_code=404, detail="Company not found")
+    company = company
 
     cfg = get_settings()
     if not cfg.YANDEX_OAUTH_CLIENT_ID or not cfg.YANDEX_OAUTH_CLIENT_SECRET:
@@ -444,14 +439,13 @@ async def exchange_yandex_auth_code(
 @router.delete("/companies/{company_id}/yandex-token")
 async def delete_yandex_token(
     company_id: int,
+    company: Company = Depends(require_company_access),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
 ):
     """Disconnect Yandex Disk from the company and delete the stored token."""
     logger = structlog.get_logger()
-    company = await db.get(Company, company_id)
-    if not company:
-        raise HTTPException(status_code=404, detail="Company not found")
+    company = company
 
     company.yandex_disk_token = None
     company.storage_provider = "local"

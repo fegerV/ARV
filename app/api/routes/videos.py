@@ -1,5 +1,5 @@
 from typing import List, Optional
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, UploadFile, File, Query
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, UploadFile, File, Query, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, and_, or_
 from datetime import datetime, timedelta, timezone
@@ -8,6 +8,9 @@ from app.core.database import get_db, AsyncSessionLocal
 from app.models.video import Video
 from app.models.ar_content import ARContent
 from app.models.video_schedule import VideoSchedule as VideoScheduleModel
+from app.models.user import User
+from app.api.deps_authz import require_resource_access
+from app.api.routes.auth import get_current_active_user
 from app.schemas.video_schedule import (
     VideoScheduleCreate, VideoScheduleUpdate, VideoSchedule as VideoScheduleSchema,
     VideoSubscriptionUpdate, VideoRotationUpdate, VideoSetActiveResponse,
@@ -168,9 +171,11 @@ router = APIRouter()
 
 @router.post("/{video_id}/regenerate-thumbnail")
 async def regenerate_video_thumbnail(
+    request: Request,
     video_id: int,
     background_tasks: BackgroundTasks,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
 ) -> dict:
     """Перегенерация WebP-превью для существующего видео.
 
@@ -180,6 +185,11 @@ async def regenerate_video_thumbnail(
     video = await db.get(Video, video_id)
     if not video:
         raise HTTPException(status_code=404, detail="Video not found")
+
+    ar_content = await db.get(ARContent, video.ar_content_id)
+    if not getattr(current_user, 'is_super_admin', False) and getattr(current_user, 'company_id', None) is not None:
+        if ar_content and ar_content.company_id != getattr(current_user, 'company_id', None):
+            raise HTTPException(status_code=403, detail="Access denied to this video")
 
     if not video.video_path:
         raise HTTPException(
@@ -217,10 +227,12 @@ def parse_subscription_preset(preset: str) -> datetime:
 
 @router.post("/ar-content/{content_id}/videos")
 async def upload_videos(
+    request: Request,
     content_id: str,
     videos: List[UploadFile] = File(...),
     background_tasks: BackgroundTasks = None,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
 ):
     """Upload one or multiple videos for AR content.
 
@@ -253,6 +265,10 @@ async def upload_videos(
     ar_content = result_content.scalar_one_or_none()
     if not ar_content:
         raise HTTPException(status_code=404, detail="AR content not found")
+
+    if not getattr(current_user, 'is_super_admin', False) and getattr(current_user, 'company_id', None) is not None:
+        if ar_content.company_id != getattr(current_user, 'company_id', None):
+            raise HTTPException(status_code=403, detail="Access denied to this AR content")
 
     # Resolve storage provider for the company
     from app.core.storage_providers import get_provider_for_company
@@ -419,9 +435,11 @@ async def upload_videos(
 
 @router.get("/ar-content/{content_id}/videos", response_model=List[VideoStatusResponse])
 async def list_videos(
+    request: Request,
     content_id: str,
     db: AsyncSession = Depends(get_db),
-    include_schedules: bool = Query(False, description="Include full schedule details")
+    include_schedules: bool = Query(False, description="Include full schedule details"),
+    current_user: User = Depends(get_current_active_user),
 ):
     """Get all videos for AR content with computed status and schedule info."""
     try:
@@ -433,7 +451,11 @@ async def list_videos(
     ar_content = await db.get(ARContent, content_uuid)
     if not ar_content:
         raise HTTPException(status_code=404, detail="AR content not found")
-    
+
+    if not getattr(current_user, 'is_super_admin', False) and getattr(current_user, 'company_id', None) is not None:
+        if ar_content.company_id != getattr(current_user, 'company_id', None):
+            raise HTTPException(status_code=403, detail="Access denied to this AR content")
+
     # Get all videos for this AR content
     stmt = select(Video).where(Video.ar_content_id == content_uuid).order_by(Video.rotation_order.asc(), Video.id.asc())
     result = await db.execute(stmt)
@@ -488,9 +510,11 @@ async def list_videos(
 
 @router.patch("/ar-content/{content_id}/videos/{video_id}/set-active", response_model=VideoSetActiveResponse)
 async def set_video_active(
+    request: Request,
     content_id: str,
     video_id: str,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
 ):
     """Atomically set a video as the active one for AR content."""
     try:
@@ -549,10 +573,12 @@ async def set_video_active(
 
 @router.patch("/ar-content/{content_id}/videos/{video_id}/subscription")
 async def update_video_subscription(
+    request: Request,
     content_id: str,
     video_id: str,
     subscription_data: VideoSubscriptionUpdate,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
 ):
     """Update video subscription end date."""
     try:
@@ -565,7 +591,11 @@ async def update_video_subscription(
     ar_content = await db.get(ARContent, content_uuid)
     if not ar_content:
         raise HTTPException(status_code=404, detail="AR content not found")
-    
+
+    if not getattr(current_user, 'is_super_admin', False) and getattr(current_user, 'company_id', None) is not None:
+        if ar_content.company_id != getattr(current_user, 'company_id', None):
+            raise HTTPException(status_code=403, detail="Access denied to this AR content")
+
     # Verify video exists and belongs to this AR content
     video = await db.get(Video, video_uuid)
     if not video or video.ar_content_id != content_uuid:
@@ -603,10 +633,12 @@ async def update_video_subscription(
 
 @router.patch("/ar-content/{content_id}/videos/{video_id}/rotation")
 async def update_video_rotation(
+    request: Request,
     content_id: str,
     video_id: str,
     rotation_data: VideoRotationUpdate,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
 ):
     """Update video rotation type and reset rotation state."""
     try:
@@ -657,10 +689,12 @@ async def update_video_rotation(
 
 @router.patch("/ar-content/{content_id}/videos/{video_id}/active")
 async def update_video_active_flag(
+    request: Request,
     content_id: str,
     video_id: str,
     active_data: VideoActiveUpdate,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
 ):
     """Toggle video active flag for rotation/scheduling."""
     import structlog
@@ -675,6 +709,10 @@ async def update_video_active_flag(
     ar_content = await db.get(ARContent, content_uuid)
     if not ar_content:
         raise HTTPException(status_code=404, detail="AR content not found")
+
+    if not getattr(current_user, 'is_super_admin', False) and getattr(current_user, 'company_id', None) is not None:
+        if ar_content.company_id != getattr(current_user, 'company_id', None):
+            raise HTTPException(status_code=403, detail="Access denied to this AR content")
 
     video = await db.get(Video, video_uuid)
     if not video or video.ar_content_id != content_uuid:
@@ -701,9 +739,11 @@ async def update_video_active_flag(
 
 @router.patch("/ar-content/{content_id}/playback-mode")
 async def update_playback_mode(
+    request: Request,
     content_id: str,
     mode_data: VideoPlaybackModeUpdate,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
 ):
     """Switch playback mode between manual and automatic rotation."""
     import structlog
@@ -717,6 +757,10 @@ async def update_playback_mode(
     ar_content = await db.get(ARContent, content_uuid)
     if not ar_content:
         raise HTTPException(status_code=404, detail="AR content not found")
+
+    if not getattr(current_user, 'is_super_admin', False) and getattr(current_user, 'company_id', None) is not None:
+        if ar_content.company_id != getattr(current_user, 'company_id', None):
+            raise HTTPException(status_code=403, detail="Access denied to this AR content")
 
     stmt = select(Video).where(Video.ar_content_id == content_uuid).order_by(Video.id.asc())
     result = await db.execute(stmt)
@@ -775,9 +819,11 @@ async def update_playback_mode(
 # Schedule CRUD endpoints
 @router.get("/ar-content/{content_id}/videos/{video_id}/schedules", response_model=List[VideoScheduleSchema])
 async def list_video_schedules(
+    request: Request,
     content_id: str,
     video_id: str,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
 ):
     """Get all schedules for a video."""
     try:
@@ -790,7 +836,12 @@ async def list_video_schedules(
     video = await db.get(Video, video_uuid)
     if not video or video.ar_content_id != content_uuid:
         raise HTTPException(status_code=404, detail="Video not found or doesn't belong to this AR content")
-    
+
+    ar_content = await db.get(ARContent, content_uuid)
+    if not getattr(current_user, 'is_super_admin', False) and getattr(current_user, 'company_id', None) is not None:
+        if ar_content and ar_content.company_id != getattr(current_user, 'company_id', None):
+            raise HTTPException(status_code=403, detail="Access denied to this AR content")
+
     stmt = select(VideoScheduleModel).where(VideoScheduleModel.video_id == video_uuid).order_by(VideoScheduleModel.start_time.asc())
     result = await db.execute(stmt)
     schedules = result.scalars().all()
@@ -800,10 +851,12 @@ async def list_video_schedules(
 
 @router.post("/ar-content/{content_id}/videos/{video_id}/schedules", response_model=VideoScheduleSchema)
 async def create_video_schedule(
+    request: Request,
     content_id: str,
     video_id: str,
     schedule_data: VideoScheduleCreate,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
 ):
     """Create a new schedule for a video."""
     try:
@@ -816,7 +869,12 @@ async def create_video_schedule(
     video = await db.get(Video, video_uuid)
     if not video or video.ar_content_id != content_uuid:
         raise HTTPException(status_code=404, detail="Video not found or doesn't belong to this AR content")
-    
+
+    ar_content = await db.get(ARContent, content_uuid)
+    if not getattr(current_user, 'is_super_admin', False) and getattr(current_user, 'company_id', None) is not None:
+        if ar_content and ar_content.company_id != getattr(current_user, 'company_id', None):
+            raise HTTPException(status_code=403, detail="Access denied to this AR content")
+
     # Validate time range
     if schedule_data.start_time >= schedule_data.end_time:
         raise HTTPException(status_code=400, detail="Start time must be before end time")
@@ -873,11 +931,13 @@ async def create_video_schedule(
 
 @router.patch("/ar-content/{content_id}/videos/{video_id}/schedules/{schedule_id}", response_model=VideoScheduleSchema)
 async def update_video_schedule(
+    request: Request,
     content_id: str,
     video_id: str,
     schedule_id: str,
     schedule_data: VideoScheduleUpdate,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
 ):
     """Update an existing schedule."""
     try:
@@ -953,10 +1013,12 @@ async def update_video_schedule(
 
 @router.delete("/ar-content/{content_id}/videos/{video_id}/schedules/{schedule_id}")
 async def delete_video_schedule(
+    request: Request,
     content_id: str,
     video_id: str,
     schedule_id: str,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
 ):
     """Delete a schedule."""
     try:
@@ -970,7 +1032,12 @@ async def delete_video_schedule(
     video = await db.get(Video, video_uuid)
     if not video or video.ar_content_id != content_uuid:
         raise HTTPException(status_code=404, detail="Video not found or doesn't belong to this AR content")
-    
+
+    ar_content = await db.get(ARContent, content_uuid)
+    if not getattr(current_user, 'is_super_admin', False) and getattr(current_user, 'company_id', None) is not None:
+        if ar_content and ar_content.company_id != getattr(current_user, 'company_id', None):
+            raise HTTPException(status_code=403, detail="Access denied to this AR content")
+
     # Get existing schedule
     schedule = await db.get(VideoScheduleModel, schedule_uuid)
     if not schedule or schedule.video_id != video_uuid:
@@ -989,7 +1056,13 @@ async def delete_video_schedule(
 
 # Legacy endpoints (kept for backward compatibility)
 @router.put("/videos/{video_id}")
-async def update_video(video_id: str, payload: dict, db: AsyncSession = Depends(get_db)):
+async def update_video(
+    request: Request,
+    video_id: str,
+    payload: dict,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
     """Legacy endpoint - use specific PATCH endpoints instead."""
     try:
         video_uuid = int(video_id)
@@ -999,6 +1072,12 @@ async def update_video(video_id: str, payload: dict, db: AsyncSession = Depends(
     v = await db.get(Video, video_uuid)
     if not v:
         raise HTTPException(status_code=404, detail="Video not found")
+
+    ar_content = await db.get(ARContent, v.ar_content_id)
+    if not getattr(current_user, 'is_super_admin', False) and getattr(current_user, 'company_id', None) is not None:
+        if ar_content and ar_content.company_id != getattr(current_user, 'company_id', None):
+            raise HTTPException(status_code=403, detail="Access denied to this video")
+
     for k, val in payload.items():
         if hasattr(v, k):
             setattr(v, k, val)
@@ -1007,7 +1086,12 @@ async def update_video(video_id: str, payload: dict, db: AsyncSession = Depends(
 
 
 @router.delete("/videos/{video_id}")
-async def delete_video(video_id: str, db: AsyncSession = Depends(get_db)):
+async def delete_video(
+    request: Request,
+    video_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
     """Delete a video and all its schedules."""
     try:
         video_uuid = int(video_id)
@@ -1017,6 +1101,12 @@ async def delete_video(video_id: str, db: AsyncSession = Depends(get_db)):
     v = await db.get(Video, video_uuid)
     if not v:
         raise HTTPException(status_code=404, detail="Video not found")
+
+    ar_content = await db.get(ARContent, v.ar_content_id)
+    if not getattr(current_user, 'is_super_admin', False) and getattr(current_user, 'company_id', None) is not None:
+        if ar_content and ar_content.company_id != getattr(current_user, 'company_id', None):
+            raise HTTPException(status_code=403, detail="Access denied to this video")
+
     await db.delete(v)
     await db.commit()
     return {"status": "deleted"}

@@ -10,6 +10,7 @@ from email.mime.multipart import MIMEMultipart
 from app.core.config import settings
 from app.core.database import get_db
 from app.models.notification import Notification
+from app.api.deps_authz import require_company_access
 from app.api.routes.auth import get_current_active_user
 from app.services.email_transport import send_smtp_message
 from app.schemas.notifications import (
@@ -76,6 +77,8 @@ async def list_notifications(
         .limit(limit)
         .offset(offset)
     )
+    if not getattr(current_user, 'is_super_admin', False) and getattr(current_user, 'company_id', None) is not None:
+        stmt = stmt.where(Notification.company_id == getattr(current_user, 'company_id', None))
     res = await db.execute(stmt)
     items = res.scalars().all()
     
@@ -132,6 +135,8 @@ async def mark_all_notifications_read(
     already-read notifications to reduce I/O.
     """
     stmt = select(Notification.id, Notification.notification_metadata)
+    if not getattr(current_user, 'is_super_admin', False) and getattr(current_user, 'company_id', None) is not None:
+        stmt = stmt.where(Notification.company_id == getattr(current_user, 'company_id', None))
     res = await db.execute(stmt)
     rows = res.all()
 
@@ -167,6 +172,8 @@ async def mark_notifications_read(
         return NotificationMarkReadResponse(success=False, message="No notification IDs provided")
 
     stmt = select(Notification).where(Notification.id.in_(ids))
+    if not getattr(current_user, 'is_super_admin', False) and getattr(current_user, 'company_id', None) is not None:
+        stmt = stmt.where(Notification.company_id == getattr(current_user, 'company_id', None))
     res = await db.execute(stmt)
     items = res.scalars().all()
 
@@ -196,6 +203,10 @@ async def delete_notification(
     if not n:
         raise HTTPException(status_code=404, detail="Notification not found")
 
+    if not getattr(current_user, 'is_super_admin', False) and getattr(current_user, 'company_id', None) is not None:
+        if n.company_id != getattr(current_user, 'company_id', None):
+            raise HTTPException(status_code=403, detail="Access denied to this notification")
+
     await db.delete(n)
     await db.commit()
     return NotificationDeleteResponse(
@@ -211,6 +222,10 @@ async def create_notification_endpoint(
     current_user: User = Depends(get_current_active_user),
 ):
     """Create a new notification."""
+    if not getattr(current_user, 'is_super_admin', False) and getattr(current_user, 'company_id', None) is not None:
+        if notification_data.company_id != getattr(current_user, 'company_id', None):
+            raise HTTPException(status_code=403, detail="Access denied to this company")
+
     notification = await create_notification(
         db=db,
         notification_type=notification_data.notification_type,
@@ -220,6 +235,7 @@ async def create_notification_endpoint(
         project_id=notification_data.project_id,
         ar_content_id=notification_data.ar_content_id,
         metadata=notification_data.metadata,
+        user_id=current_user.id,
     )
     
     meta = dict(notification.notification_metadata or {})

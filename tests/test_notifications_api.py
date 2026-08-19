@@ -143,7 +143,7 @@ async def test_create_notification_endpoint_serializes_service_response(monkeypa
             company_id=7,
         ),
         db=_FakeDb(),
-        current_user=SimpleNamespace(),
+        current_user=SimpleNamespace(id=1),
     )
 
     assert result.id == 15

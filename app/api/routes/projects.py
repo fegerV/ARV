@@ -13,6 +13,7 @@ from app.schemas.project_api import (
     ProjectCreate, ProjectUpdate, ProjectListItem, ProjectDetail,
     ProjectLinks, PaginatedProjectsResponse
 )
+from app.api.deps_authz import require_company_access
 from app.api.routes.auth import get_current_active_user
 
 router = APIRouter(tags=["projects"])
@@ -144,19 +145,23 @@ async def list_projects(
    # Validate page_size - only allow 20, 30, 40, 50
    if page_size not in [20, 30, 40, 50]:
        page_size = 20
-   
+
    logger = structlog.get_logger()
-   
+
    # Build base query
    query = select(Project).join(Company)
    count_query = select(func.count()).select_from(Project).join(Company)
-   
+
+   if not getattr(current_user, 'is_super_admin', False) and getattr(current_user, 'company_id', None) is not None:
+       query = query.where(Project.company_id == getattr(current_user, 'company_id', None))
+       count_query = count_query.where(Project.company_id == getattr(current_user, 'company_id', None))
+
    # Apply filters
    where_conditions = []
-   
+
    if company_id:
        where_conditions.append(Project.company_id == company_id)
-   
+
    if where_conditions:
        query = query.where(*where_conditions)
        count_query = count_query.where(*where_conditions)
@@ -208,6 +213,7 @@ async def list_projects_for_company(
     company_id: int,
     page: int = Query(default=1, ge=1, description="Page number"),
     page_size: int = Query(default=20, ge=1, le=100, description="Number of items per page"),
+    company: Company = Depends(require_company_access),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
 ):
@@ -273,7 +279,11 @@ async def create_project_general(
 ):
    """Create a new project"""
    logger = structlog.get_logger()
-   
+
+   if not getattr(current_user, 'is_super_admin', False) and getattr(current_user, 'company_id', None) is not None:
+       if project_data.company_id != getattr(current_user, 'company_id', None):
+           raise HTTPException(status_code=403, detail="Access denied to this company")
+
    # Validate company exists
    company = await db.get(Company, project_data.company_id)
    if not company:
@@ -314,7 +324,11 @@ async def get_project_general(
    project = await db.get(Project, project_id)
    if not project:
        raise HTTPException(status_code=404, detail="Project not found")
-   
+
+   if not getattr(current_user, 'is_super_admin', False) and getattr(current_user, 'company_id', None) is not None:
+       if project.company_id != getattr(current_user, 'company_id', None):
+           raise HTTPException(status_code=403, detail="Access denied to this project")
+
    # Get AR content count
    ar_content_count_query = select(func.count()).select_from(ARContent).where(ARContent.project_id == project.id)
    ar_content_count_result = await db.execute(ar_content_count_query)
@@ -340,11 +354,15 @@ async def update_project_general(
 ):
    """Update project information"""
    logger = structlog.get_logger()
-   
+
    # Get project
    project = await db.get(Project, project_id)
    if not project:
        raise HTTPException(status_code=404, detail="Project not found")
+
+   if not getattr(current_user, 'is_super_admin', False) and getattr(current_user, 'company_id', None) is not None:
+       if project.company_id != getattr(current_user, 'company_id', None):
+           raise HTTPException(status_code=403, detail="Access denied to this project")
    
    # Update fields
    update_data = project_data.model_dump(exclude_unset=True)
@@ -380,11 +398,15 @@ async def delete_project_general(
 ):
    """Delete a project (with dependency checks)"""
    logger = structlog.get_logger()
-   
+
    # Get project
    project = await db.get(Project, project_id)
    if not project:
        raise HTTPException(status_code=404, detail="Project not found")
+
+   if not getattr(current_user, 'is_super_admin', False) and getattr(current_user, 'company_id', None) is not None:
+       if project.company_id != getattr(current_user, 'company_id', None):
+           raise HTTPException(status_code=403, detail="Access denied to this project")
    
    # Check for dependencies
    ar_content_count_query = select(func.count()).select_from(ARContent).where(ARContent.project_id == project.id)
@@ -410,6 +432,7 @@ async def delete_project_general(
 async def create_project(
     company_id: int,
     project_data: ProjectCreate,
+    company: Company = Depends(require_company_access),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
 ):
@@ -449,6 +472,7 @@ async def create_project(
 async def get_project(
     company_id: int,
     project_id: int,
+    company: Company = Depends(require_company_access),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
 ):
@@ -483,12 +507,13 @@ async def update_project(
     company_id: int,
     project_id: int,
     project_data: ProjectUpdate,
+    company: Company = Depends(require_company_access),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
 ):
     """Update project information within a specific company"""
     logger = structlog.get_logger()
-    
+
     # Get project
     project = await db.get(Project, project_id)
     if not project:
@@ -528,12 +553,13 @@ async def update_project(
 async def delete_project(
     company_id: int,
     project_id: int,
+    company: Company = Depends(require_company_access),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
 ):
     """Delete a project (with dependency checks) within a specific company"""
     logger = structlog.get_logger()
-    
+
     # Get project
     project = await db.get(Project, project_id)
     if not project:

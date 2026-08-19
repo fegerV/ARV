@@ -8,6 +8,7 @@ from __future__ import annotations
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.api.deps_authz import require_company_access
 from app.api.routes.auth import get_current_active_user
 from app.core.database import get_db
 from app.models.user import User
@@ -38,6 +39,10 @@ async def run_backup_now(
             detail="Backup company not configured. Go to Settings → Backups.",
         )
 
+    if not getattr(current_user, 'is_super_admin', False) and getattr(current_user, 'company_id', None) is not None:
+        if bkp.backup_company_id != getattr(current_user, 'company_id', None):
+            raise HTTPException(status_code=403, detail="Access denied to this backup company")
+
     backup_service = BackupService()
     background_tasks.add_task(
         backup_service.run_backup,
@@ -58,7 +63,10 @@ async def backup_history(
 ) -> list[dict]:
     """Return recent backup records."""
     service = BackupService()
-    records = await service.list_backups(db, limit=min(limit, 100), offset=max(offset, 0))
+    company_ids = None
+    if not getattr(current_user, 'is_super_admin', False) and getattr(current_user, 'company_id', None) is not None:
+        company_ids = {getattr(current_user, 'company_id', None)}
+    records = await service.list_backups(db, limit=min(limit, 100), offset=max(offset, 0), company_ids=company_ids)
     return [
         {
             "id": r.id,
@@ -82,7 +90,10 @@ async def backup_status(
 ) -> dict:
     """Return the status of the most recent backup."""
     service = BackupService()
-    last = await service.get_last_status(db)
+    company_ids = None
+    if not getattr(current_user, 'is_super_admin', False) and getattr(current_user, 'company_id', None) is not None:
+        company_ids = {getattr(current_user, 'company_id', None)}
+    last = await service.get_last_status(db, company_ids=company_ids)
     if not last:
         return {"status": "no_backups"}
     return {
@@ -105,7 +116,10 @@ async def delete_backup(
 ) -> dict:
     """Delete a backup record and its file on Yandex Disk."""
     service = BackupService()
-    deleted = await service.delete_backup(db, backup_id)
+    company_ids = None
+    if not getattr(current_user, 'is_super_admin', False) and getattr(current_user, 'company_id', None) is not None:
+        company_ids = {getattr(current_user, 'company_id', None)}
+    deleted = await service.delete_backup(db, backup_id, company_ids=company_ids)
     if not deleted:
         raise HTTPException(status_code=404, detail="Backup not found")
     return {"status": "deleted", "id": backup_id}

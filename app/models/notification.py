@@ -31,6 +31,8 @@ class Notification(Base):
 
     notification_type = Column(String(50), nullable=False)
 
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+
     email_sent = Column(Boolean, default=False, nullable=False)
     email_sent_at = Column(DateTime)
     email_error = Column(Text)

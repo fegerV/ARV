@@ -2,7 +2,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Optional
 import uuid
 import structlog
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, distinct, text
 
@@ -11,6 +11,9 @@ from app.models.ar_view_session import ARViewSession
 from app.models.ar_content import ARContent
 from app.models.project import Project
 from app.models.company import Company
+from app.models.user import User
+from app.api.deps_authz import require_company_access
+from app.api.routes.auth import get_current_active_user
 
 router = APIRouter()
 
@@ -21,31 +24,46 @@ def _utcnow_naive() -> datetime:
 
 
 @router.get("/overview")
-async def analytics_overview(db: AsyncSession = Depends(get_db)):
+async def analytics_overview(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
     since = _utcnow_naive() - timedelta(days=30)
-    
-    # Use text() for SQLite compatibility with count(distinct)
-    total_views = await db.execute(select(func.count()).select_from(ARViewSession).where(ARViewSession.created_at >= since))
+
+    company_filter = None
+    if not getattr(current_user, 'is_super_admin', False) and getattr(current_user, 'company_id', None) is not None:
+        company_filter = getattr(current_user, 'company_id', None)
+
+    total_views = await db.execute(
+        select(func.count()).select_from(ARViewSession).where(ARViewSession.created_at >= since)
+    )
     total_views_count = total_views.scalar() or 0
-    
-    # For SQLite compatibility, use a different approach for distinct count
+
     try:
         unique_sessions = await db.execute(
             select(func.count(text('DISTINCT session_id'))).select_from(ARViewSession).where(ARViewSession.created_at >= since)
         )
     except Exception:
-        # Fallback for PostgreSQL
         unique_sessions = await db.execute(select(func.count(distinct(ARViewSession.session_id))).where(ARViewSession.created_at >= since))
     unique_sessions_count = unique_sessions.scalar() or 0
-    
-    active_content = await db.execute(select(func.count()).select_from(ARContent).where(ARContent.status == "active"))
+
+    active_content_stmt = select(func.count()).select_from(ARContent).where(ARContent.status == "active")
+    if company_filter is not None:
+        active_content_stmt = active_content_stmt.where(ARContent.company_id == company_filter)
+    active_content = await db.execute(active_content_stmt)
     active_content_count = active_content.scalar() or 0
-    
-    # Get active companies and projects
-    active_companies = await db.execute(select(func.count()).select_from(Company).where(Company.status == "active"))
+
+    active_companies_stmt = select(func.count()).select_from(Company).where(Company.status == "active")
+    if company_filter is not None:
+        active_companies_stmt = active_companies_stmt.where(Company.id == company_filter)
+    active_companies = await db.execute(active_companies_stmt)
     active_companies_count = active_companies.scalar() or 0
-    
-    active_projects = await db.execute(select(func.count()).select_from(Project).where(Project.status == "active"))
+
+    active_projects_stmt = select(func.count()).select_from(Project).where(Project.status == "active")
+    if company_filter is not None:
+        active_projects_stmt = active_projects_stmt.where(Project.company_id == company_filter)
+    active_projects = await db.execute(active_projects_stmt)
     active_projects_count = active_projects.scalar() or 0
     
     # Placeholder values for revenue and uptime
@@ -66,40 +84,87 @@ async def analytics_overview(db: AsyncSession = Depends(get_db)):
 
 
 @router.get("/summary")
-async def analytics_summary(db: AsyncSession = Depends(get_db)):
-    return await analytics_overview(db)
+async def analytics_summary(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    return await analytics_overview(request=request, db=db, current_user=current_user)
 
 
 @router.get("/companies/{company_id}")
-async def analytics_company(company_id: int, db: AsyncSession = Depends(get_db)):
+async def analytics_company(
+    company_id: int,
+    request: Request,
+    company: Company = Depends(require_company_access),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
     since = _utcnow_naive() - timedelta(days=30)
     views = await db.execute(select(func.count()).select_from(ARViewSession).where(ARViewSession.company_id == company_id, ARViewSession.created_at >= since))
     return {"company_id": company_id, "views_30_days": views.scalar() or 0}
 
 
 @router.get("/company/{company_id}")
-async def analytics_company_alias(company_id: int, db: AsyncSession = Depends(get_db)):
+async def analytics_company_alias(
+    company_id: int,
+    request: Request,
+    company: Company = Depends(require_company_access),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
     return await analytics_company(company_id, db)
 
 
 @router.get("/projects/{project_id}")
-async def analytics_project(project_id: int, db: AsyncSession = Depends(get_db)):
+async def analytics_project(
+    project_id: int,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
     since = _utcnow_naive() - timedelta(days=30)
+    project = await db.get(Project, project_id)
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    if not getattr(current_user, 'is_super_admin', False) and getattr(current_user, 'company_id', None) is not None:
+        if project.company_id != getattr(current_user, 'company_id', None):
+            raise HTTPException(status_code=403, detail="Access denied to this project")
+
     views = await db.execute(select(func.count()).select_from(ARViewSession).where(ARViewSession.project_id == project_id, ARViewSession.created_at >= since))
     return {"project_id": project_id, "views_30_days": views.scalar() or 0}
 
 
 @router.get("/ar-content/{content_id}")
-async def analytics_content(content_id: int, db: AsyncSession = Depends(get_db)):
+async def analytics_content(
+    content_id: int,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
     since = _utcnow_naive() - timedelta(days=30)
+    ar_content = await db.get(ARContent, content_id)
+    if not ar_content:
+        raise HTTPException(status_code=404, detail="AR content not found")
+
+    if not getattr(current_user, 'is_super_admin', False) and getattr(current_user, 'company_id', None) is not None:
+        if ar_content.company_id != getattr(current_user, 'company_id', None):
+            raise HTTPException(status_code=403, detail="Access denied to this AR content")
+
     views = await db.execute(select(func.count()).select_from(ARViewSession).where(ARViewSession.ar_content_id == content_id, ARViewSession.created_at >= since))
     return {"ar_content_id": content_id, "views_30_days": views.scalar() or 0}
 
 
 @router.get("/content/{content_id}")
-async def analytics_content_alias(content_id: int, db: AsyncSession = Depends(get_db)):
+async def analytics_content_alias(
+    content_id: int,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
     """Backward-compatible alias for older admin/frontend clients."""
-    return await analytics_content(content_id, db)
+    return await analytics_content(content_id=content_id, request=request, db=db, current_user=current_user)
 
 
 @router.post("/ar-session")

@@ -9,7 +9,10 @@ from typing import Any
 
 from app.core.database import get_db
 from app.core.config import get_settings
+from app.api.routes.auth import get_current_active_user
 from app.models.storage import StorageConnection
+from app.models.company import Company
+from app.models.user import User
 from app.utils.oauth_state import oauth_state_store
 from app.utils.token_encryption import token_encryption
 
@@ -230,6 +233,7 @@ async def list_yandex_folders(
     connection_id: int,
     path: str = Query("/", description="Путь в Яндекс Диске"),
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
 ):
     """
     Получение списка папок в Яндекс Диске (для file picker)

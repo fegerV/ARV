@@ -119,7 +119,7 @@ async def test_delete_yandex_token_disconnects_company():
     company = SimpleNamespace(id=9, yandex_disk_token="encrypted", storage_provider="yandex_disk")
     db = _FakeDb(get_map={(companies.Company, 9): company})
 
-    result = await companies.delete_yandex_token(9, db, current_user=SimpleNamespace())
+    result = await companies.delete_yandex_token(9, company=company, db=db, current_user=SimpleNamespace(id=1))
 
     assert company.yandex_disk_token is None
     assert company.storage_provider == "local"

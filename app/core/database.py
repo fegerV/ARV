@@ -157,6 +157,9 @@ async def seed_defaults() -> None:
                 else:
                     logger.info("default_admin_exists", user_id=admin_user.id)
 
+                if not admin_user.is_super_admin:
+                    admin_user.is_super_admin = True
+
                 # Default local storage connection
                 res_storage = await session.execute(select(StorageConnection).where(StorageConnection.name == "Local Storage"))
                 default_storage = res_storage.scalar_one_or_none()
@@ -199,6 +202,9 @@ async def seed_defaults() -> None:
                     default_company.contact_email = settings.ADMIN_EMAIL
                     default_company.status = CompanyStatus.ACTIVE
                     logger.info("default_company_updated", company_id=default_company.id)
+
+                if admin_user.company_id is None:
+                    admin_user.company_id = default_company.id
 
                 await session.commit()
                 logger.info("defaults_seeded")

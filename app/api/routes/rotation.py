@@ -12,8 +12,10 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.api.routes.auth import get_current_user_optional
+from app.api.deps_authz import require_resource_access
+from app.api.routes.auth import get_current_active_user
 from app.models.video_rotation_schedule import VideoRotationSchedule
+from app.models.ar_content import ARContent
 
 router = APIRouter()
 
@@ -21,12 +23,6 @@ router = APIRouter()
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
-
-def _require_auth(current_user) -> None:
-    """Raise 401 if user is not authenticated."""
-    if not current_user or not getattr(current_user, "is_active", False):
-        raise HTTPException(status_code=401, detail="Authentication required")
-
 
 def _sanitise_payload(payload: Dict[str, Any]) -> Dict[str, Any]:
     """Coerce types that arrive as strings from the frontend."""
@@ -65,11 +61,18 @@ def _sanitise_payload(payload: Dict[str, Any]) -> Dict[str, Any]:
 async def set_rotation(
     content_id: int,
     payload: Dict[str, Any],
-    current_user=Depends(get_current_user_optional),
+    current_user=Depends(get_current_active_user),
     db: AsyncSession = Depends(get_db),
 ):
     """Create or update a rotation schedule for an AR content item."""
-    _require_auth(current_user)
+    ar_content = await db.get(ARContent, content_id)
+    if not ar_content:
+        raise HTTPException(status_code=404, detail="AR content not found")
+
+    if not getattr(current_user, 'is_super_admin', False) and getattr(current_user, 'company_id', None) is not None:
+        if ar_content.company_id != getattr(current_user, 'company_id', None):
+            raise HTTPException(status_code=403, detail="Access denied to this AR content")
+
     clean = _sanitise_payload(payload)
 
     stmt = select(VideoRotationSchedule).where(
@@ -117,15 +120,18 @@ async def set_rotation(
 async def update_rotation(
     schedule_id: int,
     payload: Dict[str, Any],
-    current_user=Depends(get_current_user_optional),
+    current_user=Depends(get_current_active_user),
     db: AsyncSession = Depends(get_db),
 ):
     """Update an existing rotation schedule by id."""
-    _require_auth(current_user)
-
     sched = await db.get(VideoRotationSchedule, schedule_id)
     if not sched:
         raise HTTPException(status_code=404, detail="Rotation schedule not found")
+
+    ar_content = await db.get(ARContent, sched.ar_content_id)
+    if not getattr(current_user, 'is_super_admin', False) and getattr(current_user, 'company_id', None) is not None:
+        if ar_content and ar_content.company_id != getattr(current_user, 'company_id', None):
+            raise HTTPException(status_code=403, detail="Access denied to this rotation schedule")
 
     clean = _sanitise_payload(payload)
     for k, v in clean.items():
@@ -144,15 +150,18 @@ async def update_rotation(
 @router.delete("/{schedule_id}")
 async def delete_rotation(
     schedule_id: int,
-    current_user=Depends(get_current_user_optional),
+    current_user=Depends(get_current_active_user),
     db: AsyncSession = Depends(get_db),
 ):
     """Delete a rotation schedule."""
-    _require_auth(current_user)
-
     sched = await db.get(VideoRotationSchedule, schedule_id)
     if not sched:
         raise HTTPException(status_code=404, detail="Rotation schedule not found")
+
+    ar_content = await db.get(ARContent, sched.ar_content_id)
+    if not getattr(current_user, 'is_super_admin', False) and getattr(current_user, 'company_id', None) is not None:
+        if ar_content and ar_content.company_id != getattr(current_user, 'company_id', None):
+            raise HTTPException(status_code=403, detail="Access denied to this rotation schedule")
 
     await db.delete(sched)
     await db.commit()
@@ -167,11 +176,17 @@ async def delete_rotation(
 async def set_rotation_sequence(
     content_id: int,
     payload: Dict[str, Any],
-    current_user=Depends(get_current_user_optional),
+    current_user=Depends(get_current_active_user),
     db: AsyncSession = Depends(get_db),
 ):
     """Set or update the video sequence for a content's rotation schedule."""
-    _require_auth(current_user)
+    ar_content = await db.get(ARContent, content_id)
+    if not ar_content:
+        raise HTTPException(status_code=404, detail="AR content not found")
+
+    if not getattr(current_user, 'is_super_admin', False) and getattr(current_user, 'company_id', None) is not None:
+        if ar_content.company_id != getattr(current_user, 'company_id', None):
+            raise HTTPException(status_code=403, detail="Access denied to this AR content")
 
     seq = payload.get("video_sequence")
     if not isinstance(seq, list) or not seq:
@@ -213,16 +228,22 @@ async def set_rotation_sequence(
 async def rotation_calendar(
     content_id: int,
     month: str,
-    current_user=Depends(get_current_user_optional),
+    current_user=Depends(get_current_active_user),
     db: AsyncSession = Depends(get_db),
 ):
     """Return a calendar of planned videos for the given month (YYYY-MM)."""
-    _require_auth(current_user)
-
     import calendar as cal_mod
     from datetime import datetime
 
     from app.models.video import Video
+
+    ar_content = await db.get(ARContent, content_id)
+    if not ar_content:
+        raise HTTPException(status_code=404, detail="AR content not found")
+
+    if not getattr(current_user, 'is_super_admin', False) and getattr(current_user, 'company_id', None) is not None:
+        if ar_content.company_id != getattr(current_user, 'company_id', None):
+            raise HTTPException(status_code=403, detail="Access denied to this AR content")
 
     try:
         first_day = datetime.strptime(month + "-01", "%Y-%m-%d")
