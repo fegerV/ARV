@@ -15,12 +15,9 @@ API / HTML Routes → Services → Models → Database
 | `backup_service.py` | `BackupService` | Бэкап PostgreSQL → gzip → Яндекс Диск |
 | `settings_service.py` | `SettingsService` | CRUD настроек из `system_settings` |
 | `thumbnail_service.py` | `thumbnail_service` | Генерация превью (фото и видео) |
-| `enhanced_thumbnail_service.py` | `EnhancedThumbnailService` | Мульти-размерные WebP превью |
 | `video_scheduler.py` | `get_active_video()` | Выбор активного видео (ротация) |
 | `marker_service.py` | `marker_service` | AR-маркеры (фото = маркер для ARCore) |
 | `notification_service.py` | `notification_service` | Уведомления (email, Telegram) |
-| `enhanced_validation_service.py` | `EnhancedValidationService` | Расширенная валидация файлов |
-| `enhanced_cache_service.py` | `EnhancedCacheService` | Многоуровневое кэширование |
 | `reliability_service.py` | `CircuitBreaker`, `Retry` | Circuit Breaker + Retry |
 | `alert_service.py` | `alert_service` | Алерты (critical, warning, info) |
 | `storage.py` | Утилиты хранилища | Вспомогательные функции для хранилища |
@@ -74,9 +71,9 @@ CRUD настроек из таблицы `system_settings`. Категории:
 
 **Режимы:** `none` (фиксированное), `sequential` (1→2→3→stop), `cyclic` (1→2→3→1→...).
 
-### ThumbnailService / EnhancedThumbnailService
+### ThumbnailService
 
-**Файлы**: `app/services/thumbnail_service.py`, `enhanced_thumbnail_service.py`
+**Файл**: `app/services/thumbnail_service.py`
 
 Генерация превью:
 - Фото → WebP, 3 размера (150×112, 320×240, 640×480)

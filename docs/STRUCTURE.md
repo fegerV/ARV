@@ -59,7 +59,7 @@ REST API endpoints:
 | Модуль | Назначение |
 |--------|-----------|
 | `config.py` | Pydantic Settings, переменные окружения |
-| `database.py` | AsyncSession, engine, `get_db()`, `seed_defaults()` |
+| `database.py` | AsyncSession, engine, `get_db()`, startup seeding |
 | `security.py` | JWT, хеширование паролей |
 | `scheduler.py` | APScheduler — расписание бэкапов |
 | `storage_providers.py` | Фабрика провайдеров хранилища |

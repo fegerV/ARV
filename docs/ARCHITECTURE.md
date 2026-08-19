@@ -50,7 +50,7 @@ app/
 ├── main.py                    # Точка входа, lifespan (startup/shutdown)
 ├── core/                      # Ядро приложения
 │   ├── config.py              # Pydantic Settings, env
-│   ├── database.py            # AsyncSession, engine, seed_defaults
+│   ├── database.py            # AsyncSession, engine, startup seeding
 │   ├── security.py            # JWT, хеширование паролей
 │   ├── scheduler.py           # APScheduler (бэкапы по cron)
 │   ├── storage_providers.py   # Фабрика провайдеров хранения
@@ -110,7 +110,7 @@ app/
 - `video_scheduler.py` - Логика выбора видео
 - `notification_service.py` - Отправка уведомлений
 - `settings_service.py` - Управление настройками
-- `enhanced_cache_service.py` - Кэширование
+- `enhanced_cache_service.py` (удален) - был Многоуровневое кэширование
 - `reliability_service.py` - Circuit breaker, retry
 
 ### 4. Models Layer (app/models/)
@@ -230,8 +230,8 @@ storage/
 ### Провайдеры
 
 - **LocalStorageProvider** - Локальное файловое хранилище
+- **YandexDiskStorageProvider** - Яндекс Диск (реализован)
 - **S3StorageProvider** (планируется) - AWS S3
-- **YandexStorageProvider** (планируется) - Yandex Object Storage
 
 ## Аутентификация и авторизация
 
@@ -245,7 +245,10 @@ storage/
 
 - **Rate limiting**: 5 попыток входа за 15 минут
 - **Блокировка аккаунта**: После превышения лимита
-- **Валидация паролей**: SHA-256 хеширование
+- **Хеширование паролей**: pbkdf2_sha256 (passlib), legacy unsalted SHA-256 для обратной совместимости
+- **CSRF**: Middleware на всех state-changing запросах
+- **IDOR/BOLA защита**: Company-based ownership checks через `require_company_access` dependency
+- **Super-admin**: Флаг `is_super_admin` для полного доступа ко всем компаниям
 
 ## Middleware
 
@@ -304,7 +307,7 @@ storage/
 - Валидация входных данных через Pydantic
 - SQL injection защита через ORM
 - XSS защита через экранирование в Jinja2
-- CSRF защита (планируется)
+- **CSRF защита**: Реализован через middleware на всех state-changing запросах
 
 ### Конфигурация
 

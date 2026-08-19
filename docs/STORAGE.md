@@ -148,22 +148,6 @@ url = await provider.save_file(
 - CDN интеграция
 - Версионирование файлов
 
-### YandexStorageProvider (планируется)
-
-**Описание**: Хранилище в Yandex Object Storage
-
-**Конфигурация:**
-- `YANDEX_BUCKET` - Имя bucket
-- `YANDEX_ACCESS_KEY` - Access key
-- `YANDEX_SECRET_KEY` - Secret key
-- `YANDEX_ENDPOINT` - Endpoint URL
-
-**Особенности:**
-- S3-совместимый API
-- Региональное хранение
-- Низкая стоимость
-- Интеграция с Yandex Cloud
-
 ### Yandex Disk storage provider (текущая реализация)
 
 **Описание**: Компания может использовать Яндекс Диск как удалённое хранилище. Подключение выполняется через OAuth и сохраняется в записи компании.

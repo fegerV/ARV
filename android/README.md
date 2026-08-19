@@ -36,7 +36,7 @@ MainActivity                   VPortalActivity
   │    └─ ViewerRepository        │    └─ MarkerCache (disk, по uniqueId)
   │         ├─ ViewerApi          │
   │         └─ ManifestCache      ├─ ArRenderer (OpenGL)
-  │              (disk, 7 дней)   │    ├─ BackgroundRenderer (камера)
+   │              (disk, 1 день)   │    ├─ BackgroundRenderer (камера)
   │                               │    └─ VideoQuadRenderer (видео на маркере)
   QrScannerActivity               │
     └─ CameraX + ML Kit           ├─ ExoPlayer + VideoCache (256 MB LRU)
@@ -71,8 +71,8 @@ app/src/main/java/ru/neuroimagen/arviewer/
 ├── data/
 │   ├── api/ViewerApi.kt            # Retrofit интерфейс
 │   ├── cache/
-│   │   ├── ManifestCache.kt        # Диск-кеш манифестов (по uniqueId, 7 дней)
-│   │   ├── MarkerCache.kt          # Диск-кеш маркеров (по uniqueId, 7 дней)
+│   │   ├── ManifestCache.kt        # Диск-кеш манифестов (по uniqueId, 1 день)
+│   │   ├── MarkerCache.kt          # Диск-кеш маркеров (по uniqueId, 1 день)
 │   │   └── VideoCache.kt           # Media3 SimpleCache (LRU, 256 MB)
 │   ├── model/
 │   │   ├── ViewerManifest.kt       # Модель манифеста AR-контента
@@ -215,8 +215,8 @@ cd android
 
 | Что | Где | Ключ | TTL | Размер |
 |---|---|---|---|---|
-| Манифест | `manifest_cache/` | `uniqueId` | 7 дней | ~1 КБ |
-| Маркер (фото) | `marker_cache/` | `uniqueId` | 7 дней | 1–5 МБ |
+| Манифест | `manifest_cache/` | `uniqueId` | 1 день | ~1 КБ |
+| Маркер (фото) | `marker_cache/` | `uniqueId` | 1 день | 1–5 МБ |
 | Видео | `video_cache/` | `{uniqueId}_video_{videoId}` | LRU | до 256 МБ |
 
 **Стратегия:** cache-first с фоновым обновлением. Повторное открытие того же контента — мгновенное (маркер и видео читаются с диска, сетевой запрос не блокирует).

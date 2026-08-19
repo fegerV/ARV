@@ -95,6 +95,7 @@ ios/build/
 coverage.xml
 htmlcov/
 .pytest_cache/
+.pytest-temp/
 .tox/
 
 # Alembic

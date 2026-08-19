@@ -31,15 +31,17 @@ SystemSettings (key-value, категории: general, security, ar, storage, b
 
 **Таблица**: `users`
 
-**Описание**: Пользователи системы (администраторы)
+**Описание**: Пользователи системы (администраторы). Каждый пользователь может быть привязан к компании через `company_id`.
 
 **Поля**:
 - `id` (Integer, PK) - Уникальный идентификатор
 - `email` (String, Unique, Index) - Email пользователя
-- `hashed_password` (String) - SHA-256 хеш пароля
+- `hashed_password` (String) - pbkdf2_sha256 хеш пароля (legacy: unsalted SHA-256)
 - `full_name` (String) - Полное имя
 - `role` (String, default="admin") - Роль пользователя
 - `is_active` (Boolean, default=True) - Активен ли пользователь
+- `company_id` (Integer, ForeignKey("companies.id"), nullable) - ID компании (NULL для super-admin)
+- `is_super_admin` (Boolean, default=False) - Флаг супер-администратора (доступ ко всем компаниям)
 - `last_login_at` (DateTime, nullable) - Время последнего входа
 - `login_attempts` (Integer, default=0) - Количество неудачных попыток входа
 - `locked_until` (DateTime, nullable) - Время до разблокировки
@@ -49,7 +51,8 @@ SystemSettings (key-value, категории: general, security, ar, storage, b
 **Индексы**:
 - `email` - Уникальный индекс
 
-**Связи**: Нет прямых связей с другими моделями
+**Связи**:
+- `company` (N:1) - Компания пользователя
 
 ### Company (Компании)
 
@@ -243,10 +246,11 @@ SystemSettings (key-value, категории: general, security, ar, storage, b
 
 **Таблица**: `notifications`
 
-**Описание**: Уведомления системы
+**Описание**: Уведомления системы, привязанные к пользователю, компании, проекту или AR-контенту.
 
 **Поля**:
 - `id` (Integer, PK) - Уникальный идентификатор
+- `user_id` (Integer, ForeignKey("users.id"), nullable) - ID пользователя-получателя
 - `company_id` (Integer, nullable) - ID компании
 - `project_id` (Integer, nullable) - ID проекта
 - `ar_content_id` (Integer, nullable) - ID AR-контента
@@ -262,7 +266,8 @@ SystemSettings (key-value, категории: general, security, ar, storage, b
 - `notification_metadata` (JSON/JSONB, default={}) - Метаданные
 - `created_at` (DateTime) - Дата создания
 
-**Связи**: Нет прямых связей (используются ID)
+**Связи**:
+- `user` (N:1) - Пользователь-получатель
 
 ### StorageConnection (Подключения к хранилищу)
 

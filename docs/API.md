@@ -18,10 +18,6 @@ OpenAPI specification is available at:
 - Development: `http://localhost:8000/openapi.json`
 - Production: `https://your-domain.com/openapi.json`
 
-## Overview
-
-This document provides a complete reference for the Vertex AR B2B Platform API. The API follows REST principles and uses JSON for request/response payloads. All API endpoints are secured with JWT tokens for authentication and authorization.
-
 ## Base URL
 
 All endpoints are prefixed with `/api/`:

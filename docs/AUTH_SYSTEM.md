@@ -17,15 +17,20 @@
 
 ### 2. Хеширование паролей
 
-- **Алгоритм**: SHA-256
-- **Реализация**: Простое хеширование через `hashlib.sha256()`
-- **Формат**: Hex-строка (64 символа)
+- **Алгоритм**: pbkdf2_sha256 (passlib)
+- **Legacy fallback**: unsalted SHA-256 для обратной совместимости со старыми аккаунтами
+- **Формат**: Hex-строка с идентификатором алгоритма
 
 **Пример:**
 ```python
-import hashlib
-hashed = hashlib.sha256("password".encode()).hexdigest()
+from passlib.context import CryptContext
+
+pwd_context = CryptContext(schemes=["pbkdf2_sha256"], deprecated="auto")
+
+hashed = pwd_context.hash("password")
 ```
+
+При успешном логине с legacy SHA-256 хешем пароль автоматически перехешируется через pbkdf2_sha256.
 
 ### 3. Защита от брутфорса
 
@@ -98,7 +103,7 @@ curl -H "Authorization: Bearer <your-token>" \
 ### Поля безопасности
 
 - `email`: Уникальный email пользователя
-- `hashed_password`: SHA-256 хеш пароля
+- `hashed_password`: pbkdf2_sha256 хеш пароля (legacy: unsalted SHA-256)
 - `is_active`: Флаг активности аккаунта
 - `role`: Роль пользователя (admin, user, etc.)
 - `login_attempts`: Счетчик неудачных попыток входа
@@ -110,7 +115,7 @@ curl -H "Authorization: Bearer <your-token>" \
 ### Python
 
 - `python-jose[cryptography]`: Для работы с JWT токенами
-- `hashlib`: Для хеширования паролей (встроенная библиотека)
+- `passlib`: Для хеширования паролей (pbkdf2_sha256)
 
 ### Конфигурация
 
@@ -203,4 +208,4 @@ async def protected_route(current_user: User = Depends(get_current_active_user))
 
 **Решение:**
 1. Проверьте тип хеша: `python utilities/check_hash_type.py`
-2. Если хеш не SHA-256, обновите: `python utilities/update_password_directly.py`
+2. Если хеш legacy (unsalted SHA-256), перехешируйте: `python utilities/update_password_directly.py`

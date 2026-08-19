@@ -46,32 +46,15 @@
 ### Хеширование паролей
 
 **Текущая реализация:**
-- Алгоритм: SHA-256
-- Формат: Hex-строка
-
-**⚠️ ВАЖНО: SHA-256 не рекомендуется для паролей!**
+- Алгоритм: pbkdf2_sha256 (passlib)
+- Legacy fallback: unsalted SHA-256 для обратной совместимости (миграция со старых систем)
+- Автоматический rehash при логине, если старый алгоритм detected
 
 **Рекомендации:**
 
-1. **Используйте bcrypt или Argon2:**
-   ```python
-   from passlib.context import CryptContext
-   
-   pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-   
-   def get_password_hash(password: str) -> str:
-       return pwd_context.hash(password)
-   
-   def verify_password(plain_password: str, hashed_password: str) -> bool:
-       return pwd_context.verify(plain_password, hashed_password)
-   ```
-
-2. **Требования к паролям:**
-   - Минимум 12 символов
-   - Содержит заглавные и строчные буквы
-   - Содержит цифры
-   - Содержит специальные символы
-   - Не является распространенным паролем
+1. **Принудительно перехешируйте legacy SHA-256 пароли:**
+    - При успешном логине пользователя с legacy-хешем — перехешировать через pbkdf2_sha256
+    - Отслеживайте процент мигрированных хешей
 
 ### Защита от брутфорса
 
@@ -193,6 +176,25 @@
 
 ## Защита от атак
 
+### IDOR / BOLA (Insecure Direct Object Reference / Broken Level Authorization)
+
+**Текущая реализация:**
+- `User` модель содержит `company_id` (FK на companies) и `is_super_admin` флаг
+- `Notification` модель содержит `user_id` (FK на users)
+- Все защищенные endpoints проверяют company ownership через `require_company_access` dependency
+- List endpoints фильтруются по `company_id` текущего пользователя
+- Super-admin (`is_super_admin=True`) имеет доступ ко всем компаниям
+
+**Защищенные ресурсы:**
+- Companies, Projects, AR Content, Videos, Notifications, Storage, Analytics, Backups, Rotation, OAuth, Settings
+
+**Публичные endpoints (by design):**
+- `/view/{uid}` — AR viewer
+- `/api/viewer/ar/{uid}/manifest` — манифест для ARCore
+- `/api/viewer/ar/{uid}/active-video` — активное видео
+- `/api/public/ar/{uid}/content` — публичный AR контент
+- `/api/health*` — health checks
+
 ### SQL Injection
 
 **Защита:**
@@ -246,33 +248,14 @@
 ### CSRF (Cross-Site Request Forgery)
 
 **Текущее состояние:**
-- Не реализовано
+- Реализован через `CSRFMiddleware` на всех state-changing запросах (POST, PUT, DELETE, PATCH)
+- Токен валидируется по `X-CSRF-Token` header против `csrf_token` cookie
+- Исключения: login endpoints, static files, OpenAPI docs
 
 **Рекомендации:**
 
-1. **Используйте CSRF токены:**
-   ```python
-   from fastapi_csrf_protect import CsrfProtect
-   
-   @app.post("/api/ar-content/")
-   async def create_ar_content(
-       csrf_protect: CsrfProtect = Depends(),
-       ...
-   ):
-       await csrf_protect.validate_csrf(request)
-       ...
-   ```
-
-2. **Используйте SameSite cookies:**
-   ```python
-   response.set_cookie(
-       key="access_token",
-       value=token,
-       samesite="strict",  # или "lax"
-       secure=True,
-       httponly=True
-   )
-   ```
+1. **Ротируйте CSRF токены при повторном логине:**
+    - Старый токен должен инвалидироваться при получении нового access token
 
 ### Path Traversal
 

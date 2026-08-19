@@ -2,6 +2,20 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.2.0] - 2026-08-19
+
+### Security
+- **IDOR/BOLA Protection**: Added `company_id` to `User` model and `user_id` to `Notification` model
+- **Authorization dependencies**: Created `require_company_access`, `require_resource_access` in `app/api/deps_authz.py`
+- **Ownership checks**: Applied company-based access control to all protected endpoints (companies, projects, ar_content, videos, notifications, storage, analytics, backups, rotation, oauth, settings)
+- **List endpoint filtering**: All list endpoints now filter by user's company_id; super-admins bypass filter
+- **Super-admin support**: `is_super_admin` flag for full access across companies
+- **Test coverage**: Added `tests/test_idor_security.py` with 12 security tests
+
+### Changed
+- `seed_defaults()` now assigns `company_id` and `is_super_admin=True` to default admin
+- Protected route handlers now require `current_user` and sometimes `company` dependencies
+
 ## [2.1.0] - 2026-02-15
 
 ### Added

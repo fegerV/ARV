@@ -162,6 +162,7 @@ sudo systemctl restart arv
 | [Services](docs/SERVICES.md) | Описание сервисов |
 | [Storage](docs/STORAGE.md) | Система хранения файлов |
 | [Security](docs/SECURITY.md) | Политика безопасности |
+| [IDOR/BOLA Audit](IDOR_BOLA_AUDIT.md) | Аудит защиты от IDOR/BOLA уязвимостей |
 | [Auth System](docs/AUTH_SYSTEM.md) | Система аутентификации |
 | [Migrations](docs/MIGRATIONS.md) | Миграции БД |
 | [Troubleshooting](docs/TROUBLESHOOTING.md) | Решение проблем |
@@ -170,5 +171,14 @@ sudo systemctl restart arv
 
 ## Статус
 
-- **Версия**: 2.1.1
+- **Версия**: 2.2.0
 - **Лицензия**: Proprietary
+
+### Безопасность
+
+- JWT-аутентификация (cookie + Bearer)
+- Rate limiting (5 попыток / 15 минут)
+- CORS, валидация через Pydantic
+- CSRF-защита на всех state-changing запросах
+- Company-based ownership checks на всех защищенных endpoints (IDOR/BOLA защита)
+- Super-admin режим для полного доступа

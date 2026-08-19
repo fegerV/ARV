@@ -55,7 +55,7 @@
 ```
 
 - **Модели:** `ViewerManifest`, `ViewerManifestVideo`, `ContentCheckResponse`, `ViewerError`.
-- **Кэш:** манифест по unique_id (7 дней), маркер по URL (7 дней), видео — ExoPlayer SimpleCache (256 МБ, LRU).
+- **Кэш:** манифест по unique_id (1 день), маркер по URL (1 день), видео — ExoPlayer SimpleCache (256 МБ, LRU).
 
 Подробнее о структуре модулей: [STRUCTURE.md](STRUCTURE.md), [android/README.md](../android/README.md).
 
@@ -120,7 +120,7 @@ App Links: `/.well-known/assetlinks.json` для домена `ar.neuroimagen.ru
 - [x] QR-сканер (AR-ссылки и UUID).
 - [x] AR Viewer: маркер + видео, снимок экрана.
 - [x] Floating playback при потере маркера и возврат привязки при восстановлении tracking.
-- [x] Кэш маркера (диск, 7 дней).
+- [x] Кэш маркера (диск, 1 день).
 - [x] Офлайн: кэш манифеста и медиа (манифест при сетевой ошибке, видео через ExoPlayer cache).
 - [x] Splash Screen при старте.
 - [x] Сборка в GitHub Actions, артефакт APK.

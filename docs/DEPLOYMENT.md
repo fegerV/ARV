@@ -93,23 +93,45 @@ sudo -u arv bash -c 'cd /opt/arv/app && source /opt/arv/venv/bin/activate && ale
 
 ### 5. Systemd-юнит
 
+Фактическая конфигурация боевого сервера использует `gunicorn` + `uvicorn.workers.UvicornWorker`:
+
 ```ini
 # /etc/systemd/system/arv.service
 [Unit]
-Description=Vertex AR FastAPI Application
+Description=V-Portal FastAPI Application
 After=network.target postgresql.service
+Wants=postgresql.service
 
 [Service]
-Type=simple
+Type=exec
 User=arv
+Group=arv
 WorkingDirectory=/opt/arv/app
-ExecStart=/opt/arv/venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8000 --workers 2 --log-level info --access-log
+EnvironmentFile=/opt/arv/app/.env
+
+ExecStart=/opt/arv/venv/bin/gunicorn app.main:app \
+    --bind 127.0.0.1:8000 \
+    --workers 2 \
+    --worker-class uvicorn.workers.UvicornWorker \
+    --timeout 120 \
+    --graceful-timeout 30 \
+    --keep-alive 5 \
+    --max-requests 1000 \
+    --max-requests-jitter 50 \
+    --access-logfile - \
+    --log-level info
+
 Restart=always
 RestartSec=5
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=arv
 
 [Install]
 WantedBy=multi-user.target
 ```
+
+> **Примечание:** Раньше документация упоминала `Type=simple` с прямым запуском `uvicorn`. Актуальный unit-файл находится в `deploy/systemd/arv.service`.
 
 ### 6. Nginx (reverse proxy)
 

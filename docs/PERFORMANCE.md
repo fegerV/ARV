@@ -33,7 +33,7 @@ async def get_ar_content(db: AsyncSession, content_id: int):
 
 **Многоуровневое кэширование:**
 
-1. **L1 - In-Memory Cache** (EnhancedCacheService)
+1. **L1 - In-Memory Cache**
    - Быстрый доступ
    - Ограниченный размер (100MB)
    - LRU eviction
@@ -50,15 +50,8 @@ async def get_ar_content(db: AsyncSession, content_id: int):
 
 **Использование:**
 ```python
-from app.services.enhanced_cache_service import EnhancedCacheService
-
-cache = EnhancedCacheService()
-
-# Получить из кэша
-value = await cache.get("key", cache_type="metadata")
-
-# Сохранить в кэш
-await cache.set("key", value, cache_type="metadata", ttl=3600)
+# Кэширование через сервисный слой
+# Пример: кэширование манифестов AR-контента в ViewerRepository
 ```
 
 **Рекомендации:**
@@ -71,17 +64,17 @@ await cache.set("key", value, cache_type="metadata", ttl=3600)
 2. **Используйте правильные TTL:**
    ```python
    # Статические данные - долгий TTL
-   await cache.set("companies", companies, ttl=86400)  # 24 часа
+   ttl = 86400  # 24 часа
    
    # Динамические данные - короткий TTL
-   await cache.set("active_users", count, ttl=60)  # 1 минута
+   ttl = 60  # 1 минута
    ```
 
 3. **Инвалидация кэша:**
    ```python
    # При обновлении данных
-   await cache.delete("companies")
-   await cache.set("companies", updated_companies)
+   cache_key = f"companies:{company_id}"
+   await cache.delete(cache_key)
    ```
 
 ### 3. Оптимизация запросов к БД
