@@ -11,7 +11,7 @@ services:
     environment:
       POSTGRES_DB: vertex_ar
       POSTGRES_USER: vertex_ar
-      POSTGRES_PASSWORD: password
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-me-to-a-strong-random-password}
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./scripts/db/init-db.sh:/docker-entrypoint-initdb.d/init-db.sh:ro
@@ -55,7 +55,7 @@ services:
     ports:
       - "8000:8000"
     environment:
-      - DATABASE_URL=postgresql+asyncpg://vertex_ar:password@postgres:5432/vertex_ar
+      - DATABASE_URL=postgresql+asyncpg://vertex_ar:${POSTGRES_PASSWORD:-change-me-to-a-strong-random-password}@postgres:5432/vertex_ar
       - PUBLIC_URL=http://localhost:8000
       - MEDIA_ROOT=/app/storage/content
       - REDIS_URL=redis://redis:6379/0

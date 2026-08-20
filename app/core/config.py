@@ -191,6 +191,15 @@ class Settings(BaseSettings):
         if not self.ADMIN_DEFAULT_PASSWORD:
             raise ValueError("ADMIN_DEFAULT_PASSWORD must be set in production.")
 
+        if "sqlite" in self.DATABASE_URL.lower():
+            raise ValueError("SQLite is not allowed in production. Use PostgreSQL.")
+
+        if self.REDIS_URL and "localhost" in self.REDIS_URL and "redis://" in self.REDIS_URL:
+            raise ValueError("REDIS_URL must not use plain localhost in production. Use TLS or internal network.")
+
+        if "gmail.com" in self.SMTP_HOST.lower() and not self.SMTP_PASSWORD:
+            raise ValueError("SMTP_PASSWORD must be set when using Gmail SMTP in production.")
+
 
 # Global settings instance
 settings = Settings()

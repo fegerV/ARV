@@ -28,6 +28,11 @@ async def setup_test_data():
     
     print("🔧 Setting up test database...")
     
+    admin_password = os.environ.get("ADMIN_DEFAULT_PASSWORD", "")
+    if not admin_password:
+        print("Error: ADMIN_DEFAULT_PASSWORD environment variable is not set")
+        return
+    
     # Initialize database
     init_db_sync()
     
@@ -41,7 +46,7 @@ async def setup_test_data():
         if not admin:
             admin = User(
                 email="admin@vertexar.com",
-                hashed_password=get_password_hash("admin123"),
+                hashed_password=get_password_hash(admin_password),
                 full_name="Administrator",
                 is_active=True,
                 role="admin"
@@ -120,7 +125,6 @@ def main():
     print("🌐 URL: http://localhost:8000")
     print("🔐 Admin Login: http://localhost:8000/admin/login")
     print("👤 Email: admin@vertexar.com")
-    print("🔑 Password: admin123")
     print("\n🎯 Testing Checklist:")
     print("1. Login page loads with proper styles")
     print("2. Theme toggle works (🌙/☀️)")

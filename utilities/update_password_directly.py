@@ -24,9 +24,12 @@ async def update_password_directly():
             # Raw SQL update to avoid bcrypt issues in the application
             from sqlalchemy import text
             
-            # Generate bcrypt hash for "admin123"
+            password = os.environ.get("ADMIN_DEFAULT_PASSWORD", "")
+            if not password:
+                print("Error: ADMIN_DEFAULT_PASSWORD environment variable is not set")
+                return False
+            
             # Ensure password is less than 72 bytes
-            password = "admin123"
             if len(password.encode('utf-8')) > 72:
                 password = password[:72]
             
@@ -47,7 +50,6 @@ async def update_password_directly():
             
             await session.commit()
             print("Password updated successfully!")
-            print(f"New password: {password}")
             return True
             
         except Exception as e:

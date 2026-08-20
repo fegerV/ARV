@@ -4,6 +4,7 @@ Script to create admin user for testing
 """
 import asyncio
 import sys
+import os
 from pathlib import Path
 
 # Add project root to path
@@ -18,12 +19,12 @@ from app.core.config import settings
 from datetime import datetime
 import hashlib
 
-def hash_password(password: str) -> str:
-    """Hash password using SHA-256"""
-    return hashlib.sha256(password.encode()).hexdigest()
-
 async def create_admin_user():
     """Create admin user for testing"""
+    new_password = os.environ.get("ADMIN_DEFAULT_PASSWORD", "")
+    if not new_password:
+        print("Error: ADMIN_DEFAULT_PASSWORD environment variable is not set")
+        return
     
     # Create database connection
     engine = create_async_engine(settings.DATABASE_URL)
@@ -46,7 +47,7 @@ async def create_admin_user():
             # Create admin user
             admin_user = User(
                 email="admin@vertexar.com",
-                hashed_password=hash_password("admin123"),
+                hashed_password=hashlib.sha256(new_password.encode()).hexdigest(),
                 full_name="V-Portal Admin",
                 role="admin",
                 is_active=True,
@@ -62,7 +63,6 @@ async def create_admin_user():
             print(f"   Email: {admin_user.email}")
             print(f"   Role: {admin_user.role}")
             print(f"   Active: {admin_user.is_active}")
-            print(f"   Password: admin123")
             
         except Exception as e:
             print(f"❌ Error: {e}")

@@ -14,8 +14,12 @@ from app.models.user import User
 from sqlalchemy import select
 
 async def update_admin_password_sha256():
-    """Update admin user password using SHA-256 instead of bcrypt"""
+    """Update admin user password using current hash scheme"""
     settings = get_settings()
+    new_password = os.environ.get("ADMIN_DEFAULT_PASSWORD", "")
+    if not new_password:
+        print("Error: ADMIN_DEFAULT_PASSWORD environment variable is not set")
+        return False
     
     # Create async engine
     engine = create_async_engine(settings.DATABASE_URL)
@@ -33,15 +37,12 @@ async def update_admin_password_sha256():
                 
             print(f"Found user: {user.email}")
             
-            # Create new password hash with SHA-256
-            new_password = "admin123"
             user.hashed_password = get_password_hash(new_password)
             user.login_attempts = 0
             user.locked_until = None
             
             await session.commit()
             print(f"Password updated successfully for {user.email}")
-            print(f"New password: {new_password}")
             return True
             
         except Exception as e:

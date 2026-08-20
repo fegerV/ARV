@@ -4,17 +4,23 @@
 import sqlite3
 import hashlib
 from datetime import datetime
+import os
 
 def create_admin_user():
     """Создание администратора в SQLite базе данных"""
     print("Creating admin user in SQLite database...")
+    
+    new_password = os.environ.get("ADMIN_DEFAULT_PASSWORD", "")
+    if not new_password:
+        print("Error: ADMIN_DEFAULT_PASSWORD environment variable is not set")
+        return
     
     # Подключаемся к базе данных
     conn = sqlite3.connect("test_vertex_ar.db")
     cursor = conn.cursor()
     
     # Создаем хэш пароля
-    password_hash = hashlib.sha256("admin123".encode()).hexdigest()
+    password_hash = hashlib.sha256(new_password.encode()).hexdigest()
     
     # Создаем пользователя администратора
     try:
@@ -49,7 +55,6 @@ def create_admin_user():
         conn.commit()
         print("Admin user created/updated successfully!")
         print("Email: admin@vertexar.com")
-        print("Password: admin123")
         
     except sqlite3.Error as e:
         print(f"Database error: {e}")

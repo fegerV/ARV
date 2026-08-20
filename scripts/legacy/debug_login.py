@@ -8,6 +8,7 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy import select
 from app.models.user import User
 from app.api.routes.auth import verify_password
+import os
 
 async def debug_login():
     """Debug login process"""
@@ -18,7 +19,10 @@ async def debug_login():
     
     async with async_session() as session:
         username = "admin@vertexar.com"
-        password = "admin123"
+        password = os.environ.get("ADMIN_DEFAULT_PASSWORD", "")
+        if not password:
+            print("Error: ADMIN_DEFAULT_PASSWORD environment variable is not set")
+            return
         
         print(f"Testing login for: {username}")
         

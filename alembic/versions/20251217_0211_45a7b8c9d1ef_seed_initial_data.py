@@ -10,6 +10,7 @@ from alembic import op
 import sqlalchemy as sa
 from sqlalchemy.sql import func
 import hashlib
+import os
 from datetime import datetime
 
 
@@ -32,8 +33,12 @@ def upgrade() -> None:
     admin_exists = result.fetchone()[0] > 0
     
     if not admin_exists:
+        admin_password = os.environ.get("ADMIN_DEFAULT_PASSWORD", "")
+        if not admin_password:
+            raise RuntimeError("ADMIN_DEFAULT_PASSWORD environment variable must be set to run migrations")
+        
         # Hash password using SHA-256 (consistent with existing security implementation)
-        admin_password_hash = hashlib.sha256("admin123".encode()).hexdigest()
+        admin_password_hash = hashlib.sha256(admin_password.encode()).hexdigest()
         
         # Insert admin user
         connection.execute(

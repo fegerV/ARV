@@ -16,8 +16,12 @@ from app.models.user import User
 from sqlalchemy import select
 
 async def create_admin_user():
-    """Create admin user with known password"""
+    """Create admin user with password from ADMIN_DEFAULT_PASSWORD env var"""
     settings = get_settings()
+    new_password = os.environ.get("ADMIN_DEFAULT_PASSWORD", "")
+    if not new_password:
+        print("Error: ADMIN_DEFAULT_PASSWORD environment variable is not set")
+        return False
     
     # Create async engine
     engine = create_async_engine(settings.DATABASE_URL)
@@ -32,14 +36,12 @@ async def create_admin_user():
             if user:
                 print(f"Admin user already exists: {user.email}")
                 # Update password
-                new_password = "admin123"
                 user.hashed_password = get_password_hash(new_password)
                 user.login_attempts = 0
                 user.locked_until = None
                 print(f"Password updated for {user.email}")
             else:
                 # Create new admin user
-                new_password = "admin123"
                 user = User(
                     email="admin@vertexar.com",
                     hashed_password=get_password_hash(new_password),
@@ -52,7 +54,6 @@ async def create_admin_user():
                 print(f"Created new admin user: {user.email}")
             
             await session.commit()
-            print(f"Password: {new_password}")
             return True
             
         except Exception as e:

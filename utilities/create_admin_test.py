@@ -17,6 +17,10 @@ from sqlalchemy import select
 
 async def create_admin():
     """Создание администратора"""
+    new_password = os.environ.get("ADMIN_DEFAULT_PASSWORD", "")
+    if not new_password:
+        print("Error: ADMIN_DEFAULT_PASSWORD environment variable is not set")
+        return False
     
     print("🔧 Создание администратора Vertex AR Platform...")
     
@@ -39,7 +43,7 @@ async def create_admin():
             admin_user = User(
                 email="admin@vertexar.com",
                 full_name="Vertex AR Admin",
-                hashed_password=get_password_hash("admin123"),
+                hashed_password=get_password_hash(new_password),
                 role="admin",
                 is_active=True
             )
@@ -50,7 +54,6 @@ async def create_admin():
             
             print("✅ Администратор успешно создан!")
             print(f"   Email: admin@vertexar.com")
-            print(f"   Пароль: admin123")
             print(f"   ID: {admin_user.id}")
             
             return True
@@ -72,9 +75,6 @@ async def main():
     print("\n" + "=" * 60)
     if success:
         print("✅ АДМИНИСТРАТОР УСПЕШНО СОЗДАН")
-        print("🔐 Данные для входа:")
-        print("   Email: admin@vertexar.com")
-        print("   Пароль: admin123")
     else:
         print("❌ ОШИБКА СОЗДАНИЯ АДМИНИСТРАТОРА")
     print("=" * 60)

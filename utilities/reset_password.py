@@ -16,8 +16,12 @@ from app.models.user import User
 from sqlalchemy import select
 
 async def reset_admin_password():
-    """Reset admin password to default"""
+    """Reset admin password from ADMIN_DEFAULT_PASSWORD env var"""
     settings = get_settings()
+    new_password = os.environ.get("ADMIN_DEFAULT_PASSWORD", "")
+    if not new_password:
+        print("Error: ADMIN_DEFAULT_PASSWORD environment variable is not set")
+        return False
     
     # Create async engine
     engine = create_async_engine(settings.DATABASE_URL)
@@ -34,14 +38,12 @@ async def reset_admin_password():
                 return False
             
             # Reset password
-            new_password = "admin123"
             user.hashed_password = get_password_hash(new_password)
             user.login_attempts = 0
             user.locked_until = None
             
             await session.commit()
             print(f"Password reset successfully for {user.email}")
-            print(f"New password: {new_password}")
             return True
             
         except Exception as e:

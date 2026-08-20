@@ -14,8 +14,12 @@ from app.models.user import User
 from sqlalchemy import select
 
 async def fix_admin_password():
-    """Fix admin user password with proper bcrypt hashing"""
+    """Fix admin user password with proper hashing"""
     settings = get_settings()
+    new_password = os.environ.get("ADMIN_DEFAULT_PASSWORD", "")
+    if not new_password:
+        print("Error: ADMIN_DEFAULT_PASSWORD environment variable is not set")
+        return False
     
     # Create async engine
     engine = create_async_engine(settings.DATABASE_URL)
@@ -32,9 +36,6 @@ async def fix_admin_password():
                 return False
                 
             print(f"Found user: {user.email}")
-            
-            # Create new password hash with a shorter password
-            new_password = "admin123"  # This is already short
             print(f"Updating password for {user.email}")
             
             # Truncate password to 72 bytes if necessary
@@ -45,7 +46,6 @@ async def fix_admin_password():
             
             await session.commit()
             print(f"Password updated successfully for {user.email}")
-            print(f"New password: {new_password}")
             return True
             
         except Exception as e:
