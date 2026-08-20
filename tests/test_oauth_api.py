@@ -80,7 +80,7 @@ async def test_yandex_oauth_callback_creates_connection_and_redirects(monkeypatc
 
     monkeypatch.setattr(oauth.oauth_state_store, "get_and_delete_state", _fake_get_and_delete_state)
     monkeypatch.setattr(oauth.oauth_state_store, "cleanup_expired_states", _fake_cleanup)
-    monkeypatch.setattr(oauth.token_encryption, "encrypt_credentials", lambda payload: f"enc:{payload['oauth_token']}")
+    monkeypatch.setattr(oauth.token_encryption, "encrypt_credentials", lambda payload: f"enc:{payload['access_token']}")
     monkeypatch.setattr(oauth.token_encryption, "is_encryption_available", lambda: True)
 
     responses = [
@@ -175,11 +175,11 @@ def test_get_connection_credentials_prefers_storage_metadata(monkeypatch):
     from app.api.routes.oauth import _get_connection_credentials
     from app.api.routes import oauth
 
-    monkeypatch.setattr(oauth.token_encryption, "decrypt_credentials", lambda value: {"oauth_token": f"decoded:{value}"})
+    monkeypatch.setattr(oauth.token_encryption, "decrypt_credentials", lambda value: {"access_token": f"decoded:{value}"})
 
     conn = SimpleNamespace(storage_metadata={"credentials": "enc-token"})
 
-    assert _get_connection_credentials(conn) == {"oauth_token": "decoded:enc-token"}
+    assert _get_connection_credentials(conn) == {"access_token": "decoded:enc-token"}
 
 
 @pytest.mark.asyncio
@@ -193,7 +193,7 @@ async def test_list_yandex_folders_returns_directory_payload(monkeypatch):
     )
     db = _FakeDb(get_map={(oauth.StorageConnection, 7): conn})
 
-    monkeypatch.setattr(oauth.token_encryption, "decrypt_credentials", lambda value: {"oauth_token": "token-123"})
+    monkeypatch.setattr(oauth.token_encryption, "decrypt_credentials", lambda value: {"access_token": "token-123"})
 
     class FakeAsyncClient:
         def __init__(self, timeout):
@@ -268,7 +268,7 @@ async def test_create_yandex_folder_maps_conflict_error(monkeypatch):
     )
     db = _FakeDb(get_map={(oauth.StorageConnection, 10): conn})
 
-    monkeypatch.setattr(oauth.token_encryption, "decrypt_credentials", lambda value: {"oauth_token": "token-123"})
+    monkeypatch.setattr(oauth.token_encryption, "decrypt_credentials", lambda value: {"access_token": "token-123"})
 
     class FakeAsyncClient:
         def __init__(self, timeout):

@@ -281,6 +281,16 @@ async def login_2fa_verify(
 async def admin_logout(request: Request):
     """Browser logout endpoint used by the admin header."""
     from app.api.routes.auth import clear_auth_cookies
+    from app.core.security import decode_token, blacklist_token
+    from app.core.config import get_settings
+
+    token = request.cookies.get("access_token")
+    if token:
+        payload = decode_token(token)
+        if payload:
+            settings = get_settings()
+            from datetime import timedelta
+            await blacklist_token(token, timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES))
 
     response = RedirectResponse(url="/admin/login", status_code=303)
     clear_auth_cookies(response)

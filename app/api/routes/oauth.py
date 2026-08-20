@@ -11,7 +11,6 @@ from app.core.database import get_db
 from app.core.config import get_settings
 from app.api.routes.auth import get_current_active_user
 from app.models.storage import StorageConnection
-from app.models.company import Company
 from app.models.user import User
 from app.utils.oauth_state import oauth_state_store
 from app.utils.token_encryption import token_encryption
@@ -161,7 +160,7 @@ async def yandex_oauth_callback(
 
         # Prepare and encrypt credentials
         credentials = {
-            "oauth_token": access_token,
+            "access_token": access_token,
             "refresh_token": token_data.get("refresh_token"),
             "expires_in": token_data.get("expires_in"),
             "token_type": token_data.get("token_type"),
@@ -248,7 +247,7 @@ async def list_yandex_folders(
     # Decrypt credentials to get OAuth token
     try:
         credentials = _get_connection_credentials(conn)
-        token = credentials.get("oauth_token")
+        token = credentials.get("access_token")
         if not token:
             logger.error("Missing OAuth token in credentials", extra={"connection_id": connection_id})
             raise HTTPException(
@@ -384,7 +383,7 @@ async def create_yandex_folder(
     # Decrypt credentials to get OAuth token
     try:
         credentials = _get_connection_credentials(conn)
-        token = credentials.get("oauth_token")
+        token = credentials.get("access_token")
         if not token:
             logger.error("Missing OAuth token in credentials", extra={"connection_id": connection_id})
             raise HTTPException(

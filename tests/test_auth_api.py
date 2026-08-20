@@ -37,7 +37,7 @@ async def test_get_user_from_token_loads_user_by_email(monkeypatch):
     from app.api.routes import auth
 
     user = SimpleNamespace(id=7, email="admin@example.com")
-    monkeypatch.setattr(auth, "decode_token", lambda token: {"sub": "admin@example.com"})
+    monkeypatch.setattr(auth, "decode_token", lambda token: {"sub": "admin@example.com", "user_id": 7})
 
     db = _FakeDb(execute_results=[_FakeScalarOneOrNoneResult(user)])
 

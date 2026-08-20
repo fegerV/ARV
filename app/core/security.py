@@ -1,7 +1,7 @@
 import hashlib
 import re
 import secrets
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, UTC
 from typing import Optional
 
 from jose import JWTError, jwt
@@ -9,6 +9,7 @@ from passlib.context import CryptContext
 from passlib.exc import UnknownHashError
 
 from app.core.config import get_settings
+from app.core.redis import redis_client
 
 settings = get_settings()
 pwd_context = CryptContext(schemes=["pbkdf2_sha256"], deprecated="auto")
@@ -57,9 +58,9 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -
     """Create JWT access token"""
     to_encode = data.copy()
     if expires_delta:
-        expire = datetime.utcnow() + expires_delta
+        expire = datetime.now(UTC) + expires_delta
     else:
-        expire = datetime.utcnow() + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+        expire = datetime.now(UTC) + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     
     to_encode.update({"exp": expire})
     encoded_jwt = jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
@@ -72,3 +73,42 @@ def decode_token(token: str) -> Optional[dict]:
         return payload
     except JWTError:
         return None
+
+
+_BLACKLIST_PREFIX = "jwt_blacklist:"
+
+
+async def blacklist_token(token: str, expires_in: timedelta) -> None:
+    """Add JWT token to blacklist until its natural expiry."""
+    ttl_seconds = max(int(expires_in.total_seconds()), 1)
+    await redis_client.setex(_BLACKLIST_PREFIX + token, ttl_seconds, "1")
+
+
+async def is_token_blacklisted(token: str) -> bool:
+    """Return True if the token has been revoked."""
+    try:
+        return await redis_client.exists(_BLACKLIST_PREFIX + token) == 1
+    except Exception:
+        return False
+
+
+async def invalidate_user_tokens(user_id: int) -> None:
+    """Invalidate all active sessions/tokens for a user.
+
+    Uses a per-user revocation key so that future token validation can
+    reject any token issued before this call.
+    """
+    key = f"user_revoked:{user_id}"
+    try:
+        await redis_client.set(key, "1")
+        await redis_client.expire(key, settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60)
+    except Exception:
+        pass
+
+
+async def is_user_revoked(user_id: int) -> bool:
+    """Return True if all tokens for the user have been invalidated."""
+    try:
+        return await redis_client.exists(f"user_revoked:{user_id}") == 1
+    except Exception:
+        return False

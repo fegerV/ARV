@@ -12,6 +12,9 @@ from app.core.security import (
     get_password_hash,
     decode_token,
     needs_password_rehash,
+    blacklist_token,
+    is_token_blacklisted,
+    is_user_revoked,
 )
 from app.core.database import get_db
 from app.models.user import User
@@ -51,13 +54,18 @@ async def _get_user_from_token(db: AsyncSession, token: str | None) -> User | No
     """Resolve a user from a decoded JWT token."""
     if not token:
         return None
+    if await is_token_blacklisted(token):
+        return None
     payload = decode_token(token)
     if payload is None:
         return None
     email: str | None = payload.get("sub")
-    if not email:
+    user_id = payload.get("user_id")
+    if not email or user_id is None:
         return None
-    result = await db.execute(select(User).where(User.email == email))
+    if await is_user_revoked(user_id):
+        return None
+    result = await db.execute(select(User).where(User.id == int(user_id)))
     return result.scalar_one_or_none()
 
 async def get_current_user_optional(
@@ -323,9 +331,17 @@ async def login_form(
     return response
 
 @router.post("/logout")
-async def logout(current_user: User = Depends(get_current_active_user)):
+async def logout(request: Request, current_user: User = Depends(get_current_active_user)):
     """Logout user and clear cookie-based session state."""
     logger.info("User logout", user_id=current_user.id, email=current_user.email)
+
+    token = _extract_request_token(request)
+    if token:
+        payload = decode_token(token)
+        if payload:
+            expire_delta = timedelta(minutes=get_settings().ACCESS_TOKEN_EXPIRE_MINUTES)
+            await blacklist_token(token, expire_delta)
+
     response = JSONResponse({"message": "Успешно вышли из системы"})
     clear_auth_cookies(response)
     return response
