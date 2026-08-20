@@ -678,7 +678,9 @@ async def _build_manifest(
     # ── Build absolute URLs ──────────────────────────────────────────
     marker_image_url = _absolute_url(resolved_photo)
     photo_url_abs = _absolute_url(resolved_photo)
-    video_url_abs = _absolute_url(resolved_video or "")
+    if not resolved_video:
+        raise HTTPException(status_code=404, detail="Video not found for this AR content")
+    video_url_abs = _absolute_url(resolved_video)
     thumbnail_url_abs = _absolute_url(resolved_preview) if resolved_preview else None
 
     # ── Extract ALL ORM data into plain values BEFORE _record_view ──

@@ -8,6 +8,7 @@ from fastapi import APIRouter, UploadFile, File, Form, Depends, HTTPException, Q
 import shutil
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import delete as sa_delete, select, func, update as sa_update
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import selectinload
 import structlog
 import re
@@ -40,7 +41,7 @@ from app.utils.ar_content import (
     validate_photo_file,
 )
 from app.core.storage_providers import get_provider_for_company
-from app.api.deps_authz import require_company_access, require_resource_access
+from app.api.deps_authz import require_company_access
 from app.api.routes.auth import get_current_active_user
 from app.models.user import User
 
@@ -436,9 +437,17 @@ async def _create_ar_content(
         status="pending"
     )
     
-    # Add to session before processing
     db.add(ar_content)
-    await db.commit()
+    for attempt in range(3):
+        try:
+            await db.commit()
+            break
+        except IntegrityError:
+            await db.rollback()
+            if attempt == 2:
+                raise
+            order_number = generate_order_number()
+            ar_content.order_number = order_number
     await db.refresh(ar_content)
     
     # Generate thumbnail (use enhanced image path when auto-enhance was applied)

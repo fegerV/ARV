@@ -38,11 +38,13 @@ async def _scheduled_backup_job() -> None:
     from app.services.backup_service import BackupService
 
     service = BackupService()
-    await service.run_backup(
-        company_id=bkp.backup_company_id,
-        yd_folder=bkp.backup_yd_folder,
-        trigger="scheduled",
-    )
+    async with AsyncSessionLocal() as session:
+        await service.run_backup(
+            session=session,
+            company_id=bkp.backup_company_id,
+            yd_folder=bkp.backup_yd_folder,
+            trigger="scheduled",
+        )
 
 
 async def init_scheduler() -> None:

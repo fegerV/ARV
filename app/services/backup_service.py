@@ -12,7 +12,6 @@ import gzip
 import os
 import tempfile
 from datetime import datetime, timedelta, UTC
-from pathlib import Path
 from typing import Optional
 from urllib.parse import urlparse
 
@@ -63,6 +62,7 @@ class BackupService:
 
     async def run_backup(
         self,
+        session: AsyncSession,
         company_id: int,
         yd_folder: str = "backups",
         trigger: str = "manual",
@@ -80,17 +80,16 @@ class BackupService:
         log = logger.bind(company_id=company_id, trigger=trigger)
         log.info("backup_started")
 
-        async with AsyncSessionLocal() as session:
-            record = BackupHistory(
-                started_at=_utcnow_naive(),
-                status="running",
-                company_id=company_id,
-                trigger=trigger,
-            )
-            session.add(record)
-            await session.commit()
-            await session.refresh(record)
-            record_id = record.id
+        record = BackupHistory(
+            started_at=_utcnow_naive(),
+            status="running",
+            company_id=company_id,
+            trigger=trigger,
+        )
+        session.add(record)
+        await session.commit()
+        await session.refresh(record)
+        record_id = record.id
 
         tmp_path: Optional[str] = None
         gz_path: Optional[str] = None
@@ -117,19 +116,16 @@ class BackupService:
                     % company_id
                 )
 
-            # Read in a thread to avoid blocking the event loop for large files
-            data = await asyncio.to_thread(Path(gz_path).read_bytes)
-            await provider.save_file_bytes(data, yd_remote_path)
+            await provider.save_file(gz_path, yd_remote_path)
 
             # 4. Update record
-            async with AsyncSessionLocal() as session:
-                rec = await session.get(BackupHistory, record_id)
-                if rec:
-                    rec.finished_at = _utcnow_naive()
-                    rec.status = "success"
-                    rec.size_bytes = gz_size
-                    rec.yd_path = yd_remote_path
-                    await session.commit()
+            rec = await session.get(BackupHistory, record_id)
+            if rec:
+                rec.finished_at = _utcnow_naive()
+                rec.status = "success"
+                rec.size_bytes = gz_size
+                rec.yd_path = yd_remote_path
+                await session.commit()
 
             log.info(
                 "backup_completed",
@@ -139,13 +135,12 @@ class BackupService:
 
         except Exception as exc:
             log.error("backup_failed", error=str(exc), exc_info=True)
-            async with AsyncSessionLocal() as session:
-                rec = await session.get(BackupHistory, record_id)
-                if rec:
-                    rec.finished_at = _utcnow_naive()
-                    rec.status = "failed"
-                    rec.error_message = str(exc)[:1000]
-                    await session.commit()
+            rec = await session.get(BackupHistory, record_id)
+            if rec:
+                rec.finished_at = _utcnow_naive()
+                rec.status = "failed"
+                rec.error_message = str(exc)[:1000]
+                await session.commit()
 
         finally:
             # Clean up temp files
@@ -159,9 +154,8 @@ class BackupService:
         except Exception as exc:
             log.warning("backup_rotation_failed", error=str(exc))
 
-        async with AsyncSessionLocal() as session:
-            result = await session.get(BackupHistory, record_id)
-            return result  # type: ignore[return-value]
+        result = await session.get(BackupHistory, record_id)
+        return result  # type: ignore[return-value]
 
     async def list_backups(
         self,

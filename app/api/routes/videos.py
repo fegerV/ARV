@@ -1,7 +1,7 @@
 from typing import List, Optional
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, UploadFile, File, Query, Request
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func, and_, or_
+from sqlalchemy import select, and_, or_
 from datetime import datetime, timedelta, timezone
 
 from app.core.database import get_db, AsyncSessionLocal
@@ -291,11 +291,8 @@ async def upload_videos(
         order_folder = sanitize_filename(ar_content.order_number, max_length=50)
         yd_relative_prefix = f"{project_slug}/{order_folder}"
 
-    # Check if this is the first video for this AR content
-    existing_videos_count = await db.scalar(
-        select(func.count(Video.id)).where(Video.ar_content_id == content_uuid)
-    )
-    is_first_video = existing_videos_count == 0
+    # Check if this AR content already has an active video
+    is_first_video = ar_content.active_video_id is None
 
     # Build local storage paths (used for metadata extraction & local storage)
     storage_base_path = build_ar_content_storage_path(
@@ -535,16 +532,6 @@ async def set_video_active(
     
     try:
         # Clear is_active flag for all other videos in this AR content
-        await db.execute(
-            select(Video).where(
-                and_(
-                    Video.ar_content_id == content_uuid,
-                    Video.id != video_uuid
-                )
-            )
-        )
-        
-        # Set all videos as inactive first
         stmt_clear = (
             Video.__table__
             .update()

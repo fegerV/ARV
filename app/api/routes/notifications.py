@@ -4,6 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import func, select, update
 import httpx
 import smtplib
+import structlog
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 
@@ -22,6 +23,8 @@ from app.models.user import User
 from app.services.notification_service import create_notification
 from pydantic import BaseModel
 from typing import Optional, Dict, Any
+
+logger = structlog.get_logger()
 
 router = APIRouter()
 
@@ -55,12 +58,16 @@ def _send_email_notification_sync(to_email: str, subject: str, html_body: str) -
 
 
 async def _send_telegram_notification_async(chat_id: str, message: str) -> None:
-    async with httpx.AsyncClient() as client:
-        await client.post(
-            f"https://api.telegram.org/bot{settings.TELEGRAM_BOT_TOKEN}/sendMessage",
-            json={"chat_id": chat_id, "text": message, "parse_mode": "HTML"},
-            timeout=10.0,
-        )
+    try:
+        async with httpx.AsyncClient() as client:
+            await client.post(
+                f"https://api.telegram.org/bot{settings.TELEGRAM_BOT_TOKEN}/sendMessage",
+                json={"chat_id": chat_id, "text": message, "parse_mode": "HTML"},
+                timeout=10.0,
+            )
+    except Exception as exc:
+        logger.error("telegram_notification_failed", chat_id=chat_id, error=str(exc), exc_info=True)
+        raise
 
 
 @router.get("")

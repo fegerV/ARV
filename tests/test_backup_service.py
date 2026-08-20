@@ -453,16 +453,15 @@ async def test_run_backup_success_updates_record_and_cleans_files(monkeypatch):
     )
     created_record.id = 901
 
-    create_session = _FakeSession(shared_record=created_record)
-    update_session = _FakeSession(get_map={(backup_service.BackupHistory, 901): created_record}, shared_record=created_record)
-    result_session = _FakeSession(get_map={(backup_service.BackupHistory, 901): created_record}, shared_record=created_record)
+    create_session = _FakeSession(get_map={(backup_service.BackupHistory, 901): created_record}, shared_record=created_record)
 
     class FakeProvider:
         def __init__(self):
             self.saved = []
 
-        async def save_file_bytes(self, data, path):
-            self.saved.append((data, path))
+        async def save_file(self, source_path, destination_path):
+            self.saved.append((source_path, destination_path))
+            return f"yadisk://{destination_path}"
 
     provider = FakeProvider()
 
@@ -474,7 +473,7 @@ async def test_run_backup_success_updates_record_and_cleans_files(monkeypatch):
     async def _fake_rotate_backups(self, company_id, yd_folder):
         rotated.append((company_id, yd_folder))
 
-    monkeypatch.setattr(backup_service, "AsyncSessionLocal", _SessionFactory([create_session, update_session, result_session]))
+    monkeypatch.setattr(backup_service, "AsyncSessionLocal", _SessionFactory([create_session]))
     monkeypatch.setattr(backup_service.BackupService, "_run_pg_dump", _async_return(str(dump_path)))
     monkeypatch.setattr(
         backup_service.BackupService,
@@ -484,7 +483,7 @@ async def test_run_backup_success_updates_record_and_cleans_files(monkeypatch):
     monkeypatch.setattr(backup_service.asyncio, "to_thread", _fake_to_thread)
     monkeypatch.setattr(backup_service.BackupService, "_rotate_backups", _fake_rotate_backups)
 
-    result = await backup_service.BackupService().run_backup(company_id=5, yd_folder="daily", trigger="manual")
+    result = await backup_service.BackupService().run_backup(session=create_session, company_id=5, yd_folder="daily", trigger="manual")
 
     assert result is created_record
     assert created_record.id == 901
@@ -492,7 +491,7 @@ async def test_run_backup_success_updates_record_and_cleans_files(monkeypatch):
     assert created_record.size_bytes is not None
     assert created_record.yd_path is not None
     assert created_record.yd_path.startswith("daily/backup_")
-    assert provider.saved[0][0].startswith(b"\x1f\x8b")
+    assert provider.saved[0][0] == str(dump_path) + ".gz"
     assert provider.saved[0][1] == created_record.yd_path
     assert rotated == [(5, "daily")]
     assert dump_path.exists() is False
@@ -516,14 +515,12 @@ async def test_run_backup_failure_marks_record_failed_and_cleans_files(monkeypat
     )
     created_record.id = 901
 
-    create_session = _FakeSession(shared_record=created_record)
-    fail_session = _FakeSession(get_map={(backup_service.BackupHistory, 901): created_record}, shared_record=created_record)
-    result_session = _FakeSession(get_map={(backup_service.BackupHistory, 901): created_record}, shared_record=created_record)
+    create_session = _FakeSession(get_map={(backup_service.BackupHistory, 901): created_record}, shared_record=created_record)
 
     async def _fake_to_thread(func, *args, **kwargs):
         return func(*args, **kwargs)
 
-    monkeypatch.setattr(backup_service, "AsyncSessionLocal", _SessionFactory([create_session, fail_session, result_session]))
+    monkeypatch.setattr(backup_service, "AsyncSessionLocal", _SessionFactory([create_session]))
     monkeypatch.setattr(backup_service.BackupService, "_run_pg_dump", _async_return(str(dump_path)))
     monkeypatch.setattr(
         backup_service.BackupService,
@@ -533,7 +530,7 @@ async def test_run_backup_failure_marks_record_failed_and_cleans_files(monkeypat
     monkeypatch.setattr(backup_service.asyncio, "to_thread", _fake_to_thread)
     monkeypatch.setattr(backup_service.BackupService, "_rotate_backups", _async_return(None))
 
-    result = await backup_service.BackupService().run_backup(company_id=5, yd_folder="daily", trigger="manual")
+    result = await backup_service.BackupService().run_backup(session=create_session, company_id=5, yd_folder="daily", trigger="manual")
 
     assert result is created_record
     assert created_record.status == "failed"
@@ -555,9 +552,7 @@ async def test_run_backup_logs_rotation_warning_but_returns_record(monkeypatch):
     )
     created_record.id = 901
 
-    create_session = _FakeSession(shared_record=created_record)
-    fail_session = _FakeSession(get_map={(backup_service.BackupHistory, 901): created_record}, shared_record=created_record)
-    result_session = _FakeSession(get_map={(backup_service.BackupHistory, 901): created_record}, shared_record=created_record)
+    create_session = _FakeSession(get_map={(backup_service.BackupHistory, 901): created_record}, shared_record=created_record)
 
     warnings = []
 
@@ -571,12 +566,12 @@ async def test_run_backup_logs_rotation_warning_but_returns_record(monkeypatch):
         def warning(self, event, **kwargs):
             warnings.append((event, kwargs))
 
-    monkeypatch.setattr(backup_service, "AsyncSessionLocal", _SessionFactory([create_session, fail_session, result_session]))
+    monkeypatch.setattr(backup_service, "AsyncSessionLocal", _SessionFactory([create_session]))
     monkeypatch.setattr(backup_service.BackupService, "_run_pg_dump", _async_return(None))
     monkeypatch.setattr(backup_service.BackupService, "_rotate_backups", _async_raise(RuntimeError("rotate failed")))
     monkeypatch.setattr(backup_service.logger, "bind", lambda **kwargs: FakeLog())
 
-    result = await backup_service.BackupService().run_backup(company_id=5, yd_folder="daily", trigger="manual")
+    result = await backup_service.BackupService().run_backup(session=create_session, company_id=5, yd_folder="daily", trigger="manual")
 
     assert result is created_record
     assert created_record.status == "failed"

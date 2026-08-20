@@ -253,7 +253,12 @@ class ThumbnailService:
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
         )
-        _, stderr = await process.communicate()
+        try:
+            _, stderr = await asyncio.wait_for(process.communicate(), timeout=30)
+        except asyncio.TimeoutError:
+            process.kill()
+            await process.wait()
+            raise RuntimeError("Video frame extraction timed out after 30 seconds")
 
         if process.returncode != 0:
             error_msg = stderr.decode()

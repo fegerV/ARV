@@ -100,7 +100,7 @@ class YandexDiskStorageProvider(StorageProvider):
     # ------------------------------------------------------------------
 
     async def save_file(self, source_path: str, destination_path: str) -> str:
-        """Upload a local file to Yandex Disk."""
+        """Upload a local file to Yandex Disk using streaming to avoid loading entire file into memory."""
         disk_path = self._disk_path(destination_path)
         parent = str(PurePosixPath(disk_path).parent)
         await self._ensure_directory(parent)
@@ -115,19 +115,17 @@ class YandexDiskStorageProvider(StorageProvider):
             resp.raise_for_status()
             upload_url = resp.json()["href"]
 
-            # Step 2: PUT the file
+            # Step 2: stream the file in chunks
             with open(source_path, "rb") as fh:
-                data = fh.read()
-            upload_resp = await client.put(
-                upload_url,
-                content=data,
-                headers={"Content-Type": "application/octet-stream"},
-                timeout=_UPLOAD_TIMEOUT,
-            )
-            upload_resp.raise_for_status()
+                upload_resp = await client.put(
+                    upload_url,
+                    content=fh,
+                    headers={"Content-Type": "application/octet-stream"},
+                    timeout=_UPLOAD_TIMEOUT,
+                )
+                upload_resp.raise_for_status()
 
         logger.info("yd_file_uploaded", disk_path=disk_path)
-        # Return an internal reference; resolved at serve-time.
         return f"yadisk://{destination_path.replace(chr(92), '/').lstrip('/')}"
 
     async def save_file_bytes(self, content: bytes, destination_path: str) -> str:
