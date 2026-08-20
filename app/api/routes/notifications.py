@@ -10,7 +10,6 @@ from email.mime.multipart import MIMEMultipart
 from app.core.config import settings
 from app.core.database import get_db
 from app.models.notification import Notification
-from app.api.deps_authz import require_company_access
 from app.api.routes.auth import get_current_active_user
 from app.services.email_transport import send_smtp_message
 from app.schemas.notifications import (
@@ -255,7 +254,14 @@ async def create_notification_endpoint(
 
 
 @router.post("/test")
-async def test_notification(email: str, chat_id: str, background_tasks: BackgroundTasks):
+async def test_notification(
+    email: str,
+    chat_id: str,
+    background_tasks: BackgroundTasks,
+    current_user: User = Depends(get_current_active_user),
+):
+    if not getattr(current_user, 'is_super_admin', False):
+        raise HTTPException(status_code=403, detail="Only super admins can send test notifications")
     background_tasks.add_task(
         _send_email_notification_sync,
         email,

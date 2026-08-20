@@ -4,10 +4,6 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 from functools import lru_cache
 
 
-DEFAULT_SECRET_KEY = "change-this-to-a-secure-random-key-min-32-chars"
-DEFAULT_ADMIN_PASSWORD = "ChangeMe123!"
-
-
 class Settings(BaseSettings):
     """Application configuration settings."""
     
@@ -53,7 +49,7 @@ class Settings(BaseSettings):
     DB_ECHO: bool = False
     
     # Security
-    SECRET_KEY: str = Field(default=DEFAULT_SECRET_KEY)
+    SECRET_KEY: str = Field(min_length=32)
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 1440  # 24 hours
     
@@ -117,7 +113,7 @@ class Settings(BaseSettings):
     
     # Admin
     ADMIN_EMAIL: str = "admin@vertexar.com"
-    ADMIN_DEFAULT_PASSWORD: str = DEFAULT_ADMIN_PASSWORD
+    ADMIN_DEFAULT_PASSWORD: str
     ADMIN_FRONTEND_URL: str = "http://localhost:3000"
     
     # Background tasks configuration
@@ -185,15 +181,15 @@ class Settings(BaseSettings):
         return self.CORS_ORIGINS
 
     def validate_sensitive_defaults(self) -> None:
-        """Ensure insecure defaults are not used in production."""
+        """Ensure insecure defaults are not used."""
         if not self.is_production:
             return
 
-        if self.SECRET_KEY == DEFAULT_SECRET_KEY:
-            raise ValueError("SECRET_KEY must be set to a secure value in production.")
+        if len(self.SECRET_KEY) < 32:
+            raise ValueError("SECRET_KEY must be at least 32 characters in production.")
 
-        if self.ADMIN_DEFAULT_PASSWORD == DEFAULT_ADMIN_PASSWORD:
-            raise ValueError("ADMIN_DEFAULT_PASSWORD must be changed in production.")
+        if not self.ADMIN_DEFAULT_PASSWORD:
+            raise ValueError("ADMIN_DEFAULT_PASSWORD must be set in production.")
 
 
 # Global settings instance

@@ -363,6 +363,46 @@ def validate_email_format(email: str) -> bool:
     return re.match(email_pattern, email) is not None
 
 
+def validate_photo_file(upload_file, max_size: int = 10 * 1024 * 1024) -> None:
+    """Validate uploaded photo: size, MIME type, and magic bytes.
+
+    Raises HTTPException on invalid input.
+    """
+    from fastapi import HTTPException
+
+    filename = (upload_file.filename or "").lower()
+    allowed_extensions = {".jpeg", ".jpg", ".png"}
+    if not any(filename.endswith(ext) for ext in allowed_extensions):
+        raise HTTPException(status_code=400, detail="Photo must be JPEG or PNG")
+
+    if upload_file.content_type not in {"image/jpeg", "image/png"}:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unsupported photo MIME type: {upload_file.content_type}. Allowed: image/jpeg, image/png",
+        )
+
+    if upload_file.size is not None and upload_file.size > max_size:
+        raise HTTPException(
+            status_code=413,
+            detail=f"Photo file too large. Maximum size: {max_size // (1024 * 1024)}MB",
+        )
+
+    try:
+        upload_file.file.seek(0)
+        with Image.open(upload_file.file) as img:
+            if img.format not in {"JPEG", "PNG"}:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Invalid image format: {img.format}. Allowed: JPEG, PNG",
+                )
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=f"Invalid image file: {exc}")
+    finally:
+        upload_file.file.seek(0)
+
+
 def validate_file_extension(filename: str, allowed_extensions: list) -> bool:
     """Validate file extension against allowed extensions.
     

@@ -107,12 +107,21 @@
             const toast = document.createElement('div');
             toast.id = toastId;
             toast.className = `toast ${toastClass} text-white p-4 rounded shadow-lg mb-2 transition-opacity duration-300`;
-            toast.innerHTML = `
-                <div class="flex items-center justify-between">
-                    <span>${message}</span>
-                    <button onclick="removeToast('${toastId}')" class="ml-4 text-white">×</button>
-                </div>
-            `;
+
+            const inner = document.createElement('div');
+            inner.className = 'flex items-center justify-between';
+
+            const span = document.createElement('span');
+            span.textContent = message;
+
+            const button = document.createElement('button');
+            button.textContent = '×';
+            button.className = 'ml-4 text-white';
+            button.setAttribute('onclick', 'removeToast(' + JSON.stringify(toastId) + ')');
+
+            inner.appendChild(span);
+            inner.appendChild(button);
+            toast.appendChild(inner);
 
             let container = document.getElementById('toast-container');
             if (!container) {
@@ -179,7 +188,10 @@
         }
 
         function showModal(content) {
-            document.getElementById('modal-body').innerHTML = content;
+            const modalBody = document.getElementById('modal-body');
+            if (modalBody) {
+                modalBody.textContent = content;
+            }
             document.getElementById('modal-container').style.display = 'block';
         }
 

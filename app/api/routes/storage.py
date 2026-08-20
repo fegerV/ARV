@@ -167,17 +167,20 @@ async def list_storage_connections(
     Returns safe metadata without exposing sensitive information.
     """
     query = select(StorageConnection).where(StorageConnection.provider == "local_disk")
-    
-    # Apply filters
+
+    if not getattr(current_user, 'is_super_admin', False):
+        query = query.where(
+            (StorageConnection.created_by == current_user.id) | (StorageConnection.is_default)
+        )
+
     if is_active is not None:
         query = query.where(StorageConnection.is_active == is_active)
-    
+
     query = query.order_by(StorageConnection.created_at.desc())
-    
+
     result = await db.execute(query)
     connections = result.scalars().all()
-    
-    # Return safe connection data
+
     safe_connections = []
     for conn in connections:
         safe_conn = {
@@ -194,7 +197,7 @@ async def list_storage_connections(
             "metadata": conn.storage_metadata or {},
         }
         safe_connections.append(safe_conn)
-    
+
     return safe_connections
 
 

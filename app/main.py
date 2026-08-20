@@ -281,6 +281,7 @@ app.include_router(html_router)
 
 # Include API routers
 from app.api.routes import (  # noqa: E402
+    ai,
     auth,
     companies,
     projects,
@@ -313,6 +314,7 @@ app.include_router(viewer.router, prefix="/api/viewer", tags=["Viewer"])
 app.include_router(videos.router, prefix="/api/videos", tags=["Videos"])
 app.include_router(alerts_ws.router, prefix="/api/ws", tags=["WebSocket"])
 app.include_router(backups.router, prefix="/api/backups", tags=["Backups"])
+app.include_router(ai.router, prefix="/api/ai", tags=["AI Pipeline"])
 app.include_router(companies.router, prefix="/api", tags=["Companies"])
 app.include_router(projects.router, prefix="/api", tags=["Projects"])
 # ar_content last: has greedy GET /{content_id} that matches any /api/... path

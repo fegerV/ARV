@@ -37,6 +37,7 @@ from app.utils.ar_content import (
     build_unique_link,
     generate_qr_code,
     save_uploaded_file,
+    validate_photo_file,
 )
 from app.core.storage_providers import get_provider_for_company
 from app.api.deps_authz import require_company_access, require_resource_access
@@ -278,7 +279,9 @@ async def _create_ar_content(
     
     if not validate_file_extension(photo_file.filename, allowed_photo_extensions):
         raise HTTPException(status_code=422, detail="Photo must be JPEG or PNG")
-    
+
+    validate_photo_file(photo_file)
+
     if not validate_file_extension(video_file.filename, allowed_video_extensions):
         raise HTTPException(status_code=422, detail="Video must be MP4, WebM, or MOV")
 

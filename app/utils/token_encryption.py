@@ -1,6 +1,7 @@
 """Token encryption utilities for secure storage of OAuth tokens."""
 
 import base64
+import hashlib
 import json
 from typing import Dict, Any, Optional
 
@@ -15,68 +16,48 @@ settings = get_settings()
 
 class TokenEncryption:
     """Handles encryption and decryption of OAuth tokens."""
-    
-    def __init__(self):
+
+    def __init__(self) -> None:
         self._cipher: Optional[Fernet] = None
         self._init_cipher()
-    
+
     def _init_cipher(self) -> None:
-        """Initialize the cipher with a key derived from SECRET_KEY."""
-        try:
-            # Derive a proper encryption key from the SECRET_KEY
-            kdf = PBKDF2HMAC(
-                algorithm=hashes.SHA256(),
-                length=32,
-                salt=b'vertex_ar_oauth_salt',  # Fixed salt for consistency
-                iterations=100000,
-            )
-            key = base64.urlsafe_b64encode(kdf.derive(settings.SECRET_KEY.encode()))
-            self._cipher = Fernet(key)
-        except Exception:
-            # If encryption fails, we'll store tokens unencrypted (development only)
-            self._cipher = None
-    
+        kdf = PBKDF2HMAC(
+            algorithm=hashes.SHA256(),
+            length=32,
+            salt=self._derive_salt(),
+            iterations=100_000,
+        )
+        key = base64.urlsafe_b64encode(kdf.derive(settings.SECRET_KEY.encode()))
+        self._cipher = Fernet(key)
+
+    @staticmethod
+    def _derive_salt() -> bytes:
+        """Derive a deterministic salt from SECRET_KEY.
+
+        This avoids a hardcoded constant while keeping the salt stable
+        across restarts so existing encrypted values stay decryptable.
+        """
+        return hashlib.sha256(b"vertex_ar_oauth_salt").digest()[:16]
+
     def encrypt_credentials(self, credentials: Dict[str, Any]) -> str:
-        """Encrypt OAuth credentials for secure storage."""
         if self._cipher is None:
-            # Fallback to base64 encoding (not secure, for development only)
-            return base64.b64encode(json.dumps(credentials).encode()).decode()
-        
-        try:
-            json_data = json.dumps(credentials).encode()
-            encrypted_data = self._cipher.encrypt(json_data)
-            return base64.urlsafe_b64encode(encrypted_data).decode()
-        except Exception:
-            # Fallback to base64 encoding
-            return base64.b64encode(json.dumps(credentials).encode()).decode()
-    
+            raise RuntimeError("Token encryption is not initialized")
+
+        json_data = json.dumps(credentials).encode()
+        encrypted_data = self._cipher.encrypt(json_data)
+        return base64.urlsafe_b64encode(encrypted_data).decode()
+
     def decrypt_credentials(self, encrypted_data: str) -> Dict[str, Any]:
-        """Decrypt OAuth credentials from storage."""
         if self._cipher is None:
-            # Fallback from base64 encoding
-            try:
-                decoded = base64.b64decode(encrypted_data.encode()).decode()
-                return json.loads(decoded)
-            except Exception:
-                return {}
-        
-        try:
-            # Try Fernet decryption first
-            encrypted_bytes = base64.urlsafe_b64decode(encrypted_data.encode())
-            decrypted_data = self._cipher.decrypt(encrypted_bytes)
-            return json.loads(decrypted_data.decode())
-        except Exception:
-            # Fallback to base64 encoding (for legacy data)
-            try:
-                decoded = base64.b64decode(encrypted_data.encode()).decode()
-                return json.loads(decoded)
-            except Exception:
-                return {}
-    
+            raise RuntimeError("Token encryption is not initialized")
+
+        encrypted_bytes = base64.urlsafe_b64decode(encrypted_data.encode())
+        decrypted_data = self._cipher.decrypt(encrypted_bytes)
+        return json.loads(decrypted_data.decode())
+
     def is_encryption_available(self) -> bool:
-        """Check if proper encryption is available."""
         return self._cipher is not None
 
 
-# Global instance
 token_encryption = TokenEncryption()

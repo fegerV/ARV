@@ -161,7 +161,12 @@ async def test_test_notification_queues_email_and_optional_telegram(monkeypatch)
     monkeypatch.setattr(notifications, "settings", cfg)
 
     tasks = BackgroundTasks()
-    result = await notifications.test_notification("ops@example.com", "12345", tasks)
+    result = await notifications.test_notification(
+        "ops@example.com",
+        "12345",
+        tasks,
+        current_user=SimpleNamespace(is_super_admin=True),
+    )
 
     assert result == {"status": "queued"}
     assert len(tasks.tasks) == 2

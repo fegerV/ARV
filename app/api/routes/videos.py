@@ -9,7 +9,6 @@ from app.models.video import Video
 from app.models.ar_content import ARContent
 from app.models.video_schedule import VideoSchedule as VideoScheduleModel
 from app.models.user import User
-from app.api.deps_authz import require_resource_access
 from app.api.routes.auth import get_current_active_user
 from app.schemas.video_schedule import (
     VideoScheduleCreate, VideoScheduleUpdate, VideoSchedule as VideoScheduleSchema,
@@ -260,6 +259,7 @@ async def upload_videos(
             selectinload(ARContent.project),
         )
         .where(ARContent.id == content_uuid)
+        .with_for_update()
     )
     result_content = await db.execute(stmt_content)
     ar_content = result_content.scalar_one_or_none()
