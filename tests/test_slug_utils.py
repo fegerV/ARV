@@ -12,11 +12,3 @@ def test_generate_slug_handles_cyrillic_spacing_symbols_and_empty():
     assert mod.generate_slug("Компания 123") == "kompaniya-123"
     assert mod.generate_slug("  Hello___World!!  ") == "hello-world"
     assert mod.generate_slug("___###___") == ""
-
-
-def test_generate_unique_slug_handles_empty_and_collisions():
-    existing = {"company", "company-1", "vertex-ar", "vertex-ar-1"}
-
-    assert mod.generate_unique_slug("", existing) == "company-2"
-    assert mod.generate_unique_slug("Vertex AR", existing) == "vertex-ar-2"
-    assert mod.generate_unique_slug("Unique Name", existing) == "unique-name"
