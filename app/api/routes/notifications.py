@@ -57,17 +57,28 @@ def _send_email_notification_sync(to_email: str, subject: str, html_body: str) -
     )
 
 
-async def _send_telegram_notification_async(chat_id: str, message: str) -> None:
-    try:
-        async with httpx.AsyncClient() as client:
-            await client.post(
-                f"https://api.telegram.org/bot{settings.TELEGRAM_BOT_TOKEN}/sendMessage",
-                json={"chat_id": chat_id, "text": message, "parse_mode": "HTML"},
-                timeout=10.0,
+async def _send_telegram_notification_async(chat_id: str, message: str, max_retries: int = 3) -> None:
+    """Send Telegram message with retry on transient failures."""
+    for attempt in range(1, max_retries + 1):
+        try:
+            async with httpx.AsyncClient() as client:
+                await client.post(
+                    f"https://api.telegram.org/bot{settings.TELEGRAM_BOT_TOKEN}/sendMessage",
+                    json={"chat_id": chat_id, "text": message, "parse_mode": "HTML"},
+                    timeout=10.0,
+                )
+            return
+        except Exception as exc:
+            logger.error(
+                "telegram_notification_failed",
+                chat_id=chat_id,
+                attempt=attempt,
+                max_retries=max_retries,
+                error=str(exc),
+                exc_info=True,
             )
-    except Exception as exc:
-        logger.error("telegram_notification_failed", chat_id=chat_id, error=str(exc), exc_info=True)
-        raise
+            if attempt == max_retries:
+                raise
 
 
 @router.get("")

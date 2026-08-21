@@ -211,6 +211,8 @@ async def login_form(
         access_token = create_access_token(
             data={"sub": user.email, "user_id": user.id},
             expires_delta=timedelta(minutes=timeout_minutes),
+            role=user.role,
+            company_id=user.company_id,
         )
 
         logger.info("user_login_successful", user_id=user.id, email=user.email)
@@ -269,6 +271,8 @@ async def login_2fa_verify(
     access_token = create_access_token(
         data={"sub": user.email, "user_id": user.id},
         expires_delta=timedelta(minutes=timeout_minutes),
+        role=user.role,
+        company_id=user.company_id,
     )
     logger.info("user_login_successful_2fa", user_id=user.id, email=user.email)
 

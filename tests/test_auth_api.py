@@ -118,12 +118,13 @@ async def test_login_returns_token_and_resets_attempts(monkeypatch):
         login_attempts=3,
         locked_until=datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(minutes=1),
         last_login_at=None,
+        company_id=None,
     )
 
     monkeypatch.setattr(auth, "verify_password", lambda raw, hashed: True)
     monkeypatch.setattr(auth, "needs_password_rehash", lambda hashed: True)
     monkeypatch.setattr(auth, "get_password_hash", lambda raw: "rehashed")
-    monkeypatch.setattr(auth, "create_access_token", lambda data, expires_delta: "jwt-token")
+    monkeypatch.setattr(auth, "create_access_token", lambda data, expires_delta, **kwargs: "jwt-token")
     monkeypatch.setattr(auth, "get_session_timeout_minutes", _async_return(30))
 
     db = _FakeDb(execute_results=[_FakeScalarOneOrNoneResult(user)])

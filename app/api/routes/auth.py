@@ -216,7 +216,9 @@ async def login(
     access_token_expires = timedelta(minutes=timeout_minutes)
     access_token = create_access_token(
         data={"sub": user.email, "user_id": user.id},
-        expires_delta=access_token_expires
+        expires_delta=access_token_expires,
+        role=user.role,
+        company_id=user.company_id,
     )
     
     logger.info("User login successful", user_id=user.id, email=user.email)
@@ -320,7 +322,9 @@ async def login_form(
     access_token_expires = timedelta(minutes=_timeout)
     access_token = create_access_token(
         data={"sub": user.email, "user_id": user.id},
-        expires_delta=access_token_expires
+        expires_delta=access_token_expires,
+        role=user.role,
+        company_id=user.company_id,
     )
     
     logger.info("User login successful", user_id=user.id, email=user.email)

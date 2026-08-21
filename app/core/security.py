@@ -54,9 +54,13 @@ def needs_password_rehash(hashed_password: str) -> bool:
         return True
 
 
-def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
+def create_access_token(data: dict, expires_delta: Optional[timedelta] = None, role: Optional[str] = None, company_id: Optional[int] = None) -> str:
     """Create JWT access token"""
     to_encode = data.copy()
+    if role is not None:
+        to_encode["role"] = role
+    if company_id is not None:
+        to_encode["company_id"] = company_id
     if expires_delta:
         expire = datetime.now(UTC) + expires_delta
     else:
