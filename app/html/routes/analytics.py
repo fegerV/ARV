@@ -9,7 +9,7 @@ duration and video play rate.  All queries accept a configurable
 from __future__ import annotations
 
 import copy
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import time
 from typing import Any
 
@@ -82,7 +82,7 @@ async def _build_analytics_data(db: AsyncSession, period: int = _DEFAULT_PERIOD)
     """
     try:
         # Use naive UTC to match the column type (DateTime without timezone)
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         since = now - timedelta(days=period) if period > 0 else None
 
         def _time_filter(stmt):

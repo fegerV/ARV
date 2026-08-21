@@ -53,10 +53,8 @@ async def _render_settings(
     try:
         all_settings = await settings_service.get_all_settings()
     except Exception as exc:
-        logger.error("settings_load_failed: %s", exc)
-        from app.html.mock import SETTINGS_MOCK_DATA
-
-        all_settings = SETTINGS_MOCK_DATA["settings"]
+        logger.error("settings_load_failed", error=str(exc), exc_info=True)
+        raise
 
     yd_company_list: list[dict] = []
     backup_history: list[dict] = []

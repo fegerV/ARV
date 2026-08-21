@@ -1,9 +1,21 @@
-"""AI Pipeline endpoints for AR content processing."""
+"""AI Pipeline endpoints for AR content processing.
+
+PLACEHOLDER IMPLEMENTATION
+==========================
+This module currently exposes the REST surface for AI processing, but the
+actual worker integration is not implemented yet. The previous version
+simulated completion with ``asyncio.sleep`` loops, which masked the missing
+backend and returned misleading success responses.
+
+Next steps for real integration:
+- Replace the in-memory ``_jobs`` store with a durable queue (Redis/Celery/RQ).
+- Send ``AIJobCreate`` payloads to an external AI worker or microservice.
+- Poll or receive webhooks for real status/progress updates.
+- Persist results (e.g., generated markers, enhanced metadata) to ARContent.
+"""
 
 from __future__ import annotations
 
-import asyncio
-import time
 import uuid
 from typing import Dict, Optional
 
@@ -36,7 +48,10 @@ _jobs: Dict[str, dict] = {}
 
 
 async def _process_ai_job(job_id: str, ar_content_id: int) -> None:
-    """Simulate AI processing with progress updates."""
+    """Placeholder background task.
+
+    Real implementation should delegate to an external AI worker/queue.
+    """
     job = _jobs.setdefault(job_id, {
         "job_id": job_id,
         "ar_content_id": ar_content_id,
@@ -47,20 +62,12 @@ async def _process_ai_job(job_id: str, ar_content_id: int) -> None:
     })
 
     try:
-        job["status"] = "processing"
-
-        for i in range(1, 6):
-            await asyncio.sleep(0.5)
-            job["progress"] = i * 20
-
-        job["status"] = "completed"
-        job["progress"] = 100
-        job["result"] = {
-            "ar_content_id": ar_content_id,
-            "processed_at": time.time(),
-            "model_version": "default",
-            "summary": "AI processing completed successfully",
-        }
+        job["status"] = "not_implemented"
+        job["progress"] = 0
+        job["error"] = (
+            "AI processing worker is not configured. "
+            "Integrate an external model/queue to replace this placeholder."
+        )
     except Exception as exc:
         job["status"] = "failed"
         job["error"] = str(exc)
@@ -73,7 +80,12 @@ async def start_ai_processing(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
 ):
-    """Start AI processing for an AR content item."""
+    """Start AI processing for an AR content item.
+
+    Currently returns a placeholder job. Connect an external worker to
+    process ``AIJobCreate`` payloads and update job status via webhook or
+    shared storage.
+    """
     ar_content = await db.get(ARContent, payload.ar_content_id)
     if not ar_content:
         raise HTTPException(status_code=404, detail="AR content not found")

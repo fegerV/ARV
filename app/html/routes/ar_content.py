@@ -28,7 +28,7 @@ from app.html.filters import storage_url
 from app.core.config import settings
 from app.services.settings_service import SettingsService
 import structlog
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 logger = structlog.get_logger()
@@ -173,7 +173,7 @@ def _build_ar_form_context(
 
 async def _load_video_details(ar_content_id: int, db: AsyncSession) -> tuple[list[dict], dict | None]:
     """Load videos for AR content with schedules and active video details."""
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     stmt = select(Video).where(Video.ar_content_id == ar_content_id).order_by(Video.rotation_order.asc(), Video.id.asc())
     result = await db.execute(stmt)
     videos = list(result.scalars().all())
