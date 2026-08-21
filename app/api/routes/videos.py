@@ -293,7 +293,9 @@ async def upload_videos(
         yd_relative_prefix = f"{project_slug}/{order_folder}"
 
     # Check if this AR content already has an active video
-    is_first_video = ar_content.active_video_id is None
+    # is_first_video is determined inside the loop after flush to avoid
+    # race conditions when multiple videos are uploaded concurrently.
+    check_first_video = ar_content.active_video_id is None
 
     # Build local storage paths (used for metadata extraction & local storage)
     storage_base_path = build_ar_content_storage_path(
@@ -382,10 +384,13 @@ async def upload_videos(
             video.size_bytes = metadata.get("size_bytes")
             video.mime_type = metadata.get("mime_type")
 
-            # If this is the first video, mark it as active
-            if is_first_video and len(created_videos) == 0:
-                video.is_active = True
-                ar_content.active_video_id = video.id
+            # If this is the first video, mark it as active.
+            # Re-check active_video_id after flush to avoid race conditions.
+            if check_first_video and len(created_videos) == 0:
+                await db.refresh(ar_content)
+                if ar_content.active_video_id is None:
+                    video.is_active = True
+                    ar_content.active_video_id = video.id
 
             await db.commit()
             await db.refresh(video)

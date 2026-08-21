@@ -13,6 +13,9 @@ from typing import Optional, Dict, Any
 import structlog
 
 from app.core.config import settings
+from app.core.database import AsyncSessionLocal
+from app.models.storage import StorageConnection
+from sqlalchemy import select
 
 logger = structlog.get_logger()
 
@@ -269,8 +272,9 @@ async def get_provider_for_company(company) -> StorageProvider:
     Resolve the correct storage provider for a given company.
 
     For companies with ``storage_provider == 'yandex_disk'`` and a valid token,
-    returns a :class:`YandexDiskStorageProvider`.  Otherwise falls back to
-    the default local provider.
+    returns a :class:`YandexDiskStorageProvider`.  Falls back to the default
+    local provider, or to an active Yandex Disk storage connection when the
+    company token is missing.
 
     Args:
         company: A :class:`Company` SQLAlchemy model instance.
@@ -288,12 +292,41 @@ async def get_provider_for_company(company) -> StorageProvider:
         creds = token_encryption.decrypt_credentials(company.yandex_disk_token)
         oauth_token = creds.get("access_token", "")
         if oauth_token:
-            # Use company slug as the root folder on Yandex Disk
             folder_name = getattr(company, "slug", None) or getattr(company, "name", "VertexAR")
             return YandexDiskStorageProvider(oauth_token=oauth_token, base_prefix=folder_name)
         logger.warning(
             "yd_token_missing_after_decrypt",
             company_id=company.id,
         )
+
+    if getattr(company, "storage_provider", "local") == "yandex_disk":
+        from app.utils.token_encryption import token_encryption
+        from app.core.yandex_disk_provider import YandexDiskStorageProvider
+
+        async with AsyncSessionLocal() as session:
+            stmt = (
+                select(StorageConnection)
+                .where(StorageConnection.provider == "yandex_disk")
+                .where(StorageConnection.is_active == True)
+                .limit(1)
+            )
+            result = await session.execute(stmt)
+            conn = result.scalar_one_or_none()
+            if conn:
+                storage_metadata = getattr(conn, "storage_metadata", None) or {}
+                raw_credentials = storage_metadata.get("credentials")
+                if isinstance(raw_credentials, str):
+                    try:
+                        creds = token_encryption.decrypt_credentials(raw_credentials)
+                        oauth_token = creds.get("access_token", "")
+                        if oauth_token:
+                            folder_name = getattr(company, "slug", None) or getattr(company, "name", "VertexAR")
+                            return YandexDiskStorageProvider(oauth_token=oauth_token, base_prefix=folder_name)
+                    except Exception as exc:
+                        logger.warning(
+                            "yd_storage_connection_decrypt_failed",
+                            connection_id=conn.id,
+                            error=str(exc),
+                        )
 
     return get_storage_provider()

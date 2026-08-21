@@ -1,0 +1,3 @@
+{"timestamp": "2026-08-21T15:12:19.704017", "severity": "critical", "title": "API down", "message": "Viewer API is unavailable", "metrics": {"cpu_percent": 90}, "affected_services": ["viewer"]}
+{"timestamp": "2026-08-21T15:12:46.885856", "severity": "critical", "title": "API down", "message": "Viewer API is unavailable", "metrics": {"cpu_percent": 90}, "affected_services": ["viewer"]}
+{"timestamp": "2026-08-21T15:57:53.369336", "severity": "critical", "title": "API down", "message": "Viewer API is unavailable", "metrics": {"cpu_percent": 90}, "affected_services": ["viewer"]}
