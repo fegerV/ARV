@@ -15,7 +15,7 @@ import aiofiles
 import re
 
 from app.core.config import settings
-from app.core.storage import get_storage_provider_instance
+from app.core.storage_providers import get_storage_provider
 from app.utils.slug_utils import generate_slug
 
 if TYPE_CHECKING:
@@ -163,7 +163,7 @@ def build_public_url(
     Returns:
         Public URL for accessing the file.
     """
-    storage_provider = provider or get_storage_provider_instance()
+    storage_provider = provider or get_storage_provider()
 
     # Convert absolute path to relative path
     base_path = Path(settings.STORAGE_BASE_PATH)

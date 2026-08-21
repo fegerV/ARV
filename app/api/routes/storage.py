@@ -9,7 +9,7 @@ from datetime import datetime, UTC
 import httpx
 
 from app.core.database import get_db
-from app.core.storage import get_storage_provider_instance
+from app.core.storage_providers import get_storage_provider
 from app.core.storage_providers import get_provider_for_company
 from app.models.storage import StorageConnection
 from app.models.company import Company
@@ -127,7 +127,7 @@ async def get_storage_stats(
         raise HTTPException(status_code=404, detail="Connection not found")
     
     # Use the storage provider to get stats
-    storage_provider = get_storage_provider_instance()
+    storage_provider = get_storage_provider()
     stats = await storage_provider.get_usage_stats(path)
     
     return StorageUsageStats(**stats)

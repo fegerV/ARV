@@ -50,7 +50,7 @@ async def get_companies_list(db: AsyncSession = Depends(get_db), current_user: U
 
 async def get_company_detail(company_id: int, db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_active_user)) -> Dict[str, Any]:
     """Get company detail from real services."""
-    from app.schemas.company import Company as CompanySchema
+    from app.schemas.company_api import CompanyDetail as CompanySchema
     company = await get_company(company_id, db)
     return CompanySchema.model_validate(company).dict()
 
