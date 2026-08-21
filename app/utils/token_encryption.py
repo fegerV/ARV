@@ -38,7 +38,7 @@ class TokenEncryption:
         This avoids a hardcoded constant while keeping the salt stable
         across restarts so existing encrypted values stay decryptable.
         """
-        return hashlib.sha256(b"vertex_ar_oauth_salt").digest()[:16]
+        return hashlib.sha256(settings.SECRET_KEY.encode()).digest()[:16]
 
     def encrypt_credentials(self, credentials: Dict[str, Any]) -> str:
         if self._cipher is None:

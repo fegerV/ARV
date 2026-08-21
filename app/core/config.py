@@ -29,16 +29,6 @@ class Settings(BaseSettings):
     # Project info
     PROJECT_NAME: str = "V-Portal Backend"
     VERSION: str = "2.0.0"
-    API_V1_PREFIX: str = "/api"
-    
-    # Mind AR
-    MINDAR_MAX_FEATURES: int = 1000
-    
-    # Allowed origins (optional, alongside CORS_ORIGINS)
-    ALLOWED_ORIGINS: list[str] = [
-        "http://localhost:8000",
-        "https://localhost:8000",
-    ]
     
     # Database
     DATABASE_URL: str = Field(
@@ -64,7 +54,6 @@ class Settings(BaseSettings):
             "http://localhost:8000",
         ]
     )
-    CORS_ALLOW_CREDENTIALS: bool = True
 
     PUBLIC_URL: str = Field(default="http://localhost:8000")
 
@@ -116,12 +105,8 @@ class Settings(BaseSettings):
     ADMIN_DEFAULT_PASSWORD: str
     ADMIN_FRONTEND_URL: str = "http://localhost:3000"
     
-    # Background tasks configuration
-    MAX_BACKGROUND_WORKERS: int = 4
-    
     # Monitoring
     SENTRY_DSN: str = ""
-    PROMETHEUS_MULTIPROC_DIR: str = "/tmp/prometheus_multiproc"
 
     # Admin: просмотр логов (страница /admin/logs)
     # LOG_FILE — путь к файлу логов (если задан и файл есть, читаем из него)
@@ -143,13 +128,6 @@ class Settings(BaseSettings):
     # Yandex OAuth (for Yandex Disk storage)
     YANDEX_OAUTH_CLIENT_ID: str = ""
     YANDEX_OAUTH_CLIENT_SECRET: str = ""
-
-    # Backup
-    BACKUP_S3_ENDPOINT: str = ""
-    BACKUP_S3_ACCESS_KEY: str = ""
-    BACKUP_S3_SECRET_KEY: str = ""
-    BACKUP_S3_BUCKET: str = "vertex-ar-backups"
-    BACKUP_RETENTION_DAYS: int = 30
 
     @field_validator("CORS_ORIGINS", mode="before")
     @classmethod
