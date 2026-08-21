@@ -9,9 +9,10 @@ from typing import Sequence, Union
 from alembic import op
 import sqlalchemy as sa
 from sqlalchemy.sql import func
-import hashlib
 import os
 from datetime import datetime
+
+from app.core.security import get_password_hash
 
 
 # revision identifiers, used by Alembic.
@@ -37,8 +38,8 @@ def upgrade() -> None:
         if not admin_password:
             raise RuntimeError("ADMIN_DEFAULT_PASSWORD environment variable must be set to run migrations")
         
-        # Hash password using SHA-256 (consistent with existing security implementation)
-        admin_password_hash = hashlib.sha256(admin_password.encode()).hexdigest()
+        # Hash password using the current application password hasher
+        admin_password_hash = get_password_hash(admin_password)
         
         # Insert admin user
         connection.execute(

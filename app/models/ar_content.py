@@ -100,6 +100,10 @@ class ARContent(Base):
         Index('ix_ar_content_active_video_id', 'active_video_id'),
         CheckConstraint('duration_years >= 1', name='check_duration_years'),
         CheckConstraint('views_count >= 0', name='check_views_count_non_negative'),
+        CheckConstraint(
+            "active_video_id IS NULL OR EXISTS (SELECT 1 FROM videos WHERE videos.id = ar_content.active_video_id AND videos.ar_content_id = ar_content.id)",
+            name='ck_ar_content_active_video_belongs_to_content',
+        ),
     )
     
     # Relationships
