@@ -291,6 +291,8 @@ async def test_telegram_from_settings(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
 ):
+    if not getattr(current_user, 'is_super_admin', False):
+        raise HTTPException(status_code=403, detail="Only super admins can test Telegram notifications")
     """Send a test Telegram message using bot token and chat ID from DB settings.
     Always returns 200 with status/detail so the UI can show the result without 502."""
     from app.services.settings_service import SettingsService
@@ -366,6 +368,9 @@ async def test_email_from_settings(
 
     if not host or not from_email or not recipient:
         return {"status": "error", "detail": "Заполните SMTP-сервер, email отправителя и email пользователя"}
+
+    if not getattr(current_user, 'is_super_admin', False):
+        raise HTTPException(status_code=403, detail="Only super admins can test email notifications")
 
     msg = MIMEMultipart()
     msg["Subject"] = "V-Portal: test email"

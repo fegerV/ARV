@@ -8,6 +8,8 @@ from typing import Dict, Any, Optional
 import structlog
 from fastapi import UploadFile, HTTPException
 
+from app.core.config import settings
+
 logger = structlog.get_logger()
 
 # Allowed video MIME types and extensions
@@ -31,12 +33,12 @@ ALLOWED_VIDEO_EXTENSIONS = {
     ".wmv",
 }
 
-MAX_VIDEO_SIZE = 500 * 1024 * 1024  # 500MB
+MAX_VIDEO_SIZE = settings.MAX_FILE_SIZE_VIDEO
 
 
 def validate_video_file(upload_file: UploadFile) -> None:
     """
-    Validate uploaded video file MIME type and extension.
+    Validate uploaded video file MIME type, extension, and size.
     
     Args:
         upload_file: The uploaded file to validate
@@ -44,6 +46,12 @@ def validate_video_file(upload_file: UploadFile) -> None:
     Raises:
         HTTPException: If validation fails
     """
+    if upload_file.size is not None and upload_file.size > MAX_VIDEO_SIZE:
+        raise HTTPException(
+            status_code=413,
+            detail=f"Video file too large. Maximum size: {MAX_VIDEO_SIZE // (1024*1024)}MB",
+        )
+
     # Check MIME type
     if upload_file.content_type and upload_file.content_type not in ALLOWED_VIDEO_MIME_TYPES:
         raise HTTPException(

@@ -125,6 +125,10 @@ async def get_storage_stats(
     conn = await db.get(StorageConnection, connection_id)
     if not conn:
         raise HTTPException(status_code=404, detail="Connection not found")
+
+    if not getattr(current_user, 'is_super_admin', False):
+        if not ((conn.created_by == current_user.id) or conn.is_default):
+            raise HTTPException(status_code=403, detail="Access denied to this connection")
     
     # Use the storage provider to get stats
     storage_provider = get_storage_provider()

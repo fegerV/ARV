@@ -192,7 +192,7 @@ async def test_test_telegram_from_settings_requires_tokens(monkeypatch):
 
     result = await notifications.test_telegram_from_settings(
         db=_FakeDb(),
-        current_user=SimpleNamespace(),
+        current_user=SimpleNamespace(is_super_admin=True),
         telegram_bot_token="",
         telegram_admin_chat_id="",
     )
@@ -244,7 +244,7 @@ async def test_test_telegram_from_settings_reports_telegram_error(monkeypatch):
 
     result = await notifications.test_telegram_from_settings(
         db=_FakeDb(),
-        current_user=SimpleNamespace(),
+        current_user=SimpleNamespace(is_super_admin=True),
         telegram_bot_token="",
         telegram_admin_chat_id="",
     )
@@ -293,7 +293,7 @@ async def test_test_telegram_from_settings_prefers_current_form_values(monkeypat
 
     result = await notifications.test_telegram_from_settings(
         db=_FakeDb(),
-        current_user=SimpleNamespace(),
+        current_user=SimpleNamespace(is_super_admin=True),
         telegram_bot_token="form-token",
         telegram_admin_chat_id="form-chat",
     )
@@ -356,7 +356,7 @@ async def test_test_email_from_settings_uses_form_values(monkeypatch):
         smtp_password="secret",
         smtp_from_email="noreply@example.com",
         db=_FakeDb(),
-        current_user=SimpleNamespace(email="admin@example.com"),
+        current_user=SimpleNamespace(is_super_admin=True, email="admin@example.com"),
     )
 
     assert result["status"] == "ok"
