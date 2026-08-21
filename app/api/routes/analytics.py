@@ -1,11 +1,16 @@
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 from typing import Optional
-import uuid
+import os
+import shutil
 import structlog
+import time
+import uuid
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, distinct, text
 
+from app.core.config import settings
 from app.core.database import get_db
 from app.models.ar_view_session import ARViewSession
 from app.models.ar_content import ARContent
@@ -21,6 +26,26 @@ router = APIRouter()
 def _utcnow_naive() -> datetime:
     """Return UTC now as naive datetime for DB comparisons."""
     return datetime.now(timezone.utc).replace(tzinfo=None)
+
+
+def compute_storage_used_gb() -> float:
+    try:
+        base_path = Path(settings.STORAGE_BASE_PATH)
+        if not base_path.exists() or not base_path.is_dir():
+            return 0.0
+        usage = shutil.disk_usage(base_path)
+        return round(usage.used / (1024 ** 3), 2)
+    except Exception:
+        return 0.0
+
+
+def compute_uptime() -> float | None:
+    try:
+        import psutil
+        boot_time = time.time() - psutil.boot_time()
+        return round(boot_time / 3600, 1)
+    except Exception:
+        return None
 
 
 @router.get("/overview")
@@ -66,16 +91,15 @@ async def analytics_overview(
     active_projects = await db.execute(active_projects_stmt)
     active_projects_count = active_projects.scalar() or 0
     
-    # Placeholder values for revenue and uptime
-    revenue = "$0.00"
-    uptime = "99.9%"
+    storage_used_gb = compute_storage_used_gb()
+    revenue = 0.0
+    uptime = compute_uptime()
     
-    # Storage used is placeholder; can be computed per company later
     return {
         "total_views": total_views_count,
         "unique_sessions": unique_sessions_count,
         "active_content": active_content_count,
-        "storage_used_gb": 0,
+        "storage_used_gb": storage_used_gb,
         "active_companies": active_companies_count,
         "active_projects": active_projects_count,
         "revenue": revenue,

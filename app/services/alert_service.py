@@ -1,7 +1,9 @@
+import json
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
+from pathlib import Path
 from typing import List
 
 import httpx
@@ -12,6 +14,12 @@ from app.core.config import settings
 from app.services.email_transport import send_smtp_message
 
 logger = structlog.get_logger()
+
+_ALERT_QUEUE_PATH = Path("data/alerts/queue.jsonl")
+
+
+def _ensure_alert_queue_dir() -> None:
+    _ALERT_QUEUE_PATH.parent.mkdir(parents=True, exist_ok=True)
 
 
 def _utcnow_naive() -> datetime:
@@ -67,8 +75,24 @@ def _telegram_alerts_enabled(notification_settings, alerts: List[Alert]) -> bool
 
 
 async def publish_alerts(alerts: List[Alert]) -> None:
-    # Redis removed: no-op (keep API stable)
-    return None
+    if not alerts:
+        return
+    _ensure_alert_queue_dir()
+    try:
+        with open(_ALERT_QUEUE_PATH, "a", encoding="utf-8") as f:
+            for alert in alerts:
+                payload = {
+                    "timestamp": _utcnow_naive().isoformat(),
+                    "severity": alert.severity,
+                    "title": alert.title,
+                    "message": alert.message,
+                    "metrics": alert.metrics,
+                    "affected_services": alert.affected_services,
+                }
+                f.write(json.dumps(payload, ensure_ascii=False) + "\n")
+        logger.info("alerts_published_to_queue", count=len(alerts), path=str(_ALERT_QUEUE_PATH))
+    except Exception as exc:
+        logger.error("alert_queue_write_failed", error=str(exc), exc_info=True)
 
 
 ALERT_COOLDOWN_SECONDS = {

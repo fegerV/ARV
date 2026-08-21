@@ -22,7 +22,6 @@ from app.models.ar_content import ARContent
 from app.utils.ar_content import build_public_url
 from app.html.deps import get_html_db
 from app.api.routes.auth import get_current_user_optional
-from app.html.mock import MOCK_AR_CONTENT, AR_CONTENT_DETAIL_MOCK_DATA, PROJECT_CREATE_MOCK_DATA
 from app.html.templating import templates
 from app.html.utils import require_active_user, serialize_datetime, serialize_nested
 from app.html.filters import storage_url
@@ -451,15 +450,8 @@ async def ar_content_list(
         total_count = total
         # total_pages already calculated above
     except Exception as exc:
-        if not settings.DEBUG:
-            logger.exception("ar_content_list_failed", error=str(exc))
-            raise
-        # fallback to mock data
-        ar_content_list = MOCK_AR_CONTENT
-        unique_companies = PROJECT_CREATE_MOCK_DATA["companies"]
-        unique_statuses = ["ready", "processing", "pending", "failed"]
-        total_count = len(ar_content_list)
-        total_pages = 1
+        logger.exception("ar_content_list_failed", error=str(exc))
+        raise
     
     context = {
         "request": request,
@@ -489,18 +481,13 @@ async def ar_content_create(
         return redirect
     try:
         companies, projects = await _load_ar_form_reference_data(db, current_user)
-        if settings.DEBUG and not companies:
-            data = PROJECT_CREATE_MOCK_DATA
-        else:
-            data = {
-                "companies": companies,
-                "projects": projects,
-            }
+        data = {
+            "companies": companies,
+            "projects": projects,
+        }
     except Exception as exc:
-        if not settings.DEBUG:
-            logger.exception("ar_content_create_data_failed", error=str(exc))
-            raise
-        data = PROJECT_CREATE_MOCK_DATA
+        logger.exception("ar_content_create_data_failed", error=str(exc))
+        raise
 
     context = _build_ar_form_context(
         request,
@@ -539,13 +526,8 @@ async def ar_content_edit(
         # Get companies and projects
         companies, projects = await _load_ar_form_reference_data(db, current_user)
     except Exception as exc:
-        if not settings.DEBUG:
-            logger.exception("ar_content_edit_data_failed", error=str(exc))
-            raise
-        # fallback to mock data
-        ar_content = serialize_nested({**AR_CONTENT_DETAIL_MOCK_DATA, "id": ar_content_id})
-        companies = PROJECT_CREATE_MOCK_DATA["companies"]
-        projects = PROJECT_CREATE_MOCK_DATA["projects"]
+        logger.exception("ar_content_edit_data_failed", error=str(exc))
+        raise
 
     # Resolve yadisk:// URLs for the edit form
     _resolve_yadisk_urls(ar_content, company_id=ar_content.get("company_id"))
@@ -949,80 +931,8 @@ async def ar_content_detail(
         }
         
     except Exception as exc:
-        if not settings.DEBUG:
-            logger.exception("ar_content_detail_failed", error=str(exc))
-            raise
-        # fallback to mock data
-        ar_content = {**AR_CONTENT_DETAIL_MOCK_DATA, "id": ar_content_id}
-        debug_info = None
-        if settings.DEBUG:
-            debug_info = {
-                "storage_path": ar_content.get("storage_path"),
-                "photo_path": ar_content.get("photo_path"),
-                "video_path": ar_content.get("video_path"),
-                "qr_code_path": ar_content.get("qr_code_path"),
-                "thumbnail_url": ar_content.get("thumbnail_url"),
-                "marker_path": ar_content.get("marker_path"),
-                "marker_url": ar_content.get("marker_url"),
-                "marker_status": ar_content.get("marker_status"),
-            }
-        videos, active_video_info = [], None
-        rotation_schedule_js = None  # Ensure it's set even in fallback
-        from app.services.marker_service import marker_service
-        marker_metadata = ar_content.get("marker_metadata") or {}
-        iq_fb = marker_metadata.get("image_quality") or {}
-        rec_prob_fb = iq_fb.get("recognition_probability")
-        marker_metrics = {
-            "file_size_kb": marker_metadata.get("file_size_kb"),
-            "file_size_bytes": marker_metadata.get("file_size_bytes"),
-            "generation_time_seconds": marker_metadata.get("generation_time_seconds"),
-            "features_count": marker_metadata.get("features_count"),
-            "features_density": marker_metadata.get("features_density"),
-            "width": marker_metadata.get("width"),
-            "height": marker_metadata.get("height"),
-            "image_quality": iq_fb,
-            "quality_level": marker_service.get_quality_level(rec_prob_fb),
-            "recommendations": marker_service.build_image_recommendations(iq_fb) if iq_fb else [],
-            "is_valid": marker_metadata.get("is_valid", None),
-            "validation_warnings": marker_metadata.get("validation_warnings", []),
-        }
-        # Ensure unique_link and public_url are always set (fallback)
-        uid = ar_content.get("unique_id") or ""
-        unique_link = ar_content.get("unique_link") or (f"/view/{uid}" if uid else "")
-        public_url = ar_content.get("public_url")
-        if not public_url and uid:
-            base = (settings.PUBLIC_URL or "").rstrip("/")
-            public_url = f"{base}/view/{uid}" if base else f"/view/{uid}"
-        
-        # Create a simplified version for JavaScript serialization from mock data
-        ar_content_js = {
-            'id': ar_content.get('id'),
-            "company_id": ar_content.get("company_id"),
-            "project_id": ar_content.get("project_id"),
-            'order_number': ar_content.get('order_number'),
-            'unique_id': uid,
-            'customer_name': ar_content.get('customer_name'),
-            'customer_phone': ar_content.get('customer_phone'),
-            'customer_email': ar_content.get('customer_email'),
-            'duration_years': ar_content.get('duration_years'),
-            'status': ar_content.get('status'),
-            'photo_url': ar_content.get('photo_url'),
-            'video_url': ar_content.get('video_url'),
-            'thumbnail_url': ar_content.get('thumbnail_url'),
-            'qr_code_url': ar_content.get('qr_code_url'),
-            'marker_url': ar_content.get('marker_url'),
-            'marker_status': ar_content.get('marker_status'),
-            "marker_metadata": marker_metadata,
-            'public_url': public_url,
-            'unique_link': unique_link,
-            'company_name': ar_content.get('company_name'),
-            'project_name': ar_content.get('project_name'),
-            'views_count': ar_content.get('views_count'),
-            'views_30_days': ar_content.get('views_30_days'),
-            'active_video_title': ar_content.get('active_video_title'),
-            'created_at': ar_content.get('created_at').isoformat() if ar_content.get('created_at') and hasattr(ar_content.get('created_at'), 'isoformat') else ar_content.get('created_at'),
-            'updated_at': ar_content.get('updated_at').isoformat() if ar_content.get('updated_at') and hasattr(ar_content.get('updated_at'), 'isoformat') else ar_content.get('updated_at')
-        }
+        logger.exception("ar_content_detail_failed", error=str(exc))
+        raise
     
     # Resolve yadisk:// URLs in video items
     _cid = ar_content.get("company_id") if isinstance(ar_content, dict) else None

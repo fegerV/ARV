@@ -2,21 +2,18 @@ from sqlalchemy import create_engine, text
 from app.core.config import settings
 from app.core.database import Base
 
-# Импортируем все модели, чтобы они были зарегистрированы в Base.metadata
 from app.models.user import User
 from app.models.company import Company
 from app.models.project import Project
 from app.models.ar_content import ARContent
 from app.models.video import Video
-from app.models.storage import StorageConnection, StorageFolder
-from app.models.folder import Folder
-from app.models.client import Client
+from app.models.storage import StorageConnection
 from app.models.video_schedule import VideoSchedule
 from app.models.video_rotation_schedule import VideoRotationSchedule
 from app.models.ar_view_session import ARViewSession
 from app.models.notification import Notification
-from app.models.email_queue import EmailQueue
-from app.models.audit_log import AuditLog
+from app.models.settings import SystemSettings
+from app.models.backup import BackupHistory
 
 import traceback
 

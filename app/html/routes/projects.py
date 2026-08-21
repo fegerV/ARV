@@ -9,7 +9,6 @@ from app.models.project import Project
 from app.api.routes.projects import get_project
 from app.html.deps import get_html_db
 from app.api.routes.auth import get_current_user_optional
-from app.html.mock import MOCK_PROJECTS, PROJECT_CREATE_MOCK_DATA
 from app.html.templating import templates
 from app.html.utils import require_active_user, serialize_fields
 
@@ -243,11 +242,7 @@ async def project_create(
         companies = await _load_project_form_companies(db, include_project_counts=True)
     except Exception as e:
         logger.error("companies_fetch_error", error=str(e), exc_info=True)
-        try:
-            companies = await _load_project_form_companies(db)
-        except Exception as db_error:
-            logger.error("companies_db_error", error=str(db_error), exc_info=True)
-            companies = PROJECT_CREATE_MOCK_DATA.get("companies", [])
+        raise
     
     # Ensure companies is a list
     if not isinstance(companies, list):
@@ -278,18 +273,14 @@ async def project_detail(
         project_data = _pydantic_to_dict(project)
         project_data = _convert_enum_to_string(project_data)
     except Exception as e:
-        logger.error("project_detail_error", project_id=project_id, error=str(e))
-        project_data = {**MOCK_PROJECTS[0], "id": project_id}
+        logger.error("project_detail_error", project_id=project_id, error=str(e), exc_info=True)
+        raise
     
     try:
         companies = await _load_project_form_companies(db)
     except Exception as e:
-        logger.error("companies_fetch_error", error=str(e))
-        try:
-            companies = await _load_project_form_companies(db)
-        except Exception as db_error:
-            logger.error("companies_db_error", error=str(db_error))
-            companies = PROJECT_CREATE_MOCK_DATA["companies"]
+        logger.error("companies_fetch_error", error=str(e), exc_info=True)
+        raise
 
     context = _build_project_form_context(
         request,
@@ -316,18 +307,14 @@ async def project_edit(
         project_data = _pydantic_to_dict(project)
         project_data = _convert_enum_to_string(project_data)
     except Exception as e:
-        logger.error("project_edit_error", project_id=project_id, error=str(e))
-        project_data = {**MOCK_PROJECTS[0], "id": project_id}
+        logger.error("project_edit_error", project_id=project_id, error=str(e), exc_info=True)
+        raise
     
     try:
         companies = await _load_project_form_companies(db)
     except Exception as e:
-        logger.error("companies_fetch_error", error=str(e))
-        try:
-            companies = await _load_project_form_companies(db)
-        except Exception as db_error:
-            logger.error("companies_db_error", error=str(db_error))
-            companies = PROJECT_CREATE_MOCK_DATA["companies"]
+        logger.error("companies_fetch_error", error=str(e), exc_info=True)
+        raise
 
     context = _build_project_form_context(
         request,
@@ -357,8 +344,9 @@ async def project_create_post(
     if not name or not company_id:
         try:
             companies = await _load_project_form_companies(db)
-        except Exception:
-            companies = PROJECT_CREATE_MOCK_DATA["companies"]
+        except Exception as e:
+            logger.error("companies_fetch_error", error=str(e), exc_info=True)
+            raise
 
         context = _build_project_form_context(
             request,
@@ -407,8 +395,9 @@ async def project_create_post(
         logger.error("project_create_error", error=str(e), exc_info=True)
         try:
             companies = await _load_project_form_companies(db)
-        except Exception:
-            companies = PROJECT_CREATE_MOCK_DATA["companies"]
+        except Exception as db_error:
+            logger.error("companies_fetch_error", error=str(db_error), exc_info=True)
+            raise
 
         context = _build_project_form_context(
             request,
@@ -440,8 +429,9 @@ async def project_update_post(
     if not name or not company_id:
         try:
             companies = await _load_project_form_companies(db)
-        except Exception:
-            companies = PROJECT_CREATE_MOCK_DATA["companies"]
+        except Exception as e:
+            logger.error("companies_fetch_error", error=str(e), exc_info=True)
+            raise
 
         context = _build_project_form_context(
             request,
@@ -485,8 +475,9 @@ async def project_update_post(
         logger.error("project_update_error", project_id=project_id, error=str(e), exc_info=True)
         try:
             companies = await _load_project_form_companies(db)
-        except Exception:
-            companies = PROJECT_CREATE_MOCK_DATA["companies"]
+        except Exception as db_error:
+            logger.error("companies_fetch_error", error=str(db_error), exc_info=True)
+            raise
 
         context = _build_project_form_context(
             request,

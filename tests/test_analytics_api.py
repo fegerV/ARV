@@ -16,8 +16,11 @@ def _mock_user():
 
 
 @pytest.mark.asyncio
-async def test_analytics_overview_uses_distinct_fallback_when_needed():
+async def test_analytics_overview_uses_distinct_fallback_when_needed(monkeypatch):
     from app.api.routes import analytics
+
+    monkeypatch.setattr(analytics, "compute_storage_used_gb", lambda: 1.5)
+    monkeypatch.setattr(analytics, "compute_uptime", lambda: 720.5)
 
     db = _FakeDb(
         execute_results=[
@@ -36,11 +39,11 @@ async def test_analytics_overview_uses_distinct_fallback_when_needed():
         "total_views": 120,
         "unique_sessions": 45,
         "active_content": 7,
-        "storage_used_gb": 0,
+        "storage_used_gb": 1.5,
         "active_companies": 3,
         "active_projects": 11,
-        "revenue": "$0.00",
-        "uptime": "99.9%",
+        "revenue": 0.0,
+        "uptime": 720.5,
     }
 
 

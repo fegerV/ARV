@@ -6,7 +6,6 @@ from app.models.company import Company
 from app.api.routes.companies import list_companies, get_company
 from app.html.deps import get_html_db
 from app.api.routes.auth import get_current_user_optional
-from app.html.mock import MOCK_COMPANIES
 from app.html.templating import templates
 from app.html.utils import require_active_user, serialize_fields
 
@@ -174,7 +173,8 @@ async def company_detail(
             company_data["storage_provider"] = company_obj.storage_provider or "local"
             company_data["yandex_connected"] = bool(company_obj.yandex_disk_token)
     except Exception:
-        company_data = {**MOCK_COMPANIES[0], "id": company_id}
+        logger.error("company_detail_error", company_id=company_id, exc_info=True)
+        raise
 
     context = _build_company_form_context(
         request,
@@ -211,7 +211,8 @@ async def company_edit(
     except HTTPException:
         raise
     except Exception:
-        company_data = {**MOCK_COMPANIES[0], "id": company_id}
+        logger.error("company_edit_error", company_id=company_id, exc_info=True)
+        raise
 
     context = _build_company_form_context(
         request,

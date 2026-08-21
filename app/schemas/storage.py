@@ -32,25 +32,6 @@ class StorageConnection(StorageConnectionBase):
     created_at: datetime
     updated_at: datetime
 
-# ============ Storage Folders ============
-
-class StorageFolderCreate(BaseModel):
-    company_id: int
-    name: str
-    folder_type: Literal["ar_content", "videos", "markers", "thumbnails", "qr-codes"]
-
-class StorageFolderResponse(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-
-    id: int
-    company_id: int
-    name: str
-    path: str
-    folder_type: str
-    files_count: int
-    total_size_bytes: int
-    created_at: datetime
-
 # ============ Company Storage Settings ============
 
 class CompanyStorageSettings(BaseModel):

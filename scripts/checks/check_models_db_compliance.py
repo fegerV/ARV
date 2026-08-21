@@ -14,9 +14,9 @@ from sqlalchemy import inspect, create_engine
 import asyncio
 from app.core.config import settings
 from app.models import (
-    User, Company, Project, Folder, Client, Video, VideoSchedule,
+    User, Company, Project, Video, VideoSchedule,
     ARContent, VideoRotationSchedule, ARViewSession, Notification,
-    EmailQueue, AuditLog, SystemSettings, StorageConnection, StorageFolder
+    SystemSettings, StorageConnection
 )
 
 # Список всех моделей для проверки
@@ -24,19 +24,14 @@ MODELS = [
     ("users", User),
     ("companies", Company),
     ("projects", Project),
-    ("folders", Folder),
-    ("clients", Client),
     ("videos", Video),
     ("video_schedules", VideoSchedule),
     ("ar_content", ARContent),
     ("video_rotation_schedules", VideoRotationSchedule),
     ("ar_view_sessions", ARViewSession),
     ("notifications", Notification),
-    ("email_queue", EmailQueue),
-    ("audit_log", AuditLog),
     ("system_settings", SystemSettings),
     ("storage_connections", StorageConnection),
-    ("storage_folders", StorageFolder),
 ]
 
 

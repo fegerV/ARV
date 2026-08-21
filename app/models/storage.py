@@ -32,24 +32,3 @@ class StorageConnection(Base):
     created_at = Column(DateTime, default=_utcnow, nullable=False)
     updated_at = Column(DateTime, default=_utcnow, onupdate=_utcnow, nullable=False)
     created_by = Column(Integer, nullable=True)
-
-
-class StorageFolder(Base):
-    __tablename__ = "storage_folders"
-
-    __table_args__ = (
-        Index("ix_storage_folders_company_id", "company_id"),
-    )
-
-    id = Column(Integer, primary_key=True)
-    company_id = Column(Integer, ForeignKey("companies.id"), nullable=True)
-
-    name = Column(String(255), nullable=False)
-    path = Column(String(500), nullable=False)
-    folder_type = Column(String(50))
-
-    files_count = Column(Integer, default=0, nullable=False)
-    total_size_bytes = Column(BigInteger, default=0, nullable=False)
-
-    created_at = Column(DateTime, default=_utcnow, nullable=False)
-    updated_at = Column(DateTime, default=_utcnow, onupdate=_utcnow, nullable=False)
