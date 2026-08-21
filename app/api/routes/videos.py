@@ -24,7 +24,8 @@ from app.utils.video_utils import (
     validate_video_file, 
     get_video_metadata, 
     save_uploaded_video,
-    generate_video_filename
+    generate_video_filename,
+    transcode_video,
 )
 from app.services.thumbnail_service import ThumbnailService
 from app.enums import VideoStatus
@@ -335,6 +336,17 @@ async def upload_videos(
 
             # Always save locally first — ffprobe needs a local file
             await save_uploaded_video(upload_file, local_video_path)
+
+            # Transcode to standardized H.264/AAC MP4 for consistent playback
+            transcoded_path = videos_storage_path / f"transcoded_{video.id}.mp4"
+            try:
+                await transcode_video(str(local_video_path), str(transcoded_path))
+                if transcoded_path.exists():
+                    os.replace(transcoded_path, local_video_path)
+            except Exception as exc:
+                log.warning("video_transcode_skipped", video_id=video.id, error=str(exc))
+                if transcoded_path.exists():
+                    os.remove(transcoded_path)
 
             # Extract metadata from the local file
             metadata = await get_video_metadata(str(local_video_path))

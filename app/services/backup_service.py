@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import asyncio
 import gzip
+import hashlib
 import os
 import tempfile
 from datetime import datetime, timedelta, UTC
@@ -103,6 +104,7 @@ class BackupService:
             gz_path = tmp_path + ".gz"
             await asyncio.to_thread(self._gzip_file, tmp_path, gz_path)
             gz_size = os.path.getsize(gz_path)
+            checksum = await asyncio.to_thread(self._sha256_file, gz_path)
 
             # 3. Upload to Yandex Disk
             timestamp = _utcnow_naive().strftime("%Y%m%d_%H%M%S")
@@ -124,6 +126,7 @@ class BackupService:
                 rec.finished_at = _utcnow_naive()
                 rec.status = "success"
                 rec.size_bytes = gz_size
+                rec.checksum = checksum
                 rec.yd_path = yd_remote_path
                 await session.commit()
 
@@ -221,6 +224,33 @@ class BackupService:
         await session.commit()
         return True
 
+    async def verify_backup_integrity(self, backup_id: int) -> bool:
+        """Verify backup file checksum matches stored checksum.
+
+        Returns True if checksum matches or no checksum is stored.
+        Returns False if checksum mismatch or download fails.
+        """
+        async with AsyncSessionLocal() as session:
+            record = await session.get(BackupHistory, backup_id)
+            if not record or not record.checksum or not record.yd_path or not record.company_id:
+                return False
+
+            provider = await self._get_yd_provider(record.company_id)
+            if not provider:
+                return False
+
+            try:
+                with tempfile.NamedTemporaryFile(delete=False, suffix=".sql.gz") as tmp:
+                    await provider.save_file(record.yd_path, tmp.name)
+                    tmp_path = tmp.name
+
+                computed = self._sha256_file(tmp_path)
+                os.remove(tmp_path)
+                return computed == record.checksum
+            except Exception as exc:
+                logger.error("backup_verify_failed", backup_id=backup_id, error=str(exc))
+                return False
+
     # ------------------------------------------------------------------
     # Internal helpers
     # ------------------------------------------------------------------
@@ -291,6 +321,15 @@ class BackupService:
         with open(src, "rb") as f_in, gzip.open(dst, "wb", compresslevel=6) as f_out:
             while chunk := f_in.read(1024 * 1024):
                 f_out.write(chunk)
+
+    @staticmethod
+    def _sha256_file(path: str) -> str:
+        """Return SHA-256 hex digest of *path*."""
+        h = hashlib.sha256()
+        with open(path, "rb") as f:
+            for chunk in iter(lambda: f.read(1024 * 1024), b""):
+                h.update(chunk)
+        return h.hexdigest()
 
     @staticmethod
     async def _get_yd_provider(

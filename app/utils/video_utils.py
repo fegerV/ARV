@@ -291,3 +291,55 @@ def generate_video_filename(original_filename: str, video_id: Optional[int] = No
         base_name = original_path.stem.replace(" ", "_").replace("-", "_")
     
     return f"{base_name}{extension}"
+
+
+async def transcode_video(input_path: str, output_path: str) -> None:
+    """Transcode video to standardized H.264/AAC MP4 for AR playback.
+
+    Uses ffmpeg to ensure consistent playback across devices.
+    Skips transcoding if ffmpeg is not available.
+    """
+    import shutil
+    ffmpeg_bin = shutil.which("ffmpeg")
+    if not ffmpeg_bin:
+        logger.warning("ffmpeg_not_found", input_path=input_path)
+        return
+
+    cmd = [
+        ffmpeg_bin,
+        "-y",
+        "-i", input_path,
+        "-c:v", "libx264",
+        "-preset", "fast",
+        "-crf", "23",
+        "-c:a", "aac",
+        "-b:a", "128k",
+        "-movflags", "+faststart",
+        "-vf", "scale='min(1920,iw)':'min(1080,ih)':force_original_aspect_ratio=decrease",
+        output_path,
+    ]
+
+    try:
+        process = await asyncio.create_subprocess_exec(
+            *cmd,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        _, stderr = await asyncio.wait_for(
+            process.communicate(),
+            timeout=300,
+        )
+        if process.returncode != 0:
+            logger.error("video_transcode_failed", error=stderr.decode(errors="replace"), input_path=input_path)
+            if os.path.exists(output_path):
+                os.remove(output_path)
+            raise RuntimeError(f"ffmpeg failed: {stderr.decode(errors='replace')}")
+        logger.info("video_transcode_completed", input_path=input_path, output_path=output_path)
+    except asyncio.TimeoutError:
+        process.kill()
+        await process.wait()
+        if os.path.exists(output_path):
+            os.remove(output_path)
+        raise RuntimeError("ffmpeg timed out after 300s")
+    except FileNotFoundError:
+        logger.warning("ffmpeg_not_found", input_path=input_path)

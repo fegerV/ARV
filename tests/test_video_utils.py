@@ -138,6 +138,7 @@ class _UploadFile:
         self.filename = filename
         self.content_type = content_type
         self._chunks = list(chunks)
+        self.size = sum(len(c) for c in chunks)
 
     async def read(self, _size=-1):
         if self._chunks:

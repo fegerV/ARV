@@ -26,6 +26,7 @@ class BackupHistory(Base):
     finished_at = Column(DateTime, nullable=True)
     status = Column(String(20), nullable=False, default="running")
     size_bytes = Column(BigInteger, nullable=True)
+    checksum = Column(String(64), nullable=True)
     yd_path = Column(String(500), nullable=True)
     company_id = Column(Integer, ForeignKey("companies.id"), nullable=True)
     error_message = Column(Text, nullable=True)
