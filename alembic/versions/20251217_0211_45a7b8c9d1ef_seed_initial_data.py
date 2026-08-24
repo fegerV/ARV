@@ -10,7 +10,7 @@ from alembic import op
 import sqlalchemy as sa
 from sqlalchemy.sql import func
 import os
-from datetime import datetime
+from datetime import datetime, timezone
 
 from app.core.security import get_password_hash
 
@@ -53,8 +53,8 @@ def upgrade() -> None:
                 "full_name": "Admin User",
                 "role": "admin",
                 "is_active": True,
-                "created_at": datetime.utcnow(),
-                "updated_at": datetime.utcnow(),
+                "created_at": datetime.now(timezone.utc),
+                "updated_at": datetime.now(timezone.utc),
                 "login_attempts": 0
             }
         )
@@ -78,8 +78,8 @@ def upgrade() -> None:
                 "slug": "vertex-ar",
                 "contact_email": "admin@vertex.local",
                 "status": "active",
-                "created_at": datetime.utcnow(),
-                "updated_at": datetime.utcnow()
+                    "created_at": datetime.now(timezone.utc),
+                    "updated_at": datetime.now(timezone.utc)
             }
         )
 

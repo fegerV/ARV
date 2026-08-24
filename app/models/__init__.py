@@ -13,6 +13,7 @@ from .ar_view_session import ARViewSession
 from .notification import Notification
 from .settings import SystemSettings
 from .backup import BackupHistory
+from .alert import Alert
 
 __all__ = [
     "CompanyStatus", "ProjectStatus", "ArContentStatus", "VideoStatus",
@@ -28,4 +29,5 @@ __all__ = [
     "Notification",
     "SystemSettings",
     "BackupHistory",
+    "Alert",
 ]

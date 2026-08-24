@@ -63,14 +63,15 @@ class BackupService:
 
     async def run_backup(
         self,
-        session: AsyncSession,
-        company_id: int,
+        session: Optional[AsyncSession] = None,
+        company_id: int = None,
         yd_folder: str = "backups",
         trigger: str = "manual",
     ) -> BackupHistory:
         """Execute a full backup: dump, compress, upload, record.
 
         Args:
+            session: Optional database session. Created internally if not provided.
             company_id: Company whose Yandex Disk token will be used.
             yd_folder: Target folder on Yandex Disk.
             trigger: ``"manual"`` or ``"scheduled"``.
@@ -81,84 +82,93 @@ class BackupService:
         log = logger.bind(company_id=company_id, trigger=trigger)
         log.info("backup_started")
 
-        record = BackupHistory(
-            started_at=_utcnow_naive(),
-            status="running",
-            company_id=company_id,
-            trigger=trigger,
-        )
-        session.add(record)
-        await session.commit()
-        await session.refresh(record)
-        record_id = record.id
-
-        tmp_path: Optional[str] = None
-        gz_path: Optional[str] = None
-
+        owns_session = False
+        if session is None:
+            owns_session = True
+            session = AsyncSessionLocal()
+        
         try:
-            # 1. pg_dump
-            tmp_path = await self._run_pg_dump()
-            os.path.getsize(tmp_path)  # ensure file exists before gzip
+            record = BackupHistory(
+                started_at=_utcnow_naive(),
+                status="running",
+                company_id=company_id,
+                trigger=trigger,
+            )
+            session.add(record)
+            await session.commit()
+            await session.refresh(record)
+            record_id = record.id
 
-            # 2. gzip
-            gz_path = tmp_path + ".gz"
-            await asyncio.to_thread(self._gzip_file, tmp_path, gz_path)
-            gz_size = os.path.getsize(gz_path)
-            checksum = await asyncio.to_thread(self._sha256_file, gz_path)
+            tmp_path: Optional[str] = None
+            gz_path: Optional[str] = None
 
-            # 3. Upload to Yandex Disk
-            timestamp = _utcnow_naive().strftime("%Y%m%d_%H%M%S")
-            remote_name = f"backup_{timestamp}.sql.gz"
-            yd_remote_path = f"{yd_folder}/{remote_name}"
+            try:
+                # 1. pg_dump
+                tmp_path = await self._run_pg_dump()
+                os.path.getsize(tmp_path)  # ensure file exists before gzip
 
-            provider = await self._get_yd_provider(company_id)
-            if provider is None:
-                raise RuntimeError(
-                    "Yandex Disk provider not available for company_id=%s"
-                    % company_id
+                # 2. gzip
+                gz_path = tmp_path + ".gz"
+                await asyncio.to_thread(self._gzip_file, tmp_path, gz_path)
+                gz_size = os.path.getsize(gz_path)
+                checksum = await asyncio.to_thread(self._sha256_file, gz_path)
+
+                # 3. Upload to Yandex Disk
+                timestamp = _utcnow_naive().strftime("%Y%m%d_%H%M%S")
+                remote_name = f"backup_{timestamp}.sql.gz"
+                yd_remote_path = f"{yd_folder}/{remote_name}"
+
+                provider = await self._get_yd_provider(company_id)
+                if provider is None:
+                    raise RuntimeError(
+                        "Yandex Disk provider not available for company_id=%s"
+                        % company_id
+                    )
+
+                await provider.save_file(gz_path, yd_remote_path)
+
+                # 4. Update record
+                rec = await session.get(BackupHistory, record_id)
+                if rec:
+                    rec.finished_at = _utcnow_naive()
+                    rec.status = "success"
+                    rec.size_bytes = gz_size
+                    rec.checksum = checksum
+                    rec.yd_path = yd_remote_path
+                    await session.commit()
+
+                log.info(
+                    "backup_completed",
+                    size_bytes=gz_size,
+                    yd_path=yd_remote_path,
                 )
 
-            await provider.save_file(gz_path, yd_remote_path)
+            except Exception as exc:
+                log.error("backup_failed", error=str(exc), exc_info=True)
+                rec = await session.get(BackupHistory, record_id)
+                if rec:
+                    rec.finished_at = _utcnow_naive()
+                    rec.status = "failed"
+                    rec.error_message = str(exc)[:1000]
+                    await session.commit()
 
-            # 4. Update record
-            rec = await session.get(BackupHistory, record_id)
-            if rec:
-                rec.finished_at = _utcnow_naive()
-                rec.status = "success"
-                rec.size_bytes = gz_size
-                rec.checksum = checksum
-                rec.yd_path = yd_remote_path
-                await session.commit()
+            finally:
+                # Clean up temp files
+                for path in (tmp_path, gz_path):
+                    if path and os.path.exists(path):
+                        os.remove(path)
 
-            log.info(
-                "backup_completed",
-                size_bytes=gz_size,
-                yd_path=yd_remote_path,
-            )
+            # 5. Rotate old backups
+            try:
+                await self._rotate_backups(company_id, yd_folder)
+            except Exception as exc:
+                log.warning("backup_rotation_failed", error=str(exc))
 
-        except Exception as exc:
-            log.error("backup_failed", error=str(exc), exc_info=True)
-            rec = await session.get(BackupHistory, record_id)
-            if rec:
-                rec.finished_at = _utcnow_naive()
-                rec.status = "failed"
-                rec.error_message = str(exc)[:1000]
-                await session.commit()
-
+            result = await session.get(BackupHistory, record_id)
+            return result  # type: ignore[return-value]
         finally:
-            # Clean up temp files
-            for path in (tmp_path, gz_path):
-                if path and os.path.exists(path):
-                    os.remove(path)
-
-        # 5. Rotate old backups
-        try:
-            await self._rotate_backups(company_id, yd_folder)
-        except Exception as exc:
-            log.warning("backup_rotation_failed", error=str(exc))
-
-        result = await session.get(BackupHistory, record_id)
-        return result  # type: ignore[return-value]
+            if owns_session:
+                await session.close()
 
     async def list_backups(
         self,

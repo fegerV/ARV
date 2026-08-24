@@ -116,15 +116,32 @@ async def get_ar_content_or_404(content_id: int, db: AsyncSession, load_relation
     return content
 
 
-def generate_order_number() -> str:
-    """Generate unique order number in format ORD-YYYYMMDD-XXXX"""
+async def generate_order_number(project_id: int, db: AsyncSession) -> str:
+    """Generate unique order number in format ORD-YYYYMMDD-XXXX per project."""
     now = datetime.now()
     date_str = now.strftime("%Y%m%d")
-    # In a real implementation, we'd want to ensure uniqueness within the project
-    # For now, we'll use a timestamp-based approach
-    import random
-    id_part = f"{random.randint(1000, 9999):04d}"
-    return f"ORD-{date_str}-{id_part}"
+    prefix = f"ORD-{date_str}-"
+    
+    stmt = (
+        select(ARContent.order_number)
+        .where(ARContent.project_id == project_id)
+        .where(ARContent.order_number.like(prefix + "%"))
+        .order_by(ARContent.order_number.desc())
+        .limit(1)
+    )
+    result = await db.execute(stmt)
+    last_order = result.scalar_one_or_none()
+    
+    if last_order:
+        try:
+            last_seq = int(last_order.rsplit("-", 1)[-1])
+            next_seq = last_seq + 1
+        except (ValueError, IndexError):
+            next_seq = 1
+    else:
+        next_seq = 1
+    
+    return f"{prefix}{next_seq:04d}"
 
 
 def validate_file_extension(filename: str, allowed_extensions: list) -> bool:
@@ -297,7 +314,7 @@ async def _create_ar_content(
         unique_id = str(uuid4())
         
         # Generate order number
-        order_number = generate_order_number()
+        order_number = await generate_order_number(project_id, db)
         
         # Build local storage path (always needed for temp files / image analysis)
         storage_path = build_ar_content_storage_path(
@@ -456,7 +473,7 @@ async def _create_ar_content(
                 await db.rollback()
                 if attempt == 2:
                     raise
-                order_number = generate_order_number()
+                order_number = await generate_order_number(project_id, db)
                 ar_content.order_number = order_number
         await db.refresh(ar_content)
         
@@ -1075,17 +1092,35 @@ async def update_ar_content_photo(
 
     # Get storage path
     from app.utils.ar_content import get_ar_content_storage_path
+    from app.core.storage_providers import get_provider_for_company
     storage_path = await get_ar_content_storage_path(ar_content, db)
     storage_path.mkdir(parents=True, exist_ok=True)
+    provider = await get_provider_for_company(ar_content.company)
 
     # Save new photo
     photo_filename = f"photo{Path(photo.filename).suffix}"
     photo_path = storage_path / photo_filename
     await save_uploaded_file(photo, photo_path)
 
+    # Resolve URL depending on provider
+    if provider and hasattr(provider, 'save_file'):
+        from app.core.yandex_disk_provider import YandexDiskStorageProvider
+        if isinstance(provider, YandexDiskStorageProvider):
+            from app.utils.slug_utils import generate_slug
+            from app.utils.ar_content import sanitize_filename
+            project_slug = generate_slug(ar_content.project.name) if ar_content.project else f"Project_{project_id}"
+            order_folder = sanitize_filename(ar_content.order_number, max_length=50)
+            yd_relative_prefix = f"{project_slug}/{order_folder}"
+            yd_ref = await provider.save_file(str(photo_path), f"{yd_relative_prefix}/{photo_filename}")
+            photo_url_val = yd_ref or provider.get_public_url(f"{yd_relative_prefix}/{photo_filename}")
+        else:
+            photo_url_val = build_public_url(photo_path, provider=provider)
+    else:
+        photo_url_val = build_public_url(photo_path)
+
     # Update database
     ar_content.photo_path = str(photo_path)
-    ar_content.photo_url = build_public_url(photo_path)
+    ar_content.photo_url = photo_url_val
 
     # (Best-effort) regenerate thumbnail
     try:
@@ -1104,7 +1139,7 @@ async def update_ar_content_photo(
     # ARCore: marker = photo image (no .mind generation)
     try:
         ar_content.marker_path = str(photo_path)
-        ar_content.marker_url = build_public_url(photo_path)
+        ar_content.marker_url = photo_url_val
         ar_content.marker_status = "ready"
         ar_content.marker_metadata = {}
         ar_content.status = "ready"
@@ -1140,20 +1175,38 @@ async def update_ar_content_video(
     
     # Get storage path
     from app.utils.ar_content import get_ar_content_storage_path
+    from app.core.storage_providers import get_provider_for_company
     storage_path = await get_ar_content_storage_path(ar_content, db)
     storage_path.mkdir(parents=True, exist_ok=True)
+    provider = await get_provider_for_company(ar_content.company)
     
     # Save new video
     video_filename = f"video{Path(video.filename).suffix}"
     video_path = storage_path / video_filename
     await save_uploaded_file(video, video_path)
     
+    # Resolve URL depending on provider
+    if provider and hasattr(provider, 'save_file'):
+        from app.core.yandex_disk_provider import YandexDiskStorageProvider
+        if isinstance(provider, YandexDiskStorageProvider):
+            from app.utils.slug_utils import generate_slug
+            from app.utils.ar_content import sanitize_filename
+            project_slug = generate_slug(ar_content.project.name) if ar_content.project else f"Project_{project_id}"
+            order_folder = sanitize_filename(ar_content.order_number, max_length=50)
+            yd_relative_prefix = f"{project_slug}/{order_folder}"
+            yd_ref = await provider.save_file(str(video_path), f"{yd_relative_prefix}/videos/{video_filename}")
+            video_url_val = yd_ref or provider.get_public_url(f"{yd_relative_prefix}/videos/{video_filename}")
+        else:
+            video_url_val = build_public_url(video_path, provider=provider)
+    else:
+        video_url_val = build_public_url(video_path)
+    
     # Update database
     ar_content.video_path = str(video_path)
-    ar_content.video_url = build_public_url(video_path)
+    ar_content.video_url = video_url_val
     # Update preview URL as well
     if ar_content.active_video:
-        ar_content.active_video.preview_url = build_public_url(video_path)
+        ar_content.active_video.preview_url = video_url_val
     
     await db.commit()
     await db.refresh(ar_content)

@@ -7,11 +7,18 @@ from fastapi import HTTPException, Request as _FastAPIRequest
 _MOCK_REQUEST = _FastAPIRequest(scope={"type": "http", "headers": [], "query_string": b"", "path": "/"})
 
 
-def test_ar_content_helper_functions_cover_basic_validation():
+@pytest.mark.asyncio
+async def test_ar_content_helper_functions_cover_basic_validation():
     from app.api.routes import ar_content
     from app.html.routes.ar_content import _js_safe_text
+    from unittest.mock import AsyncMock, MagicMock
 
-    order_number = ar_content.generate_order_number()
+    mock_db = AsyncMock()
+    mock_result = MagicMock()
+    mock_result.scalar_one_or_none.return_value = None
+    mock_db.execute.return_value = mock_result
+
+    order_number = await ar_content.generate_order_number(1, mock_db)
 
     assert order_number.startswith("ORD-")
     assert len(order_number) == len("ORD-YYYYMMDD-0000")

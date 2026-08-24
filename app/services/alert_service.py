@@ -94,6 +94,24 @@ async def publish_alerts(alerts: List[Alert]) -> None:
     except Exception as exc:
         logger.error("alert_queue_write_failed", error=str(exc), exc_info=True)
 
+    try:
+        from app.core.database import AsyncSessionLocal
+        from app.models.alert import Alert as AlertModel
+        async with AsyncSessionLocal() as session:
+            for alert in alerts:
+                db_alert = AlertModel(
+                    severity=alert.severity,
+                    title=alert.title,
+                    message=alert.message,
+                    metrics=alert.metrics,
+                    affected_services=alert.affected_services,
+                )
+                session.add(db_alert)
+            await session.commit()
+        logger.info("alerts_persisted_to_db", count=len(alerts))
+    except Exception as exc:
+        logger.error("alert_db_persist_failed", error=str(exc), exc_info=True)
+
 
 ALERT_COOLDOWN_SECONDS = {
     "critical": 300,  # 5 minutes
