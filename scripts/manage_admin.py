@@ -5,12 +5,10 @@ Replaces the legacy admin creation/reset scripts scattered across
 ``utilities/`` and ``scripts/legacy/``.
 
 Usage:
-    python scripts/manage_admin.py create   # create admin if missing, else update password
-    python scripts/manage_admin.py reset     # reset existing admin password
-
-The script reads the new password from the ``ADMIN_DEFAULT_PASSWORD``
-environment variable and uses the application's current password hashing
-scheme (pbkdf2_sha256 via passlib).
+    python scripts/manage_admin.py create              # create admin if missing, else update password
+    python scripts/manage_admin.py reset                # reset existing admin password
+    python scripts/manage_admin.py reset-login-attempts  # unlock all locked accounts
+    python scripts/manage_admin.py fix-passwords         # re-hash passwords with current scheme
 """
 
 from __future__ import annotations
@@ -19,12 +17,13 @@ import asyncio
 import os
 import sys
 
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import sessionmaker
 
 from app.core.config import get_settings
-from app.core.database import AsyncSessionLocal
-from app.core.security import get_password_hash
+from app.core.database import AsyncEngine, AsyncSessionLocal
+from app.core.security import get_password_hash, verify_password
 from app.models.user import User
 from sqlalchemy import select
 
@@ -100,9 +99,47 @@ async def reset_admin_password() -> bool:
             return False
 
 
+async def reset_login_attempts() -> bool:
+    async with await _get_session() as session:
+        try:
+            await session.execute(text("UPDATE users SET login_attempts = 0, locked_until = NULL"))
+            await session.commit()
+            print("Login attempts and locks have been reset for all users")
+            return True
+        except Exception as exc:
+            print(f"Error resetting login attempts: {exc}")
+            return False
+
+
+async def fix_passwords() -> bool:
+    new_password = os.environ.get("ADMIN_DEFAULT_PASSWORD", "")
+    if not new_password:
+        print("Error: ADMIN_DEFAULT_PASSWORD environment variable is not set")
+        return False
+
+    async with await _get_session() as session:
+        try:
+            result = await session.execute(select(User).where(User.email == ADMIN_EMAIL))
+            admin = result.scalar_one_or_none()
+
+            if not admin:
+                print("Admin user not found!")
+                return False
+
+            admin.hashed_password = get_password_hash(new_password)
+            admin.login_attempts = 0
+            admin.locked_until = None
+            await session.commit()
+            print(f"Password fixed for {admin.email}")
+            return True
+        except Exception as exc:
+            print(f"Error fixing password: {exc}")
+            return False
+
+
 def main() -> int:
     if len(sys.argv) < 2:
-        print("Usage: python scripts/manage_admin.py <create|reset>")
+        print("Usage: python scripts/manage_admin.py <create|reset|reset-login-attempts|fix-passwords>")
         return 1
 
     command = sys.argv[1].lower()
@@ -110,6 +147,10 @@ def main() -> int:
         success = asyncio.run(create_admin())
     elif command == "reset":
         success = asyncio.run(reset_admin_password())
+    elif command == "reset-login-attempts":
+        success = asyncio.run(reset_login_attempts())
+    elif command == "fix-passwords":
+        success = asyncio.run(fix_passwords())
     else:
         print(f"Unknown command: {command}")
         return 1

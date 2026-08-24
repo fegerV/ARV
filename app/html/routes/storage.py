@@ -124,14 +124,14 @@ def calculate_directory_size(directory: Path, max_depth: int = 10) -> Tuple[int,
     return total_size, file_count
 
 
-def _default_storage_info() -> dict:
-    """Fallback storage payload for error paths."""
+def _empty_storage_info() -> dict:
+    """Empty storage payload for error paths."""
     return {
-        "total_storage": "Error",
-        "used_storage": "Error",
-        "available_storage": "Error",
+        "total_storage": None,
+        "used_storage": None,
+        "available_storage": None,
         "storage_usage_percent": 0,
-        "ar_content_storage": "0 B",
+        "ar_content_storage": None,
         "ar_content_files": 0,
         "providers": [],
         "companies": [],
@@ -332,7 +332,7 @@ async def _build_storage_info(db: AsyncSession) -> dict:
 
                 return {
                     "id": company.id,
-                    "name": getattr(company, "name", "Unknown"),
+                    "name": getattr(company, "name", ""),
                     "storage_type": storage_type,
                     "storage_used": storage_used,
                     "storage_used_bytes": storage_used_bytes,
@@ -343,7 +343,7 @@ async def _build_storage_info(db: AsyncSession) -> dict:
                 logger.warning("error_processing_company", company_id=getattr(company, "id", None), error=str(e))
                 return {
                     "id": getattr(company, "id", 0),
-                    "name": getattr(company, "name", "Unknown"),
+                    "name": getattr(company, "name", ""),
                     "storage_type": getattr(company, "storage_provider", "local"),
                     "storage_used": "—",
                     "storage_used_bytes": 0,
@@ -356,9 +356,9 @@ async def _build_storage_info(db: AsyncSession) -> dict:
             company_storage = await asyncio.gather(*(_build_company_storage(company) for company in companies))
 
         result = {
-            "total_storage": format_bytes(total_disk) if total_disk > 0 else "Unknown",
+            "total_storage": format_bytes(total_disk) if total_disk > 0 else "",
             "used_storage": format_bytes(used_disk) if used_disk > 0 else "0 B",
-            "available_storage": format_bytes(free_disk) if free_disk > 0 else "Unknown",
+            "available_storage": format_bytes(free_disk) if free_disk > 0 else "",
             "storage_usage_percent": round((used_disk / total_disk * 100), 2) if total_disk > 0 else 0,
             "ar_content_storage": format_bytes(storage_size),
             "ar_content_files": storage_files,
@@ -481,7 +481,7 @@ async def storage_page(
                 error_type=type(e).__name__,
                 traceback=traceback.format_exc(),
             )
-            storage_info = _default_storage_info()
+            storage_info = _empty_storage_info()
 
         context = {
             "request": request,
@@ -498,7 +498,7 @@ async def storage_page(
         )
         error_context = {
             "request": request,
-            "storage_info": _default_storage_info(),
+            "storage_info": _empty_storage_info(),
             "current_user": current_user if current_user else None,
             "error_message": str(e) if settings.DEBUG else "An error occurred while loading storage information.",
         }

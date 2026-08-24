@@ -5,26 +5,12 @@ This directory contains temporary utility scripts for debugging, testing, and ma
 ## Script Categories
 
 ### Database & Migration Scripts
-- `check_migration.py` - Check migration status
 - `check_and_create_tables.py` - Verify and create database tables
 - `clear_migrations.py` - Clear migration history
-- `fix_migration.py` - Fix migration issues
 - `init_db.py` - Initialize database
 
-### Authentication & User Management Scripts
-- `check_users_and_auth.py` - Verify authentication system
-- `check_and_fix_passwords.py` - Check and fix password hashes
-- `reset_password.py` - Reset user passwords
-- `reset_login_attempts.py` - Clear login attempts
-- `update_admin_password_sha256.py` - Update admin password to SHA256
-- `update_password_directly.py` - Direct password update
-
 ### Admin Management Scripts
-- `check_admin.py` - Check admin user status
-- `check_admin_user.py` - Verify admin user configuration
-- `create_admin.py` - Create admin user
-- `create_admin_test.py` - Create test admin user
-- `fix_admin_password.py` - Fix admin password issues
+- `scripts/manage_admin.py` - **Canonical** admin user management (create, reset, unlock, fix passwords)
 
 ### Database Verification Scripts
 - `check_db.py` - Basic database connectivity check
@@ -34,10 +20,22 @@ This directory contains temporary utility scripts for debugging, testing, and ma
 ### Testing Scripts
 - `create_test_project.py` - Create test project
 - `debug_server.py` - Debug server issues
-- `test_ar_content_creation.py` - Test AR content creation
 
 ### Container Scripts
 - `check_containers.py` - Check Docker containers
+
+## Canonical Admin CLI
+
+All admin and password management operations are now handled by a single script:
+
+```bash
+python scripts/manage_admin.py create                # create or update admin password
+python scripts/manage_admin.py reset                  # reset existing admin password
+python scripts/manage_admin.py reset-login-attempts   # unlock all locked accounts
+python scripts/manage_admin.py fix-passwords          # re-hash admin password with current scheme
+```
+
+The legacy scripts in `utilities/` and `scripts/legacy/` have been removed to avoid confusion.
 
 ## Usage
 

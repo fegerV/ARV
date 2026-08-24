@@ -202,7 +202,7 @@ async def protected_route(current_user: User = Depends(get_current_active_user))
 
 **Решение:**
 1. Подождите 15 минут
-2. Или сбросьте через скрипт: `python utilities/reset_login_attempts.py`
+2. Или сбросьте через скрипт: `python scripts/manage_admin.py reset-login-attempts`
 
 ### Проблема: Не могу войти с правильным паролем
 

@@ -269,7 +269,7 @@ AR-просмотр реализован через Android-приложение
 
 2. **Сбросьте блокировку:**
    ```bash
-   python utilities/reset_login_attempts.py
+   python scripts/manage_admin.py reset-login-attempts
    ```
 
 3. **Или через SQL:**

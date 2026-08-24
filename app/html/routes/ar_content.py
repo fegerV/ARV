@@ -212,20 +212,7 @@ async def _load_video_details(ar_content_id: int, db: AsyncSession) -> tuple[lis
             })
         except Exception as exc:
             logger.warning("video_item_serialize_failed", video_id=video.id, error=str(exc), exc_info=True)
-            # Add minimal video info even if serialization fails
-            video_items.append({
-                "id": video.id,
-                "title": getattr(video, 'filename', 'Unknown'),
-                "video_url": getattr(video, 'video_url', ''),
-                "preview_url": getattr(video, 'preview_url', None) or getattr(video, 'video_url', ''),
-                "is_active": getattr(video, 'is_active', False),
-                "rotation_type": getattr(video, 'rotation_type', None),
-                "subscription_end": None,
-                "status": "unknown",
-                "days_remaining": None,
-                "schedules_count": len(schedules_summary),
-                "schedules_summary": schedules_summary,
-            })
+            continue
 
     active_video_info = None
     try:

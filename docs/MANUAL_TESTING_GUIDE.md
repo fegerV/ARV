@@ -379,8 +379,8 @@ python scripts/checks/check_models_db_compliance.py
 
 **Решение:**
 1. Проверьте данные для входа
-2. Проверьте, что пользователь создан: `python utilities/check_admin.py`
-3. Сбросьте пароль: `python utilities/fix_admin_password.py`
+2. Проверьте, что пользователь создан: `python scripts/manage_admin.py create`
+3. Сбросьте пароль: `python scripts/manage_admin.py reset`
 
 ### Проблема: Маркер не генерируется
 

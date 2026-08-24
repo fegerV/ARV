@@ -179,7 +179,7 @@ async def projects_list(
                 'name': project_model.name,
                 'status': project_model.status.value if hasattr(project_model.status, 'value') else str(project_model.status),
                 'company_id': project_model.company_id,
-                'company_name': project_model.company.name if project_model.company else "Unknown",
+                'company_name': project_model.company.name if project_model.company else "",
                 'created_at': project_model.created_at.isoformat() if project_model.created_at else None,
                 'updated_at': project_model.updated_at.isoformat() if project_model.updated_at else None,
                 'ar_content_count': ar_content_counts.get(project_model.id, 0),
