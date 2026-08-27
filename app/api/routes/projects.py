@@ -145,22 +145,22 @@ async def get_projects_by_company_no_auth(
 
 @router.get("/projects", response_model=PaginatedProjectsResponse)
 async def list_projects(
-   page: int = Query(default=1, ge=1, description="Page number"),
-   page_size: int = Query(default=20, ge=1, le=100, description="Number of items per page"),
-   company_id: Optional[int] = Query(default=None, description="Filter by company ID"),
-   db: AsyncSession = Depends(get_db),
-   current_user: User = Depends(get_current_active_user)
+    page: int = Query(default=1, ge=1, description="Page number"),
+    page_size: int = Query(default=20, ge=1, le=100, description="Number of items per page"),
+    company_id: Optional[int] = Query(default=None, description="Filter by company ID"),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
 ):
-   """List projects with pagination and filtering"""
-   # Validate page_size - only allow 20, 30, 40, 50
-   if page_size not in [20, 30, 40, 50]:
+    """List projects with pagination and filtering"""
+    # Validate page_size - only allow 20, 30, 40, 50
+    if page_size not in [20, 30, 40, 50]:
        page_size = 20
 
-   logger = structlog.get_logger()
+    logger = structlog.get_logger()
 
-   # Build base query
-   query = select(Project).join(Company)
-   count_query = select(func.count()).select_from(Project).join(Company)
+    # Build base query
+    query = select(Project).join(Company)
+    count_query = select(func.count()).select_from(Project).join(Company)
 
     if not getattr(current_user, 'is_super_admin', False):
         user_company_id = getattr(current_user, 'company_id', None)
@@ -168,35 +168,35 @@ async def list_projects(
             query = query.where(Project.company_id == user_company_id)
             count_query = count_query.where(Project.company_id == user_company_id)
 
-   # Apply filters
-   where_conditions = []
+    # Apply filters
+    where_conditions = []
 
-   if company_id:
+    if company_id:
        where_conditions.append(Project.company_id == company_id)
 
-   if where_conditions:
+    if where_conditions:
        query = query.where(*where_conditions)
        count_query = count_query.where(*where_conditions)
-   
-   # Get total count
-   total_result = await db.execute(count_query)
-   total = total_result.scalar()
-   
-   # Calculate pagination
-   offset = (page - 1) * page_size
-   total_pages = (total + page_size - 1) // page_size
-   
-   # Apply pagination and ordering
-   query = query.order_by(Project.created_at.desc()).offset(offset).limit(page_size)
-   
-   # Execute query
-   result = await db.execute(query)
-   projects = result.scalars().all()
-   
-   # Batch COUNT — single query instead of N+1
-   counts = await _batch_ar_content_counts(db, [p.id for p in projects])
+    
+    # Get total count
+    total_result = await db.execute(count_query)
+    total = total_result.scalar()
+    
+    # Calculate pagination
+    offset = (page - 1) * page_size
+    total_pages = (total + page_size - 1) // page_size
+    
+    # Apply pagination and ordering
+    query = query.order_by(Project.created_at.desc()).offset(offset).limit(page_size)
+    
+    # Execute query
+    result = await db.execute(query)
+    projects = result.scalars().all()
+    
+    # Batch COUNT — single query instead of N+1
+    counts = await _batch_ar_content_counts(db, [p.id for p in projects])
 
-   items = [
+    items = [
        ProjectListItem(
            id=str(project.id),
            name=project.name,
@@ -207,17 +207,17 @@ async def list_projects(
            _links=_generate_project_links(project.id),
        )
        for project in projects
-   ]
-   
-   logger.info("projects_listed", total=total, page=page, page_size=page_size)
-   
-   return PaginatedProjectsResponse(
+    ]
+    
+    logger.info("projects_listed", total=total, page=page, page_size=page_size)
+    
+    return PaginatedProjectsResponse(
        items=items,
        total=total,
        page=page,
        page_size=page_size,
        total_pages=total_pages
-   )
+    )
 
 
 @router.get("/companies/{company_id}/projects", response_model=PaginatedProjectsResponse)
@@ -285,36 +285,36 @@ async def list_projects_for_company(
 
 @router.post("/projects", response_model=ProjectDetail)
 async def create_project_general(
-   project_data: ProjectCreate,
-   db: AsyncSession = Depends(get_db),
-   current_user: User = Depends(get_current_active_user)
+    project_data: ProjectCreate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
 ):
-   """Create a new project"""
-   logger = structlog.get_logger()
+    """Create a new project"""
+    logger = structlog.get_logger()
 
-   if not getattr(current_user, 'is_super_admin', False) and getattr(current_user, 'company_id', None) is not None:
+    if not getattr(current_user, 'is_super_admin', False) and getattr(current_user, 'company_id', None) is not None:
        if project_data.company_id != getattr(current_user, 'company_id', None):
            raise HTTPException(status_code=403, detail="Access denied to this company")
 
-   # Validate company exists
-   company = await db.get(Company, project_data.company_id)
-   if not company:
+    # Validate company exists
+    company = await db.get(Company, project_data.company_id)
+    if not company:
        raise HTTPException(status_code=404, detail="Company not found")
-   
-   # Create project
-   project = Project(
+    
+    # Create project
+    project = Project(
        company_id=project_data.company_id,
        name=project_data.name,
        status=project_data.status
-   )
-   
-   db.add(project)
-   await db.commit()
-   await db.refresh(project)
-   
-   logger.info("project_created", project_id=project.id, company_id=project_data.company_id)
-   
-   return ProjectDetail(
+    )
+    
+    db.add(project)
+    await db.commit()
+    await db.refresh(project)
+    
+    logger.info("project_created", project_id=project.id, company_id=project_data.company_id)
+    
+    return ProjectDetail(
        id=str(project.id),
        name=project.name,
        status=project.status,
@@ -322,31 +322,31 @@ async def create_project_general(
        ar_content_count=0,
        created_at=project.created_at,
        _links=_generate_project_links(project.id)
-   )
+    )
 
 
 @router.get("/projects/{project_id}", response_model=ProjectDetail)
 async def get_project_general(
-   project_id: int,
-   db: AsyncSession = Depends(get_db),
-   current_user: User = Depends(get_current_active_user)
+    project_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
 ):
-   """Get detailed project information"""
-   # Get project
-   project = await db.get(Project, project_id)
-   if not project:
+    """Get detailed project information"""
+    # Get project
+    project = await db.get(Project, project_id)
+    if not project:
        raise HTTPException(status_code=404, detail="Project not found")
 
-   if not getattr(current_user, 'is_super_admin', False) and getattr(current_user, 'company_id', None) is not None:
+    if not getattr(current_user, 'is_super_admin', False) and getattr(current_user, 'company_id', None) is not None:
        if project.company_id != getattr(current_user, 'company_id', None):
            raise HTTPException(status_code=403, detail="Access denied to this project")
 
-   # Get AR content count
-   ar_content_count_query = select(func.count()).select_from(ARContent).where(ARContent.project_id == project.id)
-   ar_content_count_result = await db.execute(ar_content_count_query)
-   ar_content_count = ar_content_count_result.scalar()
-   
-   return ProjectDetail(
+    # Get AR content count
+    ar_content_count_query = select(func.count()).select_from(ARContent).where(ARContent.project_id == project.id)
+    ar_content_count_result = await db.execute(ar_content_count_query)
+    ar_content_count = ar_content_count_result.scalar()
+    
+    return ProjectDetail(
        id=str(project.id),
        name=project.name,
        status=project.status,
@@ -354,44 +354,44 @@ async def get_project_general(
        ar_content_count=ar_content_count,
        created_at=project.created_at,
        _links=_generate_project_links(project_id)
-   )
+    )
 
 
 @router.put("/projects/{project_id}", response_model=ProjectDetail)
 async def update_project_general(
-   project_id: int,
-   project_data: ProjectUpdate,
-   db: AsyncSession = Depends(get_db),
-   current_user: User = Depends(get_current_active_user)
+    project_id: int,
+    project_data: ProjectUpdate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
 ):
-   """Update project information"""
-   logger = structlog.get_logger()
+    """Update project information"""
+    logger = structlog.get_logger()
 
-   # Get project
-   project = await db.get(Project, project_id)
-   if not project:
+    # Get project
+    project = await db.get(Project, project_id)
+    if not project:
        raise HTTPException(status_code=404, detail="Project not found")
 
-   if not getattr(current_user, 'is_super_admin', False) and getattr(current_user, 'company_id', None) is not None:
+    if not getattr(current_user, 'is_super_admin', False) and getattr(current_user, 'company_id', None) is not None:
        if project.company_id != getattr(current_user, 'company_id', None):
            raise HTTPException(status_code=403, detail="Access denied to this project")
-   
-   # Update fields
-   update_data = project_data.model_dump(exclude_unset=True)
-   for field, value in update_data.items():
+    
+    # Update fields
+    update_data = project_data.model_dump(exclude_unset=True)
+    for field, value in update_data.items():
        setattr(project, field, value)
-   
-   await db.commit()
-   await db.refresh(project)
-   
-   # Get AR content count for response
-   ar_content_count_query = select(func.count()).select_from(ARContent).where(ARContent.project_id == project.id)
-   ar_content_count_result = await db.execute(ar_content_count_query)
-   ar_content_count = ar_content_count_result.scalar()
-   
-   logger.info("project_updated", project_id=project.id)
-   
-   return ProjectDetail(
+    
+    await db.commit()
+    await db.refresh(project)
+    
+    # Get AR content count for response
+    ar_content_count_query = select(func.count()).select_from(ARContent).where(ARContent.project_id == project.id)
+    ar_content_count_result = await db.execute(ar_content_count_query)
+    ar_content_count = ar_content_count_result.scalar()
+    
+    logger.info("project_updated", project_id=project.id)
+    
+    return ProjectDetail(
        id=str(project.id),
        name=project.name,
        status=project.status,
@@ -399,45 +399,45 @@ async def update_project_general(
        ar_content_count=ar_content_count,
        created_at=project.created_at,
        _links=_generate_project_links(project_id)
-   )
+    )
 
 
 @router.delete("/projects/{project_id}")
 async def delete_project_general(
-   project_id: int,
-   db: AsyncSession = Depends(get_db),
-   current_user: User = Depends(get_current_active_user)
+    project_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
 ):
-   """Delete a project (with dependency checks)"""
-   logger = structlog.get_logger()
+    """Delete a project (with dependency checks)"""
+    logger = structlog.get_logger()
 
-   # Get project
-   project = await db.get(Project, project_id)
-   if not project:
+    # Get project
+    project = await db.get(Project, project_id)
+    if not project:
        raise HTTPException(status_code=404, detail="Project not found")
 
-   if not getattr(current_user, 'is_super_admin', False) and getattr(current_user, 'company_id', None) is not None:
+    if not getattr(current_user, 'is_super_admin', False) and getattr(current_user, 'company_id', None) is not None:
        if project.company_id != getattr(current_user, 'company_id', None):
            raise HTTPException(status_code=403, detail="Access denied to this project")
-   
-   # Check for dependencies
-   ar_content_count_query = select(func.count()).select_from(ARContent).where(ARContent.project_id == project.id)
-   ar_content_count_result = await db.execute(ar_content_count_query)
-   ar_content_count = ar_content_count_result.scalar()
-   
-   if ar_content_count > 0:
+    
+    # Check for dependencies
+    ar_content_count_query = select(func.count()).select_from(ARContent).where(ARContent.project_id == project.id)
+    ar_content_count_result = await db.execute(ar_content_count_query)
+    ar_content_count = ar_content_count_result.scalar()
+    
+    if ar_content_count > 0:
        raise HTTPException(
            status_code=400,
            detail=f"Cannot delete project with {ar_content_count} AR content items. Delete content first."
        )
-   
-   # Delete project
-   await db.delete(project)
-   await db.commit()
-   
-   logger.info("project_deleted", project_id=project_id, name=project.name)
-   
-   return {"status": "deleted"}
+    
+    # Delete project
+    await db.delete(project)
+    await db.commit()
+    
+    logger.info("project_deleted", project_id=project_id, name=project.name)
+    
+    return {"status": "deleted"}
 
 
 @router.post("/companies/{company_id}/projects", response_model=ProjectDetail)
