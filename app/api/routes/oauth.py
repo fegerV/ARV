@@ -38,14 +38,17 @@ def _get_connection_credentials(conn: StorageConnection) -> dict[str, Any]:
     if not isinstance(credentials, dict):
         return {}
     return credentials
-
 @router.get("/authorize")
 async def initiate_yandex_oauth(
     connection_name: str = Query(..., description="Название подключения"),
+    current_user: User = Depends(get_current_active_user),
 ):
     """
     Шаг 1: Инициация OAuth авторизации с Яндекс Диском (popup)
     """
+    if not getattr(current_user, 'is_super_admin', False):
+        raise HTTPException(status_code=403, detail="Only super admins can initiate OAuth")
+    
     # Validate redirect URI
     if not settings.YANDEX_OAUTH_REDIRECT_URI:
         raise HTTPException(
@@ -53,8 +56,8 @@ async def initiate_yandex_oauth(
             detail="YANDEX_OAUTH_REDIRECT_URI not configured"
         )
     
-    # Create OAuth state using the state store
-    state = await oauth_state_store.create_state(connection_name)
+    # Create OAuth state using the state store, include user_id for callback verification
+    state = await oauth_state_store.create_state(connection_name, user_id=current_user.id)
     
     # Build authorization URL
     auth_url = (
@@ -97,6 +100,15 @@ async def yandex_oauth_callback(
         )
     
     connection_name = state_data["connection_name"]
+    state_user_id = state_data.get("metadata", {}).get("user_id")
+    
+    # Verify the user who initiated this OAuth flow is still an active super admin
+    if state_user_id is None:
+        raise HTTPException(status_code=403, detail="Invalid OAuth state: missing user_id")
+    
+    initiating_user = await db.get(User, state_user_id)
+    if not initiating_user or not getattr(initiating_user, 'is_super_admin', False):
+        raise HTTPException(status_code=403, detail="OAuth flow initiated by non-admin user")
     
     try:
         # Exchange authorization code for OAuth token
@@ -244,6 +256,10 @@ async def list_yandex_folders(
     if conn.provider != "yandex_disk":
         raise HTTPException(status_code=400, detail="This endpoint only works for Yandex Disk")
 
+    if not getattr(current_user, 'is_super_admin', False):
+        if not ((conn.created_by == current_user.id) or conn.is_default):
+            raise HTTPException(status_code=403, detail="Access denied to this connection")
+
     # Decrypt credentials to get OAuth token
     try:
         credentials = _get_connection_credentials(conn)
@@ -369,6 +385,7 @@ async def create_yandex_folder(
     connection_id: int,
     folder_path: str = Query(..., description="Путь новой папки"),
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
 ):
     """
     Создание новой папки в Яндекс Диске
@@ -379,6 +396,10 @@ async def create_yandex_folder(
         raise HTTPException(status_code=404, detail="Storage connection not found")
     if conn.provider != "yandex_disk":
         raise HTTPException(status_code=400, detail="This endpoint only works for Yandex Disk")
+
+    if not getattr(current_user, 'is_super_admin', False):
+        if not ((conn.created_by == current_user.id) or conn.is_default):
+            raise HTTPException(status_code=403, detail="Access denied to this connection")
 
     # Decrypt credentials to get OAuth token
     try:

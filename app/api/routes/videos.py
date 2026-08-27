@@ -542,6 +542,10 @@ async def set_video_active(
     if not ar_content:
         raise HTTPException(status_code=404, detail="AR content not found")
     
+    if not getattr(current_user, 'is_super_admin', False) and getattr(current_user, 'company_id', None) is not None:
+        if ar_content.company_id != getattr(current_user, 'company_id', None):
+            raise HTTPException(status_code=403, detail="Access denied to this AR content")
+    
     # Verify video exists and belongs to this AR content
     video = await db.get(Video, video_uuid)
     if not video or video.ar_content_id != content_uuid:
@@ -655,6 +659,10 @@ async def update_video_rotation(
     ar_content = await db.get(ARContent, content_uuid)
     if not ar_content:
         raise HTTPException(status_code=404, detail="AR content not found")
+    
+    if not getattr(current_user, 'is_super_admin', False) and getattr(current_user, 'company_id', None) is not None:
+        if ar_content.company_id != getattr(current_user, 'company_id', None):
+            raise HTTPException(status_code=403, detail="Access denied to this AR content")
     
     # Verify video exists and belongs to this AR content
     video = await db.get(Video, video_uuid)
@@ -955,6 +963,11 @@ async def update_video_schedule(
     video = await db.get(Video, video_uuid)
     if not video or video.ar_content_id != content_uuid:
         raise HTTPException(status_code=404, detail="Video not found or doesn't belong to this AR content")
+    
+    ar_content = await db.get(ARContent, content_uuid)
+    if not getattr(current_user, 'is_super_admin', False) and getattr(current_user, 'company_id', None) is not None:
+        if ar_content and ar_content.company_id != getattr(current_user, 'company_id', None):
+            raise HTTPException(status_code=403, detail="Access denied to this AR content")
     
     # Get existing schedule
     schedule = await db.get(VideoScheduleModel, schedule_uuid)

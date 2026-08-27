@@ -34,6 +34,8 @@ async def create_connection(
     current_user: User = Depends(get_current_active_user),
 ):
     """Create a new local storage connection."""
+    if not getattr(current_user, 'is_super_admin', False):
+        raise HTTPException(status_code=403, detail="Only super admins can create storage connections")
     conn = StorageConnection(
         name=connection_data.name,
         provider="local_disk",  # Always local_disk now
@@ -41,6 +43,7 @@ async def create_connection(
         is_active=True,
         is_default=connection_data.is_default,
         storage_metadata={},
+        created_by=current_user.id,
     )
     db.add(conn)
     await db.flush()
@@ -60,6 +63,10 @@ async def test_connection(
     conn = await db.get(StorageConnection, connection_id)
     if not conn:
         raise HTTPException(status_code=404, detail="Connection not found")
+
+    if not getattr(current_user, 'is_super_admin', False):
+        if not ((conn.created_by == current_user.id) or conn.is_default):
+            raise HTTPException(status_code=403, detail="Access denied to this connection")
 
     try:
         # Test local storage by checking if base path exists and is accessible

@@ -65,6 +65,15 @@ async def analytics_overview(
     )
     total_views_count = total_views.scalar() or 0
 
+    if company_filter is not None:
+        total_views = await db.execute(
+            select(func.count()).select_from(ARViewSession).where(
+                ARViewSession.created_at >= since,
+                ARViewSession.company_id == company_filter,
+            )
+        )
+        total_views_count = total_views.scalar() or 0
+
     try:
         unique_sessions = await db.execute(
             select(func.count(text('DISTINCT session_id'))).select_from(ARViewSession).where(ARViewSession.created_at >= since)
@@ -72,6 +81,21 @@ async def analytics_overview(
     except Exception:
         unique_sessions = await db.execute(select(func.count(distinct(ARViewSession.session_id))).where(ARViewSession.created_at >= since))
     unique_sessions_count = unique_sessions.scalar() or 0
+
+    if company_filter is not None:
+        try:
+            unique_sessions = await db.execute(
+                select(func.count(text('DISTINCT session_id'))).select_from(ARViewSession).where(
+                    ARViewSession.created_at >= since,
+                    ARViewSession.company_id == company_filter,
+                )
+            )
+        except Exception:
+            unique_sessions = await db.execute(select(func.count(distinct(ARViewSession.session_id))).where(
+                ARViewSession.created_at >= since,
+                ARViewSession.company_id == company_filter,
+            ))
+        unique_sessions_count = unique_sessions.scalar() or 0
 
     active_content_stmt = select(func.count()).select_from(ARContent).where(ARContent.status == "active")
     if company_filter is not None:

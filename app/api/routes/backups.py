@@ -39,8 +39,8 @@ async def run_backup_now(
             detail="Backup company not configured. Go to Settings → Backups.",
         )
 
-    if not getattr(current_user, 'is_super_admin', False) and getattr(current_user, 'company_id', None) is not None:
-        if bkp.backup_company_id != getattr(current_user, 'company_id', None):
+    if not getattr(current_user, 'is_super_admin', False):
+        if getattr(current_user, 'company_id', None) != bkp.backup_company_id:
             raise HTTPException(status_code=403, detail="Access denied to this backup company")
 
     backup_service = BackupService()
@@ -64,8 +64,12 @@ async def backup_history(
     """Return recent backup records."""
     service = BackupService()
     company_ids = None
-    if not getattr(current_user, 'is_super_admin', False) and getattr(current_user, 'company_id', None) is not None:
-        company_ids = {getattr(current_user, 'company_id', None)}
+    if not getattr(current_user, 'is_super_admin', False):
+        user_company_id = getattr(current_user, 'company_id', None)
+        if user_company_id is not None:
+            company_ids = {user_company_id}
+        else:
+            company_ids = set()
     records = await service.list_backups(db, limit=min(limit, 100), offset=max(offset, 0), company_ids=company_ids)
     return [
         {
@@ -91,8 +95,12 @@ async def backup_status(
     """Return the status of the most recent backup."""
     service = BackupService()
     company_ids = None
-    if not getattr(current_user, 'is_super_admin', False) and getattr(current_user, 'company_id', None) is not None:
-        company_ids = {getattr(current_user, 'company_id', None)}
+    if not getattr(current_user, 'is_super_admin', False):
+        user_company_id = getattr(current_user, 'company_id', None)
+        if user_company_id is not None:
+            company_ids = {user_company_id}
+        else:
+            company_ids = set()
     last = await service.get_last_status(db, company_ids=company_ids)
     if not last:
         return {"status": "no_backups"}
@@ -117,8 +125,12 @@ async def delete_backup(
     """Delete a backup record and its file on Yandex Disk."""
     service = BackupService()
     company_ids = None
-    if not getattr(current_user, 'is_super_admin', False) and getattr(current_user, 'company_id', None) is not None:
-        company_ids = {getattr(current_user, 'company_id', None)}
+    if not getattr(current_user, 'is_super_admin', False):
+        user_company_id = getattr(current_user, 'company_id', None)
+        if user_company_id is not None:
+            company_ids = {user_company_id}
+        else:
+            company_ids = set()
     deleted = await service.delete_backup(db, backup_id, company_ids=company_ids)
     if not deleted:
         raise HTTPException(status_code=404, detail="Backup not found")
