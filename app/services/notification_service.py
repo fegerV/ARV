@@ -128,7 +128,8 @@ async def send_expiry_warning_telegram(company_chat_id: str, project_name: str, 
 📱 +7 (999) 123-45-67
 """
     try:
-        async with httpx.AsyncClient() as client:
+        proxy_url = getattr(settings, "TELEGRAM_PROXY_URL", "") or None
+        async with httpx.AsyncClient(proxy=proxy_url) as client:
             resp = await client.post(
                 f"https://api.telegram.org/bot{settings.TELEGRAM_BOT_TOKEN}/sendMessage",
                 json={
@@ -136,6 +137,7 @@ async def send_expiry_warning_telegram(company_chat_id: str, project_name: str, 
                     "text": message,
                     "parse_mode": "HTML",
                 },
+                timeout=10.0,
             )
             ok = resp.status_code == 200
             if ok:

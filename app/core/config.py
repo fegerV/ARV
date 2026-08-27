@@ -99,6 +99,7 @@ class Settings(BaseSettings):
     # Telegram
     TELEGRAM_BOT_TOKEN: str = ""
     TELEGRAM_ADMIN_CHAT_ID: str = ""
+    TELEGRAM_PROXY_URL: str = ""
     
     # Admin
     ADMIN_EMAIL: str = "admin@vertexar.com"

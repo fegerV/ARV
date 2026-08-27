@@ -73,7 +73,7 @@
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
                     <div>
                         <label for="telegram_bot_token" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">{{ t("settings.notifications.telegram_bot_token") }}</label>
-                        <input type="text" name="telegram_bot_token" id="telegram_bot_token" value="" class="form-input font-mono text-sm" placeholder="123456:ABC-DEF...">
+                        <input type="text" name="telegram_bot_token" id="telegram_bot_token" value="{{ settings.notifications.telegram_bot_token or '' }}" class="form-input font-mono text-sm" placeholder="123456:ABC-DEF...">
                         <p class="text-xs text-gray-400 dark:text-gray-500 mt-1">{{ t("settings.notifications.telegram_bot_token_hint") }}</p>
                     </div>
                     <div>

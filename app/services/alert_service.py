@@ -241,7 +241,8 @@ async def send_telegram_message(chat_id: str, message: str, bot_token: str | Non
         logger.warning("telegram_bot_token_missing")
         return
     try:
-        async with httpx.AsyncClient() as client:
+        proxy_url = getattr(settings, "TELEGRAM_PROXY_URL", "") or None
+        async with httpx.AsyncClient(proxy=proxy_url) as client:
             resp = await client.post(
                 f"https://api.telegram.org/bot{token}/sendMessage",
                 json={

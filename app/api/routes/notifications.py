@@ -61,7 +61,8 @@ async def _send_telegram_notification_async(chat_id: str, message: str, max_retr
     """Send Telegram message with retry on transient failures."""
     for attempt in range(1, max_retries + 1):
         try:
-            async with httpx.AsyncClient() as client:
+            proxy_url = getattr(settings, "TELEGRAM_PROXY_URL", "") or None
+            async with httpx.AsyncClient(proxy=proxy_url) as client:
                 await client.post(
                     f"https://api.telegram.org/bot{settings.TELEGRAM_BOT_TOKEN}/sendMessage",
                     json={"chat_id": chat_id, "text": message, "parse_mode": "HTML"},
@@ -322,7 +323,8 @@ async def test_telegram_from_settings(
         return {"status": "error", "detail": "Заполните Bot Token и Chat ID в настройках уведомлений"}
 
     try:
-        async with httpx.AsyncClient(timeout=15.0) as client:
+        proxy_url = getattr(settings, "TELEGRAM_PROXY_URL", "") or None
+        async with httpx.AsyncClient(timeout=15.0, proxy=proxy_url) as client:
             resp = await client.post(
                 f"https://api.telegram.org/bot{bot_token}/sendMessage",
                 json={

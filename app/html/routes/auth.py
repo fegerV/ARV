@@ -194,7 +194,8 @@ async def login_form(
                 try:
                     import httpx
 
-                    async with httpx.AsyncClient() as client:
+                    proxy_url = getattr(settings, "TELEGRAM_PROXY_URL", "") or None
+                    async with httpx.AsyncClient(proxy=proxy_url) as client:
                         await client.post(
                             f"https://api.telegram.org/bot{bot_token}/sendMessage",
                             json={
