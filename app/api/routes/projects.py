@@ -63,6 +63,11 @@ async def get_projects_by_company(
     if not company:
         raise HTTPException(status_code=404, detail="Company not found")
 
+    # Check user access to company
+    if not getattr(current_user, 'is_super_admin', False):
+        if getattr(current_user, 'company_id', None) != company_id:
+            raise HTTPException(status_code=403, detail="Access denied to this company")
+
     # Get projects for the company
     query = select(Project).where(Project.company_id == company_id).order_by(Project.name)
     result = await db.execute(query)
@@ -106,6 +111,11 @@ async def get_projects_by_company_no_auth(
     company = await db.get(Company, company_id)
     if not company:
         raise HTTPException(status_code=404, detail="Company not found")
+
+    # Check user access to company
+    if not getattr(current_user, 'is_super_admin', False):
+        if getattr(current_user, 'company_id', None) != company_id:
+            raise HTTPException(status_code=403, detail="Access denied to this company")
 
     # Get projects for the company
     query = select(Project).where(Project.company_id == company_id).order_by(Project.name)
@@ -152,9 +162,11 @@ async def list_projects(
    query = select(Project).join(Company)
    count_query = select(func.count()).select_from(Project).join(Company)
 
-   if not getattr(current_user, 'is_super_admin', False) and getattr(current_user, 'company_id', None) is not None:
-       query = query.where(Project.company_id == getattr(current_user, 'company_id', None))
-       count_query = count_query.where(Project.company_id == getattr(current_user, 'company_id', None))
+    if not getattr(current_user, 'is_super_admin', False):
+        user_company_id = getattr(current_user, 'company_id', None)
+        if user_company_id is not None:
+            query = query.where(Project.company_id == user_company_id)
+            count_query = count_query.where(Project.company_id == user_company_id)
 
    # Apply filters
    where_conditions = []

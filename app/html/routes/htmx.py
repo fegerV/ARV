@@ -32,7 +32,7 @@ async def copy_ar_content_link(
     current_user=CurrentActiveUser,
 ):
     """Возвращает JSON {link: ...}, фронт сам пишет в clipboard."""
-    content = await get_ar_content_by_id(int(ar_content_id), db)
+    content = await get_ar_content_by_id(request=request, content_id=int(ar_content_id), db=db, current_user=current_user)
     if not content:
         raise HTTPException(status_code=404, detail="AR content not found")
     if hasattr(content, "model_dump"):
@@ -57,7 +57,7 @@ async def get_ar_content_qr_code(
     db: AsyncSession = Depends(get_html_db),
     current_user=CurrentActiveUser,
 ):
-    content = await get_ar_content_by_id(int(ar_content_id), db)
+    content = await get_ar_content_by_id(request=request, content_id=int(ar_content_id), db=db, current_user=current_user)
     if not content:
         raise HTTPException(status_code=404, detail="AR content not found")
     if hasattr(content, "model_dump"):
@@ -123,7 +123,7 @@ async def delete_ar_content_fragment(
     db: AsyncSession = Depends(get_html_db),
     current_user=CurrentActiveUser,
 ):
-    content = await get_ar_content_by_id(int(ar_content_id), db)
+    content = await get_ar_content_by_id(request=request, content_id=int(ar_content_id), db=db, current_user=current_user)
     if not content:
         raise HTTPException(status_code=404, detail="AR content not found")
     await update_ar_content(
@@ -147,7 +147,7 @@ async def restore_ar_content_fragment(
     db: AsyncSession = Depends(get_html_db),
     current_user=CurrentActiveUser,
 ):
-    content = await get_ar_content_by_id(int(ar_content_id), db)
+    content = await get_ar_content_by_id(request=request, content_id=int(ar_content_id), db=db, current_user=current_user)
     if not content:
         raise HTTPException(status_code=404, detail="AR content not found")
     await update_ar_content(

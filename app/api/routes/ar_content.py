@@ -206,7 +206,7 @@ async def list_all_ar_content_no_slash(
 ):
     """List all AR content across all companies and projects (route with trailing slash)."""
     # This is just a redirect to the main function
-    return await list_all_ar_content(page=page, page_size=page_size, db=db)
+    return await list_all_ar_content(page=page, page_size=page_size, db=db, current_user=current_user)
 
 
 @router.get("/companies/{company_id}/projects/{project_id}/ar-content", response_model=ARContentList, tags=["AR Content"])

@@ -499,7 +499,7 @@ async def ar_content_edit(
 
     try:
         # Get the AR content
-        result = await get_ar_content_by_id(int(ar_content_id), db)
+        result = await get_ar_content_by_id(request=request, content_id=int(ar_content_id), db=db, current_user=current_user)
 
         # Convert to dict and handle datetime serialization
         if hasattr(result, "model_dump"):
@@ -593,7 +593,7 @@ async def ar_content_detail(
     if redirect:
         return redirect
     try:
-        result = await get_ar_content_by_id(int(ar_content_id), db)
+        result = await get_ar_content_by_id(request=request, content_id=int(ar_content_id), db=db, current_user=current_user)
         
         # Convert to dict and handle datetime serialization
         if hasattr(result, "model_dump"):

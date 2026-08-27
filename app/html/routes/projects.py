@@ -6,7 +6,6 @@ import structlog
 from app.models.ar_content import ARContent
 from app.models.company import Company
 from app.models.project import Project
-from app.api.routes.projects import get_project
 from app.html.deps import get_html_db
 from app.api.routes.auth import get_current_user_optional
 from app.html.templating import templates
@@ -269,7 +268,7 @@ async def project_detail(
         return redirect
     
     try:
-        project = await get_project(int(project_id), db)
+        project = await db.get(Project, int(project_id))
         project_data = _pydantic_to_dict(project)
         project_data = _convert_enum_to_string(project_data)
     except Exception as e:
@@ -303,7 +302,7 @@ async def project_edit(
         return redirect
     
     try:
-        project = await get_project(int(project_id), db)
+        project = await db.get(Project, int(project_id))
         project_data = _pydantic_to_dict(project)
         project_data = _convert_enum_to_string(project_data)
     except Exception as e:

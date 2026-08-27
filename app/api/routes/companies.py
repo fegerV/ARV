@@ -54,9 +54,11 @@ async def list_companies(
     query = select(Company)
     count_query = select(func.count()).select_from(Company)
 
-    if not getattr(current_user, 'is_super_admin', False) and getattr(current_user, 'company_id', None) is not None:
-        query = query.where(Company.id == getattr(current_user, 'company_id', None))
-        count_query = count_query.where(Company.id == getattr(current_user, 'company_id', None))
+    if not getattr(current_user, 'is_super_admin', False):
+        user_company_id = getattr(current_user, 'company_id', None)
+        if user_company_id is not None:
+            query = query.where(Company.id == user_company_id)
+            count_query = count_query.where(Company.id == user_company_id)
 
     # Apply filters
     where_conditions = []

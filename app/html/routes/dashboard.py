@@ -28,7 +28,7 @@ async def admin_dashboard(
         return redirect
     
     try:
-        since = datetime.now(timezone.utc) - timedelta(days=30)
+        since = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=30)
 
         # AsyncSession не поддерживает параллельные операции — выполняем запросы последовательно.
         r_companies = await db.execute(select(func.count()).select_from(Company))

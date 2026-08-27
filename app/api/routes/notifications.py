@@ -94,13 +94,15 @@ async def list_notifications(
         .limit(limit)
         .offset(offset)
     )
-    if not getattr(current_user, 'is_super_admin', False) and getattr(current_user, 'company_id', None) is not None:
-        stmt = stmt.where(Notification.company_id == getattr(current_user, 'company_id', None))
+    if not getattr(current_user, 'is_super_admin', False):
+        stmt = stmt.where(Notification.user_id == current_user.id)
     res = await db.execute(stmt)
     items = res.scalars().all()
     
     # Get total count for pagination — scalar COUNT instead of loading all rows
     count_stmt = select(func.count()).select_from(Notification)
+    if not getattr(current_user, 'is_super_admin', False):
+        count_stmt = count_stmt.where(Notification.user_id == current_user.id)
     count_res = await db.execute(count_stmt)
     total = count_res.scalar() or 0
     
@@ -152,8 +154,8 @@ async def mark_all_notifications_read(
     already-read notifications to reduce I/O.
     """
     stmt = select(Notification.id, Notification.notification_metadata)
-    if not getattr(current_user, 'is_super_admin', False) and getattr(current_user, 'company_id', None) is not None:
-        stmt = stmt.where(Notification.company_id == getattr(current_user, 'company_id', None))
+    if not getattr(current_user, 'is_super_admin', False):
+        stmt = stmt.where(Notification.user_id == current_user.id)
     res = await db.execute(stmt)
     rows = res.all()
 
@@ -220,8 +222,8 @@ async def delete_notification(
     if not n:
         raise HTTPException(status_code=404, detail="Notification not found")
 
-    if not getattr(current_user, 'is_super_admin', False) and getattr(current_user, 'company_id', None) is not None:
-        if n.company_id != getattr(current_user, 'company_id', None):
+    if not getattr(current_user, 'is_super_admin', False):
+        if n.user_id != current_user.id:
             raise HTTPException(status_code=403, detail="Access denied to this notification")
 
     await db.delete(n)

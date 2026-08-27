@@ -1,3 +1,7 @@
 {"timestamp": "2026-08-21T15:12:19.704017", "severity": "critical", "title": "API down", "message": "Viewer API is unavailable", "metrics": {"cpu_percent": 90}, "affected_services": ["viewer"]}
 {"timestamp": "2026-08-21T15:12:46.885856", "severity": "critical", "title": "API down", "message": "Viewer API is unavailable", "metrics": {"cpu_percent": 90}, "affected_services": ["viewer"]}
 {"timestamp": "2026-08-21T15:57:53.369336", "severity": "critical", "title": "API down", "message": "Viewer API is unavailable", "metrics": {"cpu_percent": 90}, "affected_services": ["viewer"]}
+{"timestamp": "2026-08-24T08:39:46.137797", "severity": "critical", "title": "API down", "message": "Viewer API is unavailable", "metrics": {"cpu_percent": 90}, "affected_services": ["viewer"]}
+{"timestamp": "2026-08-24T09:19:57.196351", "severity": "critical", "title": "API down", "message": "Viewer API is unavailable", "metrics": {"cpu_percent": 90}, "affected_services": ["viewer"]}
+{"timestamp": "2026-08-24T09:21:11.487469", "severity": "critical", "title": "API down", "message": "Viewer API is unavailable", "metrics": {"cpu_percent": 90}, "affected_services": ["viewer"]}
+{"timestamp": "2026-08-24T09:22:11.575976", "severity": "critical", "title": "API down", "message": "Viewer API is unavailable", "metrics": {"cpu_percent": 90}, "affected_services": ["viewer"]}
