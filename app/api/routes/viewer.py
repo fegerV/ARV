@@ -323,7 +323,17 @@ async def _resolve_yd_url(url_or_path: Optional[str], company: Company) -> Optio
                 return download_url
     except Exception as exc:
         logger.error("yd_resolve_url_failed", path=url_or_path, error=str(exc))
-    return url_or_path
+    
+    # Fallback: if Yandex Disk is not available, try local storage
+    try:
+        relative = _yadisk_relative(url_or_path)
+        local_path = Path(settings.STORAGE_BASE_PATH) / "VertexAR" / relative
+        if local_path.exists():
+            return build_public_url(local_path)
+    except Exception:
+        pass
+    
+    return None
 
 
 @router.get("/viewer/{ar_content_id}/active-video")
@@ -668,6 +678,8 @@ async def _build_manifest(
                 *(_resolve_yd_url(ref, company) for _, ref in yd_tasks),
             )
             for (field_name, _original), result in zip(yd_tasks, results):
+                if result is None:
+                    continue
                 if field_name == "photo":
                     resolved_photo = result
                 elif field_name == "video":
@@ -676,8 +688,11 @@ async def _build_manifest(
                     resolved_preview = result
 
     # ── Build absolute URLs ──────────────────────────────────────────
+    if not resolved_photo or _is_yadisk_ref(str(resolved_photo)):
+        raise HTTPException(status_code=404, detail="Marker image not available")
     marker_image_url = _absolute_url(resolved_photo)
     photo_url_abs = _absolute_url(resolved_photo)
+    
     if not resolved_video:
         raise HTTPException(status_code=404, detail="Video not found for this AR content")
     video_url_abs = _absolute_url(resolved_video)
