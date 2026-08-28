@@ -687,6 +687,17 @@ async def _build_manifest(
                 elif field_name == "preview":
                     resolved_preview = result
 
+    # ── Video local fallback by ID ────────────────────────────────────
+    if _is_yadisk_ref(str(resolved_video)):
+        try:
+            video_local = Path(settings.STORAGE_BASE_PATH) / "VertexAR" / _yadisk_relative(str(resolved_video))
+            if not video_local.exists():
+                video_local = Path(settings.STORAGE_BASE_PATH) / "VertexAR" / _yadisk_relative(str(resolved_video)).parent / f"video_{video.id}.mp4"
+            if video_local.exists():
+                resolved_video = build_public_url(video_local)
+        except Exception:
+            pass
+
     # ── Build absolute URLs ──────────────────────────────────────────
     if not resolved_photo or _is_yadisk_ref(str(resolved_photo)):
         raise HTTPException(status_code=404, detail="Marker image not available")
