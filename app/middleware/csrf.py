@@ -20,6 +20,9 @@ _EXEMPT_PATH_PREFIXES: Final[tuple[str, ...]] = (
     "/api/auth/login-form",
     "/admin/login-form",
     "/admin/login-2fa",
+    "/api/oauth/authorize",
+    "/api/oauth/callback",
+    "/api/oauth/",
 )
 
 
