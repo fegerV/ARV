@@ -27,7 +27,23 @@ _EXEMPT_PATH_PREFIXES: Final[tuple[str, ...]] = (
 
 
 def _is_exempt_path(path: str) -> bool:
-    return any(path.startswith(prefix) for prefix in _EXEMPT_PATH_PREFIXES)
+    if any(path.startswith(prefix) for prefix in _EXEMPT_PATH_PREFIXES):
+        return True
+    # Specific Yandex OAuth endpoints under /api/companies/
+    if path.startswith("/api/companies/") and (
+        "/yandex-auth-code" in path
+        or "/yandex-auth-url" in path
+        or "/yandex-token" in path
+        or "/yandex/" in path
+    ):
+        return True
+    # Specific Yandex OAuth endpoints under /api/storage/
+    if path.startswith("/api/storage/") and (
+        "/yandex" in path
+        or "/yd-file" in path
+    ):
+        return True
+    return False
 
 
 class CSRFMiddleware(BaseHTTPMiddleware):
