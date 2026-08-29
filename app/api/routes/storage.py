@@ -234,24 +234,18 @@ async def proxy_yandex_disk_file(
     path: str = Query(..., description="Relative file path on Yandex Disk"),
     company_id: int = Query(..., description="Company ID that owns the file"),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_active_user),
 ):
-    """Proxy-stream a file from Yandex Disk for the admin panel.
+    """Proxy-stream a file from Yandex Disk for viewer/manifest.
 
     Supports HTTP Range requests so that ``<video>`` elements can seek
     and the browser does not need to download the entire file at once.
 
-    The admin panel cannot reference ``yadisk://`` URLs directly — this
-    endpoint fetches a temporary download link, then streams the content
-    back to the browser with the appropriate ``Content-Type``.
+    The manifest references stable proxy URLs instead of expiring Yandex
+    download links, so previously generated QR codes keep working.
     """
     company = await db.get(Company, company_id)
     if not company:
         raise HTTPException(status_code=404, detail="Company not found")
-
-    if not getattr(current_user, 'is_super_admin', False) and getattr(current_user, 'company_id', None) is not None:
-        if company_id != getattr(current_user, 'company_id', None):
-            raise HTTPException(status_code=403, detail="Access denied to this company")
 
     if company.storage_provider != "yandex_disk" or not company.yandex_disk_token:
         raise HTTPException(

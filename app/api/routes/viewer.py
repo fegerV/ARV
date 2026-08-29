@@ -303,10 +303,11 @@ async def get_viewer_landing_data(
 
 
 async def _resolve_yd_url(url_or_path: Optional[str], company: Company) -> Optional[str]:
-    """Resolve a ``yadisk://`` reference to a temporary Yandex Disk download URL.
+    """Resolve a ``yadisk://`` reference to a stable proxy URL.
 
-    Returns the original value unchanged if it is not a YD reference or if
-    the company doesn't have a valid token.
+    Returns a server-side proxy URL so the manifest does not expose
+    expiring Yandex Disk download links.  The proxy streams the file
+    on demand and stays valid as long as the company token is valid.
     """
     if not url_or_path:
         return url_or_path
@@ -320,10 +321,10 @@ async def _resolve_yd_url(url_or_path: Optional[str], company: Company) -> Optio
             relative = _yadisk_relative(url_or_path)
             download_url = await provider.get_download_url(relative)
             if download_url:
-                return download_url
+                return f"/api/storage/yd-file?path={quote(relative, safe='/')}&company_id={company.id}"
     except Exception as exc:
         logger.error("yd_resolve_url_failed", path=url_or_path, error=str(exc))
-    
+
     # Fallback: if Yandex Disk is not available, try local storage
     try:
         relative = _yadisk_relative(url_or_path)
@@ -332,7 +333,7 @@ async def _resolve_yd_url(url_or_path: Optional[str], company: Company) -> Optio
             return build_public_url(local_path)
     except Exception:
         pass
-    
+
     return None
 
 
@@ -687,19 +688,8 @@ async def _build_manifest(
                 elif field_name == "preview":
                     resolved_preview = result
 
-    # ── Video local fallback by ID ────────────────────────────────────
-    if _is_yadisk_ref(str(resolved_video)):
-        try:
-            video_local = Path(settings.STORAGE_BASE_PATH) / "VertexAR" / _yadisk_relative(str(resolved_video))
-            if not video_local.exists():
-                video_local = Path(settings.STORAGE_BASE_PATH) / "VertexAR" / _yadisk_relative(str(resolved_video)).parent / f"video_{video.id}.mp4"
-            if video_local.exists():
-                resolved_video = build_public_url(video_local)
-        except Exception:
-            pass
-
     # ── Build absolute URLs ──────────────────────────────────────────
-    if not resolved_photo or _is_yadisk_ref(str(resolved_photo)):
+    if not resolved_photo:
         raise HTTPException(status_code=404, detail="Marker image not available")
     marker_image_url = _absolute_url(resolved_photo)
     photo_url_abs = _absolute_url(resolved_photo)
