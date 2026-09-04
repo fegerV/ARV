@@ -543,20 +543,106 @@ async def _create_ar_content(
             )
 
         # ARCore: marker = photo image (no .mind generation)
+        # Analyze quality and enrich metadata for Android app
         try:
+            from app.services.marker_service import image_quality_analyzer
+            from app.services.email_transport import send_email
+            
+            # Calculate quality score and determine status
+            quality_score = image_quality_analyzer.calculate_quality_score(image_quality)
+            marker_status = image_quality_analyzer.get_marker_status(quality_score)
+            quality_issue_reason = image_quality_analyzer.get_quality_issue_reason(image_quality, quality_score)
+            
+            # Get image dimensions (lazy import cv2)
+            import cv2
+            img = cv2.imread(str(photo_path))
+            if img is not None:
+                height, width = img.shape[:2]
+                aspect_ratio = round(width / height, 4) if height > 0 else 0.0
+            else:
+                width, height, aspect_ratio = 0, 0, 0.0
+            
+            # Build enriched marker_metadata for Android app
+            marker_metadata = {
+                "width": width,
+                "height": height,
+                "quality_score": quality_score,
+                "aspect_ratio": aspect_ratio,
+                "format": Path(photo_path).suffix.lower().lstrip("."),
+                "sharpness": round(image_quality.get("sharpness", 0.0), 2),
+                "contrast": round(image_quality.get("contrast", 0.0), 2),
+                "edge_density": round(image_quality.get("edge_density", 0.0), 4),
+                "brightness": round(image_quality.get("brightness", 0.0), 2),
+                "recognition_probability": image_quality.get("recognition_probability"),
+            }
+            
+            if quality_issue_reason:
+                marker_metadata["quality_issue_reason"] = quality_issue_reason
+            
             ar_content.marker_path = db_photo_path
             ar_content.marker_url = photo_url_val
-            ar_content.marker_status = "ready"
-            ar_content.marker_metadata = {}
-            ar_content.status = "ready"
+            ar_content.marker_status = marker_status  # "ready" or "low_quality"
+            ar_content.marker_metadata = marker_metadata
+            ar_content.status = "ready"  # Content is always created regardless of quality
+            
             await db.commit()
             await db.refresh(ar_content)
+            
             logger.info(
                 "marker_saved_from_photo",
                 ar_content_id=ar_content.id,
                 marker_url=ar_content.marker_url,
                 marker_status=ar_content.marker_status,
+                quality_score=quality_score,
             )
+            
+            # Send email notification if quality is low
+            if marker_status == "low_quality":
+                try:
+                    subject = f"⚠️ AR Content Low Quality Warning: {ar_content.order_number}"
+                    message = f"""
+<html>
+<body>
+<h2>Warning: Low Quality AR Marker Detected</h2>
+<p>AR content <strong>{ar_content.order_number}</strong> was created with a marker image that has low quality.</p>
+<p><strong>Quality Score:</strong> {quality_score}/100 (threshold: {image_quality_analyzer.MIN_MARKER_QUALITY_SCORE})</p>
+<p><strong>Issue:</strong> {quality_issue_reason or "Unknown"}</p>
+<h3>Image Metrics:</h3>
+<ul>
+    <li>Resolution: {width}x{height}</li>
+    <li>Sharpness: {marker_metadata['sharpness']}</li>
+    <li>Contrast: {marker_metadata['contrast']}</li>
+    <li>Edge Density: {marker_metadata['edge_density']}</li>
+    <li>Brightness: {marker_metadata['brightness']}</li>
+</ul>
+<p><strong>Recommendations:</strong></p>
+<ul>
+    {"".join(f"<li>{r}</li>" for r in recommendations)}
+</ul>
+<p>Consider re-uploading a higher quality image for better AR tracking performance.</p>
+<p>--<br>V-Portal Platform</p>
+</body>
+</html>
+"""
+                    # Send to admin and/or content creator
+                    recipients = [settings.ADMIN_EMAIL]
+                    if ar_content.customer_email:
+                        recipients.append(ar_content.customer_email)
+                    
+                    send_email(
+                        to_email=recipients,
+                        subject=subject,
+                        template_name="",  # Empty template name triggers plain HTML body usage
+                        context={"message": message}
+                    )
+                    logger.info(
+                        "low_quality_email_sent",
+                        ar_content_id=ar_content.id,
+                        recipients=recipients,
+                    )
+                except Exception as email_exc:
+                    logger.error("low_quality_email_failed", error=str(email_exc))
+            
             # Create notification for successful AR content creation
             try:
                 from app.services.notification_service import create_notification
@@ -569,11 +655,18 @@ async def _create_ar_content(
                 ar_content_loaded = result.scalar_one()
                 company_name = ar_content_loaded.company.name if ar_content_loaded.company else None
                 project_name = ar_content_loaded.project.name if ar_content_loaded.project else None
+                
+                notification_subject = f"New AR Content Created: {ar_content.order_number}"
+                notification_message = f"AR content '{ar_content.order_number}' has been successfully created and is ready for use."
+                
+                if marker_status == "low_quality":
+                    notification_message += f" WARNING: Marker quality is low (score: {quality_score}/100). Consider re-uploading a better image."
+                
                 await create_notification(
                     db=db,
                     notification_type="ar_content_created",
-                    subject=f"New AR Content Created: {ar_content.order_number}",
-                    message=f"AR content '{ar_content.order_number}' has been successfully created and is ready for use.",
+                    subject=notification_subject,
+                    message=notification_message,
                     company_id=company_id,
                     project_id=project_id,
                     ar_content_id=ar_content.id,
@@ -581,7 +674,9 @@ async def _create_ar_content(
                         "is_read": False,
                         "company_name": company_name,
                         "project_name": project_name,
-                        "ar_content_name": ar_content.order_number
+                        "ar_content_name": ar_content.order_number,
+                        "marker_status": marker_status,
+                        "quality_score": quality_score,
                     }
                 )
             except Exception as e:
