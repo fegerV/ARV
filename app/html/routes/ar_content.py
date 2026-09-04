@@ -719,8 +719,8 @@ async def ar_content_detail(
                 local_analysis_path = photo_path_raw
 
             if local_analysis_path:
-                from app.services.marker_service import marker_service
-                image_quality = marker_service.analyze_image_quality(local_analysis_path)
+                from app.services.marker_service import image_quality_analyzer
+                image_quality = image_quality_analyzer.analyze_image_quality(local_analysis_path)
                 if image_quality:
                     marker_metadata = {**marker_metadata, "image_quality": image_quality}
                     try:
@@ -749,7 +749,7 @@ async def ar_content_detail(
             if not marker_path.is_absolute():
                 marker_path = Path(settings.LOCAL_STORAGE_PATH) / marker_path_value
             ar_content["marker_url"] = build_public_url(marker_path)
-        from app.services.marker_service import marker_service
+        from app.services.marker_service import image_quality_analyzer
         iq = marker_metadata.get("image_quality") or {}
         rec_prob = iq.get("recognition_probability")
         marker_metrics = {
@@ -761,8 +761,8 @@ async def ar_content_detail(
             "width": marker_metadata.get("width"),
             "height": marker_metadata.get("height"),
             "image_quality": iq,
-            "quality_level": marker_service.get_quality_level(rec_prob),
-            "recommendations": marker_service.build_image_recommendations(iq) if iq else [],
+            "quality_level": image_quality_analyzer.get_quality_level(rec_prob),
+            "recommendations": image_quality_analyzer.build_image_recommendations(iq) if iq else [],
             "is_valid": marker_metadata.get("is_valid", None),
             "validation_warnings": marker_metadata.get("validation_warnings", []),
         }

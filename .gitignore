@@ -1,38 +1,4 @@
 ```
-# Compiled Python files
-*.pyc
-__pycache__/
-
-# Dependencies
-.venv/
-venv/
-node_modules/
-
-# Logs and temporary files
-*.log
-*.tmp
-*.swp
-
-# Environment files
-.env
-.env.local
-*.env.*
-
-# Editors
-.vscode/
-.idea/
-
-# Build artifacts
-dist/
-build/
-target/
-
 # Coverage reports
-coverage/
-htmlcov/
-*.coverage
-
-# System files
-.DS_Store
-Thumbs.db
+coverage.xml
 ```

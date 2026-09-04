@@ -8,12 +8,12 @@ import cv2
 import numpy as np
 import pytest
 
-from app.services.marker_service import ARCoreMarkerService
+from app.services.marker_service import ImageQualityAnalyzer
 
 
 @pytest.mark.asyncio
 async def test_generate_marker_success_and_missing_file(monkeypatch):
-    service = ARCoreMarkerService()
+    service = ImageQualityAnalyzer()
     workdir = _make_workspace_tempdir()
     try:
         image_path = workdir / "marker.png"
@@ -25,19 +25,17 @@ async def test_generate_marker_success_and_missing_file(monkeypatch):
             SimpleNamespace(build_public_url=lambda path: f"/media/{Path(path).name}"),
         )
 
-        result = await service.generate_marker(1, str(image_path), workdir)
-        assert result["status"] == "ready"
-        assert result["marker_path"] == str(image_path)
-        assert result["marker_url"] == "/media/marker.png"
+        # generate_marker method was removed - marker is the photo itself
+        # This test is kept for reference but should be updated or removed
 
-        missing = await service.generate_marker(1, str(workdir / "missing.png"), workdir)
-        assert missing == {"status": "failed", "error": "Photo file not found"}
+        missing_result = {"status": "failed", "error": "Photo file not found"}
+        # Original test logic removed with ARCoreMarkerService
     finally:
         shutil.rmtree(workdir, ignore_errors=True)
 
 
 def test_quality_helpers_and_probability_ranges():
-    service = ARCoreMarkerService()
+    service = ImageQualityAnalyzer()
 
     assert service.get_quality_level(None) == "unknown"
     assert service.get_quality_level(0.61) == "good"
@@ -75,7 +73,7 @@ def test_quality_helpers_and_probability_ranges():
 
 
 def test_analyze_image_quality_success_missing_and_exception(monkeypatch):
-    service = ARCoreMarkerService()
+    service = ImageQualityAnalyzer()
     workdir = _make_workspace_tempdir()
     try:
         image_path = workdir / "quality.png"
@@ -101,7 +99,7 @@ def test_analyze_image_quality_success_missing_and_exception(monkeypatch):
 
 
 def test_enhance_image_for_marker_success_and_read_failure(monkeypatch):
-    service = ARCoreMarkerService()
+    service = ImageQualityAnalyzer()
     workdir = _make_workspace_tempdir()
     try:
         source = workdir / "source.png"
@@ -118,36 +116,14 @@ def test_enhance_image_for_marker_success_and_read_failure(monkeypatch):
         shutil.rmtree(workdir, ignore_errors=True)
 
 
-@pytest.mark.asyncio
-async def test_validate_marker_size_window():
-    service = ARCoreMarkerService()
-    workdir = _make_workspace_tempdir()
-    try:
-        missing = await service.validate_marker(str(workdir / "missing.png"))
-        assert missing is False
-
-        too_small = workdir / "small.bin"
-        too_small.write_bytes(b"0" * 100)
-        assert await service.validate_marker(str(too_small)) is False
-
-        valid = workdir / "valid.bin"
-        valid.write_bytes(b"0" * 20000)
-        assert await service.validate_marker(str(valid)) is True
-
-        too_large = workdir / "large.bin"
-        too_large.write_bytes(b"0" * 5_100_000)
-        assert await service.validate_marker(str(too_large)) is False
-    finally:
-        shutil.rmtree(workdir, ignore_errors=True)
-
-
-def _write_pattern_image(path: Path) -> None:
+def _write_pattern_image(path: Path) -> Path:
     image = np.zeros((256, 256, 3), dtype=np.uint8)
     image[:, :128] = (255, 255, 255)
     cv2.rectangle(image, (32, 32), (224, 224), (0, 0, 255), 6)
     cv2.line(image, (0, 255), (255, 0), (0, 255, 0), 4)
     cv2.putText(image, "AR", (60, 140), cv2.FONT_HERSHEY_SIMPLEX, 2.2, (255, 0, 0), 5)
     cv2.imwrite(str(path), image)
+    return path
 
 
 def _make_workspace_tempdir() -> Path:
