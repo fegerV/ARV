@@ -14,20 +14,22 @@ from .notification import Notification
 from .settings import SystemSettings
 from .backup import BackupHistory
 from .alert import Alert
+from .ai_job import AIJob
 
 __all__ = [
     "CompanyStatus", "ProjectStatus", "ArContentStatus", "VideoStatus",
     "User",
     "Company",
-    "Project", 
+    "Project",
     "Video",
     "VideoSchedule",
     "StorageConnection",
     "ARContent",
     "VideoRotationSchedule",
-    "ARViewSession", 
+    "ARViewSession",
     "Notification",
     "SystemSettings",
     "BackupHistory",
     "Alert",
+    "AIJob",
 ]

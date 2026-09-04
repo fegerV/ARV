@@ -46,6 +46,7 @@ class Company(Base):
     # Relationships
     projects = relationship("Project", back_populates="company", cascade="all, delete-orphan")
     ar_contents = relationship("ARContent", back_populates="company", cascade="all, delete-orphan")
+    ai_jobs = relationship("AIJob", back_populates="company", cascade="all, delete-orphan")
 
     # NOTE: projects_count / ar_content_count properties removed — they
     # triggered lazy-loading (MissingGreenlet in async).  Use explicit
