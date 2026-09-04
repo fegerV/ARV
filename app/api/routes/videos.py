@@ -1,4 +1,5 @@
 from typing import List, Optional
+from urllib.parse import quote
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, UploadFile, File, Query, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_, or_
@@ -359,12 +360,15 @@ async def upload_videos(
                 yd_ref = await provider.save_file(
                     str(local_video_path), yd_dest,
                 )
+                # Store proxy URL directly so v-portal app can play video without yadisk:// scheme
+                relative_path = yd_ref.replace("yadisk://", "", 1) if yd_ref else yd_dest
+                db_video_url = f"/api/storage/yd-file?path={quote(relative_path, safe='/')}&company_id={ar_content.company_id}"
                 db_video_path = yd_ref or provider.get_public_url(yd_dest)
-                db_video_url = db_video_path
                 log.info(
                     "video_uploaded_to_yd",
                     video_id=video.id,
                     yd_dest=yd_dest,
+                    proxy_url=db_video_url,
                 )
             else:
                 db_video_path = str(local_video_path)
