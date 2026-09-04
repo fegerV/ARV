@@ -5,6 +5,9 @@ import cv2
 import numpy as np
 
 
+# Minimum quality score threshold for "ready" status
+MIN_MARKER_QUALITY_SCORE = 40
+
 
 logger = structlog.get_logger()
 
@@ -27,6 +30,87 @@ class ImageQualityAnalyzer:
     def analyze_image_quality(self, image_path: str) -> dict:
         """Public wrapper for image quality analysis."""
         return self._analyze_image_quality(image_path)
+
+    def calculate_quality_score(self, metrics: dict) -> int:
+        """Calculate overall quality score (0-100) from image metrics.
+        
+        Args:
+            metrics: Dictionary with brightness, contrast, sharpness, edge_density
+            
+        Returns:
+            Quality score from 0 to 100
+        """
+        if not metrics:
+            return 0
+        
+        contrast = metrics.get("contrast", 0.0)
+        sharpness = metrics.get("sharpness", 0.0)
+        edge_density = metrics.get("edge_density", 0.0)
+        brightness = metrics.get("brightness", 128.0)
+        
+        # Normalize each metric to 0-100 scale
+        contrast_score = min(100.0, (contrast / self._CONTRAST_NORM) * 100)
+        sharpness_score = min(100.0, (sharpness / self._SHARPNESS_NORM) * 100)
+        edge_score = min(100.0, (edge_density / self._EDGE_DENSITY_TARGET) * 100)
+        
+        # Brightness score: optimal is around 128 (middle gray)
+        brightness_deviation = abs(brightness - 128.0)
+        brightness_score = max(0.0, 100.0 - (brightness_deviation / 128.0 * 100))
+        
+        # Weighted average
+        quality_score = (
+            0.30 * edge_score +
+            0.30 * contrast_score +
+            0.25 * sharpness_score +
+            0.15 * brightness_score
+        )
+        
+        return int(round(min(max(quality_score, 0.0), 100.0)))
+
+    def get_marker_status(self, quality_score: int) -> str:
+        """Determine marker status based on quality score.
+        
+        Args:
+            quality_score: Quality score from 0-100
+            
+        Returns:
+            "ready" if score >= MIN_MARKER_QUALITY_SCORE, else "low_quality"
+        """
+        if quality_score >= MIN_MARKER_QUALITY_SCORE:
+            return "ready"
+        return "low_quality"
+
+    def get_quality_issue_reason(self, metrics: dict, quality_score: int) -> Optional[str]:
+        """Get human-readable reason for low quality score.
+        
+        Args:
+            metrics: Image metrics dictionary
+            quality_score: Calculated quality score
+            
+        Returns:
+            Reason string or None if quality is good
+        """
+        if quality_score >= MIN_MARKER_QUALITY_SCORE:
+            return None
+        
+        issues = []
+        contrast = metrics.get("contrast", 0.0)
+        sharpness = metrics.get("sharpness", 0.0)
+        edge_density = metrics.get("edge_density", 0.0)
+        brightness = metrics.get("brightness", 128.0)
+        
+        if contrast < self._MIN_CONTRAST:
+            issues.append("низкий контраст")
+        if sharpness < self._MIN_SHARPNESS:
+            issues.append("низкая резкость")
+        if edge_density < 0.01:
+            issues.append("мало деталей/текстур")
+        if brightness < 40 or brightness > 210:
+            issues.append("проблемы с яркостью")
+        
+        if issues:
+            return "Проблемы качества: " + ", ".join(issues)
+        return "Низкое общее качество изображения"
 
     def build_image_recommendations(self, image_quality: dict) -> list[str]:
         """Build recommendations based on image quality metrics."""
