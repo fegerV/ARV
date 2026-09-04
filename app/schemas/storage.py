@@ -39,10 +39,6 @@ class CompanyStorageSettings(BaseModel):
     storage_path: str
     storage_quota_gb: Optional[int] = None
 
-class CompanyCreate(BaseModel):
-    name: str
-    storage_settings: Optional[CompanyStorageSettings] = None
-
 # ============ Storage Usage Stats ============
 
 class StorageUsageStats(BaseModel):
