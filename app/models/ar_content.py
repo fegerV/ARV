@@ -111,6 +111,7 @@ class ARContent(Base):
     company = relationship("Company", back_populates="ar_contents")
     videos = relationship("Video", back_populates="ar_content", cascade="all, delete-orphan", foreign_keys="Video.ar_content_id")
     active_video = relationship("Video", foreign_keys=[active_video_id])
+    ai_jobs = relationship("AIJob", back_populates="ar_content", cascade="all, delete-orphan")
     
     @property
     def public_link(self) -> str:
