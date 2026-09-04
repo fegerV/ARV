@@ -1,6 +1,6 @@
 # Services module
 # marker_service не импортируем здесь — требует cv2/numpy, ломает тесты без opencv.
-# Импорт: from app.services.marker_service import marker_service
+# Импорт: from app.services.marker_service import image_quality_analyzer
 from .notification_service import notification_service
 from .video_scheduler import get_active_video
 from .alert_service import alert_service
