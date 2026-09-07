@@ -381,6 +381,7 @@ async def get_active_video(ar_content_id: int, db: AsyncSession, override_date: 
     # Get AR content
     ar_content = await db.get(ARContent, ar_content_id)
     if not ar_content:
+        logger.warning("ar_content_not_found", ar_content_id=ar_content_id)
         return None
 
     # 1) Check date-specific rules (highest priority - holidays, special dates)

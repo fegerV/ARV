@@ -122,35 +122,55 @@ async def generate_order_number(project_id: int, db: AsyncSession) -> str:
     
     Uses a transaction with row-level locking to ensure atomicity and prevent
     race conditions when multiple AR content items are created simultaneously.
+    Falls back to UUID-based suffix if duplicate detected.
     """
     now = datetime.now()
     date_str = now.strftime("%Y%m%d")
     prefix = f"ORD-{date_str}-"
     
-    # Use a serializable transaction to ensure complete isolation
-    async with db.begin_nested():
-        stmt = (
-            select(ARContent.order_number)
-            .where(ARContent.project_id == project_id)
-            .where(ARContent.order_number.like(prefix + "%"))
-            .order_by(ARContent.order_number.desc())
-            .limit(1)
-            .with_for_update(read=True, skip_locked=True)
-        )
-        result = await db.execute(stmt)
-        last_order = result.scalar_one_or_none()
-        
-        if last_order:
-            try:
-                last_num = int(last_order.split("-")[-1])
-                next_num = last_num + 1
-            except (ValueError, IndexError):
+    max_retries = 5
+    for attempt in range(max_retries):
+        # Use a serializable transaction to ensure complete isolation
+        async with db.begin_nested():
+            stmt = (
+                select(ARContent.order_number)
+                .where(ARContent.project_id == project_id)
+                .where(ARContent.order_number.like(prefix + "%"))
+                .order_by(ARContent.order_number.desc())
+                .limit(1)
+                .with_for_update(read=True, skip_locked=True)
+            )
+            result = await db.execute(stmt)
+            last_order = result.scalar_one_or_none()
+            
+            if last_order:
+                try:
+                    last_num = int(last_order.split("-")[-1])
+                    next_num = last_num + 1
+                except (ValueError, IndexError):
+                    next_num = 1
+            else:
                 next_num = 1
-        else:
-            next_num = 1
-        
-        order_number = f"{prefix}{next_num:04d}"
-        return order_number
+            
+            order_number = f"{prefix}{next_num:04d}"
+            
+            # Verify uniqueness before returning
+            verify_stmt = select(ARContent.id).where(
+                ARContent.order_number == order_number,
+                ARContent.project_id == project_id
+            )
+            verify_result = await db.execute(verify_stmt)
+            if verify_result.scalar_one_or_none() is None:
+                return order_number
+            
+            # If duplicate found, use UUID suffix as fallback
+            import uuid
+            order_number = f"{prefix}{str(uuid.uuid4())[:8].upper()}"
+            return order_number
+    
+    # Final fallback with timestamp and random suffix
+    import uuid
+    return f"ORD-{int(now.timestamp())}-{str(uuid.uuid4())[:6].upper()}"
 
 
 def validate_file_extension(filename: str, allowed_extensions: list) -> bool:
