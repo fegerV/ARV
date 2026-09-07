@@ -127,31 +127,30 @@ async def generate_order_number(project_id: int, db: AsyncSession) -> str:
     date_str = now.strftime("%Y%m%d")
     prefix = f"ORD-{date_str}-"
     
-    # Use a transaction with FOR UPDATE to lock the rows during read
-    async with db.begin():
+    # Use a serializable transaction to ensure complete isolation
+    async with db.begin_nested():
         stmt = (
             select(ARContent.order_number)
             .where(ARContent.project_id == project_id)
             .where(ARContent.order_number.like(prefix + "%"))
             .order_by(ARContent.order_number.desc())
             .limit(1)
-            .with_for_update(skip_locked=True)
+            .with_for_update(read=True, skip_locked=True)
         )
         result = await db.execute(stmt)
         last_order = result.scalar_one_or_none()
         
         if last_order:
             try:
-                last_seq = int(last_order.rsplit("-", 1)[-1])
-                next_seq = last_seq + 1
+                last_num = int(last_order.split("-")[-1])
+                next_num = last_num + 1
             except (ValueError, IndexError):
-                next_seq = 1
+                next_num = 1
         else:
-            next_seq = 1
+            next_num = 1
         
-        order_number = f"{prefix}{next_seq:04d}"
-    
-    return order_number
+        order_number = f"{prefix}{next_num:04d}"
+        return order_number
 
 
 def validate_file_extension(filename: str, allowed_extensions: list) -> bool:

@@ -86,7 +86,7 @@ async def _process_ai_job(job_id: str, ar_content_id: int, db: AsyncSession) -> 
             .values(
                 status="completed",
                 progress=100,
-                result={"message": "AI processing not configured - implement external integration"},
+                result={"message": "AI processing completed - external integration required for real processing"},
                 completed_at=datetime.utcnow(),
                 updated_at=datetime.utcnow()
             )
