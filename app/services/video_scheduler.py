@@ -123,6 +123,7 @@ async def check_date_rules(rule: VideoRotationSchedule, check_date: date, db: As
     Supports both specific dates and recurring dates (e.g., every December 31).
     """
     if not rule.date_rules:
+        logger.debug("no_date_rules", rule_id=rule.id)
         return None
     
     for date_rule in rule.date_rules:
@@ -150,6 +151,7 @@ async def check_date_rules(rule: VideoRotationSchedule, check_date: date, db: As
                             # Check subscription
                             now = datetime.now(timezone.utc)
                             if not video.subscription_end or _ensure_utc(video.subscription_end) > now:
+                                logger.info("recurring_date_rule_matched", rule_id=rule.id, video_id=video_id, date=str(check_date))
                                 return video
             else:
                 # Exact date match
@@ -160,17 +162,20 @@ async def check_date_rules(rule: VideoRotationSchedule, check_date: date, db: As
                         if video and video.is_active:
                             now = datetime.now(timezone.utc)
                             if not video.subscription_end or _ensure_utc(video.subscription_end) > now:
+                                logger.info("date_rule_matched", rule_id=rule.id, video_id=video_id, date=str(check_date))
                                 return video
         except (ValueError, TypeError) as e:
             logger.warning("invalid_date_rule", error=str(e), date_rule=date_rule)
             continue
     
+    logger.debug("no_date_rule_matched", rule_id=rule.id, date=str(check_date))
     return None
 
 
 async def get_daily_cycle_video(rule: VideoRotationSchedule, check_date: date, db: AsyncSession) -> Optional[Video]:
     """Get video for daily cycle rotation (rotates every day)."""
     if not rule.video_sequence:
+        logger.debug("no_video_sequence", rule_id=rule.id)
         return None
     
     # Use day of year to determine index (ensures same video on same day)
@@ -183,14 +188,23 @@ async def get_daily_cycle_video(rule: VideoRotationSchedule, check_date: date, d
         if video and video.is_active:
             now = datetime.now(timezone.utc)
             if not video.subscription_end or _ensure_utc(video.subscription_end) > now:
+                logger.info("daily_cycle_video_selected", rule_id=rule.id, video_id=video_id, day_of_year=day_of_year)
                 return video
+            else:
+                logger.warning("daily_cycle_video_expired", rule_id=rule.id, video_id=video_id)
+        else:
+            logger.debug("daily_cycle_video_inactive_or_not_found", rule_id=rule.id, video_id=video_id)
+    else:
+        logger.debug("no_video_id_at_index", rule_id=rule.id, index=index)
     
+    logger.debug("no_daily_cycle_video_found", rule_id=rule.id, date=str(check_date))
     return None
 
 
 async def get_weekly_cycle_video(rule: VideoRotationSchedule, check_date: date, db: AsyncSession) -> Optional[Video]:
     """Get video for weekly cycle rotation (different video for each day of week)."""
     if not rule.video_sequence:
+        logger.debug("no_video_sequence", rule_id=rule.id)
         return None
     
     # 0 = Monday, 6 = Sunday
@@ -203,14 +217,23 @@ async def get_weekly_cycle_video(rule: VideoRotationSchedule, check_date: date, 
         if video and video.is_active:
             now = datetime.now(timezone.utc)
             if not video.subscription_end or _ensure_utc(video.subscription_end) > now:
+                logger.info("weekly_cycle_video_selected", rule_id=rule.id, video_id=video_id, day_of_week=day_of_week)
                 return video
+            else:
+                logger.warning("weekly_cycle_video_expired", rule_id=rule.id, video_id=video_id)
+        else:
+            logger.debug("weekly_cycle_video_inactive_or_not_found", rule_id=rule.id, video_id=video_id)
+    else:
+        logger.debug("no_video_id_at_index", rule_id=rule.id, index=index)
     
+    logger.debug("no_weekly_cycle_video_found", rule_id=rule.id, date=str(check_date))
     return None
 
 
 async def get_random_daily_video(rule: VideoRotationSchedule, check_date: date, db: AsyncSession) -> Optional[Video]:
     """Get random video for the day (seed-based for reproducibility)."""
     if not rule.video_sequence:
+        logger.debug("no_video_sequence", rule_id=rule.id)
         return None
     
     # Get all videos in sequence
@@ -223,6 +246,7 @@ async def get_random_daily_video(rule: VideoRotationSchedule, check_date: date, 
                 videos.append(video)
     
     if not videos:
+        logger.debug("no_valid_videos_in_sequence", rule_id=rule.id)
         return None
     
     # Use seed for reproducibility (same date = same video)
@@ -233,6 +257,7 @@ async def get_random_daily_video(rule: VideoRotationSchedule, check_date: date, 
     weights = [getattr(v, 'rotation_weight', 1) for v in videos]
     selected = random.choices(videos, weights=weights, k=1)[0]
     
+    logger.info("random_daily_video_selected", rule_id=rule.id, video_id=selected.id, seed=seed_str)
     return selected
 
 
