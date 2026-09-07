@@ -51,10 +51,11 @@ logger = structlog.get_logger()
 router = APIRouter(tags=["AR Content"])
 
 
-def _safe_delete_folder(path: Path) -> None:
+async def _safe_delete_folder(path: Path) -> None:
     """Best-effort recursive delete of content folder.
 
     Safety: only allow deleting within STORAGE_BASE_PATH.
+    Uses asyncio.to_thread to avoid blocking the event loop.
     """
     base = Path(settings.STORAGE_BASE_PATH).resolve()
     target = path.resolve()
@@ -70,7 +71,8 @@ def _safe_delete_folder(path: Path) -> None:
         return
 
     try:
-        shutil.rmtree(target)
+        import asyncio
+        await asyncio.to_thread(shutil.rmtree, target, ignore_errors=True)
         logger.info("ar_content_delete_storage_ok", storage_path=str(target))
     except Exception as e:
         logger.error("ar_content_delete_storage_failed", storage_path=str(target), error=str(e))
@@ -116,31 +118,40 @@ async def get_ar_content_or_404(content_id: int, db: AsyncSession, load_relation
 
 
 async def generate_order_number(project_id: int, db: AsyncSession) -> str:
-    """Generate unique order number in format ORD-YYYYMMDD-XXXX per project."""
+    """Generate unique order number in format ORD-YYYYMMDD-XXXX per project.
+    
+    Uses a transaction with row-level locking to ensure atomicity and prevent
+    race conditions when multiple AR content items are created simultaneously.
+    """
     now = datetime.now()
     date_str = now.strftime("%Y%m%d")
     prefix = f"ORD-{date_str}-"
     
-    stmt = (
-        select(ARContent.order_number)
-        .where(ARContent.project_id == project_id)
-        .where(ARContent.order_number.like(prefix + "%"))
-        .order_by(ARContent.order_number.desc())
-        .limit(1)
-    )
-    result = await db.execute(stmt)
-    last_order = result.scalar_one_or_none()
-    
-    if last_order:
-        try:
-            last_seq = int(last_order.rsplit("-", 1)[-1])
-            next_seq = last_seq + 1
-        except (ValueError, IndexError):
+    # Use a transaction with FOR UPDATE to lock the rows during read
+    async with db.begin():
+        stmt = (
+            select(ARContent.order_number)
+            .where(ARContent.project_id == project_id)
+            .where(ARContent.order_number.like(prefix + "%"))
+            .order_by(ARContent.order_number.desc())
+            .limit(1)
+            .with_for_update(skip_locked=True)
+        )
+        result = await db.execute(stmt)
+        last_order = result.scalar_one_or_none()
+        
+        if last_order:
+            try:
+                last_seq = int(last_order.rsplit("-", 1)[-1])
+                next_seq = last_seq + 1
+            except (ValueError, IndexError):
+                next_seq = 1
+        else:
             next_seq = 1
-    else:
-        next_seq = 1
+        
+        order_number = f"{prefix}{next_seq:04d}"
     
-    return f"{prefix}{next_seq:04d}"
+    return order_number
 
 
 def validate_file_extension(filename: str, allowed_extensions: list) -> bool:
@@ -343,8 +354,15 @@ async def _create_ar_content(
             created_files.append(str(_tmp_photo))
             await save_uploaded_file(photo_file, _tmp_photo)
             yd_photo_ref = await provider.save_file(str(_tmp_photo), f"{yd_relative_prefix}/{photo_filename}")
-            # Keep local copy for analysis
-            shutil.copy2(str(_tmp_photo), str(photo_path))
+            # Keep local copy for analysis using async file operations
+            import aiofiles
+            async with aiofiles.open(str(_tmp_photo), 'rb') as src, aiofiles.open(str(photo_path), 'wb') as dst:
+                chunk_size = 1024 * 1024  # 1MB chunks
+                while True:
+                    chunk = await src.read(chunk_size)
+                    if not chunk:
+                        break
+                    await dst.write(chunk)
         else:
             await save_uploaded_file(photo_file, photo_path)
             yd_photo_ref = None
@@ -707,7 +725,8 @@ async def _create_ar_content(
                 try:
                     p = Path(path)
                     if p.is_dir():
-                        shutil.rmtree(p, ignore_errors=True)
+                        import asyncio
+                        await asyncio.to_thread(shutil.rmtree, p, ignore_errors=True)
                     elif p.exists():
                         p.unlink(missing_ok=True)
                 except Exception:

@@ -406,8 +406,8 @@ class BackupService:
                 if record.yd_path and provider:
                     try:
                         await provider.delete_file(record.yd_path)
-                    except Exception:
-                        pass
+                    except Exception as e:
+                        logger.warning("backup_rotation_yd_delete_failed", yd_path=record.yd_path, error=str(e))
                 await session.delete(record)
             await session.commit()
 

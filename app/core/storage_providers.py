@@ -142,8 +142,15 @@ class LocalStorageProvider(StorageProvider):
         # Create destination directory if needed
         destination.parent.mkdir(parents=True, exist_ok=True)
         
-        # Copy file
-        shutil.copy2(source, destination)
+        # Copy file using asyncio to avoid blocking the event loop
+        import aiofiles
+        async with aiofiles.open(source, 'rb') as src, aiofiles.open(destination, 'wb') as dst:
+            chunk_size = 1024 * 1024  # 1MB chunks
+            while True:
+                chunk = await src.read(chunk_size)
+                if not chunk:
+                    break
+                await dst.write(chunk)
         
         logger.info("file_saved_to_local_storage", 
                    source_path=str(source),
@@ -162,8 +169,15 @@ class LocalStorageProvider(StorageProvider):
         # Create destination directory if needed
         destination.parent.mkdir(parents=True, exist_ok=True)
         
-        # Copy file
-        shutil.copy2(source, destination)
+        # Copy file using asyncio to avoid blocking the event loop
+        import aiofiles
+        async with aiofiles.open(source, 'rb') as src, aiofiles.open(destination, 'wb') as dst:
+            chunk_size = 1024 * 1024  # 1MB chunks
+            while True:
+                chunk = await src.read(chunk_size)
+                if not chunk:
+                    break
+                await dst.write(chunk)
         
         logger.info("file_retrieved_from_local_storage",
                    storage_path=storage_path,
@@ -182,7 +196,9 @@ class LocalStorageProvider(StorageProvider):
             if file_path.is_file():
                 file_path.unlink()
             elif file_path.is_dir():
-                shutil.rmtree(file_path)
+                # Use asyncio.to_thread for blocking rmtree operation
+                import asyncio
+                await asyncio.to_thread(shutil.rmtree, file_path)
             
             logger.info("file_deleted_from_local_storage", storage_path=storage_path)
             return True

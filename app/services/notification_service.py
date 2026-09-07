@@ -152,7 +152,10 @@ async def send_expiry_warning_telegram(company_chat_id: str, project_name: str, 
 
 # Create a simple class to act as a service
 class NotificationService:
+    """Notification service for creating and managing notifications."""
+    
     def __init__(self):
+        """Initialize notification service."""
         pass
 
     async def create_notification(
