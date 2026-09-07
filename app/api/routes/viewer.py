@@ -519,7 +519,7 @@ async def get_viewer_content_check(
         logger.info("viewer_check_no_photo", unique_id=unique_id)
         return {"content_available": False, "reason": "marker_image_not_available"}
 
-    if (ar_content.marker_status or "").strip().lower() != "ready":
+    if (ar_content.marker_status or "").strip().lower() not in ("ready", "low_quality"):
         logger.info(
             "viewer_check_marker_not_ready",
             unique_id=unique_id,
@@ -634,7 +634,7 @@ async def _build_manifest(
     if not photo_url_rel:
         raise HTTPException(status_code=400, detail="Photo (marker image) not available")
 
-    if (ar_content.marker_status or "").strip().lower() != "ready":
+    if (ar_content.marker_status or "").strip().lower() not in ("ready", "low_quality"):
         raise HTTPException(
             status_code=400,
             detail="Marker is still being generated, try again later",
