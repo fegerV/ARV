@@ -171,14 +171,15 @@ class Settings(BaseSettings):
     def validate_sensitive_defaults(self) -> None:
         """Ensure insecure defaults are not used."""
         # Always validate SQLite regardless of environment
-        if "sqlite" in self.DATABASE_URL.lower():
+        if self.DATABASE_URL and "sqlite" in self.DATABASE_URL.lower():
             raise ValueError("SQLite is not allowed. Use PostgreSQL for all environments.")
+
+        # Validate SECRET_KEY minimum length in all environments
+        if len(self.SECRET_KEY) < 32:
+            raise ValueError("SECRET_KEY must be at least 32 characters in all environments.")
 
         if not self.is_production:
             return
-
-        if len(self.SECRET_KEY) < 32:
-            raise ValueError("SECRET_KEY must be at least 32 characters in production.")
 
         if not self.ADMIN_DEFAULT_PASSWORD:
             raise ValueError("ADMIN_DEFAULT_PASSWORD must be set in production.")

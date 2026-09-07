@@ -144,13 +144,20 @@ class LocalStorageProvider(StorageProvider):
         
         # Copy file using asyncio to avoid blocking the event loop
         import aiofiles
-        async with aiofiles.open(source, 'rb') as src, aiofiles.open(destination, 'wb') as dst:
-            chunk_size = 1024 * 1024  # 1MB chunks
-            while True:
-                chunk = await src.read(chunk_size)
-                if not chunk:
-                    break
-                await dst.write(chunk)
+        try:
+            async with aiofiles.open(source, 'rb') as src, aiofiles.open(destination, 'wb') as dst:
+                chunk_size = 1024 * 1024  # 1MB chunks
+                while True:
+                    chunk = await src.read(chunk_size)
+                    if not chunk:
+                        break
+                    await dst.write(chunk)
+        except Exception as exc:
+            logger.error("file_save_error", 
+                        source_path=str(source),
+                        destination_path=str(destination),
+                        error=str(exc))
+            raise
         
         logger.info("file_saved_to_local_storage", 
                    source_path=str(source),
@@ -171,13 +178,20 @@ class LocalStorageProvider(StorageProvider):
         
         # Copy file using asyncio to avoid blocking the event loop
         import aiofiles
-        async with aiofiles.open(source, 'rb') as src, aiofiles.open(destination, 'wb') as dst:
-            chunk_size = 1024 * 1024  # 1MB chunks
-            while True:
-                chunk = await src.read(chunk_size)
-                if not chunk:
-                    break
-                await dst.write(chunk)
+        try:
+            async with aiofiles.open(source, 'rb') as src, aiofiles.open(destination, 'wb') as dst:
+                chunk_size = 1024 * 1024  # 1MB chunks
+                while True:
+                    chunk = await src.read(chunk_size)
+                    if not chunk:
+                        break
+                    await dst.write(chunk)
+        except Exception as exc:
+            logger.error("file_retrieve_error",
+                        storage_path=storage_path,
+                        local_path=str(destination),
+                        error=str(exc))
+            return False
         
         logger.info("file_retrieved_from_local_storage",
                    storage_path=storage_path,
