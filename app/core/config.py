@@ -32,7 +32,8 @@ class Settings(BaseSettings):
     
     # Database
     DATABASE_URL: str = Field(
-        default="sqlite+aiosqlite:///./test_vertex_ar.db"
+        default="",
+        description="Database connection URL. Must be set via environment variable."
     )
     DB_POOL_SIZE: int = 20
     DB_MAX_OVERFLOW: int = 10
@@ -159,6 +160,14 @@ class Settings(BaseSettings):
         """Get CORS origins as list."""
         return self.CORS_ORIGINS
 
+    @field_validator("DATABASE_URL")
+    @classmethod
+    def validate_database_url(cls, v: str) -> str:
+        """Validate DATABASE_URL is properly configured."""
+        if not v:
+            raise ValueError("DATABASE_URL must be set")
+        return v
+
     def validate_sensitive_defaults(self) -> None:
         """Ensure insecure defaults are not used."""
         if not self.is_production:
@@ -170,8 +179,9 @@ class Settings(BaseSettings):
         if not self.ADMIN_DEFAULT_PASSWORD:
             raise ValueError("ADMIN_DEFAULT_PASSWORD must be set in production.")
 
+        # Validate SQLite is never used (in any environment for production-ready code)
         if "sqlite" in self.DATABASE_URL.lower():
-            raise ValueError("SQLite is not allowed in production. Use PostgreSQL.")
+            raise ValueError("SQLite is not allowed. Use PostgreSQL for all environments.")
 
         if self.REDIS_URL and "localhost" in self.REDIS_URL and "redis://" in self.REDIS_URL:
             raise ValueError("REDIS_URL must not use plain localhost in production. Use TLS or internal network.")

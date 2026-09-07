@@ -1,40 +1,40 @@
 ```
-# Python
-__pycache__/
+# Compiled and build artifacts
 *.pyc
-*.pyo
-*.pyd
-.Python
-env/
-venv/
+__pycache__/
+*.o
+*.obj
+dist/
+build/
+target/
+
+# Dependencies
 .venv/
-.ENV
-.ENV.local
+venv/
+node_modules/
+.mypy_cache/
+.pytest_cache/
+
+# Logs and temp files
+*.log
+*.tmp
+*.swp
+
+# Environment
 .env
 .env.local
-.env.*
 *.env.*
-.env~*
-.venv.bak/
-venv.bak/
-.PyCharmProject
-.pytest_cache/
-.mypy_cache/
-.coverage
-htmlcov/
-coverage/
 
-# IDE
+# Editors
 .vscode/
 .idea/
-*.swp
-*.swo
-*.tmp
 
-# Logs
-*.log
+# Coverage
+coverage/
+htmlcov/
+.coverage
 
-# OS
+# System files
 .DS_Store
 Thumbs.db
 ```

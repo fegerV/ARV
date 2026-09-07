@@ -262,16 +262,22 @@ async def send_telegram_message(chat_id: str, message: str, bot_token: str | Non
 
 
 class AlertService:
+    """Alert service for publishing and sending alerts."""
+    
     def __init__(self):
+        """Initialize alert service."""
         pass
 
     async def publish_alerts(self, alerts: List[Alert]) -> None:
+        """Publish alerts to WebSocket subscribers."""
         return await publish_alerts(alerts)
 
     async def send_critical_alerts(self, alerts: List[Alert], metrics: dict) -> None:
+        """Send critical alerts via configured channels."""
         return await send_critical_alerts(alerts, metrics)
 
     async def send_admin_email(self, alerts: List[Alert], metrics: dict) -> None:
+        """Send admin email with alerts summary."""
         return await send_admin_email(alerts, metrics)
 
     async def send_telegram_alerts(self, alerts: List[Alert], metrics: dict) -> None:
