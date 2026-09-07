@@ -82,7 +82,7 @@ async def _build_analytics_data(db: AsyncSession, period: int = _DEFAULT_PERIOD)
     """
     try:
         # Use naive UTC to match the column type (DateTime without timezone)
-        now = datetime.now(timezone.utc)
+        now = datetime.now(timezone.utc).replace(tzinfo=None)
         since = now - timedelta(days=period) if period > 0 else None
 
         def _time_filter(stmt):
