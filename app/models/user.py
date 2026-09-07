@@ -1,5 +1,6 @@
 from datetime import datetime, timezone
 from sqlalchemy import Column, Integer, String, Boolean, DateTime, ForeignKey, CheckConstraint
+from sqlalchemy.orm import relationship
 from app.core.database import Base
 
 
@@ -27,6 +28,8 @@ class User(Base):
     login_attempts = Column(Integer, default=0, nullable=False)
     locked_until = Column(DateTime(timezone=True), nullable=True)
 
+    ai_jobs_created = relationship("AIJob", back_populates="creator")
+
     __table_args__ = (
-        CheckConstraint("role IN ('admin', 'editor', 'user')", name='ck_user_role_valid'),
+        CheckConstraint("role IN ('admin', 'editor', 'user')", name="ck_user_role_valid"),
     )
