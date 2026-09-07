@@ -57,12 +57,16 @@ def compute_days_remaining(video: Video, now: datetime = None) -> Optional[int]:
     
     sub_end = _ensure_utc(video.subscription_end)
     if not sub_end:
+        logger.debug("no_subscription_end", video_id=video.id)
         return None
     
     if sub_end <= now:
+        logger.debug("subscription_expired", video_id=video.id, expired_at=sub_end.isoformat())
         return 0
     
-    return (sub_end - now).days
+    days = (sub_end - now).days
+    logger.debug("days_remaining", video_id=video.id, days=days)
+    return days
 
 
 async def get_active_video_schedule(video_id: int, db: AsyncSession, now: datetime = None) -> Optional[VideoSchedule]:
@@ -82,7 +86,14 @@ async def get_active_video_schedule(video_id: int, db: AsyncSession, now: dateti
     )
     
     result = await db.execute(stmt)
-    return result.scalar_one_or_none()
+    schedule = result.scalar_one_or_none()
+    
+    if schedule:
+        logger.debug("active_schedule_found", video_id=video_id, schedule_id=schedule.id)
+    else:
+        logger.debug("no_active_schedule", video_id=video_id)
+    
+    return schedule
 
 
 async def get_videos_with_active_schedules(ar_content_id: int, db: AsyncSession, now: datetime = None) -> list[Video]:

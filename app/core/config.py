@@ -170,6 +170,10 @@ class Settings(BaseSettings):
 
     def validate_sensitive_defaults(self) -> None:
         """Ensure insecure defaults are not used."""
+        # Always validate SQLite regardless of environment
+        if "sqlite" in self.DATABASE_URL.lower():
+            raise ValueError("SQLite is not allowed. Use PostgreSQL for all environments.")
+
         if not self.is_production:
             return
 
@@ -178,10 +182,6 @@ class Settings(BaseSettings):
 
         if not self.ADMIN_DEFAULT_PASSWORD:
             raise ValueError("ADMIN_DEFAULT_PASSWORD must be set in production.")
-
-        # Validate SQLite is never used (in any environment for production-ready code)
-        if "sqlite" in self.DATABASE_URL.lower():
-            raise ValueError("SQLite is not allowed. Use PostgreSQL for all environments.")
 
         if self.REDIS_URL and "localhost" in self.REDIS_URL and "redis://" in self.REDIS_URL:
             raise ValueError("REDIS_URL must not use plain localhost in production. Use TLS or internal network.")
