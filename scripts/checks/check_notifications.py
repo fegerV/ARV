@@ -42,7 +42,7 @@ def check_notifications():
                 if notif_dict.get('metadata'):
                     try:
                         metadata = json.loads(notif_dict['metadata'])
-                    except:
+                    except (TypeError, ValueError, json.JSONDecodeError):
                         metadata = notif_dict.get('metadata', {})
                 
                 is_read = metadata.get('is_read', False)

@@ -117,9 +117,10 @@ class YandexDiskStorageProvider(StorageProvider):
 
             # Step 2: stream the file in chunks
             with open(source_path, "rb") as fh:
+                file_content = fh.read()
                 upload_resp = await client.put(
                     upload_url,
-                    content=fh,
+                    content=file_content,
                     headers={"Content-Type": "application/octet-stream"},
                     timeout=_UPLOAD_TIMEOUT,
                 )

@@ -168,6 +168,16 @@ class Settings(BaseSettings):
             raise ValueError("DATABASE_URL must be set")
         return v
 
+    @field_validator("SECRET_KEY")
+    @classmethod
+    def validate_secret_key(cls, v: str) -> str:
+        """Validate SECRET_KEY is configured with sufficient length."""
+        if not v:
+            raise ValueError("SECRET_KEY must be set via environment variable and be at least 32 characters long.")
+        if len(v) < 32:
+            raise ValueError("SECRET_KEY must be at least 32 characters in all environments.")
+        return v
+
     def validate_sensitive_defaults(self) -> None:
         """Ensure insecure defaults are not used."""
         # Always validate SQLite regardless of environment

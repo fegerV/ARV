@@ -40,7 +40,7 @@ def _utcnow_naive() -> datetime:
     return datetime.now(UTC).replace(tzinfo=None)
 
 
-def _extract_request_token(request: Request, token: str = None) -> str | None:
+def _extract_request_token(request: Request, token: str | None = None) -> str | None:
     """Read bearer token from explicit arg, Authorization header, or cookie."""
     if token:
         return token

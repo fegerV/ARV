@@ -15,7 +15,12 @@ from . import run_background_task
 logger = logging.getLogger(__name__)
 
 # Ensure OpenCV is built with CUDA if available
-if cv2.cuda.getCudaEnabledDeviceCount() > 0:
+try:
+    cuda_devices = cv2.cuda.getCudaEnabledDeviceCount()
+except AttributeError:
+    cuda_devices = 0
+
+if cuda_devices > 0:
     try:
         cv2.cuda.setDevice(0)
         logger.info("CUDA is available and will be used for image processing")

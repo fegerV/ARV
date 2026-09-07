@@ -7,7 +7,7 @@ from datetime import datetime
 class StorageConnectionBase(BaseModel):
     name: str = Field(..., min_length=1, max_length=255)
     provider: Literal["local_disk"] = "local_disk"  # Simplified to only local_disk
-    metadata: Optional[Dict[str, Any]] = {}
+    metadata: Optional[Dict[str, Any]] = Field(default_factory=dict)
 
 class StorageConnectionCreate(StorageConnectionBase):
     base_path: str = Field(..., description="Base path for local storage")
