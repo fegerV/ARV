@@ -178,6 +178,7 @@ class Settings(BaseSettings):
         if len(self.SECRET_KEY) < 32:
             raise ValueError("SECRET_KEY must be at least 32 characters in all environments.")
 
+        # In production, enforce additional security requirements
         if not self.is_production:
             return
 
