@@ -3,6 +3,7 @@ Video processing utilities for validation, metadata extraction, and ffprobe oper
 """
 import asyncio
 import json
+import os
 from pathlib import Path
 from typing import Dict, Any, Optional
 import structlog
