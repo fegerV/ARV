@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Optional
 from fastapi import APIRouter, UploadFile, File, Form, Depends, HTTPException, Query, BackgroundTasks, Request
 import shutil
+import os
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import delete as sa_delete, select, func, update as sa_update
 from sqlalchemy.exc import IntegrityError

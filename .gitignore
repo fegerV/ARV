@@ -46,8 +46,8 @@ ENV/
 htmlcov/
 coverage/
 
-# Alembic
-alembic/versions/*.py
+# Alemic - keep migration .py files tracked, ignore compiled files
+alembic/versions/*.pyc
 
 # Temporary files
 *.tmp
