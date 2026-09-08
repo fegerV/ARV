@@ -21,20 +21,20 @@ class SettingDataType(str, Enum):
 
 class SystemSettingsBase(BaseModel):
     key: str = Field(..., min_length=1, max_length=100)
-    value: Optional[str] = None
+    value: str | None = None
     data_type: SettingDataType = SettingDataType.STRING
     category: SettingCategory = SettingCategory.GENERAL
-    description: Optional[str] = None
+    description: str | None = None
     is_public: bool = False
 
 class SystemSettingsCreate(SystemSettingsBase):
     pass
 
 class SystemSettingsUpdate(BaseModel):
-    value: Optional[str] = None
-    data_type: Optional[SettingDataType] = None
-    description: Optional[str] = None
-    is_public: Optional[bool] = None
+    value: str | None = None
+    data_type: SettingDataType | None = None
+    description: str | None = None
+    is_public: bool | None = None
 
 class SystemSettingsResponse(SystemSettingsBase):
     model_config = ConfigDict(from_attributes=True)
@@ -57,7 +57,7 @@ class SecuritySettings(BaseModel):
     password_min_length: int = 8
     session_timeout: int = 60
     require_2fa: bool = False
-    telegram_2fa_chat_id: Optional[str] = None
+    telegram_2fa_chat_id: str | None = None
     max_login_attempts: int = 5
     lockout_duration: int = 300
     api_rate_limit: int = 100
@@ -66,21 +66,21 @@ class StorageSettings(BaseModel):
     default_storage: str = "local"
     max_file_size: int = 100
     cdn_enabled: bool = False
-    cdn_url: Optional[str] = None
+    cdn_url: str | None = None
     backup_enabled: bool = True
     backup_retention_days: int = 30
     
 class NotificationSettings(BaseModel):
     email_enabled: bool = True
     notification_recipient_email: str = "admin@vertexar.com"
-    smtp_host: Optional[str] = None
+    smtp_host: str | None = None
     smtp_port: int = 587
-    smtp_username: Optional[str] = None
-    smtp_password: Optional[str] = None
+    smtp_username: str | None = None
+    smtp_password: str | None = None
     smtp_from_email: str = "noreply@vertexar.com"
     telegram_enabled: bool = False
-    telegram_bot_token: Optional[str] = None
-    telegram_admin_chat_id: Optional[str] = None
+    telegram_bot_token: str | None = None
+    telegram_admin_chat_id: str | None = None
     telegram_alerts_enabled: bool = False
     alert_on_critical: bool = True
     alert_on_warning: bool = False
@@ -91,15 +91,15 @@ class NotificationSettings(BaseModel):
 class APISettings(BaseModel):
     api_keys_enabled: bool = True
     webhook_enabled: bool = False
-    webhook_url: Optional[str] = None
+    webhook_url: str | None = None
     documentation_public: bool = True
-    cors_origins: List[str] = ["http://localhost:3000", "http://localhost:8000"]
+    cors_origins: list[str] = ["http://localhost:3000", "http://localhost:8000"]
     
 class IntegrationSettings(BaseModel):
     google_oauth_enabled: bool = False
-    google_client_id: Optional[str] = None
+    google_client_id: str | None = None
     payment_provider: str = "stripe"
-    stripe_public_key: Optional[str] = None
+    stripe_public_key: str | None = None
     analytics_enabled: bool = False
     analytics_provider: str = "google"
     
@@ -115,7 +115,7 @@ class BackupSettings(BaseModel):
     """Database backup configuration."""
 
     backup_enabled: bool = False
-    backup_company_id: Optional[int] = None
+    backup_company_id: int | None = None
     backup_yd_folder: str = "backups"
     backup_schedule: str = "daily"
     backup_cron: str = "0 3 * * *"

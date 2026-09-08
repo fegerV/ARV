@@ -54,7 +54,7 @@ def needs_password_rehash(hashed_password: str) -> bool:
         return True
 
 
-def create_access_token(data: dict, expires_delta: Optional[timedelta] = None, role: Optional[str] = None, company_id: Optional[int] = None) -> str:
+def create_access_token(data: dict, expires_delta: timedelta | None = None, role: str | None = None, company_id: int | None = None) -> str:
     """Create JWT access token"""
     to_encode = data.copy()
     if role is not None:
@@ -70,7 +70,7 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None, r
     encoded_jwt = jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
     return encoded_jwt
 
-def decode_token(token: str) -> Optional[dict]:
+def decode_token(token: str) -> dict | None:
     """Decode JWT token"""
     try:
         payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])

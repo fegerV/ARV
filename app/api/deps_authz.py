@@ -38,8 +38,8 @@ async def require_company_access(
 async def require_company_access_optional(
     company_id: int,
     db: AsyncSession = Depends(get_db),
-    current_user: Optional[User] = Depends(get_current_active_user),
-) -> tuple[Optional[Company], Optional[User]]:
+    current_user: User | None = Depends(get_current_active_user),
+) -> tuple[Company | None, User | None]:
     """Optional version that returns (company, user) or (None, None)."""
     if current_user is None:
         return None, None

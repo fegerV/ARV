@@ -13,7 +13,7 @@ from app.models.video_rotation_schedule import VideoRotationSchedule
 logger = structlog.get_logger()
 
 
-def _ensure_utc(dt: Optional[datetime]) -> Optional[datetime]:
+def _ensure_utc(dt: datetime | None) -> datetime | None:
     """Ensure datetime is timezone-aware (UTC).
 
     Database columns that store naive datetimes are treated as UTC.
@@ -48,7 +48,7 @@ def compute_video_status(video: Video, now: datetime = None) -> str:
     return "active"
 
 
-def compute_days_remaining(video: Video, now: datetime = None) -> Optional[int]:
+def compute_days_remaining(video: Video, now: datetime = None) -> int | None:
     """Compute days remaining until subscription expires."""
     if now is None:
         now = datetime.now(timezone.utc)
@@ -69,7 +69,7 @@ def compute_days_remaining(video: Video, now: datetime = None) -> Optional[int]:
     return days
 
 
-async def get_active_video_schedule(video_id: int, db: AsyncSession, now: datetime = None) -> Optional[VideoSchedule]:
+async def get_active_video_schedule(video_id: int, db: AsyncSession, now: datetime = None) -> VideoSchedule | None:
     """Get the currently active schedule for a video."""
     if now is None:
         now = datetime.now(timezone.utc)
@@ -117,7 +117,7 @@ async def get_videos_with_active_schedules(ar_content_id: int, db: AsyncSession,
     return list(result.scalars().all())
 
 
-async def check_date_rules(rule: VideoRotationSchedule, check_date: date, db: AsyncSession) -> Optional[Video]:
+async def check_date_rules(rule: VideoRotationSchedule, check_date: date, db: AsyncSession) -> Video | None:
     """Check if there's a video scheduled for a specific date (highest priority).
     
     Supports both specific dates and recurring dates (e.g., every December 31).
@@ -172,7 +172,7 @@ async def check_date_rules(rule: VideoRotationSchedule, check_date: date, db: As
     return None
 
 
-async def get_daily_cycle_video(rule: VideoRotationSchedule, check_date: date, db: AsyncSession) -> Optional[Video]:
+async def get_daily_cycle_video(rule: VideoRotationSchedule, check_date: date, db: AsyncSession) -> Video | None:
     """Get video for daily cycle rotation (rotates every day)."""
     if not rule.video_sequence:
         logger.debug("no_video_sequence", rule_id=rule.id)
@@ -201,7 +201,7 @@ async def get_daily_cycle_video(rule: VideoRotationSchedule, check_date: date, d
     return None
 
 
-async def get_weekly_cycle_video(rule: VideoRotationSchedule, check_date: date, db: AsyncSession) -> Optional[Video]:
+async def get_weekly_cycle_video(rule: VideoRotationSchedule, check_date: date, db: AsyncSession) -> Video | None:
     """Get video for weekly cycle rotation (different video for each day of week)."""
     if not rule.video_sequence:
         logger.debug("no_video_sequence", rule_id=rule.id)
@@ -230,7 +230,7 @@ async def get_weekly_cycle_video(rule: VideoRotationSchedule, check_date: date, 
     return None
 
 
-async def get_random_daily_video(rule: VideoRotationSchedule, check_date: date, db: AsyncSession) -> Optional[Video]:
+async def get_random_daily_video(rule: VideoRotationSchedule, check_date: date, db: AsyncSession) -> Video | None:
     """Get random video for the day (seed-based for reproducibility)."""
     if not rule.video_sequence:
         logger.debug("no_video_sequence", rule_id=rule.id)
@@ -261,7 +261,7 @@ async def get_random_daily_video(rule: VideoRotationSchedule, check_date: date, 
     return selected
 
 
-async def get_rotation_rule(ar_content_id: int, db: AsyncSession) -> Optional[VideoRotationSchedule]:
+async def get_rotation_rule(ar_content_id: int, db: AsyncSession) -> VideoRotationSchedule | None:
     """Get the active rotation rule for AR content."""
     stmt = select(VideoRotationSchedule).where(
         and_(
@@ -274,7 +274,7 @@ async def get_rotation_rule(ar_content_id: int, db: AsyncSession) -> Optional[Vi
     return result.scalar_one_or_none()
 
 
-async def get_default_video(ar_content: ARContent, db: AsyncSession, now: datetime = None) -> Optional[Video]:
+async def get_default_video(ar_content: ARContent, db: AsyncSession, now: datetime = None) -> Video | None:
     """Get default video for AR content (active_video_id or first active video)."""
     if now is None:
         now = datetime.now(timezone.utc)
@@ -304,7 +304,7 @@ async def get_default_video(ar_content: ARContent, db: AsyncSession, now: dateti
     return None
 
 
-async def get_next_rotation_video(ar_content: ARContent, db: AsyncSession, now: datetime = None) -> Optional[Video]:
+async def get_next_rotation_video(ar_content: ARContent, db: AsyncSession, now: datetime = None) -> Video | None:
     """Get the next video based on rotation type and current state (legacy support).
     
     This function maintains backward compatibility with old rotation_type on Video level.
@@ -356,7 +356,7 @@ async def get_next_rotation_video(ar_content: ARContent, db: AsyncSession, now: 
         return active_videos[0]
 
 
-async def get_active_video(ar_content_id: int, db: AsyncSession, override_date: Optional[date] = None) -> Optional[Dict[str, Any]]:
+async def get_active_video(ar_content_id: int, db: AsyncSession, override_date: date | None = None) -> dict[str, Any] | None:
     """Return the currently active video for AR content with metadata.
     
     Priority:

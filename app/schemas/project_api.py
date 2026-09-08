@@ -11,7 +11,7 @@ class ProjectCreate(BaseModel):
 
     company_id: int = Field(..., description="Company ID")
     name: str = Field(..., min_length=1, max_length=255, description="Project name")
-    status: Optional[ProjectStatus] = Field(default=ProjectStatus.ACTIVE, description="Project status")
+    status: ProjectStatus | None = Field(default=ProjectStatus.ACTIVE, description="Project status")
 
     @field_validator("status")
     @classmethod
@@ -26,8 +26,8 @@ class ProjectUpdate(BaseModel):
 
     model_config = ConfigDict(from_attributes=True)
 
-    name: Optional[str] = Field(None, min_length=1, max_length=255, description="Project name")
-    status: Optional[ProjectStatus] = Field(None, description="Project status")
+    name: str | None = Field(None, min_length=1, max_length=255, description="Project name")
+    status: ProjectStatus | None = Field(None, description="Project status")
 
     @field_validator("status")
     @classmethod
@@ -74,7 +74,7 @@ class ProjectDetail(BaseModel):
 
 class PaginatedProjectsResponse(BaseModel):
     """Schema for paginated projects list response"""
-    items: List[ProjectListItem]
+    items: list[ProjectListItem]
     total: int = Field(..., description="Total number of projects")
     page: int = Field(..., description="Current page number")
     page_size: int = Field(..., description="Number of items per page")

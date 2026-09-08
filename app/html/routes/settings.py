@@ -44,8 +44,8 @@ async def _render_settings(
     db: AsyncSession,
     current_user,
     active_section: str = "general",
-    success_message: Optional[str] = None,
-    error_message: Optional[str] = None,
+    success_message: str | None = None,
+    error_message: str | None = None,
 ) -> HTMLResponse:
     """Build the settings page response with fresh data from DB."""
     settings_service = SettingsService(db)

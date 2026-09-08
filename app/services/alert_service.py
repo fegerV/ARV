@@ -32,7 +32,7 @@ class Alert:
     title: str
     message: str
     metrics: dict
-    affected_services: List[str]
+    affected_services: list[str]
 
 
 async def _load_notification_settings():
@@ -60,7 +60,7 @@ def _alert_matches_kind(alert: Alert, kind: str) -> bool:
     return kind in haystack
 
 
-def _telegram_alerts_enabled(notification_settings, alerts: List[Alert]) -> bool:
+def _telegram_alerts_enabled(notification_settings, alerts: list[Alert]) -> bool:
     if not notification_settings or not getattr(notification_settings, "telegram_alerts_enabled", False):
         return False
 
@@ -74,7 +74,7 @@ def _telegram_alerts_enabled(notification_settings, alerts: List[Alert]) -> bool
     return any(enabled and any(predicate(alert) for alert in alerts) for enabled, predicate in checks)
 
 
-async def publish_alerts(alerts: List[Alert]) -> None:
+async def publish_alerts(alerts: list[Alert]) -> None:
     if not alerts:
         return
     _ensure_alert_queue_dir()
@@ -120,9 +120,9 @@ ALERT_COOLDOWN_SECONDS = {
 }
 
 
-async def send_critical_alerts(alerts: List[Alert], metrics: dict) -> None:
+async def send_critical_alerts(alerts: list[Alert], metrics: dict) -> None:
     """Send critical alerts without Redis cooldown."""
-    pending_alerts: List[Alert] = alerts
+    pending_alerts: list[Alert] = alerts
 
     if not pending_alerts:
         return
@@ -132,7 +132,7 @@ async def send_critical_alerts(alerts: List[Alert], metrics: dict) -> None:
     await publish_alerts(pending_alerts)
 
 
-async def send_admin_email(alerts: List[Alert], metrics: dict) -> None:
+async def send_admin_email(alerts: list[Alert], metrics: dict) -> None:
     """Send an admin email for critical alerts."""
     notification_settings = await _load_notification_settings()
     smtp_host = settings.SMTP_HOST
@@ -191,7 +191,7 @@ async def send_admin_email(alerts: List[Alert], metrics: dict) -> None:
         logger.error("critical_alert_email_failed", error=str(exc))
 
 
-async def send_telegram_alerts(alerts: List[Alert], metrics: dict) -> None:
+async def send_telegram_alerts(alerts: list[Alert], metrics: dict) -> None:
     """Send admin Telegram alerts using DB settings first, then env fallback."""
     notification_settings = await _load_notification_settings()
     bot_token: str | None = None
@@ -268,19 +268,19 @@ class AlertService:
         """Initialize alert service."""
         pass
 
-    async def publish_alerts(self, alerts: List[Alert]) -> None:
+    async def publish_alerts(self, alerts: list[Alert]) -> None:
         """Publish alerts to WebSocket subscribers."""
         return await publish_alerts(alerts)
 
-    async def send_critical_alerts(self, alerts: List[Alert], metrics: dict) -> None:
+    async def send_critical_alerts(self, alerts: list[Alert], metrics: dict) -> None:
         """Send critical alerts via configured channels."""
         return await send_critical_alerts(alerts, metrics)
 
-    async def send_admin_email(self, alerts: List[Alert], metrics: dict) -> None:
+    async def send_admin_email(self, alerts: list[Alert], metrics: dict) -> None:
         """Send admin email with alerts summary."""
         return await send_admin_email(alerts, metrics)
 
-    async def send_telegram_alerts(self, alerts: List[Alert], metrics: dict) -> None:
+    async def send_telegram_alerts(self, alerts: list[Alert], metrics: dict) -> None:
         return await send_telegram_alerts(alerts, metrics)
 
     async def send_telegram_message(self, chat_id: str, message: str) -> None:

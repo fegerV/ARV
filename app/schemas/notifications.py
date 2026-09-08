@@ -9,21 +9,21 @@ from pydantic import BaseModel
 class NotificationItem(BaseModel):
     """Single notification item."""
     id: int
-    title: Optional[str] = None
-    message: Optional[str] = None
+    title: str | None = None
+    message: str | None = None
     type: str
     is_read: bool = False
-    read_at: Optional[datetime] = None
+    read_at: datetime | None = None
     created_at: datetime
-    metadata: Optional[dict] = None
-    company_name: Optional[str] = None
-    project_name: Optional[str] = None
-    ar_content_name: Optional[str] = None
+    metadata: dict | None = None
+    company_name: str | None = None
+    project_name: str | None = None
+    ar_content_name: str | None = None
 
 
 class NotificationListResponse(BaseModel):
     """Paginated notifications list response."""
-    items: List[NotificationItem]
+    items: list[NotificationItem]
     total: int
     page: int
     page_size: int

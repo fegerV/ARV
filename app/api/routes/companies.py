@@ -38,8 +38,8 @@ def _generate_company_links(company_id: int) -> CompanyLinks:
 async def list_companies(
     page: int = Query(default=1, ge=1, description="Page number"),
     page_size: int = Query(default=20, ge=1, le=100, description="Number of items per page"),
-    search: Optional[str] = Query(default=None, description="Search by name or email"),
-    status: Optional[str] = Query(default=None, description="Filter by status"),
+    search: str | None = Query(default=None, description="Search by name or email"),
+    status: str | None = Query(default=None, description="Filter by status"),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
 ):

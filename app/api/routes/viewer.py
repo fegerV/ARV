@@ -32,7 +32,7 @@ _DEMO_ID_PATTERN = re.compile(r"^demo_([1-5])$")
 _DEMO_COUNT = 5
 
 
-def _parse_demo_index(unique_id: str) -> Optional[int]:
+def _parse_demo_index(unique_id: str) -> int | None:
     """Return 1..5 if unique_id is demo_1..demo_5, else None."""
     m = _DEMO_ID_PATTERN.match(unique_id.strip())
     return int(m.group(1)) if m else None
@@ -51,7 +51,7 @@ def _demo_file_exists(index: int) -> tuple[bool, bool]:
     return marker, video
 
 
-def _demo_marker_path(index: int) -> Optional[Path]:
+def _demo_marker_path(index: int) -> Path | None:
     """Path to marker file for demo_N."""
     d = _demo_storage_dir(index)
     for name in ("marker.jpg", "marker.png"):
@@ -61,7 +61,7 @@ def _demo_marker_path(index: int) -> Optional[Path]:
     return None
 
 
-def _demo_video_path(index: int) -> Optional[Path]:
+def _demo_video_path(index: int) -> Path | None:
     """Path to video file for demo_N."""
     p = _demo_storage_dir(index) / "video.mp4"
     return p if p.exists() else None
@@ -130,7 +130,7 @@ _MANIFEST_CACHE_TTL = 30  # seconds
 _MANIFEST_CACHE_PREFIX = "manifest:"
 
 
-async def _get_cached_manifest(unique_id: str) -> Optional[dict]:
+async def _get_cached_manifest(unique_id: str) -> dict | None:
     """Return cached manifest dict or None."""
     try:
         raw = await redis_client.get(f"{_MANIFEST_CACHE_PREFIX}{unique_id}")
@@ -154,7 +154,7 @@ async def _set_cached_manifest(unique_id: str, payload: dict) -> None:
         pass  # Redis down — cache miss next time, no big deal
 
 
-def _is_yadisk_ref(path_or_url: Optional[str]) -> bool:
+def _is_yadisk_ref(path_or_url: str | None) -> bool:
     """Check if a stored path is a ``yadisk://`` reference."""
     return bool(path_or_url and str(path_or_url).startswith("yadisk://"))
 
@@ -182,7 +182,7 @@ def _yadisk_proxy_url(yadisk_ref: str, company_id: int) -> str:
     return f"/api/storage/yd-file?{qs}"
 
 
-def _photo_url_from_ar_content(ar_content: ARContent) -> Optional[str]:
+def _photo_url_from_ar_content(ar_content: ARContent) -> str | None:
     """Get photo URL (relative or yadisk://) from ARContent."""
     url = ar_content.photo_url
     # For yadisk:// references, just return as-is (will be resolved later)
@@ -198,7 +198,7 @@ def _photo_url_from_ar_content(ar_content: ARContent) -> Optional[str]:
     return url
 
 
-def _marker_preview_url_from_ar_content(ar_content: ARContent) -> Optional[str]:
+def _marker_preview_url_from_ar_content(ar_content: ARContent) -> str | None:
     """Get lightweight marker preview URL used on landing page."""
     preview = ar_content.thumbnail_url
     # For yadisk:// references, return as-is (resolved later).
@@ -221,7 +221,7 @@ def _marker_preview_url_from_ar_content(ar_content: ARContent) -> Optional[str]:
 async def get_viewer_landing_data(
     unique_id: str,
     db: AsyncSession,
-) -> Optional[dict]:
+) -> dict | None:
     """Get photo_url and video_url for the /view/{unique_id} landing page (Level 3 fallback).
 
     Lenient: does not require marker_status. Returns None if content not found or invalid.
@@ -266,7 +266,7 @@ async def get_viewer_landing_data(
     resolved_photo = photo_url_rel
     resolved_preview = preview_url_rel
     resolved_video = video.video_url
-    company: Optional[Company] = None
+    company: Company | None = None
     if ar_content.company_id:
         company = await db.get(Company, ar_content.company_id)
     if company and company.storage_provider == "yandex_disk":
@@ -302,7 +302,7 @@ async def get_viewer_landing_data(
     }
 
 
-async def _resolve_yd_url(url_or_path: Optional[str], company: Company) -> Optional[str]:
+async def _resolve_yd_url(url_or_path: str | None, company: Company) -> str | None:
     """Resolve a ``yadisk://`` reference to a stable proxy URL.
 
     Returns a server-side proxy URL so the manifest does not expose
@@ -617,7 +617,7 @@ async def _build_manifest(
 
     # Load company explicitly to avoid MissingGreenlet from lazy-loading
     # a relationship in async context (selectinload is unreliable here).
-    company: Optional[Company] = None
+    company: Company | None = None
     if ar_content.company_id:
         company = await db.get(Company, ar_content.company_id)
 

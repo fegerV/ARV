@@ -13,6 +13,7 @@ from datetime import datetime
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy import select, update as sa_update
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.routes.auth import get_current_active_user
@@ -34,8 +35,8 @@ class AIJobStatus(BaseModel):
     ar_content_id: int
     status: str
     progress: int
-    result: Optional[dict] = None
-    error: Optional[str] = None
+    result: dict | None = None
+    error: str | None = None
 
 
 async def _process_ai_job(job_id: str, ar_content_id: int, db: AsyncSession) -> None:
@@ -93,7 +94,7 @@ async def _process_ai_job(job_id: str, ar_content_id: int, db: AsyncSession) -> 
         )
         await db.commit()
         
-    except Exception as exc:
+    except (SQLAlchemyError, Exception) as exc:
         await db.execute(
             sa_update(AIJob)
             .where(AIJob.job_id == job_id)

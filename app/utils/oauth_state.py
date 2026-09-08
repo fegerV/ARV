@@ -17,9 +17,9 @@ class OAuthStateStore:
     """Manages OAuth state tokens in Redis with TTL, falling back to in-memory storage."""
 
     def __init__(self):
-        self._memory_store: Dict[str, Dict[str, Any]] = {}
+        self._memory_store: dict[str, dict[str, Any]] = {}
         self._ttl_seconds = _TTL_SECONDS
-        self._redis_available: Optional[bool] = None
+        self._redis_available: bool | None = None
 
     async def _check_redis(self) -> bool:
         """Check if Redis is available. Cache result to avoid repeated connection attempts."""
@@ -56,7 +56,7 @@ class OAuthStateStore:
         self._memory_store[state] = state_data
         return state
 
-    async def get_and_delete_state(self, state: str) -> Optional[Dict[str, Any]]:
+    async def get_and_delete_state(self, state: str) -> dict[str, Any] | None:
         """Get state data and delete it (one-time use)."""
         if await self._check_redis():
             try:
@@ -105,13 +105,13 @@ class OAuthStateStore:
         return False
 
 
-def _encode_state(state_data: Dict[str, Any]) -> str:
+def _encode_state(state_data: dict[str, Any]) -> str:
     """Encode state data to a storable string."""
     import json
     return json.dumps(state_data)
 
 
-def _decode_state(raw: str) -> Dict[str, Any]:
+def _decode_state(raw: str) -> dict[str, Any]:
     """Decode state data from stored string."""
     import json
     return json.loads(raw)

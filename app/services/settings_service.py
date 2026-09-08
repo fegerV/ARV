@@ -19,14 +19,14 @@ class SettingsService:
     def __init__(self, db: AsyncSession):
         self.db = db
     
-    async def get_setting(self, key: str) -> Optional[SystemSettings]:
+    async def get_setting(self, key: str) -> SystemSettings | None:
         """Get a single setting by key."""
         result = await self.db.execute(
             select(SystemSettings).where(SystemSettings.key == key)
         )
         return result.scalar_one_or_none()
     
-    async def get_settings_by_category(self, category: str) -> List[SystemSettings]:
+    async def get_settings_by_category(self, category: str) -> list[SystemSettings]:
         """Get all settings in a category."""
         result = await self.db.execute(
             select(SystemSettings).where(SystemSettings.category == category)
@@ -34,7 +34,7 @@ class SettingsService:
         return result.scalars().all()
 
     @staticmethod
-    def _parse_setting_value(setting: Optional[SystemSettings]) -> Any:
+    def _parse_setting_value(setting: SystemSettings | None) -> Any:
         """Convert DB string value to its declared Python type."""
         if setting is None or setting.value is None:
             return None
@@ -72,7 +72,7 @@ class SettingsService:
         value: Any, 
         data_type: str = "string",
         category: str = "general",
-        description: Optional[str] = None,
+        description: str | None = None,
         is_public: bool = False,
         commit: bool = True,
     ) -> SystemSettings:

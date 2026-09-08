@@ -91,7 +91,7 @@ class StorageProvider(ABC):
         pass
     
     @abstractmethod
-    async def get_usage_stats(self, path: str = "") -> Dict[str, Any]:
+    async def get_usage_stats(self, path: str = "") -> dict[str, Any]:
         """
         Get storage usage statistics.
         
@@ -107,7 +107,7 @@ class StorageProvider(ABC):
 class LocalStorageProvider(StorageProvider):
     """Local file system storage provider."""
     
-    def __init__(self, base_path: Optional[str] = None, public_url_base: Optional[str] = None):
+    def __init__(self, base_path: str | None = None, public_url_base: str | None = None):
         """
         Initialize local storage provider.
         
@@ -237,7 +237,7 @@ class LocalStorageProvider(StorageProvider):
         # StaticFiles is mounted at /storage, so return /storage/... path
         return f"/storage/{storage_path}"
     
-    async def get_usage_stats(self, path: str = "") -> Dict[str, Any]:
+    async def get_usage_stats(self, path: str = "") -> dict[str, Any]:
         """Get storage usage statistics for local storage."""
         target_path = self._get_full_path(path)
         
@@ -272,7 +272,7 @@ class LocalStorageProvider(StorageProvider):
 
 
 # Global storage provider instance
-_storage_provider: Optional[StorageProvider] = None
+_storage_provider: StorageProvider | None = None
 
 
 def get_storage_provider() -> StorageProvider:

@@ -11,8 +11,8 @@ class CompanyCreate(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     name: str = Field(..., min_length=1, max_length=255, description="Company name")
-    contact_email: Optional[EmailStr] = Field(None, description="Contact email address")
-    status: Optional[CompanyStatus] = Field(default=CompanyStatus.ACTIVE, description="Company status")
+    contact_email: EmailStr | None = Field(None, description="Contact email address")
+    status: CompanyStatus | None = Field(default=CompanyStatus.ACTIVE, description="Company status")
     storage_provider: StorageProviderType = Field(
         default=StorageProviderType.LOCAL,
         description="Storage backend: local or yandex_disk",
@@ -39,10 +39,10 @@ class CompanyUpdate(BaseModel):
 
     model_config = ConfigDict(from_attributes=True)
 
-    name: Optional[str] = Field(None, min_length=1, max_length=255, description="Company name")
-    contact_email: Optional[EmailStr] = Field(None, description="Contact email address")
-    status: Optional[CompanyStatus] = Field(None, description="Company status")
-    storage_provider: Optional[StorageProviderType] = Field(
+    name: str | None = Field(None, min_length=1, max_length=255, description="Company name")
+    contact_email: EmailStr | None = Field(None, description="Contact email address")
+    status: CompanyStatus | None = Field(None, description="Company status")
+    storage_provider: StorageProviderType | None = Field(
         None,
         description="Storage backend: local or yandex_disk",
     )
@@ -78,7 +78,7 @@ class CompanyListItem(BaseModel):
 
     id: str
     name: str
-    contact_email: Optional[str]
+    contact_email: str | None
     storage_provider: str = Field(default="local", description="Storage provider type")
     status: CompanyStatus
     projects_count: int = Field(..., description="Number of projects for this company")
@@ -93,7 +93,7 @@ class CompanyDetail(BaseModel):
 
     id: str
     name: str
-    contact_email: Optional[str]
+    contact_email: str | None
     storage_provider: str = Field(default="local", description="Storage provider type")
     yandex_connected: bool = Field(default=False, description="Whether Yandex Disk is connected")
     status: CompanyStatus
@@ -105,7 +105,7 @@ class CompanyDetail(BaseModel):
 
 class PaginatedCompaniesResponse(BaseModel):
     """Schema for paginated companies list response"""
-    items: List[CompanyListItem]
+    items: list[CompanyListItem]
     total: int = Field(..., description="Total number of companies")
     page: int = Field(..., description="Current page number")
     page_size: int = Field(..., description="Number of items per page")

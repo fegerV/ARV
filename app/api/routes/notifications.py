@@ -34,10 +34,10 @@ class NotificationCreate(BaseModel):
     notification_type: str
     subject: str
     message: str
-    company_id: Optional[int] = None
-    project_id: Optional[int] = None
-    ar_content_id: Optional[int] = None
-    metadata: Optional[Dict[str, Any]] = None
+    company_id: int | None = None
+    project_id: int | None = None
+    ar_content_id: int | None = None
+    metadata: dict[str, Any] | None = None
 
 
 def _send_email_notification_sync(to_email: str, subject: str, html_body: str) -> None:

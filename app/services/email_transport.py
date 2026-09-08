@@ -43,7 +43,7 @@ def send_smtp_message(
         server.send_message(message)
 
 
-def _render_template(template_name: str, context: Dict) -> Optional[str]:
+def _render_template(template_name: str, context: dict) -> str | None:
     """Render an email template from the templates directory.
 
     Falls back to the ``message`` key in *context* if the template
@@ -74,10 +74,10 @@ def _render_template(template_name: str, context: Dict) -> Optional[str]:
 
 
 def send_email(
-    to_email: Union[str, List[str]],
+    to_email: str | list[str],
     subject: str,
     template_name: str,
-    context: Optional[Dict] = None,
+    context: dict | None = None,
     **kwargs,
 ) -> None:
     """Send an email via SMTP using a Jinja2 template or plain-text fallback.

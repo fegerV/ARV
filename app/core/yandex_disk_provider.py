@@ -221,7 +221,7 @@ class YandexDiskStorageProvider(StorageProvider):
         storage_path = storage_path.replace("\\", "/").lstrip("/")
         return f"yadisk://{storage_path}"
 
-    async def get_download_url(self, storage_path: str) -> Optional[str]:
+    async def get_download_url(self, storage_path: str) -> str | None:
         """
         Obtain a temporary direct-download URL from Yandex Disk.
 
@@ -241,7 +241,7 @@ class YandexDiskStorageProvider(StorageProvider):
             logger.error("yd_download_url_failed", disk_path=disk_path, error=str(exc))
             return None
 
-    async def get_folder_size(self, relative_path: str = "") -> Dict[str, Any]:
+    async def get_folder_size(self, relative_path: str = "") -> dict[str, Any]:
         """Calculate total size and file count for a folder on Yandex Disk.
 
         Recursively traverses the folder tree via the Disk REST API and
@@ -315,7 +315,7 @@ class YandexDiskStorageProvider(StorageProvider):
                 "error_type": type(exc).__name__,
             }
 
-    async def get_usage_stats(self, path: str = "") -> Dict[str, Any]:
+    async def get_usage_stats(self, path: str = "") -> dict[str, Any]:
         """Return Yandex Disk quota information."""
         try:
             async with httpx.AsyncClient(timeout=_DEFAULT_TIMEOUT) as client:

@@ -64,8 +64,8 @@ def build_ar_content_storage_path(
     company_id: int, 
     project_id: int, 
     order_number: str,
-    company_name: Optional[str] = None,
-    project_name: Optional[str] = None
+    company_name: str | None = None,
+    project_name: str | None = None
 ) -> Path:
     """Build the storage path for AR content.
     
@@ -152,7 +152,7 @@ async def get_ar_content_storage_path(ar_content, db = None) -> Path:
 
 def build_public_url(
     storage_path: Path,
-    provider: Optional["StorageProvider"] = None,
+    provider: "StorageProvider" | None = None,
 ) -> str:
     """Convert a storage path to a public URL using the storage provider.
 
@@ -200,8 +200,8 @@ def build_unique_link(unique_id: str) -> str:
 async def generate_qr_code(
     unique_id: str,
     storage_path: Path,
-    provider: Optional["StorageProvider"] = None,
-    order_number: Optional[str] = None,
+    provider: "StorageProvider" | None = None,
+    order_number: str | None = None,
 ) -> str:
     """Generate QR code for AR content and save it to storage.
 
@@ -280,7 +280,7 @@ def _draw_centered_text(
 
 def compose_printable_qr(
     qr_img: Image.Image,
-    order_number: Optional[str] = None,
+    order_number: str | None = None,
     site_label: str = "VERTEX-ART.RU",
 ) -> Image.Image:
     """Compose a print-ready QR label with order number and site text."""
@@ -316,9 +316,9 @@ def compose_printable_qr(
 async def save_uploaded_file(
     upload_file,
     destination_path: Path,
-    provider: Optional["StorageProvider"] = None,
-    relative_storage_path: Optional[str] = None,
-) -> Optional[str]:
+    provider: "StorageProvider" | None = None,
+    relative_storage_path: str | None = None,
+) -> str | None:
     """Save an uploaded file to the destination path asynchronously.
 
     For local storage the file is written to *destination_path* directly.
@@ -434,9 +434,9 @@ async def generate_thumbnail(
     image_path: Path,
     thumbnail_path: Path,
     size: tuple = (200, 200),
-    provider: Optional["StorageProvider"] = None,
-    relative_storage_path: Optional[str] = None,
-) -> Optional[str]:
+    provider: "StorageProvider" | None = None,
+    relative_storage_path: str | None = None,
+) -> str | None:
     """Generate a thumbnail for an image.
 
     Args:

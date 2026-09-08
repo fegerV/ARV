@@ -80,7 +80,7 @@ class ImageQualityAnalyzer:
             return "ready"
         return "low_quality"
 
-    def get_quality_issue_reason(self, metrics: dict, quality_score: int) -> Optional[str]:
+    def get_quality_issue_reason(self, metrics: dict, quality_score: int) -> str | None:
         """Get human-readable reason for low quality score.
         
         Args:
@@ -172,7 +172,7 @@ class ImageQualityAnalyzer:
             or recognition_probability < self._MIN_RECOGNITION_PROBABILITY
         )
 
-    def enhance_image_for_marker(self, image_path: str, output_path: str) -> Optional[str]:
+    def enhance_image_for_marker(self, image_path: str, output_path: str) -> str | None:
         """
         Enhance image for better marker tracking (contrast + sharpness).
 

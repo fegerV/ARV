@@ -23,11 +23,11 @@ async def create_notification(
     notification_type: str,
     subject: str,
     message: str,
-    company_id: Optional[int] = None,
-    project_id: Optional[int] = None,
-    ar_content_id: Optional[int] = None,
-    metadata: Optional[Dict[str, Any]] = None,
-    user_id: Optional[int] = None,
+    company_id: int | None = None,
+    project_id: int | None = None,
+    ar_content_id: int | None = None,
+    metadata: dict[str, Any] | None = None,
+    user_id: int | None = None,
 ) -> Notification:
     """Create a notification in the database.
     
@@ -164,11 +164,11 @@ class NotificationService:
         notification_type: str,
         subject: str,
         message: str,
-        company_id: Optional[int] = None,
-        project_id: Optional[int] = None,
-        ar_content_id: Optional[int] = None,
-        metadata: Optional[Dict[str, Any]] = None,
-        user_id: Optional[int] = None,
+        company_id: int | None = None,
+        project_id: int | None = None,
+        ar_content_id: int | None = None,
+        metadata: dict[str, Any] | None = None,
+        user_id: int | None = None,
     ) -> Notification:
         return await create_notification(
             db, notification_type, subject, message,

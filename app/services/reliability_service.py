@@ -45,7 +45,7 @@ class CircuitBreakerConfig:
     timeout: int = 60                  # Seconds to wait before trying again
     success_threshold: int = 3          # Successes to close circuit
     monitoring_period: int = 300       # Seconds to monitor for health
-    expected_exceptions: List[type] = field(default_factory=lambda: [Exception])
+    expected_exceptions: list[type] = field(default_factory=lambda: [Exception])
 
 @dataclass
 class RetryConfig:
@@ -211,7 +211,7 @@ class CircuitBreaker:
             time.time() - self.last_failure_time >= self.config.timeout
         )
     
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """Get circuit breaker statistics."""
         return {
             'service': self.service_name,
@@ -325,8 +325,8 @@ class HealthChecker:
     """Health checker for monitoring service health."""
     
     def __init__(self):
-        self.health_checks: Dict[str, HealthCheck] = {}
-        self.last_results: Dict[str, Dict[str, Any]] = {}
+        self.health_checks: dict[str, HealthCheck] = {}
+        self.last_results: dict[str, dict[str, Any]] = {}
         self.lock = asyncio.Lock()
         
         # Background monitoring task
@@ -343,7 +343,7 @@ class HealthChecker:
         self.health_checks[health_check.name] = health_check
         logger.info("health_check_registered", name=health_check.name, critical=health_check.critical)
     
-    async def check_health(self, check_name: Optional[str] = None) -> Dict[str, Any]:
+    async def check_health(self, check_name: str | None = None) -> dict[str, Any]:
         """Execute health check(s)."""
         
         if check_name:
@@ -444,7 +444,7 @@ class HealthChecker:
         
         return results
     
-    async def get_overall_health(self) -> Dict[str, Any]:
+    async def get_overall_health(self) -> dict[str, Any]:
         """Get overall system health status."""
         
         if not self.last_results:
@@ -515,7 +515,7 @@ class HealthChecker:
                 from app.services.alert_service import Alert, send_critical_alerts
 
                 # Build alerts from failed/degraded checks
-                alerts: List[Alert] = []
+                alerts: list[Alert] = []
                 for name, result in self.last_results.items():
                     s = result.get("status")
                     if s == HealthStatus.UNHEALTHY.value:
@@ -564,8 +564,8 @@ class ReliabilityService:
     """Main reliability service combining circuit breaker, retry, and health checks."""
     
     def __init__(self):
-        self.circuit_breakers: Dict[str, CircuitBreaker] = {}
-        self.retry_handlers: Dict[str, RetryHandler] = {}
+        self.circuit_breakers: dict[str, CircuitBreaker] = {}
+        self.retry_handlers: dict[str, RetryHandler] = {}
         self.health_checker = HealthChecker()
         
         # Register default health checks
@@ -574,7 +574,7 @@ class ReliabilityService:
     def get_circuit_breaker(
         self,
         service_name: str,
-        config: Optional[CircuitBreakerConfig] = None
+        config: CircuitBreakerConfig | None = None
     ) -> CircuitBreaker:
         """Get or create circuit breaker for service."""
         
@@ -587,7 +587,7 @@ class ReliabilityService:
     def get_retry_handler(
         self,
         service_name: str,
-        config: Optional[RetryConfig] = None
+        config: RetryConfig | None = None
     ) -> RetryHandler:
         """Get or create retry handler for service."""
         
@@ -602,8 +602,8 @@ class ReliabilityService:
         service_name: str,
         func: Callable,
         *args,
-        circuit_breaker_config: Optional[CircuitBreakerConfig] = None,
-        retry_config: Optional[RetryConfig] = None,
+        circuit_breaker_config: CircuitBreakerConfig | None = None,
+        retry_config: RetryConfig | None = None,
         **kwargs
     ) -> Any:
         """Execute function with circuit breaker and retry protection."""
@@ -668,7 +668,7 @@ class ReliabilityService:
             HealthCheck("storage", check_storage, critical=False)
         )
     
-    async def get_reliability_stats(self) -> Dict[str, Any]:
+    async def get_reliability_stats(self) -> dict[str, Any]:
         """Get comprehensive reliability statistics."""
         
         stats = {
@@ -691,7 +691,7 @@ class CircuitBreakerOpenError(Exception):
 # Decorators for easy usage
 def circuit_breaker(
     service_name: str,
-    config: Optional[CircuitBreakerConfig] = None
+    config: CircuitBreakerConfig | None = None
 ):
     """Decorator to add circuit breaker protection to functions."""
     
@@ -705,7 +705,7 @@ def circuit_breaker(
 
 def retry(
     service_name: str,
-    config: Optional[RetryConfig] = None
+    config: RetryConfig | None = None
 ):
     """Decorator to add retry logic to functions."""
     
@@ -719,8 +719,8 @@ def retry(
 
 def reliable(
     service_name: str,
-    circuit_breaker_config: Optional[CircuitBreakerConfig] = None,
-    retry_config: Optional[RetryConfig] = None
+    circuit_breaker_config: CircuitBreakerConfig | None = None,
+    retry_config: RetryConfig | None = None
 ):
     """Decorator to add both circuit breaker and retry protection."""
     

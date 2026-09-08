@@ -7,17 +7,17 @@ from datetime import datetime
 class StorageConnectionBase(BaseModel):
     name: str = Field(..., min_length=1, max_length=255)
     provider: Literal["local_disk"] = "local_disk"  # Simplified to only local_disk
-    metadata: Optional[Dict[str, Any]] = Field(default_factory=dict)
+    metadata: dict[str, Any] | None = Field(default_factory=dict)
 
 class StorageConnectionCreate(StorageConnectionBase):
     base_path: str = Field(..., description="Base path for local storage")
-    is_default: Optional[bool] = False
+    is_default: bool | None = False
 
 class StorageConnectionUpdate(BaseModel):
-    name: Optional[str] = None
-    is_active: Optional[bool] = None
-    base_path: Optional[str] = None
-    metadata: Optional[Dict[str, Any]] = None
+    name: str | None = None
+    is_active: bool | None = None
+    base_path: str | None = None
+    metadata: dict[str, Any] | None = None
 
 class StorageConnection(StorageConnectionBase):
     model_config = ConfigDict(from_attributes=True)
@@ -25,10 +25,10 @@ class StorageConnection(StorageConnectionBase):
     id: int
     is_active: bool
     base_path: str
-    is_default: Optional[bool] = False
-    last_tested_at: Optional[datetime]
-    test_status: Optional[str]
-    test_error: Optional[str]
+    is_default: bool | None = False
+    last_tested_at: datetime | None
+    test_status: str | None
+    test_error: str | None
     created_at: datetime
     updated_at: datetime
 
@@ -37,7 +37,7 @@ class StorageConnection(StorageConnectionBase):
 class CompanyStorageSettings(BaseModel):
     storage_connection_id: int
     storage_path: str
-    storage_quota_gb: Optional[int] = None
+    storage_quota_gb: int | None = None
 
 # ============ Storage Usage Stats ============
 

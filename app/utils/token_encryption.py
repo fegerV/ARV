@@ -18,7 +18,7 @@ class TokenEncryption:
     """Handles encryption and decryption of OAuth tokens."""
 
     def __init__(self) -> None:
-        self._cipher: Optional[Fernet] = None
+        self._cipher: Fernet | None = None
         self._init_cipher()
 
     def _init_cipher(self) -> None:
@@ -40,7 +40,7 @@ class TokenEncryption:
         """
         return hashlib.sha256(settings.SECRET_KEY.encode()).digest()[:16]
 
-    def encrypt_credentials(self, credentials: Dict[str, Any]) -> str:
+    def encrypt_credentials(self, credentials: dict[str, Any]) -> str:
         if self._cipher is None:
             raise RuntimeError("Token encryption is not initialized")
 
@@ -48,7 +48,7 @@ class TokenEncryption:
         encrypted_data = self._cipher.encrypt(json_data)
         return base64.urlsafe_b64encode(encrypted_data).decode()
 
-    def decrypt_credentials(self, encrypted_data: str) -> Dict[str, Any]:
+    def decrypt_credentials(self, encrypted_data: str) -> dict[str, Any]:
         if self._cipher is None:
             raise RuntimeError("Token encryption is not initialized")
 

@@ -24,9 +24,9 @@ router = APIRouter()
 # Helpers
 # ---------------------------------------------------------------------------
 
-def _sanitise_payload(payload: Dict[str, Any]) -> Dict[str, Any]:
+def _sanitise_payload(payload: dict[str, Any]) -> dict[str, Any]:
     """Coerce types that arrive as strings from the frontend."""
-    clean: Dict[str, Any] = {}
+    clean: dict[str, Any] = {}
     for key, value in payload.items():
         if key == "id":
             continue
@@ -60,7 +60,7 @@ def _sanitise_payload(payload: Dict[str, Any]) -> Dict[str, Any]:
 @router.post("/ar-content/{content_id}")
 async def set_rotation(
     content_id: int,
-    payload: Dict[str, Any],
+    payload: dict[str, Any],
     current_user=Depends(get_current_active_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -119,7 +119,7 @@ async def set_rotation(
 @router.put("/{schedule_id}")
 async def update_rotation(
     schedule_id: int,
-    payload: Dict[str, Any],
+    payload: dict[str, Any],
     current_user=Depends(get_current_active_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -175,7 +175,7 @@ async def delete_rotation(
 @router.post("/ar-content/{content_id}/sequence")
 async def set_rotation_sequence(
     content_id: int,
-    payload: Dict[str, Any],
+    payload: dict[str, Any],
     current_user=Depends(get_current_active_user),
     db: AsyncSession = Depends(get_db),
 ):

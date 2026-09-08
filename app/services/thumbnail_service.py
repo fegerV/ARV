@@ -96,10 +96,10 @@ class ThumbnailService:
         self,
         image_path: str,
         storage_path: Path,
-        thumbnail_name: Optional[str] = None,
-        output_dir: Optional[str] = None,  # Deprecated, kept for compatibility
+        thumbnail_name: str | None = None,
+        output_dir: str | None = None,  # Deprecated, kept for compatibility
         provider=None,  # Deprecated, kept for compatibility
-        company_id: Optional[int] = None,  # Deprecated, kept for compatibility
+        company_id: int | None = None,  # Deprecated, kept for compatibility
     ) -> dict:
         """
         Генерация превью для изображения
@@ -272,11 +272,11 @@ class ThumbnailService:
     async def generate_video_thumbnail(
         self,
         video_path: str,
-        output_dir: Optional[str] = None,
-        thumbnail_name: Optional[str] = None,
+        output_dir: str | None = None,
+        thumbnail_name: str | None = None,
         time_position: float = 1.0,
         provider=None,
-        company_id: Optional[int] = None,
+        company_id: int | None = None,
     ) -> dict:
         """Генерация пропорциональных WebP-превью для видео в 3 размерах.
 

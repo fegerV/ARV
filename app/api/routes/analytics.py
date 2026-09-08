@@ -35,7 +35,7 @@ def compute_storage_used_gb() -> float:
             return 0.0
         usage = shutil.disk_usage(base_path)
         return round(usage.used / (1024 ** 3), 2)
-    except Exception:
+    except OSError:
         return 0.0
 
 
@@ -221,8 +221,8 @@ async def track_ar_session(payload: dict, db: AsyncSession = Depends(get_db)):
 
     IMPORTANT: ARViewSession uses UUID FK fields; do not write sentinel 0 values.
     """
-    unique_id: Optional[str] = payload.get("ar_content_unique_id") or payload.get("portrait_id")
-    session_id_raw: Optional[str] = payload.get("session_id")
+    unique_id: str | None = payload.get("ar_content_unique_id") or payload.get("portrait_id")
+    session_id_raw: str | None = payload.get("session_id")
 
     if not unique_id:
         raise HTTPException(status_code=400, detail="ar_content_unique_id is required")
@@ -262,8 +262,8 @@ async def track_ar_session(payload: dict, db: AsyncSession = Depends(get_db)):
 @router.post("/mobile/sessions")
 async def mobile_session_start(payload: dict, db: AsyncSession = Depends(get_db)):
     """Create AR mobile/browser session (minimal REST)."""
-    unique_id: Optional[str] = payload.get("ar_content_unique_id")
-    session_id_raw: Optional[str] = payload.get("session_id")
+    unique_id: str | None = payload.get("ar_content_unique_id")
+    session_id_raw: str | None = payload.get("session_id")
 
     if not unique_id:
         raise HTTPException(status_code=400, detail="ar_content_unique_id is required")
@@ -330,7 +330,7 @@ async def ar_diagnostic_event(payload: dict):
 @router.post("/mobile/analytics")
 async def mobile_analytics_update(payload: dict, db: AsyncSession = Depends(get_db)):
     """Update session analytics (minimal REST)."""
-    session_id_raw: Optional[str] = payload.get("session_id")
+    session_id_raw: str | None = payload.get("session_id")
     if not session_id_raw:
         raise HTTPException(status_code=400, detail="session_id is required")
 

@@ -71,7 +71,7 @@ def validate_video_file(upload_file: UploadFile) -> None:
         )
 
 
-async def get_video_metadata(file_path: str) -> Dict[str, Any]:
+async def get_video_metadata(file_path: str) -> dict[str, Any]:
     """
     Extract video metadata using ffprobe.
     
@@ -86,7 +86,7 @@ async def get_video_metadata(file_path: str) -> Dict[str, Any]:
     """
     log = logger.bind(file_path=file_path)
     
-    def _parse_fps(value: Optional[str]) -> float:
+    def _parse_fps(value: str | None) -> float:
         if not value:
             return 0.0
         parts = value.split("/")
@@ -266,7 +266,7 @@ async def save_uploaded_video(upload_file: UploadFile, destination_path: Path) -
         raise HTTPException(status_code=500, detail=f"Failed to save video file: {str(exc)}")
 
 
-def generate_video_filename(original_filename: str, video_id: Optional[int] = None) -> str:
+def generate_video_filename(original_filename: str, video_id: int | None = None) -> str:
     """
     Generate a standardized filename for uploaded videos.
     

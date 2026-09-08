@@ -85,7 +85,7 @@ def format_bytes(bytes_value: int) -> str:
         return "0 B"
 
 
-def calculate_directory_size(directory: Path, max_depth: int = 10) -> Tuple[int, int]:
+def calculate_directory_size(directory: Path, max_depth: int = 10) -> tuple[int, int]:
     """Calculate total size and file count for a directory."""
     total_size = 0
     file_count = 0
@@ -94,7 +94,7 @@ def calculate_directory_size(directory: Path, max_depth: int = 10) -> Tuple[int,
         return 0, 0
 
     try:
-        def _calculate_recursive(path: Path, depth: int = 0) -> Tuple[int, int]:
+        def _calculate_recursive(path: Path, depth: int = 0) -> tuple[int, int]:
             if depth > max_depth:
                 return 0, 0
 

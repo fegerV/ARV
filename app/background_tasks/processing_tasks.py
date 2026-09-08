@@ -32,7 +32,7 @@ async def process_image(
     background_tasks: BackgroundTasks,
     image_path: str,
     output_path: str,
-    operations: List[Dict[str, Any]],
+    operations: list[dict[str, Any]],
     **kwargs
 ) -> str:
     """
@@ -69,7 +69,7 @@ async def process_image(
 def _process_image(
     image_path: str,
     output_path: str,
-    operations: List[Dict[str, Any]],
+    operations: list[dict[str, Any]],
     **kwargs
 ) -> str:
     """
@@ -197,7 +197,7 @@ def _apply_threshold(img: np.ndarray, threshold: int = 127,
     return result
 
 
-def _rotate_image(img: np.ndarray, angle: float, center: Tuple[int, int] = None, 
+def _rotate_image(img: np.ndarray, angle: float, center: tuple[int, int] = None, 
                 scale: float = 1.0) -> np.ndarray:
     """Rotate an image by the given angle."""
     h, w = img.shape[:2]

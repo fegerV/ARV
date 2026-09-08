@@ -15,10 +15,10 @@ logger = logging.getLogger(__name__)
 
 async def send_email(
     background_tasks: BackgroundTasks,
-    to_email: Union[str, List[str]],
+    to_email: str | list[str],
     subject: str,
     template_name: str,
-    context: Dict = None,
+    context: dict = None,
     **kwargs
 ) -> None:
     """
@@ -51,7 +51,7 @@ async def send_admin_notification(
     background_tasks: BackgroundTasks,
     subject: str,
     message: str,
-    context: Optional[Dict] = None
+    context: dict | None = None
 ) -> None:
     """
     Send a notification to the admin email.

@@ -51,7 +51,7 @@ def _is_yadisk_path(path: str) -> bool:
     return path.startswith(_YADISK_PREFIX)
 
 
-async def _download_yadisk_video(video_id: int, yadisk_path: str) -> Optional[str]:
+async def _download_yadisk_video(video_id: int, yadisk_path: str) -> str | None:
     """Скачивает видео с Yandex Disk во временный файл.
 
     Returns:
@@ -112,7 +112,7 @@ async def _generate_video_thumbnail_task(video_id: int, video_path: str) -> None
     log.info("video_thumbnail_task_started")
 
     local_path = video_path
-    tmp_downloaded: Optional[str] = None
+    tmp_downloaded: str | None = None
 
     # Если видео на Yandex Disk — скачиваем во временный файл
     if _is_yadisk_path(video_path):
@@ -230,7 +230,7 @@ def parse_subscription_preset(preset: str) -> datetime:
 async def upload_videos(
     request: Request,
     content_id: str,
-    videos: List[UploadFile] = File(...),
+    videos: list[UploadFile] = File(...),
     background_tasks: BackgroundTasks = None,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
@@ -280,7 +280,7 @@ async def upload_videos(
     is_yd = isinstance(provider, YandexDiskStorageProvider)
 
     # Build YD relative prefix (same structure used during AR content creation)
-    yd_relative_prefix: Optional[str] = None
+    yd_relative_prefix: str | None = None
     if is_yd:
         from app.utils.slug_utils import generate_slug
         from app.utils.ar_content import sanitize_filename
@@ -451,7 +451,7 @@ async def upload_videos(
     }
 
 
-@router.get("/ar-content/{content_id}/videos", response_model=List[VideoStatusResponse])
+@router.get("/ar-content/{content_id}/videos", response_model=list[VideoStatusResponse])
 async def list_videos(
     request: Request,
     content_id: str,
@@ -833,7 +833,7 @@ async def update_playback_mode(
 
 
 # Schedule CRUD endpoints
-@router.get("/ar-content/{content_id}/videos/{video_id}/schedules", response_model=List[VideoScheduleSchema])
+@router.get("/ar-content/{content_id}/videos/{video_id}/schedules", response_model=list[VideoScheduleSchema])
 async def list_video_schedules(
     request: Request,
     content_id: str,

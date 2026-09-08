@@ -63,7 +63,7 @@ class BackupService:
 
     async def run_backup(
         self,
-        session: Optional[AsyncSession] = None,
+        session: AsyncSession | None = None,
         company_id: int = None,
         yd_folder: str = "backups",
         trigger: str = "manual",
@@ -99,8 +99,8 @@ class BackupService:
             await session.refresh(record)
             record_id = record.id
 
-            tmp_path: Optional[str] = None
-            gz_path: Optional[str] = None
+            tmp_path: str | None = None
+            gz_path: str | None = None
 
             try:
                 # 1. pg_dump
@@ -175,7 +175,7 @@ class BackupService:
         session: AsyncSession,
         limit: int = 20,
         offset: int = 0,
-        company_ids: Optional[set[int]] = None,
+        company_ids: set[int] | None = None,
     ) -> list[BackupHistory]:
         """Return recent backup records ordered by newest first."""
         stmt = (
@@ -190,8 +190,8 @@ class BackupService:
         return list(result.scalars().all())
 
     async def get_last_status(
-        self, session: AsyncSession, company_ids: Optional[set[int]] = None
-    ) -> Optional[BackupHistory]:
+        self, session: AsyncSession, company_ids: set[int] | None = None
+    ) -> BackupHistory | None:
         """Return the most recent backup record."""
         stmt = (
             select(BackupHistory)
@@ -207,7 +207,7 @@ class BackupService:
         self,
         session: AsyncSession,
         backup_id: int,
-        company_ids: Optional[set[int]] = None,
+        company_ids: set[int] | None = None,
     ) -> bool:
         """Delete a backup record and the file on Yandex Disk."""
         record = await session.get(BackupHistory, backup_id)
@@ -344,7 +344,7 @@ class BackupService:
     @staticmethod
     async def _get_yd_provider(
         company_id: int,
-    ) -> Optional[YandexDiskStorageProvider]:
+    ) -> YandexDiskStorageProvider | None:
         """Resolve the Yandex Disk provider for *company_id*."""
         async with AsyncSessionLocal() as session:
             company = await session.get(Company, company_id)

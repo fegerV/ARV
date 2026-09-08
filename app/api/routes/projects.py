@@ -22,7 +22,7 @@ router = APIRouter(tags=["projects"])
 async def _batch_ar_content_counts(
     db: AsyncSession,
     project_ids: Sequence[int],
-) -> Dict[int, int]:
+) -> dict[int, int]:
     """Fetch AR-content counts for multiple projects in a single query.
 
     Returns a dict mapping ``project_id`` → count (default 0).
@@ -147,7 +147,7 @@ async def get_projects_by_company_no_auth(
 async def list_projects(
     page: int = Query(default=1, ge=1, description="Page number"),
     page_size: int = Query(default=20, ge=1, le=100, description="Number of items per page"),
-    company_id: Optional[int] = Query(default=None, description="Filter by company ID"),
+    company_id: int | None = Query(default=None, description="Filter by company ID"),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
 ):

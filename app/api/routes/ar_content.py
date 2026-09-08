@@ -289,9 +289,9 @@ async def list_ar_content(
 async def _create_ar_content(
     company_id: int,
     project_id: int,
-    customer_name: Optional[str],
-    customer_phone: Optional[str],
-    customer_email: Optional[str],
+    customer_name: str | None,
+    customer_phone: str | None,
+    customer_email: str | None,
     duration_years: int,
     photo_file: UploadFile,
     video_file: UploadFile,
@@ -855,9 +855,9 @@ async def create_ar_content(
     request: Request,
     company_id: int = Form(...),
     project_id: int = Form(...),
-    customer_name: Optional[str] = Form(None),
-    customer_phone: Optional[str] = Form(None),
-    customer_email: Optional[str] = Form(None),
+    customer_name: str | None = Form(None),
+    customer_phone: str | None = Form(None),
+    customer_email: str | None = Form(None),
     duration_years: int = Form(30),
     auto_enhance: bool = Form(False),
     photo_file: UploadFile = File(...),
@@ -894,7 +894,7 @@ async def parse_ar_content_data(request: Request):
     # Get form data
     form = await request.form()
 
-    def _parse_bool(value: Optional[str]) -> bool:
+    def _parse_bool(value: str | None) -> bool:
         if value is None:
             return False
         return str(value).strip().lower() in {"1", "true", "yes", "on"}

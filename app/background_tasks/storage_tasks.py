@@ -17,9 +17,9 @@ logger = logging.getLogger(__name__)
 
 async def save_upload_file(
     background_tasks: BackgroundTasks,
-    file: Union[UploadFile, BinaryIO],
+    file: UploadFile | BinaryIO,
     destination: str,
-    content_type: Optional[str] = None
+    content_type: str | None = None
 ) -> str:
     """
     Save an uploaded file to storage in the background.
@@ -61,7 +61,7 @@ def _save_file_content(
     content: bytes,
     destination: str,
     filename: str,
-    content_type: Optional[str] = None
+    content_type: str | None = None
 ) -> str:
     """
     Save file content to storage (runs in a background thread).

@@ -8,21 +8,21 @@ class ArContentCreate(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     project_id: int
-    customer_name: Optional[str] = None
-    customer_phone: Optional[str] = None
-    customer_email: Optional[EmailStr] = None
+    customer_name: str | None = None
+    customer_phone: str | None = None
+    customer_email: EmailStr | None = None
     duration_years: int = Field(default=30)
 
 
 class ArContentUpdate(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
-    project_id: Optional[int] = None
-    customer_name: Optional[str] = None
-    customer_phone: Optional[str] = None
-    customer_email: Optional[EmailStr] = None
-    status: Optional[ArContentStatus] = None
-    duration_years: Optional[int] = None
+    project_id: int | None = None
+    customer_name: str | None = None
+    customer_phone: str | None = None
+    customer_email: EmailStr | None = None
+    status: ArContentStatus | None = None
+    duration_years: int | None = None
 
 
 class VideoResponse(BaseModel):
@@ -31,8 +31,8 @@ class VideoResponse(BaseModel):
     id: int
     ar_content_id: int
     filename: str
-    duration: Optional[int] = None
-    size: Optional[int] = None
+    duration: int | None = None
+    size: int | None = None
     status: str
     is_active: bool
     created_at: datetime
@@ -45,18 +45,18 @@ class ArContentResponse(BaseModel):
     order_number: str
     project_id: int
     company_id: int
-    customer_name: Optional[str] = None
-    customer_phone: Optional[str] = None
-    customer_email: Optional[str] = None
+    customer_name: str | None = None
+    customer_phone: str | None = None
+    customer_email: str | None = None
     duration_years: int
     views_count: int
     status: str
-    active_video_id: Optional[int] = None
-    public_link: Optional[str] = None  # Optional for legacy/incomplete records
-    qr_code_url: Optional[str] = None
-    photo_url: Optional[str] = None
-    thumbnail_url: Optional[str] = None  # Thumbnail URL for photo preview
-    video_url: Optional[str] = None
+    active_video_id: int | None = None
+    public_link: str | None = None  # Optional for legacy/incomplete records
+    qr_code_url: str | None = None
+    photo_url: str | None = None
+    thumbnail_url: str | None = None  # Thumbnail URL for photo preview
+    video_url: str | None = None
     created_at: datetime
     updated_at: datetime
 
@@ -64,8 +64,8 @@ class ArContentResponse(BaseModel):
 class ArContentDetailResponse(ArContentResponse):
     model_config = ConfigDict(from_attributes=True)
 
-    videos: List[VideoResponse] = []
-    active_video: Optional[VideoResponse] = None
+    videos: list[VideoResponse] = []
+    active_video: VideoResponse | None = None
 
 
 # Additional schemas for API compatibility
@@ -88,7 +88,7 @@ class ARContentList(BaseModel):
 
     model_config = ConfigDict(from_attributes=True)
 
-    items: List[ArContentResponse]
+    items: list[ArContentResponse]
     total: int = Field(..., description="Total number of AR content items")
     page: int = Field(..., description="Current page number")
     page_size: int = Field(..., description="Number of items per page")
@@ -106,41 +106,41 @@ class ARContentCreateResponse(BaseModel):
     qr_code_url: str
     photo_url: str
     video_url: str
-    photo_analysis: Optional[Dict[str, Any]] = None
+    photo_analysis: dict[str, Any] | None = None
 
 
 class ARContentWithLinks(BaseModel):
     """Schema for AR content with additional links"""
     id: int
     order_number: str
-    unique_id: Optional[str] = None  # UUID for /view/{unique_id}
-    unique_link: Optional[str] = None
-    public_url: Optional[str] = None  # Public URL for AR viewer
+    unique_id: str | None = None  # UUID for /view/{unique_id}
+    unique_link: str | None = None
+    public_url: str | None = None  # Public URL for AR viewer
     company_id: int  # Company ID
     project_id: int  # Project ID
-    storage_path: Optional[str] = None  # Local storage path
+    storage_path: str | None = None  # Local storage path
 
-    customer_name: Optional[str] = None
-    customer_phone: Optional[str] = None
-    customer_email: Optional[str] = None
-    duration_years: Optional[int] = None
+    customer_name: str | None = None
+    customer_phone: str | None = None
+    customer_email: str | None = None
+    duration_years: int | None = None
 
     qr_code_url: str
     photo_url: str
-    thumbnail_url: Optional[str] = None  # Thumbnail URL for photo preview
+    thumbnail_url: str | None = None  # Thumbnail URL for photo preview
     video_url: str
     views_count: int
     status: str
     created_at: datetime
     updated_at: datetime
 
-    company_name: Optional[str] = None  # Company name
-    project_name: Optional[str] = None  # Project name
-    marker_url: Optional[str] = None  # URL to the AR marker file
-    marker_status: Optional[str] = None  # Status of marker generation
-    marker_metadata: Optional[Dict[str, Any]] = None  # Additional marker metadata
-    videos: List[VideoResponse] = []
-    active_video: Optional[VideoResponse] = None
+    company_name: str | None = None  # Company name
+    project_name: str | None = None  # Project name
+    marker_url: str | None = None  # URL to the AR marker file
+    marker_status: str | None = None  # Status of marker generation
+    marker_metadata: dict[str, Any] | None = None  # Additional marker metadata
+    videos: list[VideoResponse] = []
+    active_video: VideoResponse | None = None
 
     model_config = ConfigDict(from_attributes=True)
 

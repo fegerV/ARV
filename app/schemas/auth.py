@@ -10,7 +10,7 @@ class UserResponse(BaseModel):
     email: str
     full_name: str
     role: str
-    last_login_at: Optional[datetime] = None
+    last_login_at: datetime | None = None
 
 
 class Token(BaseModel):
@@ -34,8 +34,8 @@ class LoginRequest(BaseModel):
 
 class LoginError(BaseModel):
     detail: str
-    locked_until: Optional[datetime] = None
-    attempts_left: Optional[int] = None
+    locked_until: datetime | None = None
+    attempts_left: int | None = None
 
 
 class RegisterRequest(BaseModel):

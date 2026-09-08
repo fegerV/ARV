@@ -6,7 +6,7 @@ from pydantic import BaseModel, ConfigDict, Field
 class VideoScheduleBase(BaseModel):
     start_time: datetime
     end_time: datetime
-    description: Optional[str] = Field(None, max_length=500)
+    description: str | None = Field(None, max_length=500)
 
 
 class VideoScheduleCreate(VideoScheduleBase):
@@ -14,9 +14,9 @@ class VideoScheduleCreate(VideoScheduleBase):
 
 
 class VideoScheduleUpdate(BaseModel):
-    start_time: Optional[datetime] = None
-    end_time: Optional[datetime] = None
-    description: Optional[str] = Field(None, max_length=500)
+    start_time: datetime | None = None
+    end_time: datetime | None = None
+    description: str | None = Field(None, max_length=500)
 
 
 class VideoScheduleInDBBase(VideoScheduleBase):
@@ -47,8 +47,8 @@ class VideoActiveUpdate(BaseModel):
 
 class VideoPlaybackModeUpdate(BaseModel):
     mode: str = Field(..., pattern="^(manual|sequential|cyclic)$")
-    active_video_id: Optional[int] = None
-    active_video_ids: Optional[List[int]] = None
+    active_video_id: int | None = None
+    active_video_ids: list[int] | None = None
 
 
 class VideoSetActiveResponse(BaseModel):
@@ -59,13 +59,13 @@ class VideoSetActiveResponse(BaseModel):
 
 class VideoStatusResponse(BaseModel):
     id: int
-    title: Optional[str]
-    video_url: Optional[str]
-    preview_url: Optional[str]
+    title: str | None
+    video_url: str | None
+    preview_url: str | None
     is_active: bool
     rotation_type: str
-    subscription_end: Optional[datetime]
+    subscription_end: datetime | None
     status: str  # Computed: active, expiring, expired
-    days_remaining: Optional[int]  # Computed
+    days_remaining: int | None  # Computed
     schedules_count: int  # Count of attached schedules
-    schedules_summary: List[dict]  # Summary of schedule windows
+    schedules_summary: list[dict]  # Summary of schedule windows

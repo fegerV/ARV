@@ -169,7 +169,7 @@ async def set_company_storage(
 @router.get("/connections")
 async def list_storage_connections(
     request: Request,
-    is_active: Optional[bool] = Query(None, description="Filter by active status"),
+    is_active: bool | None = Query(None, description="Filter by active status"),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
 ):
