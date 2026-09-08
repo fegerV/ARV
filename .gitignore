@@ -54,3 +54,33 @@ alembic/versions/*.pyc
 *~
 .DS_Store
 Thumbs.db
+
+# SSL / certificates
+ssl/*.pem
+ssl/*.key
+ssl/*.crt
+ssl/*.p12
+
+# Mobile / client configs
+ARV/android/app/google-services.json
+**/google-services.json
+**/GoogleService-Info.plist
+
+# Runtime data
+data/alerts/queue.jsonl
+
+# Pytest temp
+.pytest-temp/
+
+# Ruff cache
+.ruff_cache/
+
+# Windows batch files
+*.bat
+
+# Root images (assets belong in static/)
+v-portal.png
+v-portal2.png
+portal_ar_icon.png
+portal_ar_icon_512.png
+Portal_AR_logo.png
