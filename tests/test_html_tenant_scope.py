@@ -48,6 +48,9 @@ class _Result:
     def scalar_one_or_none(self):
         return self._value
 
+    def scalar_one(self):
+        return self._value
+
     def scalar(self):
         return self._value
 
@@ -80,6 +83,18 @@ class _FakeDb:
 
     async def commit(self):
         self.commit_calls += 1
+
+
+class _SeqDb:
+    """Async session returning a different result per consecutive execute()."""
+
+    def __init__(self, results):
+        self.results = list(results)
+        self.statements = []
+
+    async def execute(self, stmt):
+        self.statements.append(stmt)
+        return _Result(self.results.pop(0))
 
 
 def _compiled(stmt) -> str:
@@ -424,3 +439,127 @@ async def test_project_form_companies_returns_serialized_rows():
 
     assert rows[0]["name"] == "Acme"
     assert rows[0]["contact_email"] == "ops@acme.test"
+
+
+# --------------------------------------------------------------------------
+# ARV-034 — project dropdown on the AR content forms
+# --------------------------------------------------------------------------
+
+def test_projects_for_ar_form_requires_current_user():
+    import inspect
+
+    from app.html.routes import ar_content as mod
+
+    param = inspect.signature(mod._load_projects_for_ar_form).parameters["current_user"]
+    assert param.kind is inspect.Parameter.KEYWORD_ONLY
+    assert param.default is inspect.Parameter.empty
+
+
+@pytest.mark.asyncio
+async def test_projects_for_ar_form_scoped_to_tenant():
+    from app.html.routes import ar_content as mod
+
+    db = _FakeDb(execute_result=[])
+    await mod._load_projects_for_ar_form(db, current_user=_user(company_id=10))
+
+    assert len(db.statements) == 1
+    where = db.statements[0].whereclause
+    assert where is not None
+    assert "company_id" in str(where)
+
+
+@pytest.mark.asyncio
+async def test_projects_for_ar_form_unscoped_for_super_admin():
+    from app.html.routes import ar_content as mod
+
+    db = _FakeDb(execute_result=[])
+    await mod._load_projects_for_ar_form(db, current_user=_super_admin())
+
+    assert len(db.statements) == 1
+    assert db.statements[0].whereclause is None
+
+
+@pytest.mark.asyncio
+async def test_projects_for_ar_form_fails_closed_without_company():
+    from app.html.routes import ar_content as mod
+
+    db = _FakeDb(execute_result=[])
+    stray = SimpleNamespace(id=1, company_id=None, is_super_admin=False, is_active=True)
+
+    result = await mod._load_projects_for_ar_form(db, current_user=stray)
+
+    assert result == []
+    assert db.statements == []
+
+
+# --------------------------------------------------------------------------
+# ARV-035 — AR content list (customer PII)
+# --------------------------------------------------------------------------
+
+def _ar_list_request():
+    return SimpleNamespace(query_params={}, headers={})
+
+
+class _FakeArTemplates:
+    def __init__(self):
+        self.context = None
+
+    def TemplateResponse(self, name, context, status_code=200):
+        self.context = context
+        from fastapi.responses import HTMLResponse
+
+        return HTMLResponse("ok", status_code=status_code)
+
+
+@pytest.mark.asyncio
+async def test_ar_content_list_scopes_to_tenant(monkeypatch):
+    """ARContent holds customer PII — the list must never cross tenants."""
+    from app.html.routes import ar_content as mod
+
+    fake_templates = _FakeArTemplates()
+    monkeypatch.setattr(mod, "templates", fake_templates)
+
+    # Порядок запросов: COUNT, items, company_names, statuses
+    db = _SeqDb([0, [], [], []])
+    await mod.ar_content_list(_ar_list_request(), _user(company_id=10), db)
+
+    assert len(db.statements) == 4
+    scoped = db.statements[:3]  # COUNT, items, company_names (statuses не sensitive)
+    for stmt in scoped:
+        where = stmt.whereclause
+        assert where is not None
+        # COUNT/items фильтруют по ar_content.company_id, фильтр имён — по companies.id
+        assert "company_id" in str(where) or "companies.id" in str(where)
+
+
+@pytest.mark.asyncio
+async def test_ar_content_list_leaves_super_admin_unscoped(monkeypatch):
+    from app.html.routes import ar_content as mod
+
+    fake_templates = _FakeArTemplates()
+    monkeypatch.setattr(mod, "templates", fake_templates)
+
+    db = _SeqDb([0, [], [], []])
+    await mod.ar_content_list(_ar_list_request(), _super_admin(), db)
+
+    assert len(db.statements) == 4
+    for stmt in db.statements[:3]:
+        assert stmt.whereclause is None
+
+
+@pytest.mark.asyncio
+async def test_ar_content_list_fails_closed_without_company(monkeypatch):
+    """A user with no company must get zero rows, not every tenant's data."""
+    from app.html.routes import ar_content as mod
+
+    fake_templates = _FakeArTemplates()
+    monkeypatch.setattr(mod, "templates", fake_templates)
+
+    db = _SeqDb([0, [], [], []])
+    stray = SimpleNamespace(id=1, company_id=None, is_super_admin=False, is_active=True)
+
+    await mod.ar_content_list(_ar_list_request(), stray, db)
+
+    assert len(db.statements) == 4
+    for stmt in db.statements[:3]:
+        assert stmt.whereclause is not None

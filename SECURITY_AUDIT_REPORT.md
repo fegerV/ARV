@@ -54,7 +54,7 @@
 
 ## 0.1 Повторная проверка (2026-09-14, после фиксов)
 
-Раздел добавлен по итогам **независимой перепроверки** уже помеченных «✅ Fixed» находок: код читался заново, а не принимался на веру по таблице выше. Все 7 Critical-находок (ARV-001…005, 006, 007) подтверждены фактически — проверки присутствуют в рантайме. Дополнительно найдена и устранена **одна не отражённая в исходном отчёте Critical-уязвимость**.
+Раздел добавлен по итогам **независимой перепроверки** уже помеченных «✅ Fixed» находок: код читался заново, а не принимался на веру по таблице выше. Все 7 Critical-находок (ARV-001…005, 006, 007) подтверждены фактически — проверки присутствуют в рантайме. Дополнительно найдено и устранено **пять не отражённых в исходном отчёте Critical-уязвимостей** — ARV-030…035, все в слое HTML-админки / её хелперов.
 
 ### ARV-030 — Обход CSRF: слишком широкий список исключений (NEW, Critical → ✅ Fixed)
 
@@ -120,6 +120,38 @@
 | **RECOMMENDED FIX** | ✅ Выполнено: фильтр по тенанту (`Company.id == user.company_id` для не-супер-админов); пользователь без компании получает пустой список (fail-closed); супер-админ видит всех. Параметр `current_user` сделан **обязательным keyword-only**: если будущий вызов его не передаст, будет `TypeError` на импорте/вызове, а не молчаливая утечка всех тенантов. |
 | **TEST TO ADD** | ✅ `tests/test_html_tenant_scope.py`: `test_project_form_companies_requires_current_user` (проверяет KEYWORD_ONLY и отсутствие default), `..._scoped_to_tenant`, `..._unscoped_for_super_admin`, `..._fails_closed_without_company`, `..._returns_serialized_rows`. |
 
+### ARV-034 — Раскрытие проектов всех арендаторов через выпадающий список на формах AR-контента (NEW, Critical → ✅ Fixed)
+
+| Поле | Значение |
+|------|----------|
+| **SEVERITY** | Critical |
+| **CATEGORY** | Broken Object Level Authorization (cross-tenant enumeration + PII) |
+| **FILE** | `app/html/routes/ar_content.py` (`_load_projects_for_ar_form` ~96, `_load_ar_form_reference_data` ~148) |
+| **COMPONENT** | HTML-панель: формы создания/редактирования AR-контента |
+| **VULNERABILITY** | `_load_projects_for_ar_form()` выполняла `select(Project).join(Company)` **без фильтра по арендатору**. Результат попадал в выпадающий список проектов на страницах создания/редактирования AR-контента. |
+| **EVIDENCE** | До фикса: `query = select(Project).join(Company)` — без `WHERE`; вызывается из `_load_ar_form_reference_data`, reachable любой ролью (`require_active_user` — только логин). `_serialize_project_for_ar_form` отдаёт `id`, `name`, `company_id`, `company_name`. |
+| **ATTACK SCENARIO** | Любой аутентифицированный пользователь открывает `GET /ar-content/create` (или любую форму AR-контента) и получает в `<select>` полный список проектов платформы с именами и принадлежностью к компаниям — карта проектов/компаний конкурентов. |
+| **IMPACT** | Раскрытие реестра проектов и аффилиации компаний между тенантами (confidentiality + reconnaissance). |
+| **LIKELIHOOD** | Высокая — страница открывается любым залогиненным пользователем. |
+| **RECOMMENDED FIX** | ✅ Выполнено: фильтр по тенанту (`Project.company_id == user.company_id` для не-супер-админов); пользователь без компании получает пустой список (fail-closed); супер-админ видит все. Параметр `current_user` сделан **обязательным keyword-only** (как в ARV-033) — забытый вызов даёт `TypeError`, а не молчаливую утечку. |
+| **TEST TO ADD** | ✅ `tests/test_html_tenant_scope.py`: `test_projects_for_ar_form_requires_current_user` (KEYWORD_ONLY, нет default), `..._scoped_to_tenant`, `..._unscoped_for_super_admin`, `..._fails_closed_without_company`. |
+
+### ARV-035 — IDOR/BOLA: список AR-контента без фильтра арендатора (раскрытие PII клиентов) (NEW, Critical → ✅ Fixed)
+
+| Поле | Значение |
+|------|----------|
+| **SEVERITY** | Critical |
+| **CATEGORY** | Broken Object Level Authorization (disclosure of customer PII) |
+| **FILE** | `app/html/routes/ar_content.py` (`ar_content_list` ~296, `company_names_stmt` ~463) |
+| **COMPONENT** | HTML-панель: список AR-контента (`/ar-content`) + выпадающий фильтр по компаниям |
+| **VULNERABILITY** | `ar_content_list` строил `base_conditions` и выполнял `select(ARContent).join(Company)` **без ограничения по арендатору**; выпадающий фильтр компаний (`company_names_stmt` = `select(Company.name)...distinct()`) перечислял все компании платформы. Модель `ARContent` несёт PII клиента: `customer_name`, `customer_email`, `customer_phone`, `order_number`. |
+| **EVIDENCE** | До фикса: `base_conditions = []` (без условия принадлежности); `company_names_stmt` без `WHERE`. Гард — только `require_active_user`. Список отдавал столбцы `customer_name`, `customer_email`, `customer_phone` для каждой строки. |
+| **ATTACK SCENARIO** | Любой аутентифицированный пользователь открывает `GET /ar-content` и видит строки AR-контента **всех** компаний, включая имя/email/телефон заказчиков; выпадающий фильтр компаний выдаёт полный реестр тенантов. Перебор без ограничений. |
+| **IMPACT** | Массовое раскрытие PII клиентов и метаданных контента между арендаторами (confidentiality). Тяжесть сопоставима с ARV-002/003 (Critical). |
+| **LIKELIHOOD** | Высокая. |
+| **RECOMMENDED FIX** | ✅ Выполнено: для не-супер-админов `base_conditions` получает `ARContent.company_id == user_company_id` (или `false()`, fail-closed, если компании нет); `company_names_stmt` фильтруется по `Company.id` (или `false()`). Супер-админ по-прежнему видит всё. |
+| **TEST TO ADD** | ✅ `tests/test_html_tenant_scope.py`: `test_ar_content_list_scopes_to_tenant` (4 запроса: COUNT, items, company_names, statuses; первые 3 несут `WHERE` по `company_id`/`companies.id`), `..._leaves_super_admin_unscoped`, `..._fails_closed_without_company`. |
+
 ### Как искались ARV-031/ARV-032/ARV-033 (методика)
 
 Проверка «по таблице» эти дыры не находила, поэтому был выполнен автоматический обход всех маршрутов приложения:
@@ -152,7 +184,7 @@
 
 `tests/test_storage_api.py` — 6 тестов падали **до** работ по безопасности (сигнатура `request: Request` присутствовала уже в `bf8dee7`, а тесты её не передавали). Модуль приведён в рабочее состояние и расширен: фиктивные супер-админы, актуальная фабрика `get_storage_provider` (прежняя `get_storage_provider_instance` переименована), переносимый `tempfile`-каталог вместо зашитого `e:/Project/ARV/.pytest-temp`, плюс 3 новых теста на подписи медиа (отказ для не-супер-админа, истёкшая подпись, подпись другого тенанта). Итого 10 passed.
 
-**Итог перепроверки:** все 7 исходных Critical подтверждены; закрыты четыре новые Critical — **ARV-030** (обход CSRF), **ARV-031** (IDOR в HTML-роутах проектов), **ARV-032** (IDOR в HTML-роутах уведомлений), **ARV-033** (раскрытие реестра арендаторов через список компаний). 202 passed по наборам `test_csrf_exemptions`, `test_security_fixes`, `test_security_auth`, `test_idor_security`, `test_auth_api`, `test_storage_api`, `test_html_tenant_scope` и всем backup-наборам (4 падения в `test_notifications_api` / `test_projects_and_companies_api` / `test_analytics_html_and_logs` — **предсуществующие**, подтверждено прогоном с откатом правок через `git stash`).
+**Итог перепроверки:** все 7 исходных Critical подтверждены; закрыты **пять** новых Critical — **ARV-030** (обход CSRF), **ARV-031** (IDOR в HTML-роутах проектов), **ARV-032** (IDOR в HTML-роутах уведомлений), **ARV-033** (раскрытие реестра арендаторов через список компаний), **ARV-034/035** (раскрытие проектов и AR-контента с PII клиентов через HTML-формы/список). **252 passed** по наборам `test_csrf_exemptions`, `test_security_fixes`, `test_security_auth`, `test_idor_security`, `test_auth_api`, `test_storage_api`, `test_html_tenant_scope` и всем backup-наборам; 4 падения в `test_notifications_api` / `test_projects_and_companies_api` / `test_analytics_html_and_logs` — **предсуществующие** (подтверждено прогоном с откатом правок через `git stash`).
 
 ---
 
@@ -634,7 +666,7 @@
 5. ⬜ Прогнать полный тест-сьют в CI (Docker / Python 3.11) — локальный запуск ограничен окружением.
 6. ⬜ Ротация секретов: задать `SESSION_SECRET_KEY`, `TOKEN_ENCRYPTION_KEY`, `MEDIA_URL_SECRET`, `POSTGRES_PASSWORD`, `REDIS_PASSWORD` в проде.
 
-**Перепроверка 2026-09-14 (см. §0.1):** все 7 Critical-находок подтверждены фактически по коду; дополнительно закрыта **ARV-030** (обход CSRF через широкий список исключений) — Critical, не отражённая в исходном отчёте. Секреты в истории Git по `ARV-022` не обнаружены (только плейсхолдеры) → риск переклассифицирован в Informational. Итог: **179 passed / 0 failed** по security- и backup-наборам.
+**Перепроверка 2026-09-14 (см. §0.1):** все 7 Critical-находок подтверждены фактически по коду; дополнительно закрыты **пять** не отражённых в исходном отчёте Critical — **ARV-030** (обход CSRF через широкий список исключений), **ARV-031** (IDOR в HTML-роутах проектов), **ARV-032** (IDOR в HTML-роутах уведомлений), **ARV-033** (раскрытие реестра арендаторов через список компаний), **ARV-034/035** (раскрытие проектов и AR-контента с PII клиентов через HTML-формы/список). Секреты в истории Git по `ARV-022` не обнаружены (только плейсхолдеры) → риск переклассифицирован в Informational. Итог: **252 passed** по security- и backup-наборам (4 падения — предсуществующие, вне ARV-фиксов).
 
 ---
 

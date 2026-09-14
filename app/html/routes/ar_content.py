@@ -24,7 +24,13 @@ from app.utils.ar_content import build_public_url
 from app.html.deps import get_html_db
 from app.api.routes.auth import get_current_user_optional
 from app.html.templating import templates
-from app.html.utils import require_active_user, require_company_scope, serialize_datetime, serialize_nested
+from app.html.utils import (
+    require_active_user,
+    require_company_scope,
+    serialize_datetime,
+    serialize_nested,
+    is_super_admin,
+)
 from app.html.filters import storage_url
 from app.core.config import settings
 from app.services.settings_service import SettingsService
@@ -90,13 +96,30 @@ def _to_form_js_items(items: list[dict], fields: tuple[str, ...]) -> list[dict]:
     ]
 
 
-async def _load_projects_for_ar_form(db: AsyncSession) -> list[dict]:
-    """Load all projects with AR-content counts for create/edit forms."""
+async def _load_projects_for_ar_form(db: AsyncSession, *, current_user) -> list[dict]:
+    """Load projects with AR-content counts for create/edit forms.
+
+    ARV-034: the caller's tenant is applied here. Previously this ran
+    ``select(Project).join(Company)`` with no filter, so the project dropdown
+    on the AR create/edit form was populated with every project on the
+    platform — leaking other tenants' project names and their companies.
+
+    ``current_user`` is keyword-only and required on purpose: a call site that
+    forgets it raises TypeError instead of silently exposing every tenant.
+    """
     from sqlalchemy import func
     from app.models.project import Project
     from app.models.company import Company
 
     query = select(Project).join(Company)
+
+    if not is_super_admin(current_user):
+        user_company_id = getattr(current_user, "company_id", None)
+        # Fail closed: a user without a company sees no projects at all.
+        if user_company_id is None:
+            return []
+        query = query.where(Project.company_id == user_company_id)
+
     result = await db.execute(query)
     all_projects = result.scalars().all()
 
@@ -125,7 +148,7 @@ async def _load_ar_form_reference_data(db: AsyncSession, current_user) -> tuple[
         current_user=current_user,
     )
     companies = [dict(item) for item in companies_result.items]
-    projects = await _load_projects_for_ar_form(db)
+    projects = await _load_projects_for_ar_form(db, current_user=current_user)
     return companies, projects
 
 
@@ -273,11 +296,24 @@ async def ar_content_list(
     try:
         # Optimized: Load models directly instead of using API function to avoid duplicate queries
         from sqlalchemy.orm import selectinload
-        from sqlalchemy import func
+        from sqlalchemy import false, func
         from app.models.company import Company
         
         # Build base query with filters
         base_conditions = []
+
+        # ARV-035: ARContent carries customer PII (name, e-mail, phone, order
+        # number), so the list must never cross a tenant boundary. Super admins
+        # see everything; everyone else only their own company. A user with no
+        # company resolves to false() — fail closed, zero rows.
+        if not is_super_admin(current_user):
+            user_company_id = getattr(current_user, "company_id", None)
+            base_conditions.append(
+                ARContent.company_id == user_company_id
+                if user_company_id is not None
+                else false()
+            )
+
         if filter_company:
             base_conditions.append(Company.name == filter_company)
         if filter_status:
@@ -427,6 +463,14 @@ async def ar_content_list(
             .distinct()
             .order_by(Company.name)
         )
+        # ARV-035: the filter dropdown must not enumerate other tenants either.
+        if not is_super_admin(current_user):
+            _user_company_id = getattr(current_user, "company_id", None)
+            company_names_stmt = company_names_stmt.where(
+                Company.id == _user_company_id
+                if _user_company_id is not None
+                else false()
+            )
         company_names_result = await db.execute(company_names_stmt)
         unique_companies = [row[0] for row in company_names_result.all() if row[0]]
 
