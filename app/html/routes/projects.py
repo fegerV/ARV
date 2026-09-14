@@ -9,7 +9,7 @@ from app.models.project import Project
 from app.html.deps import get_html_db
 from app.api.routes.auth import get_current_user_optional
 from app.html.templating import templates
-from app.html.utils import require_active_user, require_company_scope, serialize_fields
+from app.html.utils import require_active_user, require_company_scope, serialize_fields, is_super_admin
 
 router = APIRouter()
 logger = structlog.get_logger()
@@ -47,10 +47,28 @@ def _serialize_company_for_project_form(company, *, projects_count: int | None =
 async def _load_project_form_companies(
     db: AsyncSession,
     *,
+    current_user,
     include_project_counts: bool = False,
 ) -> list[dict]:
-    """Load companies for project create/edit forms."""
+    """Load companies for project create/edit forms, scoped to the caller's tenant.
+
+    ARV-033: this list populates the company dropdown on the project
+    create/edit pages, which every authenticated role can reach. Without a
+    filter it enumerated *all* companies on the platform — id, name,
+    contact_email, status — handing any logged-in user the tenant roster.
+
+    ``current_user`` is keyword-only and required on purpose: a call site that
+    forgets it raises TypeError instead of silently leaking every tenant.
+    """
     companies_query = select(Company).order_by(Company.created_at.desc())
+
+    if not is_super_admin(current_user):
+        user_company_id = getattr(current_user, "company_id", None)
+        # Fail closed: a user without a company sees no companies at all.
+        if user_company_id is None:
+            return []
+        companies_query = companies_query.where(Company.id == user_company_id)
+
     companies_result = await db.execute(companies_query)
     companies_db = list(companies_result.scalars().all())
 
@@ -238,7 +256,7 @@ async def project_create(
         return redirect
     
     try:
-        companies = await _load_project_form_companies(db, include_project_counts=True)
+        companies = await _load_project_form_companies(db, current_user=current_user, include_project_counts=True)
     except Exception as e:
         logger.error("companies_fetch_error", error=str(e), exc_info=True)
         raise
@@ -284,7 +302,7 @@ async def project_detail(
         raise
     
     try:
-        companies = await _load_project_form_companies(db)
+        companies = await _load_project_form_companies(db, current_user=current_user)
     except Exception as e:
         logger.error("companies_fetch_error", error=str(e), exc_info=True)
         raise
@@ -326,7 +344,7 @@ async def project_edit(
         raise
     
     try:
-        companies = await _load_project_form_companies(db)
+        companies = await _load_project_form_companies(db, current_user=current_user)
     except Exception as e:
         logger.error("companies_fetch_error", error=str(e), exc_info=True)
         raise
@@ -358,7 +376,7 @@ async def project_create_post(
     
     if not name or not company_id:
         try:
-            companies = await _load_project_form_companies(db)
+            companies = await _load_project_form_companies(db, current_user=current_user)
         except Exception as e:
             logger.error("companies_fetch_error", error=str(e), exc_info=True)
             raise
@@ -413,7 +431,7 @@ async def project_create_post(
     except Exception as e:
         logger.error("project_create_error", error=str(e), exc_info=True)
         try:
-            companies = await _load_project_form_companies(db)
+            companies = await _load_project_form_companies(db, current_user=current_user)
         except Exception as db_error:
             logger.error("companies_fetch_error", error=str(db_error), exc_info=True)
             raise
@@ -447,7 +465,7 @@ async def project_update_post(
     
     if not name or not company_id:
         try:
-            companies = await _load_project_form_companies(db)
+            companies = await _load_project_form_companies(db, current_user=current_user)
         except Exception as e:
             logger.error("companies_fetch_error", error=str(e), exc_info=True)
             raise
@@ -493,7 +511,7 @@ async def project_update_post(
     except Exception as e:
         logger.error("project_update_error", project_id=project_id, error=str(e), exc_info=True)
         try:
-            companies = await _load_project_form_companies(db)
+            companies = await _load_project_form_companies(db, current_user=current_user)
         except Exception as db_error:
             logger.error("companies_fetch_error", error=str(db_error), exc_info=True)
             raise

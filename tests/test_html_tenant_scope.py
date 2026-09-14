@@ -294,7 +294,7 @@ async def test_project_detail_raises_404_when_missing():
 async def test_project_detail_allows_own_tenant(monkeypatch):
     from app.html.routes import projects as mod
 
-    async def _fake_load_companies(db):
+    async def _fake_load_companies(db, *, current_user):
         return []
 
     monkeypatch.setattr(mod, "_load_project_form_companies", _fake_load_companies)
@@ -324,7 +324,7 @@ async def test_project_detail_allows_own_tenant(monkeypatch):
 async def test_project_detail_allows_super_admin_on_foreign_tenant(monkeypatch):
     from app.html.routes import projects as mod
 
-    async def _fake_load_companies(db):
+    async def _fake_load_companies(db, *, current_user):
         return []
 
     monkeypatch.setattr(mod, "_load_project_form_companies", _fake_load_companies)
@@ -348,3 +348,79 @@ async def test_project_detail_allows_super_admin_on_foreign_tenant(monkeypatch):
     response = await project_detail("7", request, _super_admin(), db)
 
     assert response.status_code == 200
+
+
+# --------------------------------------------------------------------------
+# ARV-033 — company dropdown on the project forms
+# --------------------------------------------------------------------------
+
+def test_project_form_companies_requires_current_user():
+    """The tenant filter must be impossible to forget at a call site."""
+    import inspect
+
+    from app.html.routes import projects as mod
+
+    sig = inspect.signature(mod._load_project_form_companies)
+    param = sig.parameters["current_user"]
+    assert param.kind is inspect.Parameter.KEYWORD_ONLY
+    assert param.default is inspect.Parameter.empty
+
+
+@pytest.mark.asyncio
+async def test_project_form_companies_scoped_to_tenant():
+    from app.html.routes import projects as mod
+
+    db = _FakeDb(execute_result=[])
+    await mod._load_project_form_companies(db, current_user=_user(company_id=10))
+
+    assert len(db.statements) == 1
+    where = db.statements[0].whereclause
+    assert where is not None
+    # Рендерится как "companies.id = :id_1" — имя таблицы, а не имя FK.
+    assert "companies.id" in str(where)
+
+
+@pytest.mark.asyncio
+async def test_project_form_companies_unscoped_for_super_admin():
+    from app.html.routes import projects as mod
+
+    db = _FakeDb(execute_result=[])
+    await mod._load_project_form_companies(db, current_user=_super_admin())
+
+    assert len(db.statements) == 1
+    assert db.statements[0].whereclause is None
+
+
+@pytest.mark.asyncio
+async def test_project_form_companies_fails_closed_without_company():
+    """A user with no company must not see the tenant roster."""
+    from app.html.routes import projects as mod
+
+    db = _FakeDb(execute_result=[])
+    stray = SimpleNamespace(id=1, company_id=None, is_super_admin=False, is_active=True)
+
+    result = await mod._load_project_form_companies(db, current_user=stray)
+
+    assert result == []
+    assert db.statements == []
+
+
+@pytest.mark.asyncio
+async def test_project_form_companies_returns_serialized_rows():
+    """Sanity check: the serializer is what made the leak worth fixing."""
+    from app.html.routes import projects as mod
+
+    company = SimpleNamespace(
+        id=10,
+        name="Acme",
+        contact_email="ops@acme.test",
+        status="active",
+        created_at=None,
+        updated_at=None,
+    )
+    db = _FakeDb(execute_result=[company])
+
+    rows = await mod._load_project_form_companies(db, current_user=_user(company_id=10))
+
+    assert rows[0]["name"] == "Acme"
+    assert rows[0]["contact_email"] == "ops@acme.test"
