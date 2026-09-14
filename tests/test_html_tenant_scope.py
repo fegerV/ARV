@@ -17,7 +17,9 @@ from app.html.routes.notifications import (
     notification_delete,
     notification_detail,
 )
-from app.html.routes.projects import project_detail, project_edit
+from app.html.routes.projects import project_detail, project_edit, projects_list
+from app.html.routes.dashboard import admin_dashboard
+from app.html.routes.storage import storage_page
 
 
 # --------------------------------------------------------------------------
@@ -99,6 +101,33 @@ class _SeqDb:
 
 def _compiled(stmt) -> str:
     return str(stmt.compile(compile_kwargs={"literal_binds": True}))
+
+
+class _ListResult:
+    """Result stub for list pages: scalar() -> 0, rows -> []."""
+
+    def scalar(self):
+        return 0
+
+    def scalar_one_or_none(self):
+        return 0
+
+    def scalars(self):
+        return self
+
+    def all(self):
+        return []
+
+
+class _ListDb:
+    """Async session that records statements and returns safe list results."""
+
+    def __init__(self):
+        self.statements = []
+
+    async def execute(self, stmt):
+        self.statements.append(stmt)
+        return _ListResult()
 
 
 # --------------------------------------------------------------------------
@@ -563,3 +592,214 @@ async def test_ar_content_list_fails_closed_without_company(monkeypatch):
     assert len(db.statements) == 4
     for stmt in db.statements[:3]:
         assert stmt.whereclause is not None
+
+
+# --------------------------------------------------------------------------
+# ARV-036 — project list page (cross-tenant project enumeration)
+# --------------------------------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_project_list_scopes_to_tenant(monkeypatch):
+    """The project list must scope to the caller's company, not every tenant."""
+    from app.html.routes import projects as mod
+
+    seen = {}
+
+    class FakeTemplates:
+        def TemplateResponse(self, name, context):
+            seen["context"] = context
+            from fastapi.responses import HTMLResponse
+
+            return HTMLResponse("ok")
+
+    monkeypatch.setattr(mod, "templates", FakeTemplates())
+
+    db = _ListDb()
+    request = SimpleNamespace(query_params={}, headers={})
+
+    await mod.projects_list(request, _user(company_id=10), db)
+
+    # Count + items queries both carry the tenant WHERE; the company filter
+    # dropdown is scoped to the caller's company too.
+    scoped = [s for s in db.statements if s.whereclause is not None and "company_id" in str(s.whereclause)]
+    assert len(scoped) == 2
+    assert any("companies.id" in str(s.whereclause) for s in db.statements)
+
+
+@pytest.mark.asyncio
+async def test_project_list_leaves_super_admin_unscoped(monkeypatch):
+    from app.html.routes import projects as mod
+
+    class FakeTemplates:
+        def TemplateResponse(self, name, context):
+            from fastapi.responses import HTMLResponse
+
+            return HTMLResponse("ok")
+
+    monkeypatch.setattr(mod, "templates", FakeTemplates())
+
+    db = _ListDb()
+    request = SimpleNamespace(query_params={}, headers={})
+
+    await mod.projects_list(request, _super_admin(), db)
+
+    # Super admin sees every tenant — no company_id scope on the list.
+    scoped = [s for s in db.statements if s.whereclause is not None and "company_id" in str(s.whereclause)]
+    assert scoped == []
+
+
+@pytest.mark.asyncio
+async def test_project_list_fails_closed_without_company(monkeypatch):
+    """A user with no company must see zero projects, not the whole platform."""
+    from app.html.routes import projects as mod
+
+    class FakeTemplates:
+        def TemplateResponse(self, name, context):
+            from fastapi.responses import HTMLResponse
+
+            return HTMLResponse("ok")
+
+    monkeypatch.setattr(mod, "templates", FakeTemplates())
+
+    db = _ListDb()
+    request = SimpleNamespace(query_params={}, headers={})
+
+    stray = SimpleNamespace(id=1, company_id=None, is_super_admin=False, is_active=True)
+    await mod.projects_list(request, stray, db)
+
+    # count + items both resolve to false() (rendered as "false") — fail closed.
+    project_stmts = [s for s in db.statements if "projects" in str(s).lower()]
+    assert len(project_stmts) >= 2
+    for s in project_stmts:
+        assert str(s.whereclause) == "false"
+
+
+# --------------------------------------------------------------------------
+# ARV-037 — storage page (cross-tenant company roster + storage usage)
+# --------------------------------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_storage_page_hides_other_tenants(monkeypatch):
+    """A tenant user must only see their own company's storage row."""
+    from app.html.routes import storage as mod
+
+    async def _fake_get_storage_info(db):
+        return {
+            "companies": [
+                {"id": 10, "name": "Acme"},
+                {"id": 999, "name": "Other"},
+            ]
+        }
+
+    monkeypatch.setattr(mod, "get_storage_info", _fake_get_storage_info)
+
+    seen = {}
+
+    class FakeTemplates:
+        def TemplateResponse(self, name, context, status_code=200):
+            seen["context"] = context
+            from fastapi.responses import HTMLResponse
+
+            return HTMLResponse("ok", status_code=status_code)
+
+    monkeypatch.setattr(mod, "templates", FakeTemplates())
+
+    request = SimpleNamespace(headers={})
+    await mod.storage_page(request, _FakeDb(), _user(company_id=10))
+
+    companies = seen["context"]["storage_info"]["companies"]
+    assert [c["id"] for c in companies] == [10]
+
+
+@pytest.mark.asyncio
+async def test_storage_page_shows_all_for_super_admin(monkeypatch):
+    from app.html.routes import storage as mod
+
+    async def _fake_get_storage_info(db):
+        return {
+            "companies": [
+                {"id": 10, "name": "Acme"},
+                {"id": 999, "name": "Other"},
+            ]
+        }
+
+    monkeypatch.setattr(mod, "get_storage_info", _fake_get_storage_info)
+
+    seen = {}
+
+    class FakeTemplates:
+        def TemplateResponse(self, name, context, status_code=200):
+            seen["context"] = context
+            from fastapi.responses import HTMLResponse
+
+            return HTMLResponse("ok", status_code=status_code)
+
+    monkeypatch.setattr(mod, "templates", FakeTemplates())
+
+    request = SimpleNamespace(headers={})
+    await mod.storage_page(request, _FakeDb(), _super_admin())
+
+    companies = seen["context"]["storage_info"]["companies"]
+    assert {c["id"] for c in companies} == {10, 999}
+
+
+# --------------------------------------------------------------------------
+# ARV-038 — admin dashboard (platform-wide metrics disclosure)
+# --------------------------------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_dashboard_scopes_metrics_to_tenant(monkeypatch):
+    """Tenant metrics must be scoped by company_id; super admin sees platform."""
+    from app.html.routes import dashboard as mod
+
+    seen = {}
+
+    class FakeTemplates:
+        def TemplateResponse(self, name, context):
+            seen["context"] = context
+            from fastapi.responses import HTMLResponse
+
+            return HTMLResponse("ok")
+
+    monkeypatch.setattr(mod, "templates", FakeTemplates())
+
+    db = _FakeDb(execute_result=[])
+    request = SimpleNamespace(headers={})
+
+    await mod.admin_dashboard(request, db, _user(company_id=10))
+
+    # Every tenant-scoped statement carries a company_id (or companies.id) clause.
+    scoped = [
+        s
+        for s in db.statements
+        if s.whereclause is not None
+        and ("company_id" in str(s.whereclause) or "companies.id" in str(s.whereclause))
+    ]
+    assert len(scoped) >= 4
+
+
+@pytest.mark.asyncio
+async def test_dashboard_leaves_super_admin_unscoped(monkeypatch):
+    from app.html.routes import dashboard as mod
+
+    class FakeTemplates:
+        def TemplateResponse(self, name, context):
+            from fastapi.responses import HTMLResponse
+
+            return HTMLResponse("ok")
+
+    monkeypatch.setattr(mod, "templates", FakeTemplates())
+
+    db = _FakeDb(execute_result=[])
+    request = SimpleNamespace(headers={})
+
+    await mod.admin_dashboard(request, db, _super_admin())
+
+    # Super admin has no tenant scope (only status/date filters, never company_id).
+    leak = [
+        s
+        for s in db.statements
+        if s.whereclause is not None
+        and ("company_id" in str(s.whereclause) or "companies.id" in str(s.whereclause))
+    ]
+    assert leak == []

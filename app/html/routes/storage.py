@@ -18,7 +18,7 @@ from app.core.config import settings
 from app.core.database import AsyncSessionLocal
 from app.html.deps import get_html_db
 from app.html.templating import templates
-from app.html.utils import require_active_user
+from app.html.utils import require_active_user, is_super_admin
 from app.models.company import Company
 from app.models.project import Project
 
@@ -475,6 +475,21 @@ async def storage_page(
 
         try:
             storage_info = await get_storage_info(db)
+
+            # ARV-037: the storage page is reachable by any authenticated user,
+            # yet the cached info enumerates every tenant's company. A non-super
+            # admin may only see their own company's storage row.
+            if not is_super_admin(current_user):
+                user_company_id = getattr(current_user, "company_id", None)
+                if user_company_id is not None:
+                    storage_info = {
+                        **storage_info,
+                        "companies": [
+                            c
+                            for c in storage_info.get("companies", [])
+                            if c.get("id") == user_company_id
+                        ],
+                    }
         except Exception as e:
             logger.error(
                 "error_getting_storage_info",

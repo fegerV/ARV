@@ -3,11 +3,11 @@ from fastapi import Request, Depends
 from fastapi.responses import HTMLResponse
 from fastapi import APIRouter
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func, desc
+from sqlalchemy import select, func, desc, false
 from app.html.deps import get_html_db
 from app.api.routes.auth import get_current_user_optional
 from app.html.templating import templates
-from app.html.utils import require_active_user
+from app.html.utils import require_active_user, is_super_admin
 from app.models.company import Company
 from app.models.project import Project
 from app.models.ar_content import ARContent
@@ -30,29 +30,64 @@ async def admin_dashboard(
     try:
         since = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=30)
 
+        # ARV-038: platform-wide metrics are admin-only. Tenant users see only
+        # their own company's aggregates (fail closed: no company -> zero).
+        is_admin = is_super_admin(current_user)
+        tenant_company_id = None if is_admin else getattr(current_user, "company_id", None)
+
+        def _tenant_where(tenant_model):
+            if is_admin:
+                return None
+            if tenant_company_id is None:
+                return false()
+            return tenant_model.company_id == tenant_company_id
+
+        def _company_where():
+            if is_admin:
+                return None
+            if tenant_company_id is None:
+                return false()
+            return Company.id == tenant_company_id
+
         # AsyncSession не поддерживает параллельные операции — выполняем запросы последовательно.
-        r_companies = await db.execute(select(func.count()).select_from(Company))
+        r_companies = await db.execute(
+            select(func.count()).select_from(Company).where(_company_where())
+        )
         total_companies_count = r_companies.scalar() or 0
         r_active_companies = await db.execute(
-            select(func.count()).select_from(Company).where(Company.status == "active")
+            select(func.count()).select_from(Company)
+            .where(Company.status == "active")
+            .where(_company_where())
         )
         active_companies_count = r_active_companies.scalar() or 0
-        r_projects = await db.execute(select(func.count()).select_from(Project))
+        r_projects = await db.execute(
+            select(func.count()).select_from(Project).where(_tenant_where(Project))
+        )
         total_projects_count = r_projects.scalar() or 0
         r_active_projects = await db.execute(
-            select(func.count()).select_from(Project).where(Project.status == "active")
+            select(func.count()).select_from(Project)
+            .where(Project.status == "active")
+            .where(_tenant_where(Project))
         )
         active_projects_count = r_active_projects.scalar() or 0
-        r_ar = await db.execute(select(func.count()).select_from(ARContent))
+        r_ar = await db.execute(
+            select(func.count()).select_from(ARContent).where(_tenant_where(ARContent))
+        )
         total_ar_content_count = r_ar.scalar() or 0
         r_active_ar = await db.execute(
-            select(func.count()).select_from(ARContent).where(ARContent.status == "active")
+            select(func.count()).select_from(ARContent)
+            .where(ARContent.status == "active")
+            .where(_tenant_where(ARContent))
         )
         active_ar_content_count = r_active_ar.scalar() or 0
-        r_views = await db.execute(select(func.coalesce(func.sum(ARContent.views_count), 0)))
+        r_views = await db.execute(
+            select(func.coalesce(func.sum(ARContent.views_count), 0)).where(_tenant_where(ARContent))
+        )
         total_views_count = r_views.scalar() or 0
         r_views_30 = await db.execute(
-            select(func.count()).select_from(ARViewSession).where(ARViewSession.created_at >= since)
+            select(func.count()).select_from(ARViewSession)
+            .where(ARViewSession.created_at >= since)
+            .where(_tenant_where(ARViewSession))
         )
         views_30d_count = r_views_30.scalar() or 0
         recent_rows_result = await db.execute(
@@ -63,6 +98,7 @@ async def admin_dashboard(
                 ARContent.created_at,
                 ARContent.views_count,
             )
+            .where(_tenant_where(ARContent))
             .order_by(desc(ARContent.created_at))
             .limit(5)
         )

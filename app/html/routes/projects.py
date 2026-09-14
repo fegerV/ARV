@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Request, Depends, HTTPException
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import func, select
+from sqlalchemy import func, select, false
 import structlog
 from app.models.ar_content import ARContent
 from app.models.company import Company
@@ -153,11 +153,31 @@ async def projects_list(
         # Build base query with eager loading
         query = select(Project).options(selectinload(Project.company))
         count_query = select(func.count()).select_from(Project)
-        
-        # Apply company filter if specified
-        if company_id_filter:
-            query = query.where(Project.company_id == company_id_filter)
-            count_query = count_query.where(Project.company_id == company_id_filter)
+
+        if not is_super_admin(current_user):
+            # ARV-036: tenant users may only see their own company's projects.
+            # The company filter is user-supplied, so we override it with the
+            # caller's tenant. No company -> no rows (fail closed).
+            user_company_id = getattr(current_user, "company_id", None)
+            tenant_scope = (
+                Project.company_id == user_company_id
+                if user_company_id is not None
+                else false()
+            )
+            query = query.where(tenant_scope)
+            count_query = count_query.where(tenant_scope)
+            companies_query = (
+                select(Company).where(Company.id == user_company_id)
+                if user_company_id is not None
+                else select(Company).where(false())
+            )
+            company_filter = str(user_company_id) if user_company_id is not None else ""
+        else:
+            # Super admin may filter the list across any tenant.
+            if company_id_filter:
+                query = query.where(Project.company_id == company_id_filter)
+                count_query = count_query.where(Project.company_id == company_id_filter)
+            companies_query = select(Company).order_by(Company.name)
         
         # Get total count (single query)
         total_result = await db.execute(count_query)
@@ -217,9 +237,8 @@ async def projects_list(
         total_count = 0
         total_pages = 1
     
-    # Get companies for filter dropdown
+    # Get companies for filter dropdown (scoped to the caller's tenant above)
     try:
-        companies_query = select(Company).order_by(Company.name)
         companies_result = await db.execute(companies_query)
         companies = [
             {"id": c.id, "name": c.name}
