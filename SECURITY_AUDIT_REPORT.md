@@ -52,6 +52,48 @@
 
 ---
 
+## 0.1 Повторная проверка (2026-09-14, после фиксов)
+
+Раздел добавлен по итогам **независимой перепроверки** уже помеченных «✅ Fixed» находок: код читался заново, а не принимался на веру по таблице выше. Все 7 Critical-находок (ARV-001…005, 006, 007) подтверждены фактически — проверки присутствуют в рантайме. Дополнительно найдена и устранена **одна не отражённая в исходном отчёте Critical-уязвимость**.
+
+### ARV-030 — Обход CSRF: слишком широкий список исключений (NEW, Critical → ✅ Fixed)
+
+| Поле | Значение |
+|------|----------|
+| **SEVERITY** | Critical |
+| **CATEGORY** | CSRF / Broken Access Control (cross-tenant) |
+| **FILE** | `app/middleware/csrf.py`, `templates/companies/form.html` |
+| **COMPONENT** | `CSRFMiddleware` — сопоставление исключений по префиксу и подстроке |
+| **VULNERABILITY** | Список CSRF-исключений матчился через `startswith()` по префиксам и через проверку подстроки (`"/yandex-token" in path`, `"/yandex-auth-code" in path`, префикс `/api/oauth/`). Из-за этого под исключение попадали **не только** пред-аутентификационные логин-эндпоинты, но и мутирующие эндпоинты, работающие по cookie-сессии. |
+| **EVIDENCE** | Перечисление по OpenAPI: из 72 мутирующих путей 7 были CSRF-exempt, из них 3 — не логин-флоу: `POST /api/oauth/{connection_id}/create-folder`, `POST /api/companies/{company_id}/yandex-auth-code`, `DELETE /api/companies/{company_id}/yandex-token`. До фикса: `_EXEMPT_PATH_PREFIXES` + подстрочные проверки. После фикса: `_EXEMPT_PATHS = {"/api/auth/login", "/api/auth/login-form", "/admin/login-form", "/admin/login-2fa"}` и `_is_exempt_path()` сравнивает путь **точно** (`path.rstrip("/") in _EXEMPT_PATHS`). |
+| **ATTACK SCENARIO** | Атакующий заманивает супер-админа тенанта на свою страницу. Браузер жертвы автоматически прикладывает cookie `access_token`. Кросс-сайтовый `fetch()`/форма отправляют `POST /api/companies/{victim_id}/yandex-auth-code` с кодом OAuth, полученным атакующим. CSRF-проверка не срабатывает → **аккаунт Яндекс.Диска атакующего привязывается к компании жертвы**. |
+| **IMPACT** | Cross-tenant data exposure: все медиа тенанта (AR-контент, маркеры, видео) уходят в хранилище атакующего и отдаются обратно через легитимную подписанную ссылку. Тихое перенаправление потока данных + потенциальная утечка PII/контента. |
+| **LIKELIHOOD** | Средняя (нужен залогиненный супер-админ + переход по ссылке), но последствия критичны и необратимы без ручного аудита привязок. |
+| **RECOMMENDED FIX** | ✅ Выполнено: (1) список исключений сведён к **точному** совпадению 4 логин-путей; (2) оба вызова в `templates/companies/form.html` (`exchangeCode()`, `disconnectYandex()`) теперь отправляют заголовок `X-CSRF-Token` вместе с `credentials: 'include'`. |
+| **TEST TO ADD** | ✅ `tests/test_csrf_exemptions.py` — 26 тестов: точное совпадение allow-list, отказ для похожих путей (`/api/auth/login-evil`), property-тест по реальной OpenAPI-таблице («ни один мутирующий не-логин роут не CSRF-exempt»), тесты диспетчеризации middleware (cookie без токена → 403, несовпадение → 403, совпадение → 200, без cookie → 200, safe-методы → 200, логин → 200) и e2e через `TestClient` с реальным приложением. |
+
+### Проверка ARV-022 — секреты в истории Git
+
+`ARV-022` закрывал `.env.production` через `git rm --cached`, но содержимое **осталось в истории** (коммиты `b0ee4bc`, `2cdfb40`, `583fcb7`). Проверено содержимое всех трёх различных blob-ов истории:
+
+| Ключ | Класс значения |
+|------|----------------|
+| `SECRET_KEY` | плейсхолдер (`CHANGE_ME…`, 43 симв.) |
+| `ADMIN_DEFAULT_PASSWORD` | плейсхолдер (`CHANGE_ME…`, 24 симв.) |
+| `DATABASE_URL` | `localhost`, пароль — плейсхолдер |
+| `REDIS_URL` | `localhost`, пароля нет |
+| `SENTRY_DSN` | пусто |
+
+**Вывод:** реальные продакшн-секреты в историю **не попадали** — только шаблонные значения и `localhost`. Риск переклассифицирован из Critical в **Informational**; `git filter-repo` и ротация ключей не требуются. Рекомендация на будущее: не хранить даже заполненный шаблон под контролем версий и включить secret-scanning в CI.
+
+### Тестовое покрытие, восстановленное в рамках проверки
+
+`tests/test_storage_api.py` — 6 тестов падали **до** работ по безопасности (сигнатура `request: Request` присутствовала уже в `bf8dee7`, а тесты её не передавали). Модуль приведён в рабочее состояние и расширен: фиктивные супер-админы, актуальная фабрика `get_storage_provider` (прежняя `get_storage_provider_instance` переименована), переносимый `tempfile`-каталог вместо зашитого `e:/Project/ARV/.pytest-temp`, плюс 3 новых теста на подписи медиа (отказ для не-супер-админа, истёкшая подпись, подпись другого тенанта). Итого 10 passed.
+
+**Итог перепроверки:** 179 passed / 0 failed по набору `test_csrf_exemptions`, `test_security_fixes`, `test_security_auth`, `test_idor_security`, `test_auth_api`, `test_storage_api` и всем backup-наборам.
+
+---
+
 ## 1. Executive Summary
 
 Платформа имеет **хорошо продуманный нижний слой безопасности** (адаптивное хеширование паролей, Redis-чёрный список JWT, CSRF double-submit, multi-tenant `company_id`, lockout, Fernet-шифрование OAuth-токенов, non-root Docker-пользователь, TLS 1.2/1.3 + HSTS + X-Frame-Options).
@@ -529,6 +571,8 @@
 4. ✅ Прод-конфигурация: БД/Redis недоступны извне, CORS строгий, CSP присутствует (`deploy/nginx/security-headers.conf`).
 5. ⬜ Прогнать полный тест-сьют в CI (Docker / Python 3.11) — локальный запуск ограничен окружением.
 6. ⬜ Ротация секретов: задать `SESSION_SECRET_KEY`, `TOKEN_ENCRYPTION_KEY`, `MEDIA_URL_SECRET`, `POSTGRES_PASSWORD`, `REDIS_PASSWORD` в проде.
+
+**Перепроверка 2026-09-14 (см. §0.1):** все 7 Critical-находок подтверждены фактически по коду; дополнительно закрыта **ARV-030** (обход CSRF через широкий список исключений) — Critical, не отражённая в исходном отчёте. Секреты в истории Git по `ARV-022` не обнаружены (только плейсхолдеры) → риск переклассифицирован в Informational. Итог: **179 passed / 0 failed** по security- и backup-наборам.
 
 ---
 

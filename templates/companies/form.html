@@ -288,7 +288,11 @@ function storageProviderSection() {
             try {
                 const resp = await fetch('/api/companies/' + companyId + '/yandex-auth-code', {
                     method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-Token': window.getCsrfToken ? window.getCsrfToken() : ''
+                    },
+                    credentials: 'include',
                     body: JSON.stringify({code: this.authCode})
                 });
                 const data = await resp.json();
@@ -310,7 +314,13 @@ function storageProviderSection() {
             if (!companyId) return;
             if (!confirm('{{ "Disconnect Yandex Disk for this company?" if request.state.locale == "en" else "Отключить Яндекс Диск для этой компании?" }}')) return;
             try {
-                const resp = await fetch('/api/companies/' + companyId + '/yandex-token', {method: 'DELETE'});
+                const resp = await fetch('/api/companies/' + companyId + '/yandex-token', {
+                    method: 'DELETE',
+                    headers: {
+                        'X-CSRF-Token': window.getCsrfToken ? window.getCsrfToken() : ''
+                    },
+                    credentials: 'include'
+                });
                 if (resp.ok) {
                     this.connected = false;
                     this.provider = 'local';

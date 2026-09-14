@@ -15,35 +15,38 @@ from app.core.config import settings
 SAFE_METHODS: Final[set[str]] = {"GET", "HEAD", "OPTIONS", "TRACE"}
 CSRF_COOKIE_NAME: Final[str] = "csrf_token"
 CSRF_HEADER_NAME: Final[str] = "X-CSRF-Token"
-_EXEMPT_PATH_PREFIXES: Final[tuple[str, ...]] = (
-    "/api/auth/login",
-    "/api/auth/login-form",
-    "/admin/login-form",
-    "/admin/login-2fa",
-    "/api/oauth/authorize",
-    "/api/oauth/callback",
-    "/api/oauth/",
+
+# Only genuinely pre-authentication endpoints are exempt, matched by exact path.
+#
+# Why this list is deliberately short:
+#   * Requests that carry no ``access_token`` cookie are skipped by
+#     ``_must_validate`` anyway, so Bearer-token API clients, payment webhooks
+#     and provider redirects never need an entry here.
+#   * GET/HEAD are already in ``SAFE_METHODS``, so the OAuth ``/authorize`` and
+#     ``/callback`` endpoints need no exemption either.
+#
+# That leaves only the login forms. Everything else that is cookie-
+# authenticated and mutates state must present the double-submit token.
+#
+# The previous version of this list used broad prefixes (``/api/oauth/``) and
+# substring matching (``"/yandex-token" in path``), which silently exempted
+# state-changing endpoints such as
+# ``POST /api/companies/{id}/yandex-auth-code`` (binds a Yandex Disk account to
+# a company) and ``DELETE /api/companies/{id}/yandex-token``. Those are
+# initiated by our own UI, so they can and must send the token.
+_EXEMPT_PATHS: Final[frozenset[str]] = frozenset(
+    {
+        "/api/auth/login",
+        "/api/auth/login-form",
+        "/admin/login-form",
+        "/admin/login-2fa",
+    }
 )
 
 
 def _is_exempt_path(path: str) -> bool:
-    if any(path.startswith(prefix) for prefix in _EXEMPT_PATH_PREFIXES):
-        return True
-    # Specific Yandex OAuth endpoints under /api/companies/
-    if path.startswith("/api/companies/") and (
-        "/yandex-auth-code" in path
-        or "/yandex-auth-url" in path
-        or "/yandex-token" in path
-        or "/yandex/" in path
-    ):
-        return True
-    # Specific Yandex OAuth endpoints under /api/storage/
-    if path.startswith("/api/storage/") and (
-        "/yandex" in path
-        or "/yd-file" in path
-    ):
-        return True
-    return False
+    """Return True only for the exact pre-authentication login endpoints."""
+    return path.rstrip("/") in _EXEMPT_PATHS
 
 
 class CSRFMiddleware(BaseHTTPMiddleware):

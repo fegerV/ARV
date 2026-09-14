@@ -1,4 +1,5 @@
 import shutil
+import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
 from types import SimpleNamespace
@@ -10,14 +11,26 @@ from fastapi import HTTPException
 from app.schemas.storage import StorageConnectionCreate
 
 
+def _super_admin(user_id: int = 1) -> SimpleNamespace:
+    """Stand-in for the ``current_user`` dependency.
+
+    FastAPI injects this at the HTTP layer, so a direct handler call has to
+    pass it explicitly. Storage administration is super-admin only
+    (ARV-001), so the fake must carry ``is_super_admin=True``.
+    """
+    return SimpleNamespace(id=user_id, is_super_admin=True)
+
+
 @pytest.mark.asyncio
 async def test_create_connection_persists_local_disk_connection():
     from app.api.routes import storage
 
     payload = StorageConnectionCreate(name="Local", base_path="E:/storage", is_default=True)
     db = _FakeDb()
+    # FastAPI injects Request at the HTTP layer; a direct handler call must pass it.
+    request = SimpleNamespace(headers={})
 
-    result = await storage.create_connection(payload, db)
+    result = await storage.create_connection(payload, request, db, current_user=_super_admin())
 
     assert db.added is not None
     assert db.added.name == "Local"
@@ -30,19 +43,39 @@ async def test_create_connection_persists_local_disk_connection():
 
 
 @pytest.mark.asyncio
+async def test_create_connection_rejects_non_super_admin():
+    """ARV-001: storage administration must stay super-admin only."""
+    from app.api.routes import storage
+
+    payload = StorageConnectionCreate(name="Local", base_path="E:/storage", is_default=False)
+    db = _FakeDb()
+    request = SimpleNamespace(headers={})
+    plain_user = SimpleNamespace(id=42, is_super_admin=False)
+
+    with pytest.raises(HTTPException) as denied:
+        await storage.create_connection(payload, request, db, current_user=plain_user)
+
+    assert denied.value.status_code == 403
+    assert db.added is None
+
+
+@pytest.mark.asyncio
 async def test_test_connection_reports_missing_base_path():
     from app.api.routes import storage
 
+    # A path that is guaranteed not to exist on this machine.
+    missing = Path(tempfile.gettempdir()) / f"arv-missing-{uuid4().hex}"
     conn = SimpleNamespace(
         id=5,
-        base_path="e:/Project/ARV/.pytest-temp-storage/missing",
+        base_path=str(missing),
         last_tested_at=None,
         test_status=None,
         test_error=None,
     )
     db = _FakeDb(get_map={(storage.StorageConnection, 5): conn})
+    request = SimpleNamespace(headers={})
 
-    result = await storage.test_connection(5, db)
+    result = await storage.test_connection(5, request, db, current_user=_super_admin())
 
     assert result["status"] == "error"
     assert "does not exist" in result["message"]
@@ -63,9 +96,10 @@ async def test_test_connection_reports_success_for_writable_dir():
         test_error=None,
     )
     db = _FakeDb(get_map={(storage.StorageConnection, 6): conn})
+    request = SimpleNamespace(headers={})
 
     try:
-        result = await storage.test_connection(6, db)
+        result = await storage.test_connection(6, request, db, current_user=_super_admin())
     finally:
         shutil.rmtree(temp_dir, ignore_errors=True)
 
@@ -92,9 +126,12 @@ async def test_get_storage_stats_uses_provider_stats(monkeypatch):
                 "base_path": "demo",
             }
 
-    monkeypatch.setattr(storage, "get_storage_provider_instance", lambda: FakeProvider())
+    # The factory was renamed to ``get_storage_provider`` in the storage
+    # provider refactor; the old name no longer exists on the module.
+    monkeypatch.setattr(storage, "get_storage_provider", lambda: FakeProvider())
 
-    result = await storage.get_storage_stats(7, path="demo", db=db)
+    request = SimpleNamespace(headers={})
+    result = await storage.get_storage_stats(7, request, path="demo", db=db, current_user=_super_admin())
 
     assert result.total_files == 3
     assert result.total_size_bytes == 2048
@@ -108,7 +145,16 @@ async def test_set_company_storage_updates_company_fields():
     company = SimpleNamespace(id=9, storage_connection_id=None, storage_path=None)
     db = _FakeDb(get_map={(storage.Company, 9): company})
 
-    result = await storage.set_company_storage(9, storage_connection_id=12, storage_path="/mnt/data", db=db)
+    request = SimpleNamespace(headers={})
+    result = await storage.set_company_storage(
+        9,
+        request,
+        storage_connection_id=12,
+        storage_path="/mnt/data",
+        company=company,
+        db=db,
+        current_user=_super_admin(),
+    )
 
     assert company.storage_connection_id == 12
     assert company.storage_path == "/mnt/data"
@@ -136,7 +182,10 @@ async def test_list_storage_connections_returns_safe_payload():
     )
     db = _FakeDb(execute_results=[_FakeScalarsResult([conn])])
 
-    result = await storage.list_storage_connections(is_active=True, db=db)
+    request = SimpleNamespace(headers={})
+    result = await storage.list_storage_connections(
+        request, is_active=True, db=db, current_user=_super_admin()
+    )
 
     assert result == [
         {
@@ -206,6 +255,51 @@ async def test_proxy_yandex_disk_file_validates_company_and_storage(monkeypatch)
     assert mismatch.value.detail == "Provider mismatch"
 
 
+@pytest.mark.asyncio
+async def test_proxy_yandex_disk_file_rejects_expired_signature():
+    """ARV-004: an expired signature must not be accepted."""
+    from app.api.routes import storage
+    from app.utils.signed_urls import _signature
+    import time
+
+    request = SimpleNamespace(headers={})
+    expired = int(time.time()) - 60
+
+    with pytest.raises(HTTPException) as denied:
+        await storage.proxy_yandex_disk_file(
+            request,
+            path="demo/file.jpg",
+            company_id=4,
+            exp=expired,
+            sig=_signature("demo/file.jpg", 4, expired),
+            db=_FakeDb(),
+        )
+    assert denied.value.status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_proxy_yandex_disk_file_rejects_cross_tenant_signature():
+    """ARV-004: a signature minted for one company must not open another's file."""
+    from app.api.routes import storage
+    from app.utils.signed_urls import _signature
+    import time
+
+    request = SimpleNamespace(headers={})
+    exp = int(time.time()) + 300
+
+    # Signature is valid for company 4 but the request asks for company 5.
+    with pytest.raises(HTTPException) as denied:
+        await storage.proxy_yandex_disk_file(
+            request,
+            path="demo/file.jpg",
+            company_id=5,
+            exp=exp,
+            sig=_signature("demo/file.jpg", 4, exp),
+            db=_FakeDb(),
+        )
+    assert denied.value.status_code == 403
+
+
 class _FakeScalars:
     def __init__(self, values):
         self._values = list(values)
@@ -252,6 +346,10 @@ class _FakeDb:
 
 
 def _make_workspace_temp_dir():
-    root = Path("e:/Project/ARV/.pytest-temp") / f"storage-{uuid4().hex}"
-    root.mkdir(parents=True, exist_ok=True)
-    return root
+    """Create a portable scratch directory.
+
+    Previously hardcoded to ``e:/Project/ARV/.pytest-temp``, which only exists
+    on the original developer's machine and made the whole module fail on any
+    other host or CI runner.
+    """
+    return Path(tempfile.mkdtemp(prefix="arv-storage-test-"))
