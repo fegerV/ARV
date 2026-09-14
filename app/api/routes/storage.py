@@ -233,16 +233,22 @@ async def proxy_yandex_disk_file(
     request: Request,
     path: str = Query(..., description="Relative file path on Yandex Disk"),
     company_id: int = Query(..., description="Company ID that owns the file"),
+    exp: int | None = Query(None, description="Signature expiry (unix seconds)"),
+    sig: str | None = Query(None, description="HMAC signature of (path, company_id, exp)"),
     db: AsyncSession = Depends(get_db),
 ):
     """Proxy-stream a file from Yandex Disk for viewer/manifest.
 
-    Supports HTTP Range requests so that ``<video>`` elements can seek
-    and the browser does not need to download the entire file at once.
-
-    The manifest references stable proxy URLs instead of expiring Yandex
-    download links, so previously generated QR codes keep working.
+    Access requires a valid, unexpired HMAC signature (see
+    ``app.utils.signed_urls``) so that the proxy cannot be used to read
+    arbitrary files of other tenants. Supports HTTP Range requests so that
+    ``<video>`` elements can seek.
     """
+    from app.utils.signed_urls import verify_yd_file_signature
+
+    if not verify_yd_file_signature(path, company_id, exp, sig):
+        raise HTTPException(status_code=403, detail="Invalid or expired media signature")
+
     company = await db.get(Company, company_id)
     if not company:
         raise HTTPException(status_code=404, detail="Company not found")

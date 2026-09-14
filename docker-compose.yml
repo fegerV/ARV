@@ -11,12 +11,12 @@ services:
     environment:
       POSTGRES_DB: vertex_ar
       POSTGRES_USER: vertex_ar
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-me-to-a-strong-random-password}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set in the environment}
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./scripts/db/init-db.sh:/docker-entrypoint-initdb.d/init-db.sh:ro
-    ports:
-      - "5432:5432"
+    expose:
+      - "5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U vertex_ar"]
       interval: 10s
@@ -32,12 +32,13 @@ services:
       --maxmemory 128mb
       --maxmemory-policy allkeys-lru
       --appendonly yes
-    ports:
-      - "6379:6379"
+      --requirepass ${REDIS_PASSWORD:?REDIS_PASSWORD must be set in the environment}
+    expose:
+      - "6379"
     volumes:
       - redis_data:/data
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
       interval: 10s
       timeout: 5s
       retries: 3
@@ -55,10 +56,10 @@ services:
     ports:
       - "8000:8000"
     environment:
-      - DATABASE_URL=postgresql+asyncpg://vertex_ar:${POSTGRES_PASSWORD:-change-me-to-a-strong-random-password}@postgres:5432/vertex_ar
+      - DATABASE_URL=postgresql+asyncpg://vertex_ar:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set in the environment}@postgres:5432/vertex_ar
       - PUBLIC_URL=http://localhost:8000
       - MEDIA_ROOT=/app/storage/content
-      - REDIS_URL=redis://redis:6379/0
+      - REDIS_URL=redis://:${REDIS_PASSWORD:?REDIS_PASSWORD must be set in the environment}@redis:6379/0
       - LOG_LEVEL=INFO
       - TEMPLATES_DIR=/app/templates  # Add templates directory
     depends_on:
@@ -67,7 +68,7 @@ services:
       redis:
         condition: service_started
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/api/health/status"]
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/health"]
       interval: 30s
       timeout: 10s
       retries: 3

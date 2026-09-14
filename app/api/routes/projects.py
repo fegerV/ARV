@@ -292,7 +292,7 @@ async def create_project_general(
     """Create a new project"""
     logger = structlog.get_logger()
 
-    if not getattr(current_user, 'is_super_admin', False) and getattr(current_user, 'company_id', None) is not None:
+    if not getattr(current_user, 'is_super_admin', False):
        if project_data.company_id != getattr(current_user, 'company_id', None):
            raise HTTPException(status_code=403, detail="Access denied to this company")
 
@@ -337,7 +337,7 @@ async def get_project_general(
     if not project:
        raise HTTPException(status_code=404, detail="Project not found")
 
-    if not getattr(current_user, 'is_super_admin', False) and getattr(current_user, 'company_id', None) is not None:
+    if not getattr(current_user, 'is_super_admin', False):
        if project.company_id != getattr(current_user, 'company_id', None):
            raise HTTPException(status_code=403, detail="Access denied to this project")
 
@@ -372,7 +372,7 @@ async def update_project_general(
     if not project:
        raise HTTPException(status_code=404, detail="Project not found")
 
-    if not getattr(current_user, 'is_super_admin', False) and getattr(current_user, 'company_id', None) is not None:
+    if not getattr(current_user, 'is_super_admin', False):
        if project.company_id != getattr(current_user, 'company_id', None):
            raise HTTPException(status_code=403, detail="Access denied to this project")
     
@@ -416,7 +416,7 @@ async def delete_project_general(
     if not project:
        raise HTTPException(status_code=404, detail="Project not found")
 
-    if not getattr(current_user, 'is_super_admin', False) and getattr(current_user, 'company_id', None) is not None:
+    if not getattr(current_user, 'is_super_admin', False):
        if project.company_id != getattr(current_user, 'company_id', None):
            raise HTTPException(status_code=403, detail="Access denied to this project")
     

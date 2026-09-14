@@ -39,7 +39,11 @@ ENV/
 # Environment
 .env
 .env.local
+.env.production
 *.env.*
+# ...but keep the committed templates
+!.env.example
+!.env.production.example
 
 # Coverage
 .coverage
@@ -84,3 +88,5 @@ v-portal2.png
 portal_ar_icon.png
 portal_ar_icon_512.png
 Portal_AR_logo.png
+# AI agent local workspace (memory, skills) — not part of the product
+.workbuddy-ai/

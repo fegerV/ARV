@@ -31,8 +31,19 @@ def test_viewer_helper_functions_cover_expected_cases():
     assert viewer._absolute_url("/storage/demo/file.jpg").endswith("/storage/demo/file.jpg")
     assert viewer._absolute_url("storage/demo/file.jpg").endswith("/storage/demo/file.jpg")
     assert viewer._absolute_url("https://cdn.example.com/file.jpg") == "https://cdn.example.com/file.jpg"
-    assert viewer._yadisk_proxy_url("yadisk://company/demo/file.mp4", 42) == (
-        "/api/storage/yd-file?path=company/demo/file.mp4&company_id=42"
+
+    # ARV-004: the proxy URL must be HMAC-signed so it cannot be forged.
+    from urllib.parse import parse_qs, urlparse
+
+    from app.utils.signed_urls import verify_yd_file_signature
+
+    signed = viewer._yadisk_proxy_url("yadisk://company/demo/file.mp4", 42)
+    assert signed.startswith("/api/storage/yd-file?")
+    query = {k: v[0] for k, v in parse_qs(urlparse(signed).query).items()}
+    assert query["path"] == "company/demo/file.mp4"
+    assert query["company_id"] == "42"
+    assert verify_yd_file_signature(
+        query["path"], int(query["company_id"]), query["exp"], query["sig"]
     )
 
 

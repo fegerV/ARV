@@ -174,7 +174,7 @@ async def test_validate_marker_requires_existing_photo_path():
     db = _FakeDb(get_map={(ar_content.ARContent, 50): content})
 
     with pytest.raises(HTTPException) as exc_info:
-        await ar_content.validate_marker(ar_content_id=50, request=_MOCK_REQUEST, db=db, current_user=SimpleNamespace(is_super_admin=False, company_id=None))
+        await ar_content.validate_marker(ar_content_id=50, request=_MOCK_REQUEST, db=db, current_user=SimpleNamespace(is_super_admin=True, company_id=None))
 
     assert exc_info.value.status_code == 400
     assert exc_info.value.detail == "Marker (photo) not set. Please upload photo or regenerate media."
@@ -197,7 +197,7 @@ async def test_validate_marker_reports_missing_file(monkeypatch):
     monkeypatch.setattr(ar_content.settings, "STORAGE_BASE_PATH", "e:/Project/ARV/.pytest-temp-storage")
 
     with pytest.raises(HTTPException) as exc_info:
-        await ar_content.validate_marker(ar_content_id=51, request=_MOCK_REQUEST, db=db, current_user=SimpleNamespace(is_super_admin=False, company_id=None))
+        await ar_content.validate_marker(ar_content_id=51, request=_MOCK_REQUEST, db=db, current_user=SimpleNamespace(is_super_admin=True, company_id=None))
 
     assert exc_info.value.status_code == 404
     assert exc_info.value.detail == "Marker image not found at missing/marker.jpg"

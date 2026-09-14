@@ -822,7 +822,7 @@ document.addEventListener('alpine:init', function() {
             printWindow.document.write(`
                 <html>
                     <head>
-                        <title>QR Code - ${this.arContent.order_number}</title>
+                        <title>QR Code - ${this.escapeHtml(this.arContent.order_number || '')}</title>
                         <style>
                             body { margin: 0; padding: 20px; text-align: center; }
                             img { width: 150mm; max-width: 100%; height: auto; }

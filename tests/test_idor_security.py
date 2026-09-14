@@ -39,10 +39,11 @@ async def test_super_admin_has_access_to_all_companies():
 
 
 @pytest.mark.asyncio
-async def test_user_without_company_has_access_to_all():
+async def test_user_without_company_has_no_access():
+    # A non-super-admin without a company assignment must NOT have global access.
     user = _FakeUser(id=2, company_id=None, is_super_admin=False)
     result = await _get_user_company_ids(None, user)
-    assert result is None
+    assert result == set()
 
 
 @pytest.mark.asyncio
@@ -81,6 +82,39 @@ async def test_require_company_access_regular_user_other_company():
     with pytest.raises(HTTPException) as exc_info:
         await require_company_access(10, db, user)
     assert exc_info.value.status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_require_company_access_denies_user_without_company():
+    # Regression: company_id=None must NOT be treated as super admin.
+    user = _FakeUser(id=4, company_id=None, is_super_admin=False)
+    company = Company(id=10, name="Test")
+    db = _FakeDb(company_map={10: company})
+
+    with pytest.raises(HTTPException) as exc_info:
+        await require_company_access(10, db, user)
+    assert exc_info.value.status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_require_resource_access_denies_user_without_company():
+    user = _FakeUser(id=4, company_id=None, is_super_admin=False)
+    with pytest.raises(HTTPException) as exc_info:
+        await require_resource_access(10, db=None, current_user=user)
+    assert exc_info.value.status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_require_super_admin_dependency():
+    from app.api.deps_authz import require_super_admin
+
+    regular = _FakeUser(id=5, company_id=1, is_super_admin=False)
+    with pytest.raises(HTTPException) as exc_info:
+        require_super_admin(current_user=regular)
+    assert exc_info.value.status_code == 403
+
+    admin = _FakeUser(id=6, company_id=None, is_super_admin=True)
+    assert require_super_admin(current_user=admin).id == 6
 
 
 @pytest.mark.asyncio

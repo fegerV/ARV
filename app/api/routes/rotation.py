@@ -24,11 +24,36 @@ router = APIRouter()
 # Helpers
 # ---------------------------------------------------------------------------
 
+# Mass-assignment protection: only these columns may be written through the
+# rotation endpoints. `id`, `ar_content_id` and timestamps are excluded so a
+# caller cannot re-parent a schedule to another tenant's AR content.
+_ROTATION_UPDATABLE_FIELDS = frozenset({
+    "rotation_type",
+    "default_video_id",
+    "date_rules",
+    "video_sequence",
+    "current_index",
+    "random_seed",
+    "no_repeat_days",
+    "cron_expression",
+    "time_of_day",
+    "day_of_week",
+    "day_of_month",
+    "is_active",
+    "next_change_at",
+    "last_changed_at",
+    "notify_before_expiry_days",
+})
+
+
 def _sanitise_payload(payload: dict[str, Any]) -> dict[str, Any]:
-    """Coerce types that arrive as strings from the frontend."""
+    """Coerce types that arrive as strings from the frontend.
+
+    Unknown keys (including ``id`` and ``ar_content_id``) are dropped.
+    """
     clean: dict[str, Any] = {}
     for key, value in payload.items():
-        if key == "id":
+        if key not in _ROTATION_UPDATABLE_FIELDS:
             continue
         if key == "default_video_id":
             if value is None or value == "" or value == "null":
@@ -69,7 +94,7 @@ async def set_rotation(
     if not ar_content:
         raise HTTPException(status_code=404, detail="AR content not found")
 
-    if not getattr(current_user, 'is_super_admin', False) and getattr(current_user, 'company_id', None) is not None:
+    if not getattr(current_user, 'is_super_admin', False):
         if ar_content.company_id != getattr(current_user, 'company_id', None):
             raise HTTPException(status_code=403, detail="Access denied to this AR content")
 
@@ -129,7 +154,7 @@ async def update_rotation(
         raise HTTPException(status_code=404, detail="Rotation schedule not found")
 
     ar_content = await db.get(ARContent, sched.ar_content_id)
-    if not getattr(current_user, 'is_super_admin', False) and getattr(current_user, 'company_id', None) is not None:
+    if not getattr(current_user, 'is_super_admin', False):
         if ar_content and ar_content.company_id != getattr(current_user, 'company_id', None):
             raise HTTPException(status_code=403, detail="Access denied to this rotation schedule")
 
@@ -159,7 +184,7 @@ async def delete_rotation(
         raise HTTPException(status_code=404, detail="Rotation schedule not found")
 
     ar_content = await db.get(ARContent, sched.ar_content_id)
-    if not getattr(current_user, 'is_super_admin', False) and getattr(current_user, 'company_id', None) is not None:
+    if not getattr(current_user, 'is_super_admin', False):
         if ar_content and ar_content.company_id != getattr(current_user, 'company_id', None):
             raise HTTPException(status_code=403, detail="Access denied to this rotation schedule")
 
@@ -184,7 +209,7 @@ async def set_rotation_sequence(
     if not ar_content:
         raise HTTPException(status_code=404, detail="AR content not found")
 
-    if not getattr(current_user, 'is_super_admin', False) and getattr(current_user, 'company_id', None) is not None:
+    if not getattr(current_user, 'is_super_admin', False):
         if ar_content.company_id != getattr(current_user, 'company_id', None):
             raise HTTPException(status_code=403, detail="Access denied to this AR content")
 
@@ -241,7 +266,7 @@ async def rotation_calendar(
     if not ar_content:
         raise HTTPException(status_code=404, detail="AR content not found")
 
-    if not getattr(current_user, 'is_super_admin', False) and getattr(current_user, 'company_id', None) is not None:
+    if not getattr(current_user, 'is_super_admin', False):
         if ar_content.company_id != getattr(current_user, 'company_id', None):
             raise HTTPException(status_code=403, detail="Access denied to this AR content")
 

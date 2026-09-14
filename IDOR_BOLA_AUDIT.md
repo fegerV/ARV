@@ -1,5 +1,8 @@
 # IDOR / BOLA & Ownership Audit Report
 
+> **Статус (2026-09-14):** находки этого отчёта устранены в рамках общей ремедиации.
+> Актуальный отчёт с разделом «0. Статус устранения» — см. [`SECURITY_AUDIT_REPORT.md`](./SECURITY_AUDIT_REPORT.md).
+
 **Дата аудита:** 2026-08-19  
 **Аудитор:** Kilo (Senior Application Security Engineer)  
 **Версия проекта:** 2.1.1  

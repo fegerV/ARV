@@ -21,6 +21,7 @@ from app.core.config import settings
 from app.core.database import get_db
 from app.core.redis import redis_client
 from app.core.security import get_password_hash, needs_password_rehash, verify_password
+from app.utils.pii import mask_email
 from app.html.i18n import get_request_locale, normalize_locale, translate
 from app.html.templating import templates
 from app.middleware.rate_limiter import limiter
@@ -92,6 +93,9 @@ async def admin_set_language(request: Request, language: str | None = Form(None)
     request.session["language"] = normalize_locale(str(selected_language))
     request.state.locale = request.session["language"]
     redirect_to = request.headers.get("referer") or "/admin"
+    # Prevent open redirect: only allow same-site relative paths.
+    if not redirect_to.startswith("/") or redirect_to.startswith("//"):
+        redirect_to = "/admin"
     return RedirectResponse(url=redirect_to, status_code=303)
 
 
@@ -102,6 +106,7 @@ async def login_form_get():
 
 
 @router.post("/admin/login-form", response_class=HTMLResponse)
+@limiter.limit("10/minute")
 async def login_form(
     request: Request,
     username: str = Form(...),
@@ -121,7 +126,7 @@ async def login_form(
 
     if user and user.locked_until:
         if datetime.now(timezone.utc) < user.locked_until:
-            logger.warning("login_attempt_locked_account", email=username)
+            logger.warning("login_attempt_locked_account", email=mask_email(username))
             return _render_login(
                 request,
                 error=translate("auth.account_locked", get_request_locale(request)),
@@ -132,7 +137,7 @@ async def login_form(
         await db.commit()
 
     if not user or not verify_password(password, user.hashed_password):
-        logger.warning("login_failed", email=username)
+        logger.warning("login_failed", email=mask_email(username))
         if user:
             user.login_attempts = (user.login_attempts or 0) + 1
             if user.login_attempts >= MAX_LOGIN_ATTEMPTS:
@@ -216,7 +221,7 @@ async def login_form(
             company_id=user.company_id,
         )
 
-        logger.info("user_login_successful", user_id=user.id, email=user.email)
+        logger.info("user_login_successful", user_id=user.id, email=mask_email(user.email))
         response = RedirectResponse(url="/admin", status_code=303)
         create_access_token_cookie(response, access_token, timeout_minutes)
         return response
@@ -229,6 +234,7 @@ async def login_form(
 
 
 @router.post("/admin/login-2fa", response_class=HTMLResponse)
+@limiter.limit("10/minute")
 async def login_2fa_verify(
     request: Request,
     pending_2fa_token: str = Form(...),
@@ -241,6 +247,7 @@ async def login_2fa_verify(
         return _render_2fa_step(request, pending_2fa_token, error=translate("auth.enter_2fa_code", get_request_locale(request)))
 
     redis_key = f"2fa:pending:{pending_2fa_token}"
+    attempts_key = f"2fa:attempts:{pending_2fa_token}"
     try:
         raw = await redis_client.get(redis_key)
     except Exception as exc:
@@ -250,13 +257,35 @@ async def login_2fa_verify(
     if not raw:
         return _render_login(request, error=translate("auth.otp_expired", get_request_locale(request)))
 
+    # Limit verification attempts to prevent brute-forcing the 6-digit code.
+    try:
+        attempts_raw = await redis_client.get(attempts_key)
+        attempts = int(attempts_raw) if attempts_raw else 0
+    except Exception:
+        attempts = 0
+    if attempts >= 5:
+        try:
+            await redis_client.delete(redis_key)
+        except Exception:
+            pass
+        return _render_login(
+            request,
+            error=translate("auth.too_many_attempts", get_request_locale(request), minutes=5),
+        )
+
     try:
         data = json.loads(raw)
     except (json.JSONDecodeError, TypeError):
         await redis_client.delete(redis_key)
         return _render_login(request, error=translate("auth.otp_data_error", get_request_locale(request)))
 
-    if data.get("code") != code:
+    expected_code = str(data.get("code") or "")
+    if not (expected_code and secrets.compare_digest(expected_code, code)):
+        try:
+            await redis_client.incr(attempts_key)
+            await redis_client.expire(attempts_key, 300)
+        except Exception:
+            pass
         return _render_2fa_step(request, pending_2fa_token, error=translate("auth.otp_invalid", get_request_locale(request)))
 
     user_id = data.get("user_id")
@@ -275,7 +304,7 @@ async def login_2fa_verify(
         role=user.role,
         company_id=user.company_id,
     )
-    logger.info("user_login_successful_2fa", user_id=user.id, email=user.email)
+    logger.info("user_login_successful_2fa", user_id=user.id, email=mask_email(user.email))
 
     response = RedirectResponse(url="/admin", status_code=303)
     create_access_token_cookie(response, access_token, timeout_minutes)

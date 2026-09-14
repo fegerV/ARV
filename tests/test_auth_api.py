@@ -211,7 +211,7 @@ async def test_register_user_rejects_duplicate_email():
                 full_name="New User",
             ),
             db=db,
-            current_user=SimpleNamespace(id=1, email="admin@example.com", role="admin"),
+            current_user=SimpleNamespace(id=1, email="admin@example.com", role="admin", is_super_admin=True, company_id=1),
         )
 
     assert exc_info.value.status_code == 409
@@ -233,9 +233,10 @@ async def test_register_user_creates_new_user(monkeypatch):
             password="Password123",
             full_name="New User",
             role="admin",
+            company_id=1,
         ),
         db=db,
-        current_user=SimpleNamespace(id=1, email="admin@example.com", role="admin"),
+        current_user=SimpleNamespace(id=1, email="admin@example.com", role="admin", is_super_admin=True, company_id=1),
     )
 
     assert db.added is not None

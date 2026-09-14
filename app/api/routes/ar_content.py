@@ -41,7 +41,7 @@ from app.utils.ar_content import (
     validate_photo_file,
 )
 from app.core.storage_providers import get_provider_for_company
-from app.api.deps_authz import require_company_access
+from app.api.deps_authz import require_company_access, ensure_authenticated_user
 from app.api.routes.auth import get_current_active_user
 from app.models.user import User
 
@@ -194,12 +194,16 @@ async def list_all_ar_content(
     current_user: User = Depends(get_current_active_user),
 ):
     """List all AR content across all companies and projects."""
+    # Fail closed: a non-super-admin without a company assignment has no access
+    if not getattr(current_user, 'is_super_admin', False) and getattr(current_user, 'company_id', None) is None:
+        raise HTTPException(status_code=403, detail="Access denied: user has no company assignment")
+
     # Calculate offset from page and page_size
     skip = (page - 1) * page_size
     
     # Count total items
     count_stmt = select(func.count(ARContent.id))
-    if not getattr(current_user, 'is_super_admin', False) and getattr(current_user, 'company_id', None) is not None:
+    if not getattr(current_user, 'is_super_admin', False):
         count_stmt = count_stmt.where(ARContent.company_id == getattr(current_user, 'company_id', None))
     count_result = await db.execute(count_stmt)
     total = count_result.scalar_one()
@@ -212,7 +216,7 @@ async def list_all_ar_content(
         selectinload(ARContent.company), 
         selectinload(ARContent.project)
     ).order_by(ARContent.created_at.desc()).offset(skip).limit(page_size)
-    if not getattr(current_user, 'is_super_admin', False) and getattr(current_user, 'company_id', None) is not None:
+    if not getattr(current_user, 'is_super_admin', False):
         stmt = stmt.where(ARContent.company_id == getattr(current_user, 'company_id', None))
     result = await db.execute(stmt)
     items = result.scalars().all()
@@ -765,7 +769,7 @@ async def regenerate_media(
     if not ar_content:
         raise HTTPException(status_code=404, detail="AR content not found")
 
-    if not getattr(current_user, 'is_super_admin', False) and getattr(current_user, 'company_id', None) is not None:
+    if not getattr(current_user, 'is_super_admin', False):
         if ar_content.company_id != getattr(current_user, 'company_id', None):
             raise HTTPException(status_code=403, detail="Access denied to this AR content")
 
@@ -867,7 +871,7 @@ async def create_ar_content(
     current_user: User = Depends(get_current_active_user),
 ):
     """Create new AR content with photo and video files."""
-    if not getattr(current_user, 'is_super_admin', False) and getattr(current_user, 'company_id', None) is not None:
+    if not getattr(current_user, 'is_super_admin', False):
         if company_id != getattr(current_user, 'company_id', None):
             raise HTTPException(status_code=403, detail="Access denied to this company")
     return await _create_ar_content(
@@ -995,7 +999,7 @@ async def create_ar_content_hierarchical(
         photo_filename=data["photo_file"].filename if data.get("photo_file") else None,
         video_filename=data["video_file"].filename if data.get("video_file") else None,
     )
-    if not getattr(current_user, 'is_super_admin', False) and getattr(current_user, 'company_id', None) is not None:
+    if not getattr(current_user, 'is_super_admin', False):
         if company_id != getattr(current_user, 'company_id', None):
             raise HTTPException(status_code=403, detail="Access denied to this company")
     try:
@@ -1077,7 +1081,7 @@ async def create_ar_content_legacy(
         metadata=metadata
     )
 
-    if not getattr(current_user, 'is_super_admin', False) and getattr(current_user, 'company_id', None) is not None:
+    if not getattr(current_user, 'is_super_admin', False):
         if company_id != getattr(current_user, 'company_id', None):
             raise HTTPException(status_code=403, detail="Access denied to this company")
 
@@ -1173,7 +1177,7 @@ async def update_ar_content(
     # Get AR content
     ar_content = await get_ar_content_or_404(content_id, db)
 
-    if not getattr(current_user, 'is_super_admin', False) and getattr(current_user, 'company_id', None) is not None:
+    if not getattr(current_user, 'is_super_admin', False):
         if ar_content.company_id != getattr(current_user, 'company_id', None):
             raise HTTPException(status_code=403, detail="Access denied to this AR content")
     
@@ -1365,7 +1369,7 @@ async def delete_ar_content(
     # Get AR content with relations
     ar_content = await get_ar_content_or_404(content_id, db, load_relations=True)
 
-    if not getattr(current_user, 'is_super_admin', False) and getattr(current_user, 'company_id', None) is not None:
+    if not getattr(current_user, 'is_super_admin', False):
         if ar_content.company_id != getattr(current_user, 'company_id', None):
             raise HTTPException(status_code=403, detail="Access denied to this AR content")
     
@@ -1419,6 +1423,7 @@ async def get_ar_content_by_id(
     current_user: User = Depends(get_current_active_user),
 ):
     """Get AR content by ID without requiring company/project context"""
+    ensure_authenticated_user(current_user)
     # Get AR content with related videos, company, and project
     stmt = select(ARContent).options(
         selectinload(ARContent.videos),
@@ -1432,7 +1437,7 @@ async def get_ar_content_by_id(
     if not ar_content:
         raise HTTPException(status_code=404, detail="AR content not found")
 
-    if not getattr(current_user, 'is_super_admin', False) and getattr(current_user, 'company_id', None) is not None:
+    if not getattr(current_user, 'is_super_admin', False):
         if ar_content.company_id != getattr(current_user, 'company_id', None):
             raise HTTPException(status_code=403, detail="Access denied to this AR content")
 
@@ -1480,10 +1485,11 @@ async def delete_ar_content_by_id(
     current_user: User = Depends(get_current_active_user),
 ):
     """Delete AR content by ID without requiring company/project context"""
+    ensure_authenticated_user(current_user)
     # Get AR content with relations for building proper storage path
     ar_content = await get_ar_content_or_404(content_id, db, load_relations=True)
 
-    if not getattr(current_user, 'is_super_admin', False) and getattr(current_user, 'company_id', None) is not None:
+    if not getattr(current_user, 'is_super_admin', False):
         if ar_content.company_id != getattr(current_user, 'company_id', None):
             raise HTTPException(status_code=403, detail="Access denied to this AR content")
     
@@ -1540,7 +1546,7 @@ async def validate_marker(
     if not ar_content:
         raise HTTPException(status_code=404, detail="AR content not found")
 
-    if not getattr(current_user, 'is_super_admin', False) and getattr(current_user, 'company_id', None) is not None:
+    if not getattr(current_user, 'is_super_admin', False):
         if ar_content.company_id != getattr(current_user, 'company_id', None):
             raise HTTPException(status_code=403, detail="Access denied to this AR content")
 

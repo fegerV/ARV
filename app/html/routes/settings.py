@@ -12,7 +12,7 @@ from app.api.routes.auth import get_current_user_optional
 from app.html.deps import get_html_db
 from app.html.i18n import get_request_locale, normalize_locale, translate
 from app.html.templating import templates
-from app.html.utils import require_active_user
+from app.html.utils import require_super_admin
 from app.models.company import Company
 from app.schemas.settings import (
     ARSettings,
@@ -104,7 +104,7 @@ async def settings_page(
     db: AsyncSession = Depends(get_html_db),
 ):
     """Render the settings page."""
-    redirect = require_active_user(current_user)
+    redirect = require_super_admin(current_user)
     if redirect:
         return redirect
     return await _render_settings(request, db, current_user)
@@ -124,7 +124,7 @@ async def update_general_settings(
     default_subscription_years: int = Form(30),
 ):
     """Save general settings."""
-    redirect = require_active_user(current_user)
+    redirect = require_super_admin(current_user)
     if redirect:
         return redirect
 
@@ -176,7 +176,7 @@ async def update_security_settings(
     api_rate_limit: int = Form(100),
 ):
     """Save security settings."""
-    redirect = require_active_user(current_user)
+    redirect = require_super_admin(current_user)
     if redirect:
         return redirect
 
@@ -233,7 +233,7 @@ async def update_ar_settings(
     default_content_lifetime_years: int = Form(30),
 ):
     """Save AR content settings."""
-    redirect = require_active_user(current_user)
+    redirect = require_super_admin(current_user)
     if redirect:
         return redirect
 
@@ -291,7 +291,7 @@ async def update_backup_settings(
     backup_max_copies: int = Form(30),
 ):
     """Save backup settings and reschedule the APScheduler job."""
-    redirect = require_active_user(current_user)
+    redirect = require_super_admin(current_user)
     if redirect:
         return redirect
 
@@ -357,7 +357,7 @@ async def update_notification_settings(
     alert_on_health_degraded: str = Form("off"),
 ):
     """Save notification settings."""
-    redirect = require_active_user(current_user)
+    redirect = require_super_admin(current_user)
     if redirect:
         return redirect
 
@@ -415,7 +415,7 @@ async def update_storage_settings(
     cdn_url: str = Form(""),
 ):
     """Save storage settings."""
-    redirect = require_active_user(current_user)
+    redirect = require_super_admin(current_user)
     if redirect:
         return redirect
 

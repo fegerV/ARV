@@ -176,10 +176,11 @@ def _absolute_url(relative_path: str) -> str:
 
 
 def _yadisk_proxy_url(yadisk_ref: str, company_id: int) -> str:
-    """Convert yadisk:// ref to proxy URL when direct resolution failed."""
+    """Convert yadisk:// ref to a signed proxy URL when direct resolution failed."""
+    from app.utils.signed_urls import build_yd_file_url
+
     relative = _yadisk_relative(yadisk_ref)
-    qs = f"path={quote(relative, safe='/')}&company_id={company_id}"
-    return f"/api/storage/yd-file?{qs}"
+    return build_yd_file_url(relative, company_id)
 
 
 def _photo_url_from_ar_content(ar_content: ARContent) -> str | None:
@@ -321,7 +322,9 @@ async def _resolve_yd_url(url_or_path: str | None, company: Company) -> str | No
             relative = _yadisk_relative(url_or_path)
             download_url = await provider.get_download_url(relative)
             if download_url:
-                return f"/api/storage/yd-file?path={quote(relative, safe='/')}&company_id={company.id}"
+                from app.utils.signed_urls import build_yd_file_url
+
+                return build_yd_file_url(relative, company.id)
     except Exception as exc:
         logger.error("yd_resolve_url_failed", path=url_or_path, error=str(exc))
 

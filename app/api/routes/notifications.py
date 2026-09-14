@@ -192,8 +192,11 @@ async def mark_notifications_read(
         return NotificationMarkReadResponse(success=False, message="No notification IDs provided")
 
     stmt = select(Notification).where(Notification.id.in_(ids))
-    if not getattr(current_user, 'is_super_admin', False) and getattr(current_user, 'company_id', None) is not None:
-        stmt = stmt.where(Notification.company_id == getattr(current_user, 'company_id', None))
+    if not getattr(current_user, 'is_super_admin', False):
+        _company_id = getattr(current_user, 'company_id', None)
+        if _company_id is None:
+            raise HTTPException(status_code=403, detail="Access denied: user has no company assignment")
+        stmt = stmt.where(Notification.company_id == _company_id)
     res = await db.execute(stmt)
     items = res.scalars().all()
 
@@ -242,7 +245,7 @@ async def create_notification_endpoint(
     current_user: User = Depends(get_current_active_user),
 ):
     """Create a new notification."""
-    if not getattr(current_user, 'is_super_admin', False) and getattr(current_user, 'company_id', None) is not None:
+    if not getattr(current_user, 'is_super_admin', False):
         if notification_data.company_id != getattr(current_user, 'company_id', None):
             raise HTTPException(status_code=403, detail="Access denied to this company")
 

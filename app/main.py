@@ -218,14 +218,20 @@ app = FastAPI(
 
 
 # CORS middleware
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=settings.CORS_ORIGINS,
-    allow_origin_regex=r"https?://(localhost|127\.0\.0\.1)(:\d+)?",
-    allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allow_headers=["*"],
-)
+# In production only the explicitly configured origins are allowed. The
+# permissive localhost regex is restricted to non-production environments,
+# because combining it with ``allow_credentials=True`` in production would let
+# any page served from localhost read authenticated cross-origin responses.
+_cors_kwargs: dict = {
+    "allow_origins": settings.CORS_ORIGINS,
+    "allow_credentials": True,
+    "allow_methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    "allow_headers": ["*"],
+}
+if not settings.is_production:
+    _cors_kwargs["allow_origin_regex"] = r"https?://(localhost|127\.0\.0\.1)(:\d+)?"
+
+app.add_middleware(CORSMiddleware, **_cors_kwargs)
 
 # GZip middleware for compressing responses
 app.add_middleware(
@@ -235,7 +241,7 @@ app.add_middleware(
 
 app.add_middleware(
     SessionMiddleware,
-    secret_key=settings.SECRET_KEY,
+    secret_key=settings.session_secret,
     same_site="lax",
     https_only=settings.is_production,
 )
@@ -325,14 +331,21 @@ app.include_router(ar_content.router, prefix="/api", tags=["AR Content"])
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request: Request, exc: RequestValidationError):
     logger = structlog.get_logger()
-    # Convert body to string to avoid serialization issues
-    body_content = str(exc.body) if exc.body else "No body"
+    # Do NOT log or echo the raw request body: it can contain passwords, tokens
+    # and other sensitive fields (e.g. /auth/login, /auth/register).
     logger.error(
-        "validation_error", errors=exc.errors(), body=body_content, url=str(request.url), method=request.method
+        "validation_error",
+        errors=exc.errors(),
+        url=str(request.url),
+        method=request.method,
     )
+    content: dict = {"detail": exc.errors()}
+    # Only surface the offending body outside production, for local debugging.
+    if not settings.is_production and exc.body:
+        content["body"] = str(exc.body)
     return JSONResponse(
         status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-        content={"detail": exc.errors(), "body": body_content},
+        content=content,
     )
 
 

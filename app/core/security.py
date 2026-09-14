@@ -4,6 +4,7 @@ import secrets
 from datetime import datetime, timedelta, UTC
 from typing import Optional
 
+import structlog
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 from passlib.exc import UnknownHashError
@@ -12,6 +13,7 @@ from app.core.config import get_settings
 from app.core.redis import redis_client
 
 settings = get_settings()
+logger = structlog.get_logger()
 pwd_context = CryptContext(schemes=["pbkdf2_sha256"], deprecated="auto")
 _LEGACY_SHA256_RE = re.compile(r"^[a-f0-9]{64}$")
 
@@ -25,11 +27,28 @@ def is_legacy_password_hash(hashed_password: str) -> bool:
     return bool(hashed_password and _LEGACY_SHA256_RE.fullmatch(hashed_password))
 
 
+def legacy_hashes_enabled() -> bool:
+    """Whether legacy unsalted SHA-256 hashes may still authenticate.
+
+    Never allowed in production: an unsalted SHA-256 hash is trivially
+    crackable and must not be an accepted credential form there.
+    """
+    if settings.is_production:
+        return False
+    return bool(settings.ALLOW_LEGACY_PASSWORD_HASHES)
+
+
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     """Verify password against the current hash scheme or legacy SHA-256."""
     if not hashed_password:
         return False
     if is_legacy_password_hash(hashed_password):
+        if not legacy_hashes_enabled():
+            # Refuse the weak legacy scheme. The caller rehashes on success, so
+            # a matching password will simply be migrated on the next login
+            # once ALLOW_LEGACY_PASSWORD_HASHES is enabled for the transition.
+            logger.warning("legacy_password_hash_rejected")
+            return False
         return secrets.compare_digest(_legacy_sha256(plain_password), hashed_password)
     try:
         return pwd_context.verify(plain_password, hashed_password)

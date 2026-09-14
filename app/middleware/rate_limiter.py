@@ -8,12 +8,14 @@ The default limit is read from the ``api_rate_limit`` DB setting
 the DB on every request.
 """
 
+import ipaddress
 import time
 from typing import Callable
 
 from fastapi import FastAPI, Request
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
+from slowapi.middleware import SlowAPIMiddleware
 import structlog
 from starlette.responses import Response
 
@@ -53,18 +55,38 @@ async def _refresh_rate_limit_cache() -> None:
 
 # ── Key function ─────────────────────────────────────────────────────
 
+def _is_trusted_proxy(host: str | None) -> bool:
+    """Return True for loopback / private peers (i.e. our own reverse proxy).
+
+    Proxy headers are only honoured when the request arrives from a trusted
+    network; otherwise a client could spoof ``X-Real-IP`` and bypass limits.
+    """
+    if not host:
+        return False
+    try:
+        ip = ipaddress.ip_address(host)
+    except ValueError:
+        return False
+    return ip.is_loopback or ip.is_private
+
+
 def _get_real_ip(request: Request) -> str:
     """Extract the real client IP from reverse-proxy headers.
 
-    Priority: X-Real-IP → first entry in X-Forwarded-For → direct peer.
+    Proxy headers are only trusted when the direct peer is a trusted proxy
+    (loopback/private address). Otherwise the peer address itself is used.
     """
-    real_ip = request.headers.get("x-real-ip")
-    if real_ip:
-        return real_ip.strip()
-    forwarded = request.headers.get("x-forwarded-for")
-    if forwarded:
-        return forwarded.split(",")[0].strip()
-    return request.client.host if request.client else "unknown"
+    peer = request.client.host if request.client else None
+
+    if _is_trusted_proxy(peer):
+        real_ip = request.headers.get("x-real-ip")
+        if real_ip:
+            return real_ip.strip()
+        forwarded = request.headers.get("x-forwarded-for")
+        if forwarded:
+            return forwarded.split(",")[0].strip()
+
+    return peer or "unknown"
 
 
 def _dynamic_limit() -> str:
@@ -98,9 +120,13 @@ async def _call_next_with_disconnect_guard(request: Request, call_next) -> Respo
 # ── Setup ────────────────────────────────────────────────────────────
 
 def setup_rate_limiting(app: FastAPI) -> None:
-    """Register the slowapi limiter and a middleware that adds real headers."""
+    """Register the slowapi limiter, middleware and exception handler."""
     app.state.limiter = limiter
     app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+    # SlowAPIMiddleware is required for ``default_limits`` to be enforced on
+    # every route. Without it only explicitly decorated routes are limited.
+    app.add_middleware(SlowAPIMiddleware)
 
     @app.middleware("http")
     async def rate_limit_header_middleware(request: Request, call_next):

@@ -7,12 +7,24 @@ from fastapi import Request as _FastAPIRequest
 
 
 def _mock_request():
-    scope = {"type": "http", "headers": [], "query_string": b"", "path": "/"}
+    scope = {
+        "type": "http",
+        "method": "POST",
+        "headers": [],
+        "query_string": b"",
+        "path": "/",
+        "scheme": "http",
+        "server": ("testserver", 80),
+        "client": ("127.0.0.1", 12345),
+    }
     return _FastAPIRequest(scope=scope)
 
 
 def _mock_user():
-    return SimpleNamespace(id=1, email="test@example.com", is_active=True, is_super_admin=False, company_id=None)
+    # Analytics overview aggregates across the whole platform, so the fixture
+    # is a super admin. Tenant-scoped denial is covered by
+    # tests/test_security_fixes.py and tests/test_idor_security.py.
+    return SimpleNamespace(id=1, email="test@example.com", is_active=True, is_super_admin=True, company_id=None)
 
 
 @pytest.mark.asyncio
@@ -112,7 +124,7 @@ async def test_track_ar_session_requires_valid_uuid_session_id():
     payload = {"ar_content_unique_id": str(uuid4()), "session_id": "not-a-uuid"}
 
     with pytest.raises(HTTPException) as exc_info:
-        await analytics.track_ar_session(payload, _FakeDb())
+        await analytics.track_ar_session(payload, _mock_request(), _FakeDb())
 
     assert exc_info.value.status_code == 400
     assert exc_info.value.detail == "session_id must be UUID"
@@ -134,6 +146,7 @@ async def test_track_ar_session_persists_session_for_found_content():
             "device_type": "mobile",
             "video_played": True,
         },
+        _mock_request(),
         db,
     )
 
@@ -162,6 +175,7 @@ async def test_mobile_session_start_is_idempotent_for_existing_session():
 
     result = await analytics.mobile_session_start(
         {"ar_content_unique_id": unique_id, "session_id": session_id},
+        _mock_request(),
         db,
     )
 
@@ -185,6 +199,7 @@ async def test_mobile_analytics_update_updates_existing_session():
             "tracking_quality": "good",
             "video_played": True,
         },
+        _mock_request(),
         db,
     )
 
@@ -199,7 +214,9 @@ async def test_mobile_analytics_update_updates_existing_session():
 async def test_ar_diagnostic_event_returns_ok():
     from app.api.routes import analytics
 
-    result = await analytics.ar_diagnostic_event({"event": "mindar_start", "duration_ms": 1200})
+    result = await analytics.ar_diagnostic_event(
+        {"event": "mindar_start", "duration_ms": 1200}, _mock_request()
+    )
 
     assert result == {"status": "ok"}
 

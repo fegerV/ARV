@@ -38,6 +38,19 @@ import structlog
 
 _log = structlog.get_logger()
 
+# Mass-assignment protection: only these columns may be changed through the
+# legacy PUT /videos/{id} endpoint. System fields (id, ar_content_id, storage
+# paths, size, timestamps) are deliberately excluded so a caller cannot
+# re-parent a video to another tenant's AR content.
+_LEGACY_VIDEO_UPDATABLE_FIELDS = frozenset({
+    "is_active",
+    "rotation_type",
+    "rotation_order",
+    "rotation_weight",
+    "is_default",
+    "subscription_end",
+})
+
 _YADISK_PREFIX = "yadisk://"
 
 
@@ -188,7 +201,7 @@ async def regenerate_video_thumbnail(
         raise HTTPException(status_code=404, detail="Video not found")
 
     ar_content = await db.get(ARContent, video.ar_content_id)
-    if not getattr(current_user, 'is_super_admin', False) and getattr(current_user, 'company_id', None) is not None:
+    if not getattr(current_user, 'is_super_admin', False):
         if ar_content and ar_content.company_id != getattr(current_user, 'company_id', None):
             raise HTTPException(status_code=403, detail="Access denied to this video")
 
@@ -268,7 +281,7 @@ async def upload_videos(
     if not ar_content:
         raise HTTPException(status_code=404, detail="AR content not found")
 
-    if not getattr(current_user, 'is_super_admin', False) and getattr(current_user, 'company_id', None) is not None:
+    if not getattr(current_user, 'is_super_admin', False):
         if ar_content.company_id != getattr(current_user, 'company_id', None):
             raise HTTPException(status_code=403, detail="Access denied to this AR content")
 
@@ -360,9 +373,11 @@ async def upload_videos(
                 yd_ref = await provider.save_file(
                     str(local_video_path), yd_dest,
                 )
-                # Store proxy URL directly so v-portal app can play video without yadisk:// scheme
+                # Store signed proxy URL directly so v-portal app can play video without yadisk:// scheme
                 relative_path = yd_ref.replace("yadisk://", "", 1) if yd_ref else yd_dest
-                db_video_url = f"/api/storage/yd-file?path={quote(relative_path, safe='/')}&company_id={ar_content.company_id}"
+                from app.utils.signed_urls import build_yd_file_url
+
+                db_video_url = build_yd_file_url(relative_path, ar_content.company_id)
                 db_video_path = yd_ref or provider.get_public_url(yd_dest)
                 log.info(
                     "video_uploaded_to_yd",
@@ -470,7 +485,7 @@ async def list_videos(
     if not ar_content:
         raise HTTPException(status_code=404, detail="AR content not found")
 
-    if not getattr(current_user, 'is_super_admin', False) and getattr(current_user, 'company_id', None) is not None:
+    if not getattr(current_user, 'is_super_admin', False):
         if ar_content.company_id != getattr(current_user, 'company_id', None):
             raise HTTPException(status_code=403, detail="Access denied to this AR content")
 
@@ -546,7 +561,7 @@ async def set_video_active(
     if not ar_content:
         raise HTTPException(status_code=404, detail="AR content not found")
     
-    if not getattr(current_user, 'is_super_admin', False) and getattr(current_user, 'company_id', None) is not None:
+    if not getattr(current_user, 'is_super_admin', False):
         if ar_content.company_id != getattr(current_user, 'company_id', None):
             raise HTTPException(status_code=403, detail="Access denied to this AR content")
     
@@ -604,7 +619,7 @@ async def update_video_subscription(
     if not ar_content:
         raise HTTPException(status_code=404, detail="AR content not found")
 
-    if not getattr(current_user, 'is_super_admin', False) and getattr(current_user, 'company_id', None) is not None:
+    if not getattr(current_user, 'is_super_admin', False):
         if ar_content.company_id != getattr(current_user, 'company_id', None):
             raise HTTPException(status_code=403, detail="Access denied to this AR content")
 
@@ -664,7 +679,7 @@ async def update_video_rotation(
     if not ar_content:
         raise HTTPException(status_code=404, detail="AR content not found")
     
-    if not getattr(current_user, 'is_super_admin', False) and getattr(current_user, 'company_id', None) is not None:
+    if not getattr(current_user, 'is_super_admin', False):
         if ar_content.company_id != getattr(current_user, 'company_id', None):
             raise HTTPException(status_code=403, detail="Access denied to this AR content")
     
@@ -726,7 +741,7 @@ async def update_video_active_flag(
     if not ar_content:
         raise HTTPException(status_code=404, detail="AR content not found")
 
-    if not getattr(current_user, 'is_super_admin', False) and getattr(current_user, 'company_id', None) is not None:
+    if not getattr(current_user, 'is_super_admin', False):
         if ar_content.company_id != getattr(current_user, 'company_id', None):
             raise HTTPException(status_code=403, detail="Access denied to this AR content")
 
@@ -774,7 +789,7 @@ async def update_playback_mode(
     if not ar_content:
         raise HTTPException(status_code=404, detail="AR content not found")
 
-    if not getattr(current_user, 'is_super_admin', False) and getattr(current_user, 'company_id', None) is not None:
+    if not getattr(current_user, 'is_super_admin', False):
         if ar_content.company_id != getattr(current_user, 'company_id', None):
             raise HTTPException(status_code=403, detail="Access denied to this AR content")
 
@@ -854,7 +869,7 @@ async def list_video_schedules(
         raise HTTPException(status_code=404, detail="Video not found or doesn't belong to this AR content")
 
     ar_content = await db.get(ARContent, content_uuid)
-    if not getattr(current_user, 'is_super_admin', False) and getattr(current_user, 'company_id', None) is not None:
+    if not getattr(current_user, 'is_super_admin', False):
         if ar_content and ar_content.company_id != getattr(current_user, 'company_id', None):
             raise HTTPException(status_code=403, detail="Access denied to this AR content")
 
@@ -887,7 +902,7 @@ async def create_video_schedule(
         raise HTTPException(status_code=404, detail="Video not found or doesn't belong to this AR content")
 
     ar_content = await db.get(ARContent, content_uuid)
-    if not getattr(current_user, 'is_super_admin', False) and getattr(current_user, 'company_id', None) is not None:
+    if not getattr(current_user, 'is_super_admin', False):
         if ar_content and ar_content.company_id != getattr(current_user, 'company_id', None):
             raise HTTPException(status_code=403, detail="Access denied to this AR content")
 
@@ -969,7 +984,7 @@ async def update_video_schedule(
         raise HTTPException(status_code=404, detail="Video not found or doesn't belong to this AR content")
     
     ar_content = await db.get(ARContent, content_uuid)
-    if not getattr(current_user, 'is_super_admin', False) and getattr(current_user, 'company_id', None) is not None:
+    if not getattr(current_user, 'is_super_admin', False):
         if ar_content and ar_content.company_id != getattr(current_user, 'company_id', None):
             raise HTTPException(status_code=403, detail="Access denied to this AR content")
     
@@ -1055,7 +1070,7 @@ async def delete_video_schedule(
         raise HTTPException(status_code=404, detail="Video not found or doesn't belong to this AR content")
 
     ar_content = await db.get(ARContent, content_uuid)
-    if not getattr(current_user, 'is_super_admin', False) and getattr(current_user, 'company_id', None) is not None:
+    if not getattr(current_user, 'is_super_admin', False):
         if ar_content and ar_content.company_id != getattr(current_user, 'company_id', None):
             raise HTTPException(status_code=403, detail="Access denied to this AR content")
 
@@ -1095,13 +1110,19 @@ async def update_video(
         raise HTTPException(status_code=404, detail="Video not found")
 
     ar_content = await db.get(ARContent, v.ar_content_id)
-    if not getattr(current_user, 'is_super_admin', False) and getattr(current_user, 'company_id', None) is not None:
+    if not getattr(current_user, 'is_super_admin', False):
         if ar_content and ar_content.company_id != getattr(current_user, 'company_id', None):
             raise HTTPException(status_code=403, detail="Access denied to this video")
 
     for k, val in payload.items():
-        if hasattr(v, k):
-            setattr(v, k, val)
+        if k not in _LEGACY_VIDEO_UPDATABLE_FIELDS or not hasattr(v, k):
+            continue
+        if k == "subscription_end" and isinstance(val, str) and val.strip():
+            try:
+                val = datetime.fromisoformat(val.replace("Z", "+00:00")).replace(tzinfo=None)
+            except ValueError:
+                raise HTTPException(status_code=400, detail="subscription_end must be an ISO-8601 datetime")
+        setattr(v, k, val)
     await db.commit()
     return {"status": "updated"}
 
@@ -1124,7 +1145,7 @@ async def delete_video(
         raise HTTPException(status_code=404, detail="Video not found")
 
     ar_content = await db.get(ARContent, v.ar_content_id)
-    if not getattr(current_user, 'is_super_admin', False) and getattr(current_user, 'company_id', None) is not None:
+    if not getattr(current_user, 'is_super_admin', False):
         if ar_content and ar_content.company_id != getattr(current_user, 'company_id', None):
             raise HTTPException(status_code=403, detail="Access denied to this video")
 

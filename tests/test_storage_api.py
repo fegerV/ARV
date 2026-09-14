@@ -158,17 +158,33 @@ async def test_list_storage_connections_returns_safe_payload():
 @pytest.mark.asyncio
 async def test_proxy_yandex_disk_file_validates_company_and_storage(monkeypatch):
     from app.api.routes import storage
+    from app.utils.signed_urls import _signature
+    import time
 
     request = SimpleNamespace(headers={})
 
-    with pytest.raises(HTTPException) as missing_company:
+    def _sig(path: str, company_id: int) -> dict:
+        """Build a valid, unexpired signature for the proxy endpoint (ARV-004)."""
+        exp = int(time.time()) + 300
+        return {"exp": exp, "sig": _signature(path, company_id, exp)}
+
+    # Missing/invalid signature must be rejected before any storage lookup.
+    with pytest.raises(HTTPException) as unsigned:
         await storage.proxy_yandex_disk_file(request, path="demo/file.jpg", company_id=404, db=_FakeDb())
+    assert unsigned.value.status_code == 403
+
+    with pytest.raises(HTTPException) as missing_company:
+        await storage.proxy_yandex_disk_file(
+            request, path="demo/file.jpg", company_id=404, db=_FakeDb(), **_sig("demo/file.jpg", 404)
+        )
     assert missing_company.value.status_code == 404
 
     company = SimpleNamespace(id=4, storage_provider="local", yandex_disk_token=None)
     db = _FakeDb(get_map={(storage.Company, 4): company})
     with pytest.raises(HTTPException) as wrong_storage:
-        await storage.proxy_yandex_disk_file(request, path="demo/file.jpg", company_id=4, db=db)
+        await storage.proxy_yandex_disk_file(
+            request, path="demo/file.jpg", company_id=4, db=db, **_sig("demo/file.jpg", 4)
+        )
     assert wrong_storage.value.status_code == 400
     assert wrong_storage.value.detail == "Company does not use Yandex Disk storage"
 
@@ -183,7 +199,9 @@ async def test_proxy_yandex_disk_file_validates_company_and_storage(monkeypatch)
 
     monkeypatch.setattr(storage, "get_provider_for_company", _fake_get_provider_for_company)
     with pytest.raises(HTTPException) as mismatch:
-        await storage.proxy_yandex_disk_file(request, path="demo/file.jpg", company_id=5, db=db)
+        await storage.proxy_yandex_disk_file(
+            request, path="demo/file.jpg", company_id=5, db=db, **_sig("demo/file.jpg", 5)
+        )
     assert mismatch.value.status_code == 400
     assert mismatch.value.detail == "Provider mismatch"
 

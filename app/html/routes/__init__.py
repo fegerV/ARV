@@ -4,6 +4,7 @@ from . import (
     storage, analytics, notifications, settings,
     help_routes, logs, debug, backups as backups_routes, htmx
 )
+from app.core.config import settings as app_settings
 
 html_router = APIRouter(prefix="", tags=["HTML"])
 
@@ -20,7 +21,10 @@ html_router.include_router(settings.router)
 html_router.include_router(backups_routes.router)
 html_router.include_router(logs.router)
 html_router.include_router(help_routes.router)
-html_router.include_router(debug.router)
+
+# Debug endpoints are only exposed outside production.
+if not app_settings.is_production:
+    html_router.include_router(debug.router)
 
 # htmx-фрагменты
 html_router.include_router(htmx.router)

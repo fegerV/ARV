@@ -28,17 +28,17 @@ class TokenEncryption:
             salt=self._derive_salt(),
             iterations=100_000,
         )
-        key = base64.urlsafe_b64encode(kdf.derive(settings.SECRET_KEY.encode()))
+        key = base64.urlsafe_b64encode(kdf.derive(settings.token_encryption_secret.encode()))
         self._cipher = Fernet(key)
 
     @staticmethod
     def _derive_salt() -> bytes:
-        """Derive a deterministic salt from SECRET_KEY.
+        """Derive a deterministic salt from the encryption secret.
 
         This avoids a hardcoded constant while keeping the salt stable
         across restarts so existing encrypted values stay decryptable.
         """
-        return hashlib.sha256(settings.SECRET_KEY.encode()).digest()[:16]
+        return hashlib.sha256(settings.token_encryption_secret.encode()).digest()[:16]
 
     def encrypt_credentials(self, credentials: dict[str, Any]) -> str:
         if self._cipher is None:

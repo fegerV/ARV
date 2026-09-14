@@ -48,7 +48,7 @@ async def test_list_projects_clamps_page_size_and_serializes_links():
         ]
     )
 
-    result = await projects.list_projects(page=1, page_size=999, company_id=None, db=db, current_user=SimpleNamespace())
+    result = await projects.list_projects(page=1, page_size=999, company_id=None, db=db, current_user=SimpleNamespace(is_super_admin=True))
 
     assert result.total == 1
     assert result.page_size == 20
@@ -77,7 +77,7 @@ async def test_get_projects_by_company_returns_sorted_items():
         ],
     )
 
-    result = await projects.get_projects_by_company(3, db, current_user=SimpleNamespace())
+    result = await projects.get_projects_by_company(3, db, current_user=SimpleNamespace(is_super_admin=True))
 
     assert result == {
         "projects": [
@@ -102,7 +102,7 @@ async def test_create_project_general_requires_existing_company():
     db = _FakeDb(get_map={(projects.Company, 1): None})
 
     with pytest.raises(HTTPException) as exc_info:
-        await projects.create_project_general(payload, db, current_user=SimpleNamespace())
+        await projects.create_project_general(payload, db, current_user=SimpleNamespace(is_super_admin=True))
 
     assert exc_info.value.status_code == 404
     assert exc_info.value.detail == "Company not found"
@@ -116,7 +116,7 @@ async def test_create_project_general_persists_project():
     db = _FakeDb(get_map={(projects.Company, 7): company})
     payload = ProjectCreate(company_id=7, name="New Project", status=ProjectStatus.ACTIVE)
 
-    result = await projects.create_project_general(payload, db, current_user=SimpleNamespace())
+    result = await projects.create_project_general(payload, db, current_user=SimpleNamespace(is_super_admin=True))
 
     assert db.added is not None
     assert db.added.company_id == 7
@@ -146,7 +146,7 @@ async def test_update_project_general_updates_fields():
         14,
         ProjectUpdate(name="After", status=ProjectStatus.ARCHIVED),
         db,
-        current_user=SimpleNamespace(),
+        current_user=SimpleNamespace(is_super_admin=True),
     )
 
     assert project.name == "After"
@@ -167,7 +167,7 @@ async def test_delete_project_general_blocks_when_content_exists():
     )
 
     with pytest.raises(HTTPException) as exc_info:
-        await projects.delete_project_general(22, db, current_user=SimpleNamespace())
+        await projects.delete_project_general(22, db, current_user=SimpleNamespace(is_super_admin=True))
 
     assert exc_info.value.status_code == 400
     assert "Cannot delete project with 4 AR content items" in exc_info.value.detail

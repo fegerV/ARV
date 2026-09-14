@@ -12,6 +12,7 @@ from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from app.api.routes.auth import get_current_user_optional
 from app.core.config import settings
 from app.html.templating import templates
+from app.html.utils import is_super_admin
 
 router = APIRouter()
 logger = structlog.get_logger()
@@ -200,9 +201,11 @@ async def admin_logs_page(
     request: Request,
     current_user=Depends(get_current_user_optional),
 ):
-    """Страница просмотра логов (только для авторизованных)."""
+    """Страница просмотра логов (только для супер-админов)."""
     if not current_user or not current_user.is_active:
         return RedirectResponse(url="/admin/login", status_code=303)
+    if not is_super_admin(current_user):
+        return HTMLResponse("Super admin access required", status_code=403)
 
     lines, source, source_label, error = await get_log_content(None)
     log_entries = classify_log_lines(lines)
@@ -230,6 +233,11 @@ async def api_admin_logs(
         return JSONResponse(
             status_code=401,
             content={"detail": "Unauthorized"},
+        )
+    if not is_super_admin(current_user):
+        return JSONResponse(
+            status_code=403,
+            content={"detail": "Super admin access required"},
         )
     log_lines, source, source_label, error = await get_log_content(lines)
     items = classify_log_lines(log_lines)

@@ -43,6 +43,42 @@ class Settings(BaseSettings):
     SECRET_KEY: str = Field(min_length=32)
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 1440  # 24 hours
+
+    # Dedicated secrets. Each falls back to SECRET_KEY when unset so that
+    # existing deployments keep working, but they SHOULD be set separately so
+    # that leaking one secret does not compromise the others.
+    SESSION_SECRET_KEY: str = ""       # signs browser session cookies
+    TOKEN_ENCRYPTION_KEY: str = ""     # encrypts stored OAuth tokens (Fernet)
+    MEDIA_URL_SECRET: str = ""         # signs Yandex Disk proxy URLs
+
+    # Legacy unsalted SHA-256 password hashes are only accepted while accounts
+    # are being migrated. They MUST be disabled in production; when disabled,
+    # such accounts simply fail to authenticate (forcing a password reset).
+    ALLOW_LEGACY_PASSWORD_HASHES: bool = False
+
+    # SameSite policy for the ``access_token`` session cookie.
+    #   "lax"    — default: cookie is sent on top-level GET navigations, which
+    #              keeps "open the admin panel from a link" working, and still
+    #              blocks cross-site POST/iframe/subresource requests.
+    #   "strict" — tightest: cookie is never sent on cross-site navigations, so
+    #              users arriving via an external link land logged-out (they
+    #              must refresh). Recommended once UX impact is acceptable.
+    COOKIE_SAMESITE: str = "lax"
+
+    @property
+    def session_secret(self) -> str:
+        """Secret used to sign browser session cookies."""
+        return self.SESSION_SECRET_KEY or self.SECRET_KEY
+
+    @property
+    def token_encryption_secret(self) -> str:
+        """Secret used to derive the token-encryption key."""
+        return self.TOKEN_ENCRYPTION_KEY or self.SECRET_KEY
+
+    @property
+    def media_url_secret(self) -> str:
+        """Secret used to sign media proxy URLs."""
+        return self.MEDIA_URL_SECRET or self.SECRET_KEY
     
     # CORS
     CORS_ORIGINS: Any = Field(

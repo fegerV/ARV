@@ -7,7 +7,13 @@ from app.api.routes.companies import list_companies, get_company
 from app.html.deps import get_html_db
 from app.api.routes.auth import get_current_user_optional
 from app.html.templating import templates
-from app.html.utils import require_active_user, serialize_fields
+from app.html.utils import (
+    is_super_admin,
+    require_active_user,
+    require_company_scope,
+    require_super_admin,
+    serialize_fields,
+)
 
 router = APIRouter()
 logger = structlog.get_logger()
@@ -141,7 +147,7 @@ async def company_create(
     db: AsyncSession = Depends(get_html_db)
 ):
     """Company create page."""
-    redirect = require_active_user(current_user)
+    redirect = require_super_admin(current_user)
     if redirect:
         return redirect
 
@@ -164,14 +170,28 @@ async def company_detail(
     if redirect:
         return redirect
     try:
-        company_detail_resp = await get_company(int(company_id), db, current_user=current_user)
+        cid = int(company_id)
+    except (TypeError, ValueError):
+        raise HTTPException(status_code=400, detail="Invalid company id")
+
+    scope_error = require_company_scope(current_user, cid)
+    if scope_error:
+        return scope_error
+
+    try:
+        company_obj = await db.get(Company, cid)
+        if not company_obj:
+            raise HTTPException(status_code=404, detail="Company not found")
+        company_detail_resp = await get_company(
+            cid, company=company_obj, db=db, current_user=current_user
+        )
         company_data = _pydantic_to_dict(company_detail_resp)
         company_data = _convert_data_for_template(company_data)
         # Ensure storage fields are present
-        company_obj = await db.get(Company, int(company_id))
-        if company_obj:
-            company_data["storage_provider"] = company_obj.storage_provider or "local"
-            company_data["yandex_connected"] = bool(company_obj.yandex_disk_token)
+        company_data["storage_provider"] = company_obj.storage_provider or "local"
+        company_data["yandex_connected"] = bool(company_obj.yandex_disk_token)
+    except HTTPException:
+        raise
     except Exception:
         logger.error("company_detail_error", company_id=company_id, exc_info=True)
         raise
@@ -194,10 +214,19 @@ async def company_edit(
     redirect = require_active_user(current_user)
     if redirect:
         return redirect
-    
+
+    try:
+        cid = int(company_id)
+    except (TypeError, ValueError):
+        raise HTTPException(status_code=400, detail="Invalid company id")
+
+    scope_error = require_company_scope(current_user, cid)
+    if scope_error:
+        return scope_error
+
     try:
         # Load directly from DB to get storage_provider and yandex_disk_token
-        company_obj = await db.get(Company, int(company_id))
+        company_obj = await db.get(Company, cid)
         if not company_obj:
             raise HTTPException(status_code=404, detail="Company not found")
         company_data = {
@@ -228,7 +257,7 @@ async def company_create_post(
     db: AsyncSession = Depends(get_html_db)
 ):
     """Handle company creation form submission."""
-    redirect = require_active_user(current_user)
+    redirect = require_super_admin(current_user)
     if redirect:
         return redirect
     
@@ -308,13 +337,22 @@ async def company_delete(
     
     if not current_user.is_active:
         return JSONResponse(content={"error": "Unauthorized"}, status_code=401)
+
+    if not is_super_admin(current_user):
+        return JSONResponse(content={"error": "Super admin access required"}, status_code=403)
     
     try:
         # Delete company via API
         from app.api.routes.companies import delete_company
-        
+
+        cid = int(company_id)
+        company_obj = await db.get(Company, cid)
+        if not company_obj:
+            return JSONResponse(content={"error": "Company not found"}, status_code=404)
+
         await delete_company(
-            company_id=int(company_id),
+            company_id=cid,
+            company=company_obj,
             db=db,
             current_user=current_user
         )
@@ -367,7 +405,16 @@ async def company_update_post(
     redirect = require_active_user(current_user)
     if redirect:
         return redirect
-    
+
+    try:
+        cid = int(company_id)
+    except (TypeError, ValueError):
+        raise HTTPException(status_code=400, detail="Invalid company id")
+
+    scope_error = require_company_scope(current_user, cid)
+    if scope_error:
+        return scope_error
+
     # Get form data
     form_data = await request.form()
     name = form_data.get("name", "").strip()
@@ -401,9 +448,14 @@ async def company_update_post(
             storage_provider=storage_provider,
         )
         
+        company_obj = await db.get(Company, cid)
+        if not company_obj:
+            raise HTTPException(status_code=404, detail="Company not found")
+
         await update_company(
-            company_id=int(company_id),
+            company_id=cid,
             company_data=company_update_data,
+            company=company_obj,
             db=db,
             current_user=current_user
         )

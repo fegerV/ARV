@@ -59,7 +59,7 @@ async def test_set_rotation_creates_schedule_with_sanitized_values():
             "video_sequence": ["5", "7"],
             "is_active": "false",
         },
-        current_user=SimpleNamespace(is_active=True),
+        current_user=SimpleNamespace(is_active=True, is_super_admin=True),
         db=db,
     )
 
@@ -84,7 +84,7 @@ async def test_set_rotation_updates_existing_schedule():
     result = await rotation.set_rotation(
         41,
         {"current_index": "4", "is_active": "false", "ignored_field": "x"},
-        current_user=SimpleNamespace(is_active=True),
+        current_user=SimpleNamespace(is_active=True, is_super_admin=True),
         db=db,
     )
 
@@ -102,7 +102,7 @@ async def test_update_rotation_requires_existing_schedule():
         await rotation.update_rotation(
             99,
             {"rotation_type": "random"},
-            current_user=SimpleNamespace(is_active=True),
+            current_user=SimpleNamespace(is_active=True, is_super_admin=True),
             db=_FakeDb(),
         )
 
@@ -118,7 +118,7 @@ async def test_delete_rotation_deletes_existing_schedule():
     ar_content = SimpleNamespace(id=41, company_id=1)
     db = _FakeDb(get_map={(rotation.VideoRotationSchedule, 12): sched, (rotation.ARContent, 41): ar_content})
 
-    result = await rotation.delete_rotation(12, current_user=SimpleNamespace(is_active=True), db=db)
+    result = await rotation.delete_rotation(12, current_user=SimpleNamespace(is_active=True, is_super_admin=True), db=db)
 
     assert result == {"status": "deleted"}
     assert db.deleted is sched
@@ -133,7 +133,7 @@ async def test_set_rotation_sequence_validates_non_empty_list():
         await rotation.set_rotation_sequence(
             5,
             {"video_sequence": []},
-            current_user=SimpleNamespace(is_active=True),
+            current_user=SimpleNamespace(is_active=True, is_super_admin=True),
             db=_FakeDb(get_map={(rotation.ARContent, 5): SimpleNamespace(id=5, company_id=1)}),
         )
 
@@ -151,7 +151,7 @@ async def test_set_rotation_sequence_creates_schedule_when_missing():
     result = await rotation.set_rotation_sequence(
         77,
         {"video_sequence": ["3", "4"]},
-        current_user=SimpleNamespace(is_active=True),
+        current_user=SimpleNamespace(is_active=True, is_super_admin=True),
         db=db,
     )
 
@@ -171,7 +171,7 @@ async def test_rotation_calendar_rejects_invalid_month():
         await rotation.rotation_calendar(
             5,
             month="2025-13",
-            current_user=SimpleNamespace(is_active=True),
+            current_user=SimpleNamespace(is_active=True, is_super_admin=True),
             db=_FakeDb(get_map={(rotation.ARContent, 5): SimpleNamespace(id=5, company_id=1)}),
         )
 
@@ -223,7 +223,7 @@ async def test_rotation_calendar_prefers_scheduled_video_then_sequence():
     result = await rotation.rotation_calendar(
         5,
         month="2025-01",
-        current_user=SimpleNamespace(is_active=True),
+        current_user=SimpleNamespace(is_active=True, is_super_admin=True),
         db=db,
     )
 

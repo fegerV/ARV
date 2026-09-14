@@ -2,7 +2,10 @@ import pytest
 
 
 class _DummyUser:
+    # Global settings are super-admin only (ARV-001).
     is_active = True
+    is_super_admin = True
+    company_id = None
     email = "admin@vertexar.com"
 
 

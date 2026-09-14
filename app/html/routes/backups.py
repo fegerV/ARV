@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, Request
 from fastapi.responses import HTMLResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.routes.auth import get_current_active_user
+from app.api.deps_authz import require_super_admin
 from app.core.database import get_db
 from app.html.templating import templates
 from app.models.user import User
@@ -18,7 +18,7 @@ router = APIRouter()
 async def backups_page(
     request: Request,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_active_user),
+    current_user: User = Depends(require_super_admin),
 ):
     """Page for backup management."""
     svc = BackupService()

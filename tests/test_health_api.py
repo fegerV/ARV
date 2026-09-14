@@ -1,5 +1,6 @@
 import httpx
 import pytest
+from types import SimpleNamespace
 
 
 @pytest.mark.asyncio
@@ -40,10 +41,11 @@ async def test_health_status_reports_degraded_when_database_fails(monkeypatch):
     monkeypatch.setattr(health.psutil, "virtual_memory", lambda: Memory())
     monkeypatch.setattr(health.psutil, "disk_usage", lambda path: Disk())
 
-    result = await health.health_status()
+    result = await health.health_status(current_user=SimpleNamespace(is_super_admin=True))
 
     assert result["database"] == "unhealthy"
-    assert result["database_error"] == "db down"
+    # ARV-018: internal error details must never be echoed to the caller.
+    assert "database_error" not in result
     assert result["system"] == {
         "cpu_percent": 12.5,
         "memory_percent": 42.0,

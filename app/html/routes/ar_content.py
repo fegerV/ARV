@@ -19,11 +19,12 @@ from app.models.video_rotation_schedule import VideoRotationSchedule
 from app.services.video_scheduler import compute_video_status, compute_days_remaining, get_active_video
 # marker_service — ленивый импорт (cv2/numpy)
 from app.models.ar_content import ARContent
+from app.models.company import Company
 from app.utils.ar_content import build_public_url
 from app.html.deps import get_html_db
 from app.api.routes.auth import get_current_user_optional
 from app.html.templating import templates
-from app.html.utils import require_active_user, serialize_datetime, serialize_nested
+from app.html.utils import require_active_user, require_company_scope, serialize_datetime, serialize_nested
 from app.html.filters import storage_url
 from app.core.config import settings
 from app.services.settings_service import SettingsService
@@ -548,9 +549,11 @@ async def ar_content_delete(
         # Call API to delete AR content
         # Use injected BackgroundTasks from FastAPI
         await delete_ar_content_by_id(
+            request=request,
             content_id=int(ar_content_id),
             background_tasks=background_tasks,
-            db=db
+            db=db,
+            current_user=current_user,
         )
         
         logger.info("ar_content_deleted", ar_content_id=ar_content_id)
@@ -996,6 +999,11 @@ async def ar_content_create_post(
             raise ValueError("Customer name is required")
         if not photo_file or not video_file:
             raise ValueError("Photo and video files are required")
+
+        # Authorisation: the user may only create content for their own company
+        scope_error = require_company_scope(current_user, company_id)
+        if scope_error:
+            return scope_error
         
         # Call API to create AR content
         # Files from form are already UploadFile objects
@@ -1046,11 +1054,18 @@ async def ar_content_update_post(
         return redirect
     
     try:
-        # Get AR content to find company_id and project_id
-        ar_content = await get_ar_content_by_id(int(ar_content_id), db)
-        if not ar_content:
+        # Load AR content directly and enforce tenant scope
+        ar_content_db = await db.get(ARContent, int(ar_content_id))
+        if not ar_content_db:
             return RedirectResponse(url="/ar-content", status_code=303)
-        
+
+        scope_error = require_company_scope(current_user, ar_content_db.company_id)
+        if scope_error:
+            return scope_error
+
+        company_id = ar_content_db.company_id
+        project_id = ar_content_db.project_id
+
         # Get form data
         form_data = await request.form()
         customer_name = form_data.get("customer_name", "").strip()
@@ -1061,23 +1076,9 @@ async def ar_content_update_post(
         # Validation
         if not customer_name:
             raise ValueError("Customer name is required")
-        
-        # Call API to update AR content
-        # Convert ar_content to dict if it's a Pydantic model
-        if hasattr(ar_content, 'company_id'):
-            company_id = ar_content.company_id
-            project_id = ar_content.project_id
-        elif isinstance(ar_content, dict):
-            company_id = ar_content.get('company_id')
-            project_id = ar_content.get('project_id')
-        else:
-            # Get from database
-            ar_content_db = await db.get(ARContent, int(ar_content_id))
-            if not ar_content_db:
-                raise ValueError("AR content not found")
-            company_id = ar_content_db.company_id
-            project_id = ar_content_db.project_id
-        
+
+        company_obj = await db.get(Company, company_id)
+
         update_data = ARContentUpdate(
             customer_name=customer_name,
             customer_phone=customer_phone if customer_phone else None,
@@ -1086,11 +1087,14 @@ async def ar_content_update_post(
         )
         
         await update_ar_content(
+            request=request,
             company_id=company_id,
             project_id=project_id,
             content_id=int(ar_content_id),
             update_data=update_data,
-            db=db
+            company=company_obj,
+            db=db,
+            current_user=current_user,
         )
         
         # Redirect to AR content detail after successful update

@@ -36,7 +36,7 @@ async def test_list_notifications_builds_paginated_payload():
         limit=2,
         offset=2,
         db=db,
-        current_user=SimpleNamespace(),
+        current_user=SimpleNamespace(is_super_admin=True),
     )
 
     assert result.total == 3
@@ -64,7 +64,7 @@ async def test_mark_all_notifications_read_updates_only_unread_rows():
         ]
     )
 
-    result = await notifications.mark_all_notifications_read(db=db, current_user=SimpleNamespace())
+    result = await notifications.mark_all_notifications_read(db=db, current_user=SimpleNamespace(is_super_admin=True))
 
     assert result.success is True
     assert result.message == "Marked 2 notifications as read"
@@ -80,7 +80,7 @@ async def test_mark_all_notifications_read_updates_only_unread_rows():
 async def test_mark_notifications_read_handles_empty_ids():
     from app.api.routes import notifications
 
-    result = await notifications.mark_notifications_read([], db=_FakeDb(), current_user=SimpleNamespace())
+    result = await notifications.mark_notifications_read([], db=_FakeDb(), current_user=SimpleNamespace(is_super_admin=True))
 
     assert result.success is False
     assert result.message == "No notification IDs provided"
@@ -97,7 +97,7 @@ async def test_mark_notifications_read_updates_unread_items():
     ]
     db = _FakeDb(execute_results=[_FakeScalarsResult(items)])
 
-    result = await notifications.mark_notifications_read([1, 2, 3], db=db, current_user=SimpleNamespace())
+    result = await notifications.mark_notifications_read([1, 2, 3], db=db, current_user=SimpleNamespace(is_super_admin=True))
 
     assert result.success is True
     assert result.message == "Marked 2 notifications as read"
@@ -111,7 +111,7 @@ async def test_delete_notification_raises_for_missing_item():
     from app.api.routes import notifications
 
     with pytest.raises(HTTPException) as exc_info:
-        await notifications.delete_notification(404, db=_FakeDb(), current_user=SimpleNamespace())
+        await notifications.delete_notification(404, db=_FakeDb(), current_user=SimpleNamespace(is_super_admin=True))
 
     assert exc_info.value.status_code == 404
     assert exc_info.value.detail == "Notification not found"
@@ -143,7 +143,7 @@ async def test_create_notification_endpoint_serializes_service_response(monkeypa
             company_id=7,
         ),
         db=_FakeDb(),
-        current_user=SimpleNamespace(id=1),
+        current_user=SimpleNamespace(id=1, is_super_admin=True),
     )
 
     assert result.id == 15

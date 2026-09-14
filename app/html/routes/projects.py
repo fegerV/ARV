@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Request, Depends
+from fastapi import APIRouter, Request, Depends, HTTPException
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import func, select
@@ -9,7 +9,7 @@ from app.models.project import Project
 from app.html.deps import get_html_db
 from app.api.routes.auth import get_current_user_optional
 from app.html.templating import templates
-from app.html.utils import require_active_user, serialize_fields
+from app.html.utils import require_active_user, require_company_scope, serialize_fields
 
 router = APIRouter()
 logger = structlog.get_logger()
@@ -368,10 +368,14 @@ async def project_create_post(
             except (ValueError, KeyError):
                 project_status = ProjectStatus.ACTIVE
         
-        # Validate company exists
+        # Validate company exists and that the user may create projects in it
         company = await db.get(Company, int(company_id))
         if not company:
             raise ValueError("Company not found")
+
+        scope_error = require_company_scope(current_user, company.id)
+        if scope_error:
+            return scope_error
         
         # Create project
         # ProjectStatus is str, Enum, so .value is always available

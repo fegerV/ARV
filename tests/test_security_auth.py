@@ -13,13 +13,27 @@ def test_password_hash_uses_pbkdf2_and_verifies():
     assert needs_password_rehash(hashed) is False
 
 
-def test_legacy_sha256_hash_still_verifies_but_requires_upgrade():
+def test_legacy_sha256_hash_is_rejected_by_default_but_requires_upgrade():
+    """Legacy unsalted SHA-256 hashes must not authenticate by default (ARV-015)."""
     from app.core.security import verify_password, needs_password_rehash
 
     legacy_hash = hashlib.sha256("Secret123!".encode()).hexdigest()
-    assert verify_password("Secret123!", legacy_hash) is True
+    assert verify_password("Secret123!", legacy_hash) is False
     assert verify_password("wrong", legacy_hash) is False
+    # ...but they are still flagged for rehashing so a successful login on the
+    # legacy scheme (when explicitly enabled) upgrades them.
     assert needs_password_rehash(legacy_hash) is True
+
+
+def test_legacy_sha256_hash_verifies_only_when_explicitly_enabled(monkeypatch):
+    from app.core import security
+
+    monkeypatch.setattr(security.settings, "ALLOW_LEGACY_PASSWORD_HASHES", True, raising=False)
+    monkeypatch.setattr(security.settings, "ENVIRONMENT", "development", raising=False)
+
+    legacy_hash = hashlib.sha256("Secret123!".encode()).hexdigest()
+    assert security.verify_password("Secret123!", legacy_hash) is True
+    assert security.verify_password("wrong", legacy_hash) is False
 
 
 @pytest.mark.asyncio

@@ -20,6 +20,7 @@ from app.core.database import get_db
 from app.models.user import User
 from app.schemas.auth import Token, UserResponse, RegisterRequest, RegisterResponse
 from app.core.config import get_settings
+from app.utils.pii import mask_email
 import structlog
 
 router = APIRouter(tags=["auth"])
@@ -99,6 +100,13 @@ async def get_session_timeout_minutes(db: AsyncSession) -> int:
         return settings.ACCESS_TOKEN_EXPIRE_MINUTES
 
 
+def _cookie_samesite() -> str:
+    """Resolve the configured SameSite policy for auth cookies."""
+    settings = get_settings()
+    value = (getattr(settings, "COOKIE_SAMESITE", None) or "lax").lower()
+    return value if value in ("lax", "strict", "none") else "lax"
+
+
 def create_access_token_cookie(response: Response, access_token: str, timeout_minutes: int) -> None:
     """Set access token in cookie for HTML interface."""
     settings = get_settings()
@@ -111,18 +119,18 @@ def create_access_token_cookie(response: Response, access_token: str, timeout_mi
         path="/",
         secure=settings.is_production,  # Use secure cookies in production
         httponly=True,
-        samesite="lax",
+        samesite=_cookie_samesite(),
     )
 
 
 def clear_access_token_cookie(response: Response) -> None:
-    response.delete_cookie("access_token", path="/", samesite="lax")
+    response.delete_cookie("access_token", path="/", samesite=_cookie_samesite())
 
 
 def clear_auth_cookies(response: Response) -> None:
     """Clear browser authentication cookies."""
     clear_access_token_cookie(response)
-    response.delete_cookie("csrf_token", path="/", samesite="lax")
+    response.delete_cookie("csrf_token", path="/", samesite=_cookie_samesite())
 
 @router.post("/login", response_model=Token)
 @rate_limit("10/minute")
@@ -139,7 +147,7 @@ async def login(
     # Check if account is locked
     if user and user.locked_until:
         if _utcnow_naive() < user.locked_until:
-            logger.warning("Login attempt on locked account", email=form_data.username)
+            logger.warning("Login attempt on locked account", email=mask_email(form_data.username))
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail={
@@ -155,7 +163,7 @@ async def login(
 
     # Verify credentials
     if not user or not verify_password(form_data.password, user.hashed_password):
-        logger.warning("Failed login attempt", email=form_data.username)
+        logger.warning("Failed login attempt", email=mask_email(form_data.username))
         
         if user:
             # Increment login attempts
@@ -167,7 +175,7 @@ async def login(
                 await db.commit()
                 
                 logger.warning("Account locked due to excessive login attempts",
-                             email=form_data.username,
+                             email=mask_email(form_data.username),
                              attempts=user.login_attempts)
                 
                 raise HTTPException(
@@ -221,7 +229,7 @@ async def login(
         company_id=user.company_id,
     )
     
-    logger.info("User login successful", user_id=user.id, email=user.email)
+    logger.info("User login successful", user_id=user.id, email=mask_email(user.email))
     
     return {
         "access_token": access_token,
@@ -230,6 +238,7 @@ async def login(
     }
 
 @router.post("/login-form", response_class=HTMLResponse)
+@rate_limit("10/minute")
 async def login_form(
     request: Request,
     username: str = Form(...),
@@ -247,7 +256,7 @@ async def login_form(
     # Check if account is locked
     if user and user.locked_until:
         if _utcnow_naive() < user.locked_until:
-            logger.warning("Login attempt on locked account", email=username)
+            logger.warning("Login attempt on locked account", email=mask_email(username))
             # Return login page with error
             context = {
                 "request": request,
@@ -263,7 +272,7 @@ async def login_form(
 
     # Verify credentials
     if not user or not verify_password(password, user.hashed_password):
-        logger.warning("Failed login attempt", email=username)
+        logger.warning("Failed login attempt", email=mask_email(username))
         
         if user:
             # Increment login attempts
@@ -275,7 +284,7 @@ async def login_form(
                 await db.commit()
                 
                 logger.warning("Account locked due to excessive login attempts",
-                              email=username,
+                              email=mask_email(username),
                               attempts=user.login_attempts)
                 
                 context = {
@@ -327,7 +336,7 @@ async def login_form(
         company_id=user.company_id,
     )
     
-    logger.info("User login successful", user_id=user.id, email=user.email)
+    logger.info("User login successful", user_id=user.id, email=mask_email(user.email))
     
     # Create response and set cookie
     response = RedirectResponse(url="/admin", status_code=303)
@@ -337,7 +346,7 @@ async def login_form(
 @router.post("/logout")
 async def logout(request: Request, current_user: User = Depends(get_current_active_user)):
     """Logout user and clear cookie-based session state."""
-    logger.info("User logout", user_id=current_user.id, email=current_user.email)
+    logger.info("User logout", user_id=current_user.id, email=mask_email(current_user.email))
 
     token = _extract_request_token(request)
     if token:
@@ -362,20 +371,42 @@ async def register_user(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
 ):
-    """Register a new user (admin only)"""
-    # Check if current user is admin
-    if current_user.role != "admin":
+    """Register a new user (super admin only)"""
+    # Only global super admins may create users. A tenant admin must not be
+    # able to mint accounts (which previously had no company_id and therefore
+    # bypassed tenant isolation).
+    if not getattr(current_user, 'is_super_admin', False):
         logger.warning(
             "unauthorized_registration_attempt", 
             user_id=current_user.id, 
-            email=current_user.email,
+            email=mask_email(current_user.email),
             requested_role=user_data.role
         )
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Only administrators can create new users"
         )
-    
+
+    # Validate role against the allow-list (defence in depth on top of schema)
+    if user_data.role not in {"admin", "editor", "user"}:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid role",
+        )
+
+    # Determine the company assignment. A non-super-admin user MUST belong to a
+    # company; otherwise it would gain cross-tenant access.
+    target_company_id = (
+        user_data.company_id
+        if user_data.company_id is not None
+        else getattr(current_user, 'company_id', None)
+    )
+    if not user_data.is_super_admin and target_company_id is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="company_id is required for non-super-admin users",
+        )
+
     # Check if email already exists
     result = await db.execute(select(User).where(User.email == user_data.email))
     existing_user = result.scalar_one_or_none()
@@ -383,8 +414,8 @@ async def register_user(
     if existing_user:
         logger.warning(
             "duplicate_email_registration_attempt",
-            email=user_data.email,
-            attempted_by=current_user.email
+            email=mask_email(user_data.email),
+            attempted_by=mask_email(current_user.email)
         )
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
@@ -398,7 +429,9 @@ async def register_user(
         hashed_password=hashed_password,
         full_name=user_data.full_name,
         role=user_data.role,
-        is_active=True
+        is_active=True,
+        company_id=target_company_id,
+        is_super_admin=bool(user_data.is_super_admin),
     )
     
     db.add(new_user)
@@ -408,9 +441,9 @@ async def register_user(
     logger.info(
         "user_registered",
         user_id=new_user.id,
-        email=new_user.email,
+        email=mask_email(new_user.email),
         role=new_user.role,
-        created_by=current_user.email
+        created_by=mask_email(current_user.email)
     )
     
     return RegisterResponse(

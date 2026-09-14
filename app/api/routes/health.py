@@ -2,11 +2,13 @@ import os
 
 import psutil
 import structlog
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 from sqlalchemy import text
 from starlette.responses import Response
 
 from app.core.database import engine
+from app.api.deps_authz import require_super_admin
+from app.models.user import User
 
 # Prometheus
 try:
@@ -30,8 +32,8 @@ async def health_ping():
 
 
 @router.get("/status")
-async def health_status():
-    """Расширенный health check endpoint"""
+async def health_status(current_user: User = Depends(require_super_admin)):
+    """Расширенный health check endpoint (только для супер-админов)."""
     checks: dict = {}
 
     # 1. Database connectivity
@@ -39,9 +41,9 @@ async def health_status():
         async with engine.begin() as conn:
             await conn.execute(text("SELECT 1"))
         checks["database"] = "healthy"
-    except Exception as e:
+    except Exception:
+        # Do not leak internal error strings to the caller.
         checks["database"] = "unhealthy"
-        checks["database_error"] = str(e)
 
     # 3. System resources
     cpu_percent = psutil.cpu_percent(interval=0.5)
@@ -72,8 +74,8 @@ async def health_status():
 
 
 @router.get("/metrics")
-async def prometheus_metrics():
-    """Prometheus metrics endpoint."""
+async def prometheus_metrics(current_user: User = Depends(require_super_admin)):
+    """Prometheus metrics endpoint (только для супер-админов)."""
     if generate_latest is None:
         return Response(content="", media_type=CONTENT_TYPE_LATEST, status_code=204)
 
