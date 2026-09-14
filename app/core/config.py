@@ -167,6 +167,79 @@ class Settings(BaseSettings):
     YANDEX_OAUTH_CLIENT_ID: str = ""
     YANDEX_OAUTH_CLIENT_SECRET: str = ""
 
+    # ------------------------------------------------------------------
+    # Backup / disaster recovery (see docs/BACKUP_AND_RECOVERY.md)
+    # ------------------------------------------------------------------
+    # Local staging directory where dumps are assembled before shipping.
+    BACKUP_STAGING_DIR: str = "/var/backups/arv"
+
+    # Encryption of database dumps. When AGE_RECIPIENT is set, the dump is
+    # encrypted with `age` before it leaves the host. The matching private key
+    # MUST NOT be stored on this server (see docs, section "Encryption").
+    BACKUP_AGE_RECIPIENT: str = ""
+    BACKUP_AGE_BINARY: str = "age"
+    # Private key used to DECRYPT during a restore/drill. Deliberately a
+    # separate setting: the encryption recipient is public and may live on the
+    # production host, while the identity must be mounted only for the short
+    # duration of a restore (see docs, section "Encryption").
+    BACKUP_AGE_IDENTITY_FILE: str = ""
+
+    # Secondary, independent off-site target (a DIFFERENT provider than the one
+    # holding production media, so a single account compromise cannot destroy
+    # both the primary data and its backup). Any rclone remote works.
+    BACKUP_SECONDARY_RCLONE_REMOTE: str = ""
+    BACKUP_RCLONE_BINARY: str = "rclone"
+
+    # Media backup via restic (deduplicated, encrypted, incremental snapshots).
+    BACKUP_MEDIA_ENABLED: bool = False
+    BACKUP_RESTIC_BINARY: str = "restic"
+    BACKUP_RESTIC_REPOSITORY: str = ""
+    BACKUP_RESTIC_PASSWORD_FILE: str = ""
+    BACKUP_MEDIA_PATHS: str = ""  # comma-separated; defaults to STORAGE_BASE_PATH
+
+    # External dead-man's-switch. Metric-based alerting cannot detect a host
+    # that is entirely down, because the metrics simply stop arriving.
+    BACKUP_HEARTBEAT_URL: str = ""
+
+    # GFS retention (grandfather-father-son).
+    BACKUP_KEEP_DAILY: int = 7
+    BACKUP_KEEP_WEEKLY: int = 4
+    BACKUP_KEEP_MONTHLY: int = 12
+    BACKUP_KEEP_YEARLY: int = 3
+
+    # Verify a restored copy at least this often; alert when overdue.
+    BACKUP_MAX_AGE_HOURS: int = 26
+    BACKUP_DRILL_MAX_AGE_DAYS: int = 31
+
+    # PostgreSQL client binaries used by the restore/drill path. They are
+    # resolved by name so the host's own pg_dump/pg_restore version is used
+    # (a version mismatch with the server is the classic silent restore break).
+    BACKUP_PG_RESTORE_BINARY: str = "pg_restore"
+    BACKUP_PSQL_BINARY: str = "psql"
+    # Parallel restore workers; -j requires the custom format, which is exactly
+    # why the dump uses -Fc.
+    BACKUP_RESTORE_JOBS: int = 4
+    # Prefix for the throwaway database created by the restore drill.
+    BACKUP_DRILL_DB_PREFIX: str = "arv_drill"
+
+    @property
+    def backup_media_paths(self) -> list[str]:
+        """Filesystem paths covered by the media backup."""
+        raw = (self.BACKUP_MEDIA_PATHS or "").strip()
+        if raw:
+            return [p.strip() for p in raw.split(",") if p.strip()]
+        return [self.STORAGE_BASE_PATH]
+
+    @property
+    def encryption_enabled(self) -> bool:
+        """True when dumps are encrypted with age before leaving the host."""
+        return bool(self.BACKUP_AGE_RECIPIENT)
+
+    @property
+    def secondary_target_enabled(self) -> bool:
+        """True when a second, independent off-site target is configured."""
+        return bool(self.BACKUP_SECONDARY_RCLONE_REMOTE)
+
     @field_validator("CORS_ORIGINS", mode="before")
     @classmethod
     def parse_cors_origins(cls, v: Any) -> list[str]:

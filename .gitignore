@@ -47,6 +47,7 @@ ENV/
 
 # Coverage
 .coverage
+coverage.xml
 htmlcov/
 coverage/
 
@@ -90,3 +91,8 @@ portal_ar_icon_512.png
 Portal_AR_logo.png
 # AI agent local workspace (memory, skills) — not part of the product
 .workbuddy-ai/
+
+# Local SQLite databases created by test runs
+*.db
+*.sqlite
+*.sqlite3

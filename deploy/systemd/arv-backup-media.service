@@ -1,0 +1,24 @@
+[Unit]
+Description=ARV media backup (restic snapshot of uploaded originals)
+Documentation=file:/opt/arv/app/docs/BACKUP_AND_RECOVERY.md
+After=network-online.target
+Wants=network-online.target
+OnFailure=arv-backup-alert@%n.service
+
+[Service]
+Type=oneshot
+User=arv
+Group=arv
+WorkingDirectory=/opt/arv/app
+EnvironmentFile=/opt/arv/app/.env
+OOMScoreAdjust=-200
+ExecStart=/opt/arv/app/deploy/backup/backup-media.sh
+# The first full snapshot of a large media tree can take hours; subsequent
+# incremental runs are minutes. The limit must accommodate the former.
+TimeoutStartSec=8h
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=arv-backup-media
+
+[Install]
+WantedBy=multi-user.target

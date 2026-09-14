@@ -1,4 +1,5 @@
 import gzip
+import tempfile
 from datetime import timedelta
 from pathlib import Path
 from types import SimpleNamespace
@@ -689,6 +690,9 @@ async def _pass_through_wait_for(awaitable, timeout):
 
 
 def _make_temp_dir() -> Path:
-    root = Path("e:/Project/ARV/.pytest-temp") / f"backup-service-{uuid4().hex}"
-    root.mkdir(parents=True, exist_ok=True)
-    return root
+    """Create a portable temporary directory.
+
+    Previously hardcoded to ``e:/Project/ARV/.pytest-temp``, which only existed
+    on the original developer's machine and broke the suite everywhere else.
+    """
+    return Path(tempfile.mkdtemp(prefix="backup-service-"))

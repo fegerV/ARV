@@ -207,6 +207,10 @@ class SettingsService:
             backup_cron=settings_dict.get("backup_cron", "0 3 * * *"),
             backup_retention_days=settings_dict.get("backup_retention_days", 30),
             backup_max_copies=settings_dict.get("backup_max_copies", 30),
+            backup_keep_daily=settings_dict.get("backup_keep_daily", 7),
+            backup_keep_weekly=settings_dict.get("backup_keep_weekly", 4),
+            backup_keep_monthly=settings_dict.get("backup_keep_monthly", 12),
+            backup_keep_yearly=settings_dict.get("backup_keep_yearly", 3),
         )
 
         return AllSettings(
@@ -337,6 +341,10 @@ class SettingsService:
         await self.set_setting("backup_cron", settings.backup_cron, "string", "backup", commit=False)
         await self.set_setting("backup_retention_days", settings.backup_retention_days, "integer", "backup", commit=False)
         await self.set_setting("backup_max_copies", settings.backup_max_copies, "integer", "backup", commit=False)
+        await self.set_setting("backup_keep_daily", settings.backup_keep_daily, "integer", "backup", commit=False)
+        await self.set_setting("backup_keep_weekly", settings.backup_keep_weekly, "integer", "backup", commit=False)
+        await self.set_setting("backup_keep_monthly", settings.backup_keep_monthly, "integer", "backup", commit=False)
+        await self.set_setting("backup_keep_yearly", settings.backup_keep_yearly, "integer", "backup", commit=False)
 
         await self.db.commit()
         return settings

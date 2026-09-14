@@ -2,7 +2,7 @@
 
 **Проект:** V-Portal / ARV — B2B SaaS для создания AR-контента
 **Область:** PostgreSQL, медиафайлы, Redis, конфигурация и секреты, инфраструктура
-**Статус:** проект решения (design proposal)
+**Статус:** P0 и P1 реализованы в коде (см. §13.2 и §14); P2 частично — только поля `backup_history`
 **Дата:** 2026-09-14
 
 ---
@@ -464,110 +464,132 @@ Ransomware и компрометация облачных учёток — ос�
 - настройки: `backup_enabled`, `backup_company_id`, `backup_cron`, `backup_yd_folder`, `backup_retention_days`, `backup_max_copies`;
 - `verify_backup_integrity()` — сверка SHA-256.
 
-### 13.2 Чего не хватает ❌ (приоритеты)
+### 13.2 Чего не хватало ❌ и что реализовано ✅
 
-| # | Пробел | Приоритет | Что сделать |
-|---|---|---|---|
-| 1 | **Медиа вообще не бэкапится** | 🔴 P0 | Добавить restic-задание для `/opt/arv/storage` |
-| 2 | **Нет восстановления** | 🔴 P0 | Написать runbook + скрипты `restore.sh`, автоматизировать drill |
-| 3 | **Нет шифрования бэкапов** | 🔴 P0 | Шифровать дамп через `age` перед загрузкой |
-| 4 | **Единственная копия на Yandex Disk** | 🔴 P0 | Добавить S3 №2 у другого провайдера |
-| 5 | **Нет алертинга о сбое** | 🔴 P0 | Метрики Prometheus + алерт при `age > 26h` + dead-man's-switch |
-| 6 | **Секреты (A3) не бэкапятся** | 🟠 P1 | Отдельное задание `tar + age` для `.env`/SSL/deploy |
-| 7 | **Ротация не GFS** | 🟠 P1 | Заменить `max_copies` на `--keep-daily/weekly/monthly/yearly` |
-| 8 | **`pg_dump -F p`** | 🟠 P1 | Перейти на `-Fc` (параллельное и выборочное восстановление) |
-| 9 | **Нет restore drill** | 🟠 P1 | Ежемесячное авто-восстановление в тестовую БД + отчёт |
-| 10 | **Бэкап внутри приложения** | 🟠 P1 | Вынести в systemd-таймеры на хосте |
-| 11 | **Нет object lock / раздельных ключей** | 🟡 P2 | Включить WORM на bucket, ключ без `DeleteObject` |
-| 12 | **Нет PITR** | 🟡 P2 | WAL-архивирование для RPO ≈ 5 мин |
-| 13 | **`backup_history` без полей верификации** | 🟡 P2 | Добавить `backup_type`, `target`, `verified_at`, `restore_tested_at`, `app_commit` |
-| 14 | **Бэкап только для одной компании** | 🟡 P2 | `backup_company_id` — единственный получатель; учесть в multi-tenant модели |
+Статус на 2026-09-14 (см. §13.4 — как проверено).
+
+| # | Пробел | Приоритет | Реализация | Статус |
+|---|---|---|---|---|
+| 1 | **Медиа вообще не бэкапится** | 🔴 P0 | `app/services/media_backup_service.py` — restic-снапшоты + GFS-prune | ✅ |
+| 2 | **Нет восстановления** | 🔴 P0 | `app/services/restore_service.py` + `app/cli/backup.py restore` | ✅ |
+| 3 | **Нет шифрования бэкапов** | 🔴 P0 | `age` перед загрузкой (`_encrypt_file`, `BACKUP_AGE_RECIPIENT`) | ✅ |
+| 4 | **Единственная копия на Yandex Disk** | 🔴 P0 | Второй независимый off-site через `rclone` (`_copy_to_secondary`) | ✅ |
+| 5 | **Нет алертинга о сбое** | 🔴 P0 | Prometheus-метрики + heartbeat + systemd `OnFailure=` | ✅ |
+| 6 | **Секреты (A3) не бэкапятся** | 🟠 P1 | `app.cli.backup secrets` — `tar` + `age`, weekly-таймер | ✅ |
+| 7 | **Ротация не GFS** | 🟠 P1 | `app/services/backup_rotation.py` — 7/4/12/3 для дампов и restic | ✅ |
+| 8 | **`pg_dump -F p`** | 🟠 P1 | `-Fc -Z0` (custom format, параллельный `pg_restore -j`) | ✅ |
+| 9 | **Нет restore drill** | 🟠 P1 | `RestoreService.restore_drill()` + месячный таймер | ✅ |
+| 10 | **Бэкап внутри приложения** | 🟠 P1 | `deploy/backup/*.sh` + `deploy/systemd/arv-backup-*.{service,timer}` | ✅ |
+| 11 | **Нет object lock / раздельных ключей** | 🟡 P2 | Требует настройки на стороне провайдера; вне кода | ⬜ |
+| 12 | **Нет PITR** | 🟡 P2 | Требует `archive_mode`/`archive_command` на сервере БД | ⬜ |
+| 13 | **`backup_history` без полей верификации** | 🟡 P2 | Миграция `20260914_1400_backup_verification` | ✅ |
+| 14 | **Бэкап только для одной компании** | 🟡 P2 | Не изменено: `backup_company_id` остаётся единственным получателем | ⬜ |
 
 ### 13.3 План внедрения по этапам
 
-| Этап | Содержание | Результат |
-|---|---|---|
-| **Этап 1 (P0)** | Шифрование дампа, второй off-site, алертинг, restic для медиа | Устраняются 5 критичных пробелов; система становится работоспособной |
-| **Этап 2 (P1)** | Секреты, GFS-ротация, `-Fc`, systemd-таймеры, restore drill | Соответствие модели 3-2-1-1-0 |
-| **Этап 3 (P2)** | Object lock, PITR, расширение `backup_history`, multi-tenant | Защита от ransomware, RPO ≈ 5 мин |
+| Этап | Содержание | Результат | Статус |
+|---|---|---|---|
+| **Этап 1 (P0)** | Шифрование дампа, второй off-site, алертинг, restic для медиа | Устраняются 5 критичных пробелов; система становится работоспособной | ✅ выполнен |
+| **Этап 2 (P1)** | Секреты, GFS-ротация, `-Fc`, systemd-таймеры, restore drill | Соответствие модели 3-2-1-1-0 | ✅ выполнен |
+| **Этап 3 (P2)** | Object lock, PITR, расширение `backup_history`, multi-tenant | Защита от ransomware, RPO ≈ 5 мин | 🟡 поля `backup_history` сделаны; остальное — инфраструктурные настройки |
+
+### 13.4 Как проверено
+
+| Уровень | Чем доказано |
+|---|---|
+| Логика ротации | `tests/test_backup_rotation.py` (10 тестов) — в т.ч. что точка 6-недельной давности выживает, а при `max_copies=30` была бы удалена |
+| Шифрование, второй off-site, алертинг | `tests/test_backup_hardening.py` (9) — проверяется, что загружается именно `.age`-артефакт и что его SHA-256 совпадает с записанным |
+| Медиа/restic | `tests/test_media_backup_service.py` (13) — парсинг `--json`-сводки, GFS-аргументы, отсутствие пароля в env |
+| Восстановление | `tests/test_restore_service.py` (16) — материализация, `pg_restore --list`, drill с гарантированным `DROP` тестовой БД, отказ восстанавливать поверх продовой БД |
+| CLI и хостовые скрипты | `tests/test_backup_cli.py` (18) — включая `bash -n` для всех `deploy/backup/*.sh` |
+| Обратная совместимость | `tests/test_backup_service.py` (17) — прежние контракты не сломаны |
+| Реальное восстановление | Ежемесячный `arv-backup-drill.timer` — единственное настоящее доказательство |
 
 ---
 
 ## 14. Приложения
 
-### 14.1 Пример: дамп БД с шифрованием
+### 14.1 Реализованная структура
+
+Логика бэкапа живёт в Python (покрыта тестами), хостовые скрипты — тонкие
+обёртки вокруг неё (блокировка, права на staging, коды возврата). Дублировать
+логику в bash не нужно: её пришлось бы тестировать дважды.
+
+| Компонент | Файл | Назначение |
+|---|---|---|
+| Дамп БД | `app/services/backup_service.py` | `pg_dump -Fc -Z0` → gzip → `age` → primary + secondary → GFS |
+| Медиа | `app/services/media_backup_service.py` | restic `backup` / `forget --prune` / `check --read-data-subset` |
+| Восстановление | `app/services/restore_service.py` | материализация, `pg_restore --list`, drill, restore в отдельную БД |
+| Ротация | `app/services/backup_rotation.py` | чистые функции GFS-отбора (без БД и ФС) |
+| Метрики | `app/services/backup_metrics.py` | серии `arv_backup_*` для Prometheus |
+| Heartbeat | `app/utils/heartbeat.py` | внешний dead-man's-switch |
+| Команды | `app/utils/command.py` | единый запуск внешних бинарников с таймаутом |
+| CLI | `app/cli/backup.py` | `db`, `media`, `secrets`, `verify`, `drill`, `restore`, `status`, `notify` |
+| Скрипты | `deploy/backup/*.sh` | `flock`, staging, коды возврата |
+| Таймеры | `deploy/systemd/arv-backup-*.{service,timer}` | расписание + `OnFailure=` |
+| Миграция | `alembic/versions/20260914_1400_backup_verification.py` | поля верификации в `backup_history` |
+
+> Имя артефакта осталось прежним — `backup_<ts>.sql.gz` (и `.sql.gz.age` при
+> шифровании). Это сознательное решение: на это имя завязаны UI бэкапов и
+> операционные инструкции. Формат внутри — custom (`-Fc`), поэтому файл
+> восстанавливается только через `pg_restore`; сжатие делает gzip (`-Z0`
+> отключает внутреннее сжатие pg_dump, чтобы не сжимать дважды).
+
+### 14.2 CLI
 
 ```bash
-#!/usr/bin/env bash
-set -euo pipefail
+cd /opt/arv/app
 
-TS=$(date -u +%Y%m%d_%H%M%S)
-STAGE=/var/backups/arv
-OUT="$STAGE/db_${TS}.sql.gz.age"
+# Ежедневные задания (их вызывают таймеры)
+python -m app.cli.backup db
+python -m app.cli.backup media
+python -m app.cli.backup secrets
 
-mkdir -p "$STAGE"
+# Проверка: SHA-256 + pg_restore --list
+python -m app.cli.backup verify --limit 3
 
-# 1. Дамп в custom-format (сжатый, поддерживает pg_restore -j)
-pg_dump -Fc -Z6 -h "$PGHOST" -U "$PGUSER" -d vertex_ar -f "$STAGE/db_${TS}.dump"
+# Drill: восстановление в одноразовую БД и подсчёт таблиц
+python -m app.cli.backup drill
 
-# 2. Шифрование (публичный age-ключ, приватный — вне сервера)
-age -r "$(cat /etc/arv/backup-age.pub)" -o "$OUT" "$STAGE/db_${TS}.dump"
-rm -f "$STAGE/db_${TS}.dump"
+# Восстановление (только в отдельную БД; продовая отвергается кодом)
+python -m app.cli.backup restore 42 --target-db vertex_ar_recovered
 
-# 3. Контрольная сумма
-sha256sum "$OUT" > "$OUT.sha256"
-
-# 4. Отправка в оба off-site
-rclone copy "$OUT"        s3primary:arv-backups/db/
-rclone copy "$OUT.sha256" s3primary:arv-backups/db/
-rclone copy "$OUT"        s3secondary:arv-backups/db/
-
-# 5. GFS-ротация
-rclone delete --min-age 7d   s3primary:arv-backups/db/  # + weekly/monthly/yearly по тегам
-
-# 6. Heartbeat во внешний сервис (dead-man's-switch)
-curl -fsS -m 10 "https://hc-ping.com/${HC_UUID}" || true
+# Состояние: последний запуск по каждому типу, возраст, верификация
+python -m app.cli.backup status
 ```
 
-### 14.2 Пример: медиа через restic
+### 14.3 Установка таймеров
 
 ```bash
-#!/usr/bin/env bash
-set -euo pipefail
+cd /opt/arv/app
+sudo install -m 0755 deploy/backup/*.sh /opt/arv/app/deploy/backup/
+sudo install -m 0644 deploy/systemd/arv-backup-* /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now \
+    arv-backup-db.timer arv-backup-media.timer arv-backup-secrets.timer \
+    arv-backup-verify.timer arv-backup-drill.timer
 
-export RESTIC_REPOSITORY="s3:s3.example.com/arv-backups/restic-media"
-export RESTIC_PASSWORD_FILE="/etc/arv/restic.pass"   # файл 0600, владелец backup
-
-restic backup /opt/arv/storage \
-  --exclude-caches \
-  --tag "media,$(date -u +%F)" \
-  --host arv-prod
-
-restic forget \
-  --keep-daily 7 --keep-weekly 4 --keep-monthly 12 --keep-yearly 3 \
-  --prune
-
-# Еженедельная проверка целостности
-restic check --read-data-subset=5%
+systemctl list-timers 'arv-backup-*'
 ```
 
-### 14.3 Пример: systemd-таймер
+Расписание (все таймеры с `Persistent=true`):
 
-```ini
-# /etc/systemd/system/arv-backup-db.timer
-[Unit]
-Description=ARV PostgreSQL backup timer
+| Таймер | Когда | Что делает |
+|---|---|---|
+| `arv-backup-db.timer` | ежедневно 03:00 UTC | дамп БД |
+| `arv-backup-media.timer` | ежедневно 03:30 UTC | restic-снапшот медиа |
+| `arv-backup-secrets.timer` | вс 04:00 UTC | `.env` + TLS + `deploy/` |
+| `arv-backup-verify.timer` | вс 05:00 UTC | контрольные суммы + `pg_restore --list` |
+| `arv-backup-drill.timer` | 1-е число 06:00 UTC | восстановление в одноразовую БД |
 
-[Timer]
-OnCalendar=*-*-* 03:00:00
-Persistent=true          # догоняет пропущенный запуск после простоя
-RandomizedDelaySec=300
+`Persistent=true` — не деталь: без него выключенный в 03:00 сервер молча
+пропускает сутки. Медиа-задание смещено на 03:30 от БД-задания, потому что оба
+конкурируют за диск и за канал в объектное хранилище.
 
-[Install]
-WantedBy=timers.target
-```
-
-> `Persistent=true` — важная деталь: если сервер был выключен в 03:00, задание выполнится при следующей загрузке, а не будет молча пропущено.
+При сбое любого задания systemd запускает `arv-backup-alert@%n.service`, который
+вызывает `python -m app.cli.backup notify`. Алерт отправляется **отдельным
+процессом**, а не из веб-приложения: приложение может быть как раз тем, что
+сломалось, и алерт из него не уйдёт.
 
 ### 14.4 Полезные команды
 

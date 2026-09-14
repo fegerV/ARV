@@ -122,6 +122,17 @@ class BackupSettings(BaseModel):
     backup_retention_days: int = 30
     backup_max_copies: int = 30
 
+    # GFS retention ladder (docs/BACKUP_AND_RECOVERY.md §8). When present,
+    # rotation keeps the newest artifact of each of the N newest days / ISO
+    # weeks / months / years instead of "the N newest copies", which is the only
+    # way to still have a restore point from a month ago. The legacy
+    # ``backup_max_copies`` / ``backup_retention_days`` rule applies only when
+    # the ladder is absent.
+    backup_keep_daily: int = 7
+    backup_keep_weekly: int = 4
+    backup_keep_monthly: int = 12
+    backup_keep_yearly: int = 3
+
 
 class AllSettings(BaseModel):
     general: GeneralSettings

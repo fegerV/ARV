@@ -1,0 +1,15 @@
+[Unit]
+Description=ARV restore drill timer (monthly, 1st at 06:00 UTC)
+
+[Timer]
+# Monthly, on the 1st: a restore drill costs a full download plus a full
+# restore, and the value it adds is proving the *retention ladder* still yields
+# a usable artifact — which does not change day to day.
+OnCalendar=*-*-01 06:00:00
+Persistent=true
+RandomizedDelaySec=1800
+AccuracySec=1min
+Unit=arv-backup-drill.service
+
+[Install]
+WantedBy=timers.target

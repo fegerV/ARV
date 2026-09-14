@@ -1,0 +1,16 @@
+[Unit]
+Description=ARV PostgreSQL backup timer (daily 03:00 UTC)
+
+[Timer]
+OnCalendar=*-*-* 03:00:00
+# If the host was powered off at 03:00, run as soon as it comes back instead of
+# silently skipping the day. This is the single most common cause of a "backup
+# gap" that nobody notices until a restore is needed.
+Persistent=true
+# Spread load across the fleet and avoid colliding with other 03:00 cron jobs.
+RandomizedDelaySec=300
+AccuracySec=1min
+Unit=arv-backup-db.service
+
+[Install]
+WantedBy=timers.target

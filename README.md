@@ -162,6 +162,7 @@ sudo systemctl restart arv
 | [Services](docs/SERVICES.md) | Описание сервисов |
 | [Storage](docs/STORAGE.md) | Система хранения файлов |
 | [Security](docs/SECURITY.md) | Политика безопасности |
+| [Backup & DR](docs/BACKUP_AND_RECOVERY.md) | Резервное копирование, восстановление, ротация, runbook |
 | [IDOR/BOLA Audit](IDOR_BOLA_AUDIT.md) | Аудит защиты от IDOR/BOLA уязвимостей |
 | [Auth System](docs/AUTH_SYSTEM.md) | Система аутентификации |
 | [Migrations](docs/MIGRATIONS.md) | Миграции БД |

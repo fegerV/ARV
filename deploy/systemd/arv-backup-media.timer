@@ -1,0 +1,15 @@
+[Unit]
+Description=ARV media backup timer (daily 03:30 UTC)
+
+[Timer]
+# Deliberately offset from the database job: both compete for disk I/O and for
+# the uplink to object storage, and running them together doubles the wall time
+# of both.
+OnCalendar=*-*-* 03:30:00
+Persistent=true
+RandomizedDelaySec=300
+AccuracySec=1min
+Unit=arv-backup-media.service
+
+[Install]
+WantedBy=timers.target

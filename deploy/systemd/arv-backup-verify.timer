@@ -1,0 +1,15 @@
+[Unit]
+Description=ARV backup verification timer (weekly, Sunday 05:00 UTC)
+
+[Timer]
+# Weekly: verification downloads the artifact back from object storage, so it
+# consumes egress and bandwidth. Monthly runs check more than the newest copy
+# (see deploy/backup/verify.sh).
+OnCalendar=Sun *-*-* 05:00:00
+Persistent=true
+RandomizedDelaySec=600
+AccuracySec=1min
+Unit=arv-backup-verify.service
+
+[Install]
+WantedBy=timers.target

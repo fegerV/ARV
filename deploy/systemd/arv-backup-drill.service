@@ -1,0 +1,22 @@
+[Unit]
+Description=ARV restore drill (restore newest backup into a throwaway database)
+Documentation=file:/opt/arv/app/docs/BACKUP_AND_RECOVERY.md
+After=network-online.target postgresql.service
+Wants=network-online.target
+OnFailure=arv-backup-alert@%n.service
+
+[Service]
+Type=oneshot
+User=arv
+Group=arv
+WorkingDirectory=/opt/arv/app
+EnvironmentFile=/opt/arv/app/.env
+ExecStart=/opt/arv/app/deploy/backup/restore-drill.sh
+# The drill performs a full restore, so it is bounded by the same RTO budget.
+TimeoutStartSec=4h
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=arv-backup-drill
+
+[Install]
+WantedBy=multi-user.target

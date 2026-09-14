@@ -1,0 +1,25 @@
+[Unit]
+Description=ARV PostgreSQL backup
+Documentation=file:/opt/arv/app/docs/BACKUP_AND_RECOVERY.md
+After=network-online.target postgresql.service
+Wants=network-online.target
+# Report failures to admins without depending on the web application being up.
+OnFailure=arv-backup-alert@%n.service
+
+[Service]
+Type=oneshot
+User=arv
+Group=arv
+WorkingDirectory=/opt/arv/app
+EnvironmentFile=/opt/arv/app/.env
+# Keep the backup job from being OOM-killed alongside the application.
+OOMScoreAdjust=-200
+ExecStart=/opt/arv/app/deploy/backup/backup-db.sh
+# A hung pg_dump must not hold the timer hostage for days.
+TimeoutStartSec=2h
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=arv-backup-db
+
+[Install]
+WantedBy=multi-user.target

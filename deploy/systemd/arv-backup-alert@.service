@@ -1,0 +1,20 @@
+[Unit]
+Description=Alert admins that %i failed
+Documentation=file:/opt/arv/app/docs/BACKUP_AND_RECOVERY.md
+
+[Service]
+Type=oneshot
+User=arv
+Group=arv
+WorkingDirectory=/opt/arv/app
+EnvironmentFile=/opt/arv/app/.env
+# Sent from a short-lived process, not from the web application: the whole point
+# is to report failures that may include the application itself being down.
+ExecStart=/opt/arv/venv/bin/python -m app.cli.backup notify --unit %i
+TimeoutStartSec=2min
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=arv-backup-alert
+
+[Install]
+WantedBy=multi-user.target
