@@ -72,6 +72,50 @@
 | **RECOMMENDED FIX** | ✅ Выполнено: (1) список исключений сведён к **точному** совпадению 4 логин-путей; (2) оба вызова в `templates/companies/form.html` (`exchangeCode()`, `disconnectYandex()`) теперь отправляют заголовок `X-CSRF-Token` вместе с `credentials: 'include'`. |
 | **TEST TO ADD** | ✅ `tests/test_csrf_exemptions.py` — 26 тестов: точное совпадение allow-list, отказ для похожих путей (`/api/auth/login-evil`), property-тест по реальной OpenAPI-таблице («ни один мутирующий не-логин роут не CSRF-exempt»), тесты диспетчеризации middleware (cookie без токена → 403, несовпадение → 403, совпадение → 200, без cookie → 200, safe-методы → 200, логин → 200) и e2e через `TestClient` с реальным приложением. |
 
+### ARV-031 — IDOR/BOLA: HTML-роуты проектов без проверки арендатора (NEW, Critical → ✅ Fixed)
+
+| Поле | Значение |
+|------|----------|
+| **SEVERITY** | Critical |
+| **CATEGORY** | Broken Object Level Authorization (cross-tenant disclosure) |
+| **FILE** | `app/html/routes/projects.py` (`project_detail` ~259, `project_edit` ~293) |
+| **COMPONENT** | HTML-панель администратора |
+| **VULNERABILITY** | Оба обработчика делали `db.get(Project, int(project_id))` и дальше работали с объектом, проверив только `require_active_user()` — то есть **факт логина, но не арендатора**. |
+| **EVIDENCE** | До фикса: `project = await db.get(Project, int(project_id))` → `_pydantic_to_dict(project)` → рендер формы, без обращения к `require_company_scope` / `user_can_access_company`. Роутер не имеет общей зависимости-гарда, а `require_active_user` возвращает только логин-редирект. |
+| **ATTACK SCENARIO** | Любой аутентифицированный пользователь (роль `user`, компания A) открывает `GET /projects/{id}` или `GET /projects/{id}/edit` с id проекта компании B и получает полную форму проекта чужого тенанта: название, slug, описание, привязку к компании, пути хранилища. Перебор id даёт дамп всех проектов платформы. |
+| **IMPACT** | Раскрытие данных между арендаторами (confidentiality). Класс уязвимости идентичен ARV-002/ARV-003, которые в этом же отчёте классифицированы как Critical. |
+| **LIKELIHOOD** | Высокая — нужен только любой валидный аккаунт и перебор целочисленных id. |
+| **RECOMMENDED FIX** | ✅ Выполнено: после выборки добавлены проверка на отсутствие объекта (404) и `require_company_scope(current_user, project.company_id)`; при отказе возвращается 403. Супер-админ по-прежнему видит всё. |
+| **TEST TO ADD** | ✅ `tests/test_html_tenant_scope.py`: `test_project_detail_denies_other_tenant`, `test_project_edit_denies_other_tenant`, `test_project_detail_raises_404_when_missing`, `test_project_detail_allows_own_tenant`, `test_project_detail_allows_super_admin_on_foreign_tenant`. |
+
+### ARV-032 — IDOR/BOLA: HTML-роуты уведомлений без фильтра арендатора (NEW, Critical → ✅ Fixed)
+
+| Поле | Значение |
+|------|----------|
+| **SEVERITY** | Critical |
+| **CATEGORY** | Broken Object Level Authorization (disclosure + destructive write) |
+| **FILE** | `app/html/routes/notifications.py` (`notifications_page` ~75, `notification_detail` ~178, `notification_delete` ~226) |
+| **COMPONENT** | HTML-панель администратора, модель `Notification` (`company_id`, `project_id`, `ar_content_id`, `user_id`) |
+| **VULNERABILITY** | Все три обработчика выбирали `Notification` **без ограничения по арендатору**. Список вообще не фильтровался; детальная страница и удаление — выборка только по `id`. |
+| **EVIDENCE** | До фикса: `count_query = select(func.count()).select_from(Notification)` и `select(Notification).order_by(...)` без `WHERE`; `select(Notification).where(Notification.id == notification_id)` для детали и удаления. Гард — только `require_active_user`. При этом **API**-аналоги уже были корректны: `list_notifications` и `delete_notification` фильтруют по `user_id`, `mark_notifications_read` — по `company_id`. Расхождение API/HTML и стало причиной пропуска. |
+| **ATTACK SCENARIO** | Любой аутентифицированный пользователь открывает `GET /notifications` и видит уведомления **всех** компаний (`subject`, `message`, `company_name`, `project_name`, `ar_content_name`). Далее `GET /notifications/{id}` раскрывает любое уведомление, а `DELETE /notifications/{id}` удаляет его. |
+| **IMPACT** | Раскрытие данных между арендаторами + межтенантное разрушительное изменение (уничтожение истории уведомлений чужой компании, в т.ч. следов инцидентов и ошибок доставки). |
+| **LIKELIHOOD** | Высокая. |
+| **RECOMMENDED FIX** | ✅ Выполнено: введён общий хелпер `_tenant_scope_condition()` (супер-админ — без ограничений; обычный пользователь — `company_id` **или** `user_id`; если ни того ни другого — `false()`, fail-closed). Фильтр применён к счётчику и к выборке списка; детальная страница и удаление проверяют владельца через `_notification_is_visible()` → 403. |
+| **TEST TO ADD** | ✅ `tests/test_html_tenant_scope.py`: тесты хелперов (супер-админ, свой тенант, чужой тенант, пользователь без компании → fail-closed), `test_notification_delete_denies_other_tenant` / `_allows_own_tenant` / `_allows_super_admin` / `_reports_missing`, `test_notification_detail_denies_other_tenant`, `test_notification_list_scopes_the_query_for_tenant_users`, `test_notification_list_leaves_super_admin_unscoped`. |
+
+### Как искались ARV-031/ARV-032 (методика)
+
+Проверка «по таблице» эти дыры не находила, поэтому был выполнен автоматический обход всех маршрутов приложения:
+
+1. Рекурсивный обход дерева роутеров (`app.routes` → `_IncludedRouter.original_router`), потому что `app.routes` напрямую отдаёт `_IncludedRouter` без `.path`.
+2. Для каждого мутирующего маршрута — транзитивный разбор `Depends(...)` и поиск зависимости авторизации. 82 мутирующих маршрута; 10 без зависимости — все оказались легитимно пред-аутентификационными (логин, logout, смена языка) либо намеренно публичными аналитикой AR-viewer'а (rate-limited + валидация).
+3. Отдельно проверены HTML-роуты, которые используют `get_current_user_optional` и вызывают гарды **императивно внутри тела** (а не через `Depends`) — их можно пропустить, если искать только по зависимостям.
+
+**Вывод по обходу:** 5 уязвимых роутов (2 в `projects.py`, 3 в `notifications.py`). Остальные HTML-роуты защищены либо явно (`require_company_scope` / `require_super_admin`), либо через делегат с проверкой (`delete_project_general`, `delete_ar_content_by_id`, `get_ar_content_by_id`, `list_companies`) — это проверено чтением кода.
+
+**Побочно найденный дефект (не уязвимость):** в `app/html/routes/htmx.py` функции `delete_ar_content_fragment` (стр. ~126) и `restore_ar_content_fragment` (стр. ~150) передают в `get_ar_content_by_id(request=request, ...)`, но **не объявляют параметр `request`** — гарантированный `NameError` → 500. С точки зрения безопасности это fail-closed (операция не выполняется), но функциональность soft-delete/restore из htmx-списка не работает. Требуется добавить `request: Request` в сигнатуры.
+
 ### Проверка ARV-022 — секреты в истории Git
 
 `ARV-022` закрывал `.env.production` через `git rm --cached`, но содержимое **осталось в истории** (коммиты `b0ee4bc`, `2cdfb40`, `583fcb7`). Проверено содержимое всех трёх различных blob-ов истории:
@@ -90,7 +134,7 @@
 
 `tests/test_storage_api.py` — 6 тестов падали **до** работ по безопасности (сигнатура `request: Request` присутствовала уже в `bf8dee7`, а тесты её не передавали). Модуль приведён в рабочее состояние и расширен: фиктивные супер-админы, актуальная фабрика `get_storage_provider` (прежняя `get_storage_provider_instance` переименована), переносимый `tempfile`-каталог вместо зашитого `e:/Project/ARV/.pytest-temp`, плюс 3 новых теста на подписи медиа (отказ для не-супер-админа, истёкшая подпись, подпись другого тенанта). Итого 10 passed.
 
-**Итог перепроверки:** 179 passed / 0 failed по набору `test_csrf_exemptions`, `test_security_fixes`, `test_security_auth`, `test_idor_security`, `test_auth_api`, `test_storage_api` и всем backup-наборам.
+**Итог перепроверки:** все 7 исходных Critical подтверждены; закрыты три новые Critical — **ARV-030** (обход CSRF), **ARV-031** (IDOR в HTML-роутах проектов), **ARV-032** (IDOR в HTML-роутах уведомлений). 197 passed по наборам `test_csrf_exemptions`, `test_security_fixes`, `test_security_auth`, `test_idor_security`, `test_auth_api`, `test_storage_api`, `test_html_tenant_scope` и всем backup-наборам (4 падения в `test_notifications_api` / `test_projects_and_companies_api` / `test_analytics_html_and_logs` — **предсуществующие**, подтверждено прогоном с откатом правок).
 
 ---
 

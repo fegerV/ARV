@@ -269,8 +269,16 @@ async def project_detail(
     
     try:
         project = await db.get(Project, int(project_id))
+        if not project:
+            raise HTTPException(status_code=404, detail="Project not found")
+        # ARV-031: the project must belong to the caller's tenant.
+        denied = require_company_scope(current_user, project.company_id)
+        if denied:
+            return denied
         project_data = _pydantic_to_dict(project)
         project_data = _convert_enum_to_string(project_data)
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error("project_detail_error", project_id=project_id, error=str(e), exc_info=True)
         raise
@@ -303,8 +311,16 @@ async def project_edit(
     
     try:
         project = await db.get(Project, int(project_id))
+        if not project:
+            raise HTTPException(status_code=404, detail="Project not found")
+        # ARV-031: the project must belong to the caller's tenant.
+        denied = require_company_scope(current_user, project.company_id)
+        if denied:
+            return denied
         project_data = _pydantic_to_dict(project)
         project_data = _convert_enum_to_string(project_data)
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error("project_edit_error", project_id=project_id, error=str(e), exc_info=True)
         raise

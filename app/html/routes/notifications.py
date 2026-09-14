@@ -1,17 +1,59 @@
 from fastapi import APIRouter, Request, Depends
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func
+from sqlalchemy import false, or_, select, func
 import structlog
 from app.html.deps import get_html_db
 from app.api.routes.auth import get_current_user_optional
 from app.models.notification import Notification
 from app.html.templating import templates
-from app.html.utils import require_active_user
+from app.html.utils import require_active_user, is_super_admin, forbidden_response
 from app.core.config import settings
 
 router = APIRouter()
 logger = structlog.get_logger()
+
+
+def _tenant_scope_condition(current_user):
+    """Return a WHERE clause restricting notifications to the caller's tenant.
+
+    ARV-032: ``Notification`` carries both ``company_id`` and ``user_id``, and
+    the admin panel is reachable by every authenticated role — not only super
+    admins. Without this filter any logged-in user could list, read and delete
+    notifications belonging to other tenants.
+
+    Super admins are unrestricted. Everyone else may only see rows addressed to
+    their company or to themselves. A user with neither a company nor an id
+    resolves to ``false`` — fail-closed, nothing is returned.
+    """
+    if is_super_admin(current_user):
+        return None
+
+    company_id = getattr(current_user, "company_id", None)
+    user_id = getattr(current_user, "id", None)
+    conditions = []
+    if company_id is not None:
+        conditions.append(Notification.company_id == company_id)
+    if user_id is not None:
+        conditions.append(Notification.user_id == user_id)
+    return or_(*conditions) if conditions else false()
+
+
+def _apply_tenant_scope(stmt, current_user):
+    """Apply :func:`_tenant_scope_condition` to a SELECT/COUNT statement."""
+    condition = _tenant_scope_condition(current_user)
+    return stmt if condition is None else stmt.where(condition)
+
+
+def _notification_is_visible(notification, current_user) -> bool:
+    """Return True when *notification* belongs to the caller's tenant."""
+    if is_super_admin(current_user):
+        return True
+    company_id = getattr(current_user, "company_id", None)
+    user_id = getattr(current_user, "id", None)
+    if company_id is not None and notification.company_id == company_id:
+        return True
+    return user_id is not None and notification.user_id == user_id
 
 
 def _convert_data_for_template(data_dict):
@@ -52,8 +94,10 @@ async def notifications_page(
         page_size = 20
     
     try:
-        # Get total count
-        count_query = select(func.count()).select_from(Notification)
+        # Get total count (ARV-032: scoped to the caller's tenant)
+        count_query = _apply_tenant_scope(
+            select(func.count()).select_from(Notification), current_user
+        )
         count_result = await db.execute(count_query)
         total_count = count_result.scalar() or 0
         
@@ -61,8 +105,11 @@ async def notifications_page(
         offset = (page - 1) * page_size
         total_pages = (total_count + page_size - 1) // page_size if total_count > 0 else 1
         
-        # Get notifications (latest first)
-        stmt = select(Notification).order_by(Notification.created_at.desc()).offset(offset).limit(page_size)
+        # Get notifications (latest first), scoped to the caller's tenant
+        stmt = _apply_tenant_scope(
+            select(Notification).order_by(Notification.created_at.desc()).offset(offset).limit(page_size),
+            current_user,
+        )
         result = await db.execute(stmt)
         notifications_db = result.scalars().all()
         
@@ -150,6 +197,10 @@ async def notification_detail(
         if not notification_db:
             return RedirectResponse(url="/notifications", status_code=303)
         
+        # ARV-032: deny cross-tenant reads of a notification by id.
+        if not _notification_is_visible(notification_db, current_user):
+            return forbidden_response("Access denied to this notification")
+        
         meta = dict(notification_db.notification_metadata or {})
         notification = {
             "id": notification_db.id,
@@ -197,6 +248,10 @@ async def notification_delete(
         
         if not notification:
             return JSONResponse(content={"error": "Notification not found"}, status_code=404)
+        
+        # ARV-032: deny cross-tenant deletion of a notification by id.
+        if not _notification_is_visible(notification, current_user):
+            return JSONResponse(content={"error": "Access denied to this notification"}, status_code=403)
         
         # Delete notification
         await db.delete(notification)
