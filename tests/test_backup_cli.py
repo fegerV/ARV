@@ -5,6 +5,7 @@ error in one of them means the backup silently never runs — so they are parsed
 by ``bash -n`` here.
 """
 
+import os
 import shutil
 import subprocess
 import sys
@@ -15,6 +16,7 @@ from types import SimpleNamespace
 import pytest
 
 from app.cli import backup as backup_cli
+from app.utils.command import CommandError
 
 
 def _cli_settings(**overrides) -> SimpleNamespace:
@@ -396,7 +398,7 @@ async def test_cmd_secrets_encrypts_and_removes_the_plaintext_archive(monkeypatc
 
     monkeypatch.setattr(backup_cli, "settings", _cli_settings())
     monkeypatch.setattr(
-        backup_cli, "SECRET_PATHS", ((str(secret_file), "app/.env"),)
+        backup_cli, "SECRET_PATHS", ((str(secret_file), "app/.env", True, ()),)
     )
     monkeypatch.setattr(backup_cli, "run_command", _fake_run_command)
     monkeypatch.setattr(backup_cli, "send_heartbeat", _fake_heartbeat)
@@ -427,7 +429,7 @@ async def test_cmd_secrets_warns_when_encryption_is_disabled(monkeypatch):
         backup_cli, "settings", _cli_settings(encryption_enabled=False)
     )
     monkeypatch.setattr(
-        backup_cli, "SECRET_PATHS", ((str(secret_file), "app/.env"),)
+        backup_cli, "SECRET_PATHS", ((str(secret_file), "app/.env", True, ()),)
     )
     monkeypatch.setattr(backup_cli, "send_heartbeat", _async_return(True))
 
@@ -462,7 +464,7 @@ async def test_cmd_secrets_pushes_to_the_secondary_remote(monkeypatch):
             BACKUP_SECONDARY_RCLONE_REMOTE="s3secondary:arv-backups",
         ),
     )
-    monkeypatch.setattr(backup_cli, "SECRET_PATHS", ((str(secret_file), "app/.env"),))
+    monkeypatch.setattr(backup_cli, "SECRET_PATHS", ((str(secret_file), "app/.env", True, ()),))
     monkeypatch.setattr(backup_cli, "run_command", _fake_run_command)
     monkeypatch.setattr(backup_cli, "send_heartbeat", _async_return(True))
 
@@ -473,6 +475,161 @@ async def test_cmd_secrets_pushes_to_the_secondary_remote(monkeypatch):
         assert len(rclone_calls) == 1
         # [rclone, copyto, <local artifact>, <remote destination>]
         assert rclone_calls[0][3].startswith("s3secondary:arv-backups/secrets/")
+    finally:
+        shutil.rmtree(workdir, ignore_errors=True)
+
+
+@pytest.mark.asyncio
+async def test_cmd_secrets_creates_the_archive_unreadable_by_others(monkeypatch):
+    """The archive holds SECRET_KEY; it must never be world-readable.
+
+    ``tarfile.open(path, ...)`` applies the process umask, so the file used to
+    appear as 0644 and stayed that way for the whole run — and permanently, if
+    the run died before the ``chmod`` at the end.
+    """
+    workdir = Path(tempfile.mkdtemp(prefix="arv-secrets-mode-"))
+    secret_file = workdir / "app.env"
+    secret_file.write_text("SECRET_KEY=super-secret\n")
+    stage = workdir / "stage"
+
+    modes: list[int] = []
+    real_open = os.open
+
+    def _spy_open(path, flags, mode=0o777):
+        modes.append(mode)
+        return real_open(path, flags, mode)
+
+    async def _fake_run_command(cmd, **kwargs):
+        Path(cmd[cmd.index("--output") + 1]).write_bytes(b"encrypted")
+        return ""
+
+    monkeypatch.setattr(backup_cli, "settings", _cli_settings())
+    monkeypatch.setattr(
+        backup_cli, "SECRET_PATHS", ((str(secret_file), "app/.env", True, ()),)
+    )
+    monkeypatch.setattr(backup_cli, "run_command", _fake_run_command)
+    monkeypatch.setattr(backup_cli, "send_heartbeat", _async_return(True))
+    monkeypatch.setattr(backup_cli.os, "open", _spy_open)
+
+    args = backup_cli.build_parser().parse_args(["secrets", "--stage", str(stage)])
+    try:
+        assert await backup_cli.cmd_secrets(args) == 0
+        assert modes == [0o600], [oct(m) for m in modes]
+    finally:
+        shutil.rmtree(workdir, ignore_errors=True)
+
+
+@pytest.mark.asyncio
+async def test_cmd_secrets_never_leaves_a_plaintext_archive_behind(monkeypatch):
+    """A failure before encryption used to leave a readable .env on disk.
+
+    The old code removed the plaintext tar only inside the encryption success
+    branch, so an exception raised earlier (an unreadable tree, a missing
+    binary) left the archive in place — world-readable, because it was created
+    with the default umask.
+    """
+    workdir = Path(tempfile.mkdtemp(prefix="arv-secrets-fail-"))
+    secret_file = workdir / "app.env"
+    secret_file.write_text("SECRET_KEY=super-secret\n")
+    stage = workdir / "stage"
+
+    async def _boom(cmd, **kwargs):
+        raise CommandError("age: command not found")
+
+    monkeypatch.setattr(backup_cli, "settings", _cli_settings())
+    monkeypatch.setattr(
+        backup_cli, "SECRET_PATHS", ((str(secret_file), "app/.env", True, ()),)
+    )
+    monkeypatch.setattr(backup_cli, "run_command", _boom)
+    monkeypatch.setattr(backup_cli, "send_heartbeat", _async_return(True))
+
+    args = backup_cli.build_parser().parse_args(["secrets", "--stage", str(stage)])
+    try:
+        with pytest.raises(CommandError):
+            await backup_cli.cmd_secrets(args)
+        assert list(stage.glob("secrets_*")) == []
+    finally:
+        shutil.rmtree(workdir, ignore_errors=True)
+
+
+@pytest.mark.asyncio
+async def test_cmd_secrets_fails_when_a_required_path_is_missing(monkeypatch):
+    """An archive without .env looks like a backup but is not one."""
+    workdir = Path(tempfile.mkdtemp(prefix="arv-secrets-missing-"))
+    stage = workdir / "stage"
+
+    monkeypatch.setattr(backup_cli, "settings", _cli_settings())
+    monkeypatch.setattr(
+        backup_cli,
+        "SECRET_PATHS",
+        ((str(workdir / "absent.env"), "app/.env", True, ()),),
+    )
+    monkeypatch.setattr(backup_cli, "send_heartbeat", _async_return(True))
+
+    args = backup_cli.build_parser().parse_args(["secrets", "--stage", str(stage)])
+    try:
+        with pytest.raises(RuntimeError, match="required secret paths are missing"):
+            await backup_cli.cmd_secrets(args)
+        assert list(stage.glob("secrets_*")) == []
+    finally:
+        shutil.rmtree(workdir, ignore_errors=True)
+
+
+@pytest.mark.asyncio
+async def test_cmd_secrets_survives_an_unreadable_optional_path(monkeypatch):
+    """A root-only tree must not take the whole archive down.
+
+    /etc/letsencrypt/live and /archive are mode 0700 root, so a unit running as
+    ``arv`` cannot descend into them. Letting that raise made the secrets
+    backup impossible to run at all: it failed every week and alerted every
+    week.
+    """
+    workdir = Path(tempfile.mkdtemp(prefix="arv-secrets-unreadable-"))
+    secret_file = workdir / "app.env"
+    secret_file.write_text("SECRET_KEY=super-secret\n")
+    stage = workdir / "stage"
+    locked = workdir / "root-only"
+    locked.mkdir()
+
+    added: list[str] = []
+
+    class _FakeArchive:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *exc):
+            return False
+
+        def add(self, path, arcname=None):
+            if path == str(locked):
+                raise PermissionError(13, "Permission denied", str(path))
+            added.append(arcname)
+
+    def _fake_open(fileobj=None, mode=None, **kwargs):
+        return _FakeArchive()
+
+    async def _fake_run_command(cmd, **kwargs):
+        Path(cmd[cmd.index("--output") + 1]).write_bytes(b"encrypted")
+        return ""
+
+    monkeypatch.setattr(backup_cli, "settings", _cli_settings())
+    monkeypatch.setattr(
+        backup_cli,
+        "SECRET_PATHS",
+        (
+            (str(secret_file), "app/.env", True, ()),
+            (str(locked), "etc/letsencrypt", False, ()),
+        ),
+    )
+    monkeypatch.setattr(backup_cli.tarfile, "open", _fake_open)
+    monkeypatch.setattr(backup_cli, "run_command", _fake_run_command)
+    monkeypatch.setattr(backup_cli, "send_heartbeat", _async_return(True))
+
+    args = backup_cli.build_parser().parse_args(["secrets", "--stage", str(stage)])
+    try:
+        assert await backup_cli.cmd_secrets(args) == 0
+        assert "app/.env" in added
+        assert "etc/letsencrypt" not in added
     finally:
         shutil.rmtree(workdir, ignore_errors=True)
 

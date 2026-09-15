@@ -44,10 +44,25 @@ logger = structlog.get_logger()
 # Filesystem paths holding class-A3 material (secrets and configuration).
 # Restoring these BEFORE the database is mandatory: OAuth tokens stored in the
 # DB are encrypted with TOKEN_ENCRYPTION_KEY and cannot be decrypted without it.
-SECRET_PATHS: tuple[tuple[str, str], ...] = (
-    (".env", "app/.env"),
-    ("/etc/letsencrypt", "etc/letsencrypt"),
-    ("deploy", "deploy"),
+#
+# ``required`` marks the paths without which the archive is worthless. A backup
+# that quietly omits ``.env`` is worse than a failed one: it looks like a backup
+# until the day it is needed. ``subpaths`` narrows a tree to the parts that
+# matter for recovery, which also keeps the walk out of directories the service
+# account cannot read.
+#
+# On /etc/letsencrypt: ``live``, ``archive``, ``accounts``, ``keys`` and ``csr``
+# are mode 0700 root-only, so a unit running as ``arv`` can never read them —
+# recursing into that tree is what made this job fail with
+# ``PermissionError: /etc/letsencrypt/accounts``. Only ``cli.ini`` and
+# ``renewal`` are service-readable. The certificates themselves are
+# re-issuable with certbot, which is the documented recovery path
+# (docs/RESTORE_RUNBOOK.md §7); to capture them as well, run
+# ``deploy/backup/backup-secrets.sh`` as root.
+SECRET_PATHS: tuple[tuple[str, str, bool, tuple[str, ...]], ...] = (
+    (".env", "app/.env", True, ()),
+    ("/etc/letsencrypt", "etc/letsencrypt", False, ("cli.ini", "renewal")),
+    ("deploy", "deploy", False, ()),
 )
 
 
@@ -117,25 +132,70 @@ async def cmd_media(args: argparse.Namespace) -> int:
 
 
 async def cmd_secrets(args: argparse.Namespace) -> int:
-    """Archive and encrypt the configuration/secret material (class A3)."""
+    """Archive and encrypt the configuration/secret material (class A3).
+
+    The archive holds ``SECRET_KEY``, so two invariants are enforced here:
+
+    * it is created mode ``0600`` from the first byte — ``tarfile.open(path)``
+      would apply the process umask (0644 in practice) and leave the key
+      world-readable for the whole run, and permanently if the run died before
+      the ``chmod`` at the end;
+    * the plaintext tar never survives when encryption is configured, on any
+      outcome. A previous version removed it only on the success path, so a
+      failure mid-archive left a readable ``.env`` on disk.
+    """
     stage = args.stage or settings.BACKUP_STAGING_DIR
     os.makedirs(stage, exist_ok=True)
 
     timestamp = datetime.now(UTC).strftime("%Y%m%d_%H%M%S")
     tar_path = os.path.join(stage, f"secrets_{timestamp}.tar.gz")
+    encrypted_path = tar_path + ".age"
+    missing_required: list[str] = []
 
-    with tarfile.open(tar_path, "w:gz") as archive:
-        for source, arcname in SECRET_PATHS:
-            if not os.path.exists(source):
-                logger.warning("secrets_backup_path_missing", path=source)
-                continue
-            archive.add(source, arcname=arcname)
+    try:
+        fd = os.open(tar_path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+        with os.fdopen(fd, "wb") as raw:
+            with tarfile.open(fileobj=raw, mode="w:gz") as archive:
+                for source, arcname, required, subpaths in SECRET_PATHS:
+                    targets = (
+                        [
+                            (os.path.join(source, sub), f"{arcname}/{sub}")
+                            for sub in subpaths
+                        ]
+                        if subpaths
+                        else [(source, arcname)]
+                    )
+                    for path, name in targets:
+                        if not os.path.exists(path):
+                            if required:
+                                missing_required.append(path)
+                            else:
+                                logger.warning(
+                                    "secrets_backup_path_missing", path=path
+                                )
+                            continue
+                        try:
+                            archive.add(path, arcname=name)
+                        except OSError as exc:
+                            # An unreadable optional tree (root-only
+                            # /etc/letsencrypt/live, for instance) must not take
+                            # the whole archive down, but it must be visible in
+                            # the log rather than silently dropped.
+                            if required:
+                                raise
+                            logger.warning(
+                                "secrets_backup_path_unreadable",
+                                path=path,
+                                error=str(exc),
+                            )
 
-    artifact = tar_path
-    if settings.encryption_enabled:
-        encrypted_path = tar_path + ".age"
-        binary = (settings.BACKUP_AGE_BINARY or "age").strip()
-        try:
+        if missing_required:
+            raise RuntimeError(
+                "required secret paths are missing: " + ", ".join(missing_required)
+            )
+
+        if settings.encryption_enabled:
+            binary = (settings.BACKUP_AGE_BINARY or "age").strip()
             await run_command(
                 [
                     binary, "--encrypt",
@@ -146,31 +206,43 @@ async def cmd_secrets(args: argparse.Namespace) -> int:
                 label="age --encrypt (secrets)",
                 timeout=600,
             )
-        finally:
-            if os.path.exists(tar_path):
+            artifact = encrypted_path
+        else:
+            artifact = tar_path
+            logger.warning(
+                "secrets_backup_unencrypted",
+                reason="BACKUP_AGE_RECIPIENT is not set; the archive holds secrets in the clear",
+            )
+
+        os.chmod(artifact, 0o600)
+
+        # Keep a local copy with restrictive permissions; the off-site push is
+        # done by the same rclone remote the database dumps use.
+        if settings.secondary_target_enabled:
+            remote = settings.BACKUP_SECONDARY_RCLONE_REMOTE.rstrip("/")
+            rclone = (settings.BACKUP_RCLONE_BINARY or "rclone").strip()
+            await run_command(
+                [
+                    rclone, "copyto", artifact,
+                    f"{remote}/secrets/{os.path.basename(artifact)}",
+                ],
+                label="rclone copyto (secrets)",
+                timeout=3600,
+            )
+
+        print(f"secrets archive: {artifact}")
+        await send_heartbeat("success", detail=os.path.basename(artifact))
+        return 0
+    finally:
+        if os.path.exists(tar_path):
+            if settings.encryption_enabled:
+                # Configured to encrypt: a plaintext archive must never survive,
+                # whether the run succeeded or died half-way through.
                 os.remove(tar_path)
-        artifact = encrypted_path
-    else:
-        logger.warning(
-            "secrets_backup_unencrypted",
-            reason="BACKUP_AGE_RECIPIENT is not set; the archive holds secrets in the clear",
-        )
-
-    # Keep a local copy with restrictive permissions; the off-site push is done
-    # by the same rclone remote the database dumps use.
-    os.chmod(artifact, 0o600)
-    if settings.secondary_target_enabled:
-        remote = settings.BACKUP_SECONDARY_RCLONE_REMOTE.rstrip("/")
-        rclone = (settings.BACKUP_RCLONE_BINARY or "rclone").strip()
-        await run_command(
-            [rclone, "copyto", artifact, f"{remote}/secrets/{os.path.basename(artifact)}"],
-            label="rclone copyto (secrets)",
-            timeout=3600,
-        )
-
-    print(f"secrets archive: {artifact}")
-    await send_heartbeat("success", detail=os.path.basename(artifact))
-    return 0
+            else:
+                # Unencrypted output *is* the artifact, so keep it — but never
+                # readable by anyone other than the backup user.
+                os.chmod(tar_path, 0o600)
 
 
 async def cmd_verify(args: argparse.Namespace) -> int:
