@@ -1,5 +1,6 @@
-import base64
 import json
+
+import pytest
 
 from app.utils import token_encryption as mod
 
@@ -15,21 +16,27 @@ def test_token_encryption_roundtrip_and_availability():
     assert encryptor.is_encryption_available() is True
 
 
-def test_token_encryption_cipherless_fallback(monkeypatch):
+def test_token_encryption_fails_closed_without_cipher():
+    """A missing cipher must fail loudly, never silently store plaintext.
+
+    The plaintext (base64-of-JSON) fallback was removed deliberately: it
+    turned a key/KDF problem into a silent security downgrade where OAuth
+    tokens were persisted unencrypted.
+    """
     encryptor = mod.TokenEncryption()
     encryptor._cipher = None
 
     credentials = {"token": "plain", "scope": ["disk", "info"]}
-    encoded = encryptor.encrypt_credentials(credentials)
-    assert base64.b64decode(encoded.encode()).decode() == json.dumps(credentials)
-    assert encryptor.decrypt_credentials(encoded) == credentials
-    assert encryptor.decrypt_credentials("not-valid-base64") == {}
+
     assert encryptor.is_encryption_available() is False
+    with pytest.raises(RuntimeError, match="not initialized"):
+        encryptor.encrypt_credentials(credentials)
+    with pytest.raises(RuntimeError, match="not initialized"):
+        encryptor.decrypt_credentials("anything")
 
 
-def test_token_encryption_encrypt_and_decrypt_fallback_paths(monkeypatch):
+def test_token_encryption_propagates_cipher_errors():
     encryptor = mod.TokenEncryption()
-    credentials = {"token": "fallback"}
 
     class BrokenCipher:
         def encrypt(self, _value):
@@ -39,13 +46,15 @@ def test_token_encryption_encrypt_and_decrypt_fallback_paths(monkeypatch):
             raise RuntimeError("decrypt failed")
 
     encryptor._cipher = BrokenCipher()
-    encrypted = encryptor.encrypt_credentials(credentials)
-    assert base64.b64decode(encrypted.encode()).decode() == json.dumps(credentials)
-    assert encryptor.decrypt_credentials(encrypted) == credentials
-    assert encryptor.decrypt_credentials("%%%") == {}
+
+    with pytest.raises(RuntimeError, match="encrypt failed"):
+        encryptor.encrypt_credentials({"token": "fallback"})
+    with pytest.raises(RuntimeError, match="decrypt failed"):
+        encryptor.decrypt_credentials("Zm9v")
 
 
 def test_token_encryption_init_cipher_failure(monkeypatch):
     monkeypatch.setattr(mod, "PBKDF2HMAC", lambda **kwargs: (_ for _ in ()).throw(RuntimeError("kdf failed")))
-    encryptor = mod.TokenEncryption()
-    assert encryptor._cipher is None
+
+    with pytest.raises(RuntimeError, match="kdf failed"):
+        mod.TokenEncryption()

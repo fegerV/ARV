@@ -15,7 +15,10 @@ async def test_initiate_yandex_oauth_requires_redirect_uri(monkeypatch):
     ))
 
     with pytest.raises(HTTPException) as exc_info:
-        await oauth.initiate_yandex_oauth("Vertex")
+        await oauth.initiate_yandex_oauth(
+            "Vertex",
+            current_user=SimpleNamespace(is_super_admin=True, id=1),
+        )
 
     assert exc_info.value.status_code == 500
     assert exc_info.value.detail == "YANDEX_OAUTH_REDIRECT_URI not configured"
@@ -30,13 +33,17 @@ async def test_initiate_yandex_oauth_redirects_with_state(monkeypatch):
         YANDEX_OAUTH_CLIENT_ID="client-id",
     ))
 
-    async def _fake_create_state(connection_name):
+    async def _fake_create_state(connection_name, user_id=None):
         assert connection_name == "Vertex"
+        assert user_id == 1
         return "state-123"
 
     monkeypatch.setattr(oauth.oauth_state_store, "create_state", _fake_create_state)
 
-    response = await oauth.initiate_yandex_oauth("Vertex")
+    response = await oauth.initiate_yandex_oauth(
+        "Vertex",
+        current_user=SimpleNamespace(is_super_admin=True, id=1),
+    )
 
     assert response.headers["location"].startswith("https://oauth.yandex.ru/authorize?")
     assert "client_id=client-id" in response.headers["location"]
@@ -73,7 +80,7 @@ async def test_yandex_oauth_callback_creates_connection_and_redirects(monkeypatc
 
     async def _fake_get_and_delete_state(state):
         assert state == "state-1"
-        return {"connection_name": "Vertex Disk"}
+        return {"connection_name": "Vertex Disk", "metadata": {"user_id": 1}}
 
     async def _fake_cleanup():
         return 1
@@ -82,6 +89,8 @@ async def test_yandex_oauth_callback_creates_connection_and_redirects(monkeypatc
     monkeypatch.setattr(oauth.oauth_state_store, "cleanup_expired_states", _fake_cleanup)
     monkeypatch.setattr(oauth.token_encryption, "encrypt_credentials", lambda payload: f"enc:{payload['access_token']}")
     monkeypatch.setattr(oauth.token_encryption, "is_encryption_available", lambda: True)
+
+    from app.models.user import User as _User
 
     responses = [
         _FakeResponse(200, {"access_token": "token-123", "refresh_token": "refresh-1", "expires_in": 3600, "token_type": "bearer"}),
@@ -110,7 +119,7 @@ async def test_yandex_oauth_callback_creates_connection_and_redirects(monkeypatc
 
     monkeypatch.setattr(oauth.httpx, "AsyncClient", FakeAsyncClient)
 
-    db = _FakeDb()
+    db = _FakeDb(get_map={(_User, 1): SimpleNamespace(is_super_admin=True)})
     background_tasks = BackgroundTasks()
 
     response = await oauth.yandex_oauth_callback(
@@ -143,7 +152,9 @@ async def test_yandex_oauth_callback_redirects_on_network_error(monkeypatch):
     ))
 
     async def _fake_get_and_delete_state(_state):
-        return {"connection_name": "Vertex Disk"}
+        return {"connection_name": "Vertex Disk", "metadata": {"user_id": 1}}
+
+    from app.models.user import User as _User
 
     class FakeAsyncClient:
         def __init__(self, timeout):
@@ -165,7 +176,7 @@ async def test_yandex_oauth_callback_redirects_on_network_error(monkeypatch):
         background_tasks=BackgroundTasks(),
         code="code-1",
         state="state-1",
-        db=_FakeDb(),
+        db=_FakeDb(get_map={(_User, 1): SimpleNamespace(is_super_admin=True)}),
     )
 
     assert response.headers["location"].startswith("https://admin.example.com/oauth/yandex/callback?success=false&error=")
@@ -222,7 +233,12 @@ async def test_list_yandex_folders_returns_directory_payload(monkeypatch):
 
     monkeypatch.setattr(oauth.httpx, "AsyncClient", FakeAsyncClient)
 
-    result = await oauth.list_yandex_folders(7, path="/demo/folder", db=db)
+    result = await oauth.list_yandex_folders(
+        7,
+        path="/demo/folder",
+        db=db,
+        current_user=SimpleNamespace(is_super_admin=True),
+    )
 
     assert result["current_path"] == "/demo/folder"
     assert result["parent_path"] == "/demo"
@@ -251,7 +267,12 @@ async def test_list_yandex_folders_requires_token(monkeypatch):
     db = _FakeDb(get_map={(oauth.StorageConnection, 9): conn})
 
     with pytest.raises(HTTPException) as exc_info:
-        await oauth.list_yandex_folders(9, path="/", db=db)
+        await oauth.list_yandex_folders(
+            9,
+            path="/",
+            db=db,
+            current_user=SimpleNamespace(is_super_admin=True),
+        )
 
     assert exc_info.value.status_code == 500
     assert exc_info.value.detail == "Failed to access stored credentials. Please re-authenticate."
@@ -287,7 +308,12 @@ async def test_create_yandex_folder_maps_conflict_error(monkeypatch):
     monkeypatch.setattr(oauth.httpx, "AsyncClient", FakeAsyncClient)
 
     with pytest.raises(HTTPException) as exc_info:
-        await oauth.create_yandex_folder(10, folder_path="/demo/new-folder", db=db)
+        await oauth.create_yandex_folder(
+            10,
+            folder_path="/demo/new-folder",
+            db=db,
+            current_user=SimpleNamespace(is_super_admin=True),
+        )
 
     assert exc_info.value.status_code == 409
     assert exc_info.value.detail == "Folder already exists at this location."

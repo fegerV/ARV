@@ -1,6 +1,5 @@
 from fastapi import APIRouter, HTTPException, Depends, status, Request, Form, Response
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
-from fastapi.templating import Jinja2Templates
 from app.middleware.rate_limiter import rate_limit
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -246,8 +245,9 @@ async def login_form(
     db: AsyncSession = Depends(get_db)
 ):
     """Handle form-based login for HTML interface"""
-    # Create templates instance to render login page with errors
-    templates = Jinja2Templates(directory="templates")
+    # Use the shared template instance so the render goes through AdminTemplates,
+    # which normalises the legacy TemplateResponse(name, context) call style.
+    from app.html.templating import templates
     
     # Get user by email
     result = await db.execute(select(User).where(User.email == username))

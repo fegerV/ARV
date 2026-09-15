@@ -4,7 +4,6 @@ from pathlib import Path
 from fastapi import FastAPI, Request, status
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse, ORJSONResponse, Response
-from fastapi.templating import Jinja2Templates
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
@@ -41,6 +40,7 @@ _ACCESS_LOG_PROBE_PATTERNS = (
 from app.core.config import settings  # noqa: E402
 from app.core.database import seed_defaults  # noqa: E402
 from app.html.i18n import DEFAULT_LANGUAGE, normalize_locale  # noqa: E402
+from app.html.templating import templates as _viewer_templates  # noqa: E402
 from app.middleware.csrf import CSRFMiddleware  # noqa: E402
 from app.middleware.maintenance import MaintenanceModeMiddleware  # noqa: E402
 from app.middleware.rate_limiter import setup_rate_limiting  # noqa: E402
@@ -362,7 +362,7 @@ async def api_protected_route(request: Request, path: str):
 
 
 # AR viewer landing page: /view/{unique_id} — Level 3 fallback (photo + video overlay) + app buttons
-_viewer_templates = Jinja2Templates(directory="templates")
+# Reuses the shared AdminTemplates instance (filters, i18n globals, legacy-call shim).
 
 
 @app.get("/view/{unique_id}", response_class=HTMLResponse)

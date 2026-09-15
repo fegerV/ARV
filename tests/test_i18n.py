@@ -56,5 +56,8 @@ async def test_admin_language_switch_updates_rendered_login_page():
 
     assert response.status_code == 200
     assert 'lang="en"' in response.text
-    assert '<option value="en" selected' in response.text
     assert "Admin sign in" in response.text
+    # The switch must actually flip the rendered copy, not just the lang attr.
+    # (The admin login page has no <select> language dropdown — that control
+    # lives on the settings tab — so assert on the translated strings.)
+    assert "Вход в админку" not in response.text

@@ -18,6 +18,14 @@ async def test_ar_content_helper_functions_cover_basic_validation():
     mock_result.scalar_one_or_none.return_value = None
     mock_db.execute.return_value = mock_result
 
+    # generate_order_number wraps its work in `async with db.begin_nested():`,
+    # so the mocked session must hand back a real async context manager rather
+    # than the coroutine an unconfigured AsyncMock would produce.
+    nested = MagicMock()
+    nested.__aenter__ = AsyncMock(return_value=None)
+    nested.__aexit__ = AsyncMock(return_value=False)
+    mock_db.begin_nested = MagicMock(return_value=nested)
+
     order_number = await ar_content.generate_order_number(1, mock_db)
 
     assert order_number.startswith("ORD-")

@@ -7,13 +7,36 @@ from app.html.i18n import SUPPORTED_LANGUAGES, get_request_locale, t
 
 
 class AdminTemplates(Jinja2Templates):
-    """Jinja2Templates variant that keeps request.state.locale in sync with session."""
+    """Jinja2Templates variant that keeps request.state.locale in sync with session.
 
-    def TemplateResponse(self, name, context, *args, **kwargs):  # noqa: N802
-        request = context.get("request") if isinstance(context, dict) else None
+    It also normalises the legacy ``TemplateResponse(name, context)`` call style
+    used throughout the HTML routes into starlette's current
+    ``TemplateResponse(request, name, context)`` signature.  starlette removed the
+    branch that tolerated a leading string, so without this shim every admin page
+    raises ``TypeError: unhashable type: 'dict'`` on any install that satisfies
+    ``requirements.txt`` (starlette >= 0.40).
+    """
+
+    def TemplateResponse(self, *args, **kwargs):  # noqa: N802
+        # Legacy style: TemplateResponse("page.html", {"request": request, ...})
+        if args and isinstance(args[0], str):
+            name = args[0]
+            context = args[1] if len(args) > 1 else kwargs.pop("context", None)
+            rest = args[2:]
+            context = context if isinstance(context, dict) else {}
+            request = context.get("request")
+            if request is None:
+                raise ValueError(
+                    "TemplateResponse requires a 'request' key in the context"
+                )
+            get_request_locale(request)
+            return super().TemplateResponse(request, name, context, *rest, **kwargs)
+
+        # Modern style: TemplateResponse(request, "page.html", {...})
+        request = args[0] if args else kwargs.get("request")
         if request is not None:
             get_request_locale(request)
-        return super().TemplateResponse(name, context, *args, **kwargs)
+        return super().TemplateResponse(*args, **kwargs)
 
 
 def build_templates() -> Jinja2Templates:

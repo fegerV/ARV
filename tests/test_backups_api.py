@@ -63,7 +63,7 @@ async def test_run_backup_now_queues_background_task(monkeypatch):
     result = await backups.run_backup_now(
         background_tasks=tasks,
         db=_FakeDb(),
-        current_user=SimpleNamespace(),
+        current_user=SimpleNamespace(is_super_admin=True),
     )
 
     assert result == {"status": "started", "message": "Backup task queued"}
@@ -98,7 +98,7 @@ async def test_backup_history_clamps_limit_and_normalizes_offset(monkeypatch):
         def __init__(self):
             self.calls = []
 
-        async def list_backups(self, db, limit, offset):
+        async def list_backups(self, db, limit, offset, company_ids=None):
             self.calls.append((db, limit, offset))
             return records
 
@@ -109,7 +109,7 @@ async def test_backup_history_clamps_limit_and_normalizes_offset(monkeypatch):
         limit=999,
         offset=-5,
         db=_FakeDb(),
-        current_user=SimpleNamespace(),
+        current_user=SimpleNamespace(is_super_admin=True),
     )
 
     assert service.calls[0][1:] == (100, 0)
@@ -133,12 +133,12 @@ async def test_backup_status_returns_no_backups_when_empty(monkeypatch):
     from app.api.routes import backups
 
     class FakeBackupService:
-        async def get_last_status(self, _db):
+        async def get_last_status(self, _db, company_ids=None):
             return None
 
     monkeypatch.setattr(backups, "BackupService", FakeBackupService)
 
-    result = await backups.backup_status(db=_FakeDb(), current_user=SimpleNamespace())
+    result = await backups.backup_status(db=_FakeDb(), current_user=SimpleNamespace(is_super_admin=True))
 
     assert result == {"status": "no_backups"}
 
@@ -161,12 +161,12 @@ async def test_backup_status_serializes_last_record(monkeypatch):
     )
 
     class FakeBackupService:
-        async def get_last_status(self, _db):
+        async def get_last_status(self, _db, company_ids=None):
             return record
 
     monkeypatch.setattr(backups, "BackupService", FakeBackupService)
 
-    result = await backups.backup_status(db=_FakeDb(), current_user=SimpleNamespace())
+    result = await backups.backup_status(db=_FakeDb(), current_user=SimpleNamespace(is_super_admin=True))
 
     assert result == {
         "id": 9,
@@ -185,13 +185,13 @@ async def test_delete_backup_raises_for_missing_record(monkeypatch):
     from app.api.routes import backups
 
     class FakeBackupService:
-        async def delete_backup(self, _db, _backup_id):
+        async def delete_backup(self, _db, _backup_id, company_ids=None):
             return False
 
     monkeypatch.setattr(backups, "BackupService", FakeBackupService)
 
     with pytest.raises(HTTPException) as exc_info:
-        await backups.delete_backup(404, db=_FakeDb(), current_user=SimpleNamespace())
+        await backups.delete_backup(404, db=_FakeDb(), current_user=SimpleNamespace(is_super_admin=True))
 
     assert exc_info.value.status_code == 404
     assert exc_info.value.detail == "Backup not found"
@@ -202,13 +202,13 @@ async def test_delete_backup_returns_deleted_status(monkeypatch):
     from app.api.routes import backups
 
     class FakeBackupService:
-        async def delete_backup(self, _db, backup_id):
+        async def delete_backup(self, _db, backup_id, company_ids=None):
             assert backup_id == 11
             return True
 
     monkeypatch.setattr(backups, "BackupService", FakeBackupService)
 
-    result = await backups.delete_backup(11, db=_FakeDb(), current_user=SimpleNamespace())
+    result = await backups.delete_backup(11, db=_FakeDb(), current_user=SimpleNamespace(is_super_admin=True))
 
     assert result == {"status": "deleted", "id": 11}
 

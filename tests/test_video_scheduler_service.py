@@ -9,7 +9,7 @@ def test_ensure_utc_and_status_helpers():
     video_scheduler = _video_scheduler_module()
     now = datetime(2026, 3, 29, 12, 0, tzinfo=timezone.utc)
     naive = datetime(2026, 3, 29, 12, 0)
-    video = SimpleNamespace(is_active=True, subscription_end=now + timedelta(days=10))
+    video = SimpleNamespace(id=1, is_active=True, subscription_end=now + timedelta(days=10))
 
     ensured = video_scheduler._ensure_utc(naive)
 
@@ -19,8 +19,8 @@ def test_ensure_utc_and_status_helpers():
     assert video_scheduler.compute_video_status(SimpleNamespace(is_active=True, subscription_end=now - timedelta(days=1)), now) == "expired"
     assert video_scheduler.compute_video_status(SimpleNamespace(is_active=True, subscription_end=now + timedelta(days=3)), now) == "expiring"
     assert video_scheduler.compute_video_status(video, now) == "active"
-    assert video_scheduler.compute_days_remaining(SimpleNamespace(subscription_end=None), now) is None
-    assert video_scheduler.compute_days_remaining(SimpleNamespace(subscription_end=now - timedelta(days=1)), now) == 0
+    assert video_scheduler.compute_days_remaining(SimpleNamespace(id=2, subscription_end=None), now) is None
+    assert video_scheduler.compute_days_remaining(SimpleNamespace(id=3, subscription_end=now - timedelta(days=1)), now) == 0
     assert video_scheduler.compute_days_remaining(video, now) == 10
     assert video_scheduler.compute_video_status(video, naive) == "active"
     assert video_scheduler.compute_days_remaining(video, naive) == 10
@@ -63,9 +63,9 @@ async def test_check_date_rules_supports_exact_recurring_invalid_and_expired(mon
     )
     monkeypatch.setattr(video_scheduler, "Video", "video")
 
-    recurring_rule = SimpleNamespace(date_rules=[{"date": "2020-12-31", "recurring": True, "video_id": 1}])
-    exact_rule = SimpleNamespace(date_rules=[{"date": "2026-03-29T00:00:00", "video_id": 2}])
-    invalid_rule = SimpleNamespace(date_rules=[{"date": "not-a-date", "video_id": 2}, {"date": "2026-03-29", "video_id": 3}])
+    recurring_rule = SimpleNamespace(id=101, date_rules=[{"date": "2020-12-31", "recurring": True, "video_id": 1}])
+    exact_rule = SimpleNamespace(id=102, date_rules=[{"date": "2026-03-29T00:00:00", "video_id": 2}])
+    invalid_rule = SimpleNamespace(id=103, date_rules=[{"date": "not-a-date", "video_id": 2}, {"date": "2026-03-29", "video_id": 3}])
 
     recurring = await video_scheduler.check_date_rules(recurring_rule, date(2026, 12, 31), db)
     exact = await video_scheduler.check_date_rules(exact_rule, date(2026, 3, 29), db)
@@ -93,14 +93,14 @@ async def test_cycle_video_helpers_select_expected_items(monkeypatch):
     monkeypatch.setattr(video_scheduler, "Video", "video")
     monkeypatch.setattr(video_scheduler.random, "choices", lambda videos, weights, k: [videos[1]])
 
-    daily_rule = SimpleNamespace(video_sequence=[12, 10], random_seed="seed")
-    weekly_rule = SimpleNamespace(video_sequence=[10, 11])
-    random_rule = SimpleNamespace(video_sequence=[10, 11], random_seed="seed")
+    daily_rule = SimpleNamespace(id=201, video_sequence=[12, 10], random_seed="seed")
+    weekly_rule = SimpleNamespace(id=202, video_sequence=[10, 11])
+    random_rule = SimpleNamespace(id=203, video_sequence=[10, 11], random_seed="seed")
 
     daily = await video_scheduler.get_daily_cycle_video(daily_rule, date(2026, 1, 2), db)
     weekly = await video_scheduler.get_weekly_cycle_video(weekly_rule, date(2026, 3, 29), db)  # Sunday
     random_video = await video_scheduler.get_random_daily_video(random_rule, date(2026, 3, 29), db)
-    empty_random = await video_scheduler.get_random_daily_video(SimpleNamespace(video_sequence=[]), date(2026, 3, 29), db)
+    empty_random = await video_scheduler.get_random_daily_video(SimpleNamespace(id=204, video_sequence=[]), date(2026, 3, 29), db)
 
     assert daily is monday_video
     assert weekly is monday_video

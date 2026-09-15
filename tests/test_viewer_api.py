@@ -1,4 +1,5 @@
 import shutil
+import tempfile
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from types import SimpleNamespace
@@ -55,7 +56,7 @@ def test_parse_user_agent_recognizes_mobile_and_app_client():
     )
 
     assert device_type == "mobile"
-    assert browser_name == "Vertex AR App"
+    assert browser_name == "V-Portal App"
     assert os_name == "Android"
 
 
@@ -155,7 +156,9 @@ async def test_manifest_endpoint_rejects_invalid_unique_id():
 
 
 def _make_workspace_temp_dir():
-    root = Path("e:/Project/ARV/.pytest-temp") / f"viewer-{uuid4().hex}"
+    # Use the OS temp dir instead of a hardcoded drive path so the test runs
+    # on any platform (a literal "e:/..." breaks on machines without E:).
+    root = Path(tempfile.gettempdir()) / "arv-pytest" / f"viewer-{uuid4().hex}"
     root.mkdir(parents=True, exist_ok=True)
     return root
 
@@ -173,6 +176,7 @@ async def test_get_viewer_landing_data_returns_absolute_urls(monkeypatch):
         status="active",
         photo_url="/storage/photos/marker.jpg",
         photo_path=None,
+        thumbnail_url=None,
         order_number="ORD-101",
     )
     video = SimpleNamespace(video_url="/storage/videos/clip.mp4")
@@ -193,6 +197,7 @@ async def test_get_viewer_landing_data_returns_absolute_urls(monkeypatch):
 
     assert result == {
         "photo_url": "https://example.test/storage/photos/marker.jpg",
+        "preview_url": "https://example.test/storage/photos/marker.jpg",
         "video_url": "https://example.test/storage/videos/clip.mp4",
         "order_number": "ORD-101",
     }

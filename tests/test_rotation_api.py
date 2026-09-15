@@ -33,15 +33,35 @@ def test_sanitise_payload_coerces_frontend_values():
     assert result["video_sequence"] == [1, 2, 3]
 
 
-def test_require_auth_rejects_missing_or_inactive_user():
+@pytest.mark.asyncio
+async def test_require_auth_rejects_missing_or_inactive_user(monkeypatch):
+    from app.api.routes import auth
     from app.core.security import decode_token
 
+    # A malformed token never decodes to a payload.
+    assert decode_token("invalid") is None
+
+    monkeypatch.setattr(auth, "_extract_request_token", lambda _request, token=None: "token")
+
+    async def _no_user(_db, _token):
+        return None
+
+    monkeypatch.setattr(auth, "_get_user_from_token", _no_user)
     with pytest.raises(HTTPException) as missing_user:
-        from app.api.routes.auth import get_current_active_user
-        import inspect
-        sig = inspect.signature(get_current_active_user)
-        # Just verify that decode_token returns None for invalid token
-        assert decode_token("invalid") is None
+        await auth.get_current_active_user(
+            request=SimpleNamespace(), db=SimpleNamespace()
+        )
+    assert missing_user.value.status_code == 401
+
+    async def _inactive_user(_db, _token):
+        return SimpleNamespace(is_active=False)
+
+    monkeypatch.setattr(auth, "_get_user_from_token", _inactive_user)
+    with pytest.raises(HTTPException) as inactive_user:
+        await auth.get_current_active_user(
+            request=SimpleNamespace(), db=SimpleNamespace()
+        )
+    assert inactive_user.value.status_code == 401
 
 
 @pytest.mark.asyncio
