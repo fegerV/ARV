@@ -483,6 +483,15 @@ async def test_run_backup_success_updates_record_and_cleans_files(monkeypatch):
     )
     monkeypatch.setattr(backup_service.asyncio, "to_thread", _fake_to_thread)
     monkeypatch.setattr(backup_service.BackupService, "_rotate_backups", _fake_rotate_backups)
+    # Pin encryption off. `settings` reads the deployment's .env, so leaving this
+    # to the ambient configuration makes the assertions below depend on how prod
+    # happens to be set up: with BACKUP_AGE_RECIPIENT set the uploaded artifact
+    # gains an .age suffix and this test fails for no code reason at all.
+    monkeypatch.setattr(
+        type(backup_service.settings),
+        "encryption_enabled",
+        property(lambda self: False),
+    )
 
     result = await backup_service.BackupService().run_backup(session=create_session, company_id=5, yd_folder="daily", trigger="manual")
 

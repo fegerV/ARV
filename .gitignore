@@ -44,6 +44,10 @@ ENV/
 # ...but keep the committed templates
 !.env.example
 !.env.production.example
+# ...and the test environment: it holds no real credentials, and without it in
+# the repo a checkout can only run the suite against its own live .env, which
+# makes the outcome depend on how the deployment happens to be configured.
+!.env.test
 
 # Coverage
 .coverage
