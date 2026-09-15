@@ -136,11 +136,43 @@ def test_scheduler_module_importable():
 # ---------------------------------------------------------------------------
 
 
+def _collect_route_paths(routes) -> set[str]:
+    """Recursively collect every registered route path.
+
+    Route-table introspection differs across FastAPI versions:
+      * classic ``APIRoute`` exposes ``path``;
+      * ``Mount`` exposes ``routes``;
+      * newer FastAPI wraps ``include_router()`` results in ``_IncludedRouter``,
+        which has no ``path`` and no ``routes`` — the real router is reachable
+        via ``original_router`` plus the prefix held in ``include_context``.
+
+    The flat ``[r.path for r in app.routes]`` idiom therefore raises
+    AttributeError on modern FastAPI. Walk the tree instead.
+    """
+    paths: set[str] = set()
+    for route in routes:
+        path = getattr(route, "path", None)
+        if path is not None:
+            paths.add(path)
+
+        nested = getattr(route, "routes", None)
+        if nested:
+            paths |= _collect_route_paths(nested)
+
+        original = getattr(route, "original_router", None)
+        if original is not None:
+            context = getattr(route, "include_context", None)
+            prefix = getattr(context, "prefix", "") or ""
+            for sub in _collect_route_paths(getattr(original, "routes", None) or []):
+                paths.add(f"{prefix}{sub}")
+    return paths
+
+
 def test_app_has_backup_routes():
     """Backup routes are registered on the application."""
     from app.main import app
 
-    routes = [r.path for r in app.routes]
+    routes = _collect_route_paths(app.routes)
     assert "/api/backups/run" in routes or any("/backups/run" in r for r in routes)
 
 
@@ -188,5 +220,5 @@ def test_no_debug_endpoint_in_production():
     """The debug/storage-test endpoint should NOT be registered."""
     from app.main import app
 
-    routes = [r.path for r in app.routes]
+    routes = _collect_route_paths(app.routes)
     assert "/debug/storage-test" not in routes
