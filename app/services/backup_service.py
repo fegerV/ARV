@@ -364,6 +364,11 @@ class BackupService:
 
         Shared by integrity verification and the restore drill so that both
         exercise exactly the same retrieval path a real recovery would use.
+
+        Uses ``get_file`` (remote -> local). ``save_file`` is the *upload*
+        direction: it opens its first argument as a local path, so calling it
+        with a remote ``yd_path`` fails with ``FileNotFoundError`` and takes
+        the whole verification/restore path down with it.
         """
         async with AsyncSessionLocal() as session:
             record = await session.get(BackupHistory, backup_id)
@@ -376,7 +381,15 @@ class BackupService:
                     f"Storage provider unavailable for backup {backup_id}"
                 )
 
-            await provider.save_file(record.yd_path, dest_path)
+            # `get_file` reports failure by returning False rather than raising,
+            # so an unchecked call would surface as a bogus checksum mismatch
+            # instead of the real cause.
+            downloaded = await provider.get_file(record.yd_path, dest_path)
+            if not downloaded:
+                raise RuntimeError(
+                    f"Could not download backup {backup_id} "
+                    f"from {record.yd_path!r}"
+                )
         return dest_path
 
     async def verify_backup_integrity(self, backup_id: int) -> bool:

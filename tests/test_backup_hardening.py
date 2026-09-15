@@ -618,6 +618,143 @@ async def test_verify_backup_integrity_records_mismatch(monkeypatch):
 
 
 # ----------------------------------------------------------------------
+# Retrieval direction (download_backup)
+# ----------------------------------------------------------------------
+
+
+def _download_record(backup_id: int, yd_path: str):
+    from app.services import backup_service
+
+    record = backup_service.BackupHistory(
+        started_at=backup_service._utcnow_naive(),
+        status="success",
+        company_id=5,
+        trigger="manual",
+    )
+    record.id = backup_id
+    record.yd_path = yd_path
+    record.encrypted = False
+    return record
+
+
+@pytest.mark.asyncio
+async def test_download_backup_downloads_remote_artifact(monkeypatch, tmp_path):
+    """A backup must come *down* from the provider, not be pushed to it.
+
+    ``save_file`` is the upload direction: it opens its first argument as a
+    local path, so using it here raised ``FileNotFoundError`` on the remote
+    ``yd_path``. Every other download in the codebase uses ``get_file``.
+    """
+    from app.services import backup_service
+
+    record = _download_record(801, "backups/backup_20260915_153939.sql.gz")
+    session = _FakeSession(get_map={(backup_service.BackupHistory, 801): record})
+    dest = tmp_path / "artifact.sql.gz"
+
+    class FakeProvider:
+        def __init__(self):
+            self.downloaded: list[tuple[str, str]] = []
+
+        async def get_file(self, storage_path, local_path):
+            self.downloaded.append((storage_path, local_path))
+            Path(local_path).write_bytes(b"custom-format-archive")
+            return True
+
+        async def save_file(self, source_path, destination_path):
+            raise AssertionError(
+                "download_backup must not call save_file (upload direction)"
+            )
+
+    provider = FakeProvider()
+
+    async def _fake_provider(_company_id):
+        return provider
+
+    monkeypatch.setattr(backup_service, "AsyncSessionLocal", _SessionFactory([session]))
+    monkeypatch.setattr(
+        backup_service.BackupService,
+        "_get_yd_provider",
+        staticmethod(_fake_provider),
+    )
+
+    result = await backup_service.BackupService().download_backup(801, str(dest))
+
+    assert result == str(dest)
+    assert provider.downloaded == [(record.yd_path, str(dest))]
+    assert dest.read_bytes() == b"custom-format-archive"
+
+
+@pytest.mark.asyncio
+async def test_download_backup_raises_when_provider_reports_failure(
+    monkeypatch, tmp_path
+):
+    """``get_file`` signals failure by returning False, not by raising.
+
+    An unchecked return value would surface downstream as a bogus checksum
+    mismatch instead of "the download did not happen".
+    """
+    from app.services import backup_service
+
+    record = _download_record(802, "backups/missing.sql.gz")
+    session = _FakeSession(get_map={(backup_service.BackupHistory, 802): record})
+
+    class FakeProvider:
+        async def get_file(self, storage_path, local_path):
+            return False
+
+    async def _fake_provider(_company_id):
+        return FakeProvider()
+
+    monkeypatch.setattr(backup_service, "AsyncSessionLocal", _SessionFactory([session]))
+    monkeypatch.setattr(
+        backup_service.BackupService,
+        "_get_yd_provider",
+        staticmethod(_fake_provider),
+    )
+
+    with pytest.raises(RuntimeError, match="Could not download backup 802"):
+        await backup_service.BackupService().download_backup(
+            802, str(tmp_path / "x.sql.gz")
+        )
+
+
+@pytest.mark.asyncio
+async def test_download_backup_raises_without_storage_provider(monkeypatch, tmp_path):
+    from app.services import backup_service
+
+    record = _download_record(803, "backups/no-provider.sql.gz")
+    session = _FakeSession(get_map={(backup_service.BackupHistory, 803): record})
+
+    async def _no_provider(_company_id):
+        return None
+
+    monkeypatch.setattr(backup_service, "AsyncSessionLocal", _SessionFactory([session]))
+    monkeypatch.setattr(
+        backup_service.BackupService, "_get_yd_provider", staticmethod(_no_provider)
+    )
+
+    with pytest.raises(RuntimeError, match="Storage provider unavailable"):
+        await backup_service.BackupService().download_backup(
+            803, str(tmp_path / "y.sql.gz")
+        )
+
+
+@pytest.mark.asyncio
+async def test_download_backup_raises_without_artifact(monkeypatch, tmp_path):
+    from app.services import backup_service
+
+    record = _download_record(804, "")
+    session = _FakeSession(get_map={(backup_service.BackupHistory, 804): record})
+
+    monkeypatch.setattr(backup_service, "AsyncSessionLocal", _SessionFactory([session]))
+
+    with pytest.raises(RuntimeError, match="has no downloadable artifact"):
+        await backup_service.BackupService().download_backup(
+            804, str(tmp_path / "z.sql.gz")
+        )
+
+
+# ----------------------------------------------------------------------
 # Helpers
 # ----------------------------------------------------------------------
 
