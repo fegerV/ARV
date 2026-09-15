@@ -487,8 +487,44 @@ def test_pg_restore_uses_parallelism_and_exit_on_error(monkeypatch):
     assert cmd[0] == "pg_restore"
     assert "-j" in cmd and cmd[cmd.index("-j") + 1] == "4"
     assert "--exit-on-error" in cmd
+    assert "--no-owner" in cmd
     assert cmd[-1] == "/tmp/backup.dump"
     assert captured["env"]["PGPASSWORD"] == "secret"
+
+
+def test_pg_restore_does_not_replay_object_ownership(monkeypatch):
+    """Restoring must not try to reassign objects to their original owner.
+
+    A dump records each object's owner and pg_restore replays it as
+    ``ALTER ... OWNER TO <role>``, which requires the restoring role to be able
+    to ``SET ROLE`` to that role. Production has five objects owned by
+    ``postgres`` (``ai_jobs`` and its sequence/indexes) while the application
+    connects as ``vertex_ar``, so the replay failed with
+
+        ERROR: must be able to SET ROLE "postgres"
+
+    and ``--exit-on-error`` then aborted the entire restore, leaving the target
+    database empty. Verified against the real cluster: with ``--no-owner`` the
+    same dump restores all 15 tables; without it, one.
+    """
+    from app.services import restore_service
+
+    captured: dict = {}
+
+    async def _fake_run_command(cmd, **kwargs):
+        captured["cmd"] = cmd
+        return ""
+
+    monkeypatch.setattr(restore_service, "settings", _restore_settings())
+    monkeypatch.setattr(restore_service, "run_command", _fake_run_command)
+
+    import asyncio
+
+    asyncio.run(
+        restore_service.RestoreService()._pg_restore_into("target_db", "/tmp/b.dump")
+    )
+
+    assert "--no-owner" in captured["cmd"]
 
 
 # ----------------------------------------------------------------------

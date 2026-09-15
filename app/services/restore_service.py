@@ -355,6 +355,18 @@ class RestoreService:
         ``--exit-on-error`` is intentional: a drill that silently tolerates
         errors proves nothing. ``-j`` works because the dump uses the custom
         format.
+
+        ``--no-owner`` is required, not cosmetic. A dump records each object's
+        owner, and pg_restore replays that as ``ALTER ... OWNER TO <role>``,
+        which needs the restoring role to be able to ``SET ROLE`` to it. The
+        production cluster has five objects owned by ``postgres`` (``ai_jobs``
+        and its sequence/indexes, created by an early migration run as a
+        superuser) while the application connects as ``vertex_ar`` — so the
+        replay aborted on ``ALTER TABLE public.ai_jobs OWNER TO postgres`` and,
+        with ``--exit-on-error``, took the whole restore with it, leaving the
+        target database empty. Restoring into a *separate* database and cutting
+        over deliberately is the documented model, so ownership is expected to
+        be re-established by the restoring role anyway.
         """
         binary = (
             getattr(settings, "BACKUP_PG_RESTORE_BINARY", "pg_restore") or "pg_restore"
@@ -370,6 +382,7 @@ class RestoreService:
                 "-U", params["user"],
                 "-d", database,
                 "-j", str(jobs),
+                "--no-owner",
                 "--exit-on-error",
                 dump_path,
             ],
