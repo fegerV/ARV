@@ -38,18 +38,22 @@
 |---|---|
 | Последний успешный бэкап | **id 139**, 68 462 Б, `backups/backup_20260915_215426.sql.gz` |
 | Восстановление проверено | **да** — `restore 139 --target-db vertex_ar_recovered` → `ok: True`, 15 таблиц, счётчики совпали с продом |
-| `verification_status` | **`ok`** (записано впервые 2026-09-15 22:14:27) |
-| `restore_test_status` | NULL — код `drill` не запускался (нет права `CREATEDB`, см. §2.3) |
+| `verification_status` | **`ok`** (записано 2026-09-15 22:29:47) |
+| `restore_test_status` | **`ok`** (drill пройден 2026-09-15 22:30:15) |
 | Шифрование дампа | `encrypted = f` — **не шифруется** |
 | `media` / `secrets` бэкапы | `never run` |
 | Размер БД / медиа | 10 МБ / 217 МБ (`/opt/arv/storage`) |
 | Свободно на диске | 19 ГБ — запаса достаточно |
-| Роль `vertex_ar` | `rolcreatedb = f` → **`drill` упадёт** (см. §2.3) |
+| Роль `vertex_ar` | `rolcreatedb = t` (выдано 2026-09-15 → drill работает) |
 | Владельцы объектов в `public` | все 15 таблиц / 13 последовательностей / 48 индексов → `vertex_ar` (нормализовано 2026-09-15) |
 | `pg_restore` | 16.11 (Ubuntu) = версия сервера → совместимо |
-| `age` / `restic` / `rclone` | **не установлены** |
-| `/var/backups/arv` | **не существует** (staging не создан) |
-| systemd-таймеры `arv-backup-*` | **0 установлено** |
+| `age` / `restic` / `rclone` | **не установлены** — apt-лок держит зависший `apt-get update` (см. ниже) |
+| `/var/backups/arv` | **создан** (0700, `arv:arv`) |
+| systemd-таймеры | `arv-backup-verify.timer` (вс 05:00), `arv-backup-drill.timer` (1-е 06:00) — **установлены и проверены боевым запуском** |
+
+> ⚠️ **apt на сервере заблокирован ~200 дней.** Лок-файл `/var/lib/apt/lists/lock` держит процесс `apt-get -qq -y update` (PID 2865430), запущенный ~200 суток назад и висящий до сих пор. Следствия: `apt-get update/install` не работают, индекс пакетов устарел (пакеты отдают 404), **обновления безопасности ОС не приходят**. `age`, `restic`, `rclone` поставить из репозитория нельзя, пока это не устранено. Лечение: завершить зависший процесс (`sudo kill 2865430`), затем `sudo apt-get update`. Решение за оператором — это чужая сессия root.
+
+> ⚠️ **Скрипты в репозитории лежали без флага выполнения** (`100644`), поэтому systemd не мог их запустить: `status=203/EXEC` и пустой журнал. Исправлено коммитом `5e98147` (`git update-index --chmod=+x`). Инструкция по установке предполагает `install -m 0755`, но это копирование поверх того же пути — флаг обязан быть в репозитории. Если разворачиваете на новом хосте и юниты падают с `203/EXEC` — проверить `ls -l deploy/backup/*.sh`.
 
 > **Что здесь было сломано и исправлено (2026-09-15).** Бэкап исправно создавался и выгружался на Яндекс Диск, но **вернуть его было нельзя** — падали все три уровня: `verify`, `drill`, `restore`. Две независимые причины, обе исправлены и проверены на проде:
 >
@@ -108,10 +112,10 @@ sudo -u postgres psql -tAc \
   "SELECT rolname, rolcreatedb, rolsuper FROM pg_roles WHERE rolname='vertex_ar'"
 ```
 
-`rolcreatedb = f` → **drill и создание целевой БД упадут** с `permission denied to create database`. На проде это так и есть. Дать право:
+На проде право **выдано 2026-09-15** (`rolcreatedb = t`), `drill` проходит. Если разворачиваете на новом хосте и `drill` падает с `permission denied to create database` — дать право:
 `sudo -u postgres psql -c 'ALTER ROLE vertex_ar CREATEDB'` (drill создаёт и дропает одноразовую БД).
 
-Альтернатива без выдачи прав: создавать целевую БД вручную от `postgres` (для `restore` этого достаточно, `CREATEDB` роли не нужен — нужен только для автоматического `drill`).
+Альтернатива без выдачи прав: создавать целевую БД вручную от `postgres` — для `restore` этого достаточно (`CREATEDB` нужен только автоматическому `drill`).
 
 ### 2.4 Конфигурация бэкапа (без раскрытия секретов)
 
@@ -404,20 +408,23 @@ sudo -u postgres psql -c 'ALTER DATABASE vertex_ar RENAME TO vertex_ar_broken_20
 
 ## 10. Известные ограничения (проверено на хосте 2026-09-15)
 
-| # | Ограничение | Доказательство | Последствие | Как закрыть |
+| # | Ограничение | Статус | Последствие | Как закрыть |
 |---|---|---|---|---|
-| 1 | **Медиа не бэкапится** | `media: never run`; `restic` не установлен; `BACKUP_MEDIA_ENABLED` не задан | Потеря сервера = потеря всех оригиналов фото/видео. Невосстановимо | `apt install restic`, задать `BACKUP_RESTIC_REPOSITORY` + `BACKUP_RESTIC_PASSWORD_FILE`, включить таймер |
-| 2 | **Секреты не бэкапятся** | `secrets: never run`; таймер не установлен; `age` не установлен | `.env` существует в одном экземпляре на сервере. Потеря = нерасшифровываемые OAuth-токены | `apt install age`, держать `.env` в менеджере паролей, включить таймер |
-| 3 | **Дампы не шифруются** | `encrypted = f` у всех строк; `BACKUP_AGE_RECIPIENT` не задан | Дамп с `users.hashed_password` лежит в облаке открытым текстом | `apt install age`, задать `BACKUP_AGE_RECIPIENT`, приватный ключ хранить **вне** сервера |
-| 4 | **systemd-таймеры не установлены** | `systemctl list-timers 'arv-backup-*'` → `0 timers listed`; unit-файлов нет | Работает только планировщик внутри приложения: упало приложение — остановились и бэкапы | `deploy/systemd/arv-backup-*` → `/etc/systemd/system/`, `enable --now` |
-| 5 | **Проверки не автоматизированы** | `verify`/`drill` прогнаны вручную 2026-09-15; таймеры не установлены | Два дефекта пути восстановления (см. §1) жили незамеченными, пока никто не пытался восстановиться | Установить `arv-backup-verify.timer` и `arv-backup-drill.timer` |
-| 6 | **`drill` не может создаться БД** | `rolcreatedb = f` у роли `vertex_ar` | Автоматический ежемесячный drill будет падать всегда (полное восстановление при этом работает — §6 проверен) | `ALTER ROLE vertex_ar CREATEDB` (либо drill запускать от роли с этим правом) |
-| 7 | **Второго off-site нет** | `BACKUP_SECONDARY_RCLONE_REMOTE` не задан; `rclone` не установлен | Бэкап лежит на том же Яндекс Диске, что и прод-медиа. Один аккаунт = общая точка отказа | `apt install rclone`, настроить remote другого провайдера (B2/Selectel) |
-| 8 | **Staging-каталог не создан** | `/var/backups/arv` отсутствует | Ручные сценарии из §3–§6 не заработают «как есть» | `sudo install -d -m 0700 -o arv -g arv /var/backups/arv` (скрипты создают сами, но при первом ручном запуске проверить) |
-| 9 | **Автоматический restore требует живую БД** | `download_backup` → `_get_yd_provider` читает `companies` из БД | При полной потере БД — только ручной путь (§7) | Дублировать доступ к папке бэкапов и `.env` в офсайт-хранилище оператора |
-| 10 | `backup_company_id=4` — единственный получатель | настройки в `system_settings` | Бэкапы только для VertexART | Осознанное решение, см. §13.2 п.14 основного документа |
+| 1 | **Медиа не бэкапится** — `media: never run`, `restic` не установлен, `BACKUP_MEDIA_ENABLED` не задан | ❌ открыто | Потеря сервера = потеря всех оригиналов фото/видео (217 МБ). Невосстановимо | Установить `restic` (см. блокер apt), задать `BACKUP_RESTIC_REPOSITORY` + `BACKUP_RESTIC_PASSWORD_FILE`, включить таймер |
+| 2 | **Секреты не бэкапятся** — `secrets: never run`, `age` не установлен | ❌ открыто | `.env` существует в одном экземпляре на сервере. Потеря `SECRET_KEY` = нерасшифровываемые OAuth-токены + разлогин всех сессий | Хранить `.env` в менеджере паролей; включить таймер **только** вместе с шифрованием (иначе `.env` уедет в облако открытым текстом) |
+| 3 | **Дампы не шифруются** — `encrypted = f` у всех строк | ❌ открыто | Дамп с `users.hashed_password` лежит в облаке открытым текстом | Задать `BACKUP_AGE_RECIPIENT`; приватный ключ — **вне** сервера, до включения шифрования |
+| 4 | **Таймер `arv-backup-db` не установлен** | ⏸ решение за оператором | Работает только планировщик внутри приложения: упало приложение — остановились и бэкапы. Но включить таймер при работающем APScheduler = **два дампа в сутки** | Либо оставить APScheduler, либо включить таймер и выключить `backup_enabled` в `system_settings` |
+| 5 | ~~Проверки не автоматизированы~~ | ✅ **закрыто** | — | `arv-backup-verify.timer` (вс 05:00) и `arv-backup-drill.timer` (1-е 06:00) установлены и проверены боевым запуском |
+| 6 | ~~`drill` не может создаться БД~~ | ✅ **закрыто** | — | `ALTER ROLE vertex_ar CREATEDB` выдано 2026-09-15; drill проходит |
+| 7 | **Второго off-site нет** — `BACKUP_SECONDARY_RCLONE_REMOTE` не задан | ❌ открыто | Бэкап лежит на том же Яндекс Диске, что и прод-медиа. Один аккаунт = общая точка отказа | Настроить rclone-remote другого провайдера (B2/Selectel) |
+| 8 | ~~Staging-каталог не создан~~ | ✅ **закрыто** | — | `/var/backups/arv` создан (0700, `arv:arv`) |
+| 9 | **Автоматический restore требует живую БД** — `download_backup` читает `companies` из БД | ⚠️ by design | При полной потере БД — только ручной путь (§7) | Дублировать доступ к папке бэкапов и `.env` в офсайт-хранилище оператора |
+| 10 | **apt заблокирован ~200 дней** — зависший `apt-get update` (PID 2865430) держит лок | ❌ открыто | Не ставятся пакеты, **не приходят обновления безопасности ОС** | `sudo kill 2865430`, затем `apt-get update` — решение за оператором |
+| 11 | `backup_company_id=4` — единственный получатель | ⚠️ by design | Бэкапы только для VertexART | См. §13.2 п.14 основного документа |
 
-Порядок закрытия по приоритету: **5 → 6 → 4 → 1 → 2** (это то, что делает восстановление возможным и проверенным), затем 3 → 7 (устойчивость), затем 8 → 9 → 10.
+**Итог.** Бэкап БД теперь **проверен и восстанавливаем**: `verify` и `drill` автоматизированы, полное восстановление пройдено end-to-end (§1). Осталось то, что требует решений оператора: медиа и секреты (1, 2, 3), устойчивость (7) и заблокированный apt (10).
+
+Порядок закрытия: **10** (без apt не поставить `restic`/`age`/`rclone` — он блокирует пункты 1, 2, 3, 7) → **1 → 2 → 3** → **7** → **4**. Обратите внимание на связку 2+3: включать бэкап секретов **до** шифрования нельзя — `.env` с `SECRET_KEY` уедет на Яндекс Диск открытым текстом.
 
 ---
 
@@ -449,15 +456,23 @@ sudo -n journalctl -u arv.service -p warning -n 50 --no-pager
 sudo -u postgres psql -d vertex_ar -c "SELECT * FROM backup_history ORDER BY id DESC LIMIT 5"
 df -h /var/backups /opt/arv
 
-# --- разблокировать проверяемое восстановление (закрывает ограничения 4,5,6,8) ---
-sudo apt-get install -y age restic rclone
+# --- уже сделано на проде (2026-09-15) ---
 sudo install -d -m 0700 -o arv -g arv /var/backups/arv
 sudo -u postgres psql -c 'ALTER ROLE vertex_ar CREATEDB'
-sudo install -m 0755 /opt/arv/app/deploy/backup/*.sh /opt/arv/app/deploy/backup/
 sudo install -m 0644 /opt/arv/app/deploy/systemd/arv-backup-* /etc/systemd/system/
 sudo systemctl daemon-reload
-sudo systemctl enable --now arv-backup-db.timer arv-backup-verify.timer arv-backup-drill.timer
+sudo systemctl enable --now arv-backup-verify.timer arv-backup-drill.timer
+sudo chmod 0755 /opt/arv/app/deploy/backup/*.sh     # без этого юниты падают с 203/EXEC
 systemctl list-timers 'arv-backup-*'
+
+# --- ещё не сделано: apt заблокирован зависшим update (~200 дней) ---
+sudo fuser -v /var/lib/apt/lists/lock       # покажет PID 2865430
+sudo kill 2865430 && sudo apt-get update    # решение за оператором
+sudo apt-get install -y age restic rclone   # после разблокировки
+
+# проверить юниты боевым запуском (безопасно, прод не трогают)
+sudo systemctl start arv-backup-verify.service && sudo journalctl -u arv-backup-verify -n 20 --no-pager
+sudo systemctl start arv-backup-drill.service  && sudo journalctl -u arv-backup-drill  -n 20 --no-pager
 ```
 
 **Значения по умолчанию, о которые спотыкаются:**
