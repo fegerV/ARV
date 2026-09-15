@@ -79,6 +79,7 @@ async def test_cmd_db_returns_zero_on_success(monkeypatch):
         return record
 
     monkeypatch.setattr(backup_cli.BackupService, "run_backup", _fake_run_backup)
+    _patch_backup_settings(monkeypatch)
 
     args = backup_cli.build_parser().parse_args(["db", "--company-id", "5"])
     assert await backup_cli.cmd_db(args) == 0
@@ -96,9 +97,52 @@ async def test_cmd_db_returns_one_on_failure(monkeypatch):
         return record
 
     monkeypatch.setattr(backup_cli.BackupService, "run_backup", _fake_run_backup)
+    _patch_backup_settings(monkeypatch)
 
     args = backup_cli.build_parser().parse_args(["db"])
     assert await backup_cli.cmd_db(args) == 1
+
+
+@pytest.mark.asyncio
+async def test_cmd_db_defaults_the_company_from_system_settings(monkeypatch):
+    """``backup-db.sh`` has no way to pass --company-id.
+
+    Without this fallback the whole ``arv-backup-db.timer`` path — the one the
+    docs tell operators to install — dies with "Yandex Disk provider not
+    available for company_id=None", because the dump is shipped through a
+    company's Yandex Disk and the CLI defaulted the id to None.
+    """
+    captured: dict = {}
+
+    async def _fake_run_backup(self, **kwargs):
+        captured.update(kwargs)
+        return SimpleNamespace(
+            id=3, status="success", backup_type="db", target="primary",
+            encrypted=True, size_bytes=1, duration_seconds=1,
+            yd_path="daily/x.sql.gz.age", error_message=None,
+        )
+
+    monkeypatch.setattr(backup_cli.BackupService, "run_backup", _fake_run_backup)
+    _patch_backup_settings(monkeypatch, company_id=4, yd_folder="backups")
+
+    args = backup_cli.build_parser().parse_args(["db"])
+
+    assert await backup_cli.cmd_db(args) == 0
+    assert captured["company_id"] == 4
+    assert captured["yd_folder"] == "backups"
+
+
+@pytest.mark.asyncio
+async def test_cmd_db_reports_a_missing_backup_company(monkeypatch):
+    async def _fake_run_backup(self, **kwargs):
+        raise AssertionError("must not attempt a backup without a company")
+
+    monkeypatch.setattr(backup_cli.BackupService, "run_backup", _fake_run_backup)
+    _patch_backup_settings(monkeypatch, company_id=None)
+
+    args = backup_cli.build_parser().parse_args(["db"])
+
+    assert await backup_cli.cmd_db(args) == 2
 
 
 @pytest.mark.asyncio
@@ -161,7 +205,13 @@ async def test_cmd_verify_scopes_the_check_to_database_backups(monkeypatch):
 @pytest.mark.asyncio
 async def test_cmd_verify_treats_a_skipped_toc_as_success(monkeypatch):
     """No key on the host is not a verification failure."""
-    record = SimpleNamespace(id=139, backup_type="db")
+    record = SimpleNamespace(
+        id=139,
+        backup_type="db",
+        status="success",
+        yd_path="backups/backup_20260915_215426.sql.gz.age",
+        checksum="deadbeef",
+    )
 
     class _Service:
         def __init__(self, *args, **kwargs):
@@ -189,7 +239,13 @@ async def test_cmd_verify_treats_a_skipped_toc_as_success(monkeypatch):
 @pytest.mark.asyncio
 async def test_cmd_verify_still_fails_on_a_checksum_mismatch(monkeypatch):
     """Skipping the TOC must not mask a real checksum failure."""
-    record = SimpleNamespace(id=139, backup_type="db")
+    record = SimpleNamespace(
+        id=139,
+        backup_type="db",
+        status="success",
+        yd_path="backups/backup_20260915_215426.sql.gz.age",
+        checksum="deadbeef",
+    )
 
     class _Service:
         def __init__(self, *args, **kwargs):
@@ -212,6 +268,36 @@ async def test_cmd_verify_still_fails_on_a_checksum_mismatch(monkeypatch):
     args = backup_cli.build_parser().parse_args(["verify"])
 
     assert await backup_cli.cmd_verify(args) == 1
+
+
+@pytest.mark.asyncio
+async def test_cmd_verify_skips_rows_that_never_uploaded_an_artifact(monkeypatch):
+    """A failed run has nothing to checksum.
+
+    Reporting it as a checksum failure would keep the weekly timer red long
+    after the incident recovered. "The newest backup failed" is what `status`
+    and the backup_age metric are for.
+    """
+    record = SimpleNamespace(
+        id=142, backup_type="db", status="failed", yd_path=None, checksum=None
+    )
+
+    class _Service:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        async def list_backups(self, session, **kwargs):
+            return [record]
+
+        async def verify_backup_integrity(self, backup_id):
+            raise AssertionError("nothing to verify on a row without an artifact")
+
+    monkeypatch.setattr(backup_cli, "BackupService", _Service)
+    monkeypatch.setattr(backup_cli, "AsyncSessionLocal", _FakeSession)
+
+    args = backup_cli.build_parser().parse_args(["verify"])
+
+    assert await backup_cli.cmd_verify(args) == 0
 
 
 @pytest.mark.asyncio
@@ -563,3 +649,24 @@ def _async_return(value):
         return value
 
     return _inner
+
+
+def _patch_backup_settings(monkeypatch, company_id=4, yd_folder="backups"):
+    """Make ``cmd_db`` resolve its recipient company without touching a database.
+
+    The service is imported lazily inside ``cmd_db``, so it has to be patched on
+    the module that defines it rather than on ``backup_cli``.
+    """
+    from app.services.settings_service import SettingsService
+
+    backup = SimpleNamespace(
+        backup_company_id=company_id,
+        backup_yd_folder=yd_folder,
+        backup_enabled=True,
+    )
+
+    async def _get_all_settings(self):
+        return SimpleNamespace(backup=backup)
+
+    monkeypatch.setattr(SettingsService, "get_all_settings", _get_all_settings)
+    monkeypatch.setattr(backup_cli, "AsyncSessionLocal", _FakeSession)

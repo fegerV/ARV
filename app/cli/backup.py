@@ -57,11 +57,42 @@ SECRET_PATHS: tuple[tuple[str, str], ...] = (
 
 
 async def cmd_db(args: argparse.Namespace) -> int:
-    """Run a database backup and report the outcome."""
+    """Run a database backup and report the outcome.
+
+    The recipient company and the remote folder default to the values in
+    ``system_settings`` (``backup.backup_company_id`` / ``backup.backup_yd_folder``)
+    because the dump is shipped through *that company's* Yandex Disk. Resolving
+    them here is what makes ``deploy/backup/backup-db.sh`` — and therefore
+    ``arv-backup-db.timer`` — usable at all: the in-app scheduler passes
+    ``company_id`` explicitly, but the CLI used to default it to ``None`` and
+    die with "Yandex Disk provider not available for company_id=None".
+    """
+    company_id = args.company_id
+    yd_folder = args.yd_folder
+
+    if company_id is None or yd_folder is None:
+        from app.services.settings_service import SettingsService
+
+        async with AsyncSessionLocal() as session:
+            all_settings = await SettingsService(session).get_all_settings()
+        backup_settings = all_settings.backup
+        if company_id is None:
+            company_id = backup_settings.backup_company_id
+        if yd_folder is None:
+            yd_folder = backup_settings.backup_yd_folder
+
+    if company_id is None:
+        print(
+            "no backup company configured: pass --company-id or set "
+            "'backup_company_id' under Settings -> Backup in the admin panel",
+            file=sys.stderr,
+        )
+        return 2
+
     service = BackupService()
     record = await service.run_backup(
-        company_id=args.company_id,
-        yd_folder=args.yd_folder,
+        company_id=company_id,
+        yd_folder=yd_folder or "backups",
         trigger=args.trigger,
         backup_type="db",
     )
@@ -165,6 +196,20 @@ async def cmd_verify(args: argparse.Namespace) -> int:
 
         failures = 0
         for record in records:
+            # A row with no uploaded artifact — a run that failed before the
+            # upload, for instance — has nothing to verify. Calling it a
+            # checksum failure would keep the weekly timer red long after the
+            # incident recovered; "the newest backup failed" is `status`'s job
+            # (and the backup_age metric's), not this command's.
+            if not getattr(record, "yd_path", None) or not getattr(
+                record, "checksum", None
+            ):
+                print(
+                    f"backup {record.id} ({record.backup_type}): "
+                    f"skipped (status={record.status}, no artifact uploaded)"
+                )
+                continue
+
             checksum_ok = await service.verify_backup_integrity(record.id)
             listing = await RestoreService().verify_dump(record.id)
             skipped = bool(listing.get("skipped"))
@@ -345,7 +390,11 @@ def build_parser() -> argparse.ArgumentParser:
 
     db = sub.add_parser("db", help="Back up the PostgreSQL database.")
     db.add_argument("--company-id", type=int, default=None)
-    db.add_argument("--yd-folder", default="backups")
+    db.add_argument(
+        "--yd-folder",
+        default=None,
+        help="Defaults to the configured backup.backup_yd_folder.",
+    )
     db.set_defaults(func=cmd_db)
 
     media = sub.add_parser("media", help="Snapshot media originals with restic.")
