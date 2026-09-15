@@ -20,6 +20,7 @@ from app.html.routes.notifications import (
 from app.html.routes.projects import project_detail, project_edit, projects_list
 from app.html.routes.dashboard import admin_dashboard
 from app.html.routes.storage import storage_page
+from app.html.routes.analytics import analytics_page
 
 
 # --------------------------------------------------------------------------
@@ -803,3 +804,92 @@ async def test_dashboard_leaves_super_admin_unscoped(monkeypatch):
         and ("company_id" in str(s.whereclause) or "companies.id" in str(s.whereclause))
     ]
     assert leak == []
+
+
+# --------------------------------------------------------------------------
+# ARV-039 — analytics dashboard (platform-wide metrics disclosure)
+# --------------------------------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_analytics_page_scopes_metrics_to_tenant(monkeypatch):
+    """A tenant user must only see their own company's analytics (ARV-039)."""
+    from app.html.routes import analytics as mod
+
+    seen = {}
+
+    class FakeTemplates:
+        def TemplateResponse(self, name, context):
+            seen["context"] = context
+            from fastapi.responses import HTMLResponse
+
+            return HTMLResponse("ok")
+
+    monkeypatch.setattr(mod, "templates", FakeTemplates())
+    monkeypatch.setattr(mod, "_ANALYTICS_CACHE", {})
+
+    db = _ListDb()
+    request = SimpleNamespace(query_params={}, headers={})
+
+    await mod.analytics_page(request, db, _user(company_id=10))
+
+    scoped = [
+        s
+        for s in db.statements
+        if s.whereclause is not None
+        and ("company_id" in str(s.whereclause) or "companies.id" in str(s.whereclause))
+    ]
+    # Several metrics (views, content, companies, projects) must carry the scope.
+    assert len(scoped) >= 4
+
+
+@pytest.mark.asyncio
+async def test_analytics_page_leaves_super_admin_unscoped(monkeypatch):
+    from app.html.routes import analytics as mod
+
+    class FakeTemplates:
+        def TemplateResponse(self, name, context):
+            from fastapi.responses import HTMLResponse
+
+            return HTMLResponse("ok")
+
+    monkeypatch.setattr(mod, "templates", FakeTemplates())
+    monkeypatch.setattr(mod, "_ANALYTICS_CACHE", {})
+
+    db = _ListDb()
+    request = SimpleNamespace(query_params={}, headers={})
+
+    await mod.analytics_page(request, db, _super_admin())
+
+    leak = [
+        s
+        for s in db.statements
+        if s.whereclause is not None
+        and ("company_id" in str(s.whereclause) or "companies.id" in str(s.whereclause))
+    ]
+    assert leak == []
+
+
+@pytest.mark.asyncio
+async def test_analytics_page_fails_closed_without_company(monkeypatch):
+    """A user with no company must see nothing, not the whole platform."""
+    from app.html.routes import analytics as mod
+
+    class FakeTemplates:
+        def TemplateResponse(self, name, context):
+            from fastapi.responses import HTMLResponse
+
+            return HTMLResponse("ok")
+
+    monkeypatch.setattr(mod, "templates", FakeTemplates())
+    monkeypatch.setattr(mod, "_ANALYTICS_CACHE", {})
+
+    db = _ListDb()
+    request = SimpleNamespace(query_params={}, headers={})
+
+    stray = SimpleNamespace(id=1, company_id=None, is_super_admin=False, is_active=True)
+    await mod.analytics_page(request, db, stray)
+
+    # Every statement resolves to false() (fail closed) for a tenantless user.
+    assert len(db.statements) >= 4
+    for stmt in db.statements:
+        assert "false" in str(stmt.whereclause)

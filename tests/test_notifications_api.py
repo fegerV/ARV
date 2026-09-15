@@ -225,7 +225,7 @@ async def test_test_telegram_from_settings_reports_telegram_error(monkeypatch):
             return {"description": "chat not found"}
 
     class FakeAsyncClient:
-        def __init__(self, timeout):
+        def __init__(self, timeout=None, **kwargs):
             self.timeout = timeout
 
         async def __aenter__(self):
@@ -274,7 +274,7 @@ async def test_test_telegram_from_settings_prefers_current_form_values(monkeypat
     captured = {}
 
     class FakeAsyncClient:
-        def __init__(self, timeout):
+        def __init__(self, timeout=None, **kwargs):
             self.timeout = timeout
 
         async def __aenter__(self):

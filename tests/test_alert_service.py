@@ -420,6 +420,9 @@ async def test_send_telegram_message_handles_missing_token_success_failure_and_e
         status_code = 500
 
     class FakeAsyncClientOk:
+        def __init__(self, *args, **kwargs):
+            pass
+
         async def __aenter__(self):
             return self
 
@@ -430,6 +433,9 @@ async def test_send_telegram_message_handles_missing_token_success_failure_and_e
             return FakeResponseOk()
 
     class FakeAsyncClientFail:
+        def __init__(self, *args, **kwargs):
+            pass
+
         async def __aenter__(self):
             return self
 
@@ -440,6 +446,9 @@ async def test_send_telegram_message_handles_missing_token_success_failure_and_e
             return FakeResponseFail()
 
     class FakeAsyncClientError:
+        def __init__(self, *args, **kwargs):
+            pass
+
         async def __aenter__(self):
             return self
 

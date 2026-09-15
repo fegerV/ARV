@@ -16,13 +16,13 @@ from typing import Any
 import structlog
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import HTMLResponse
-from sqlalchemy import cast, Date, case, distinct, func, literal_column, select
+from sqlalchemy import cast, Date, case, distinct, false, func, literal_column, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.routes.auth import get_current_user_optional
 from app.html.deps import get_html_db
 from app.html.templating import templates
-from app.html.utils import require_active_user
+from app.html.utils import is_super_admin, require_active_user
 from app.models.ar_content import ARContent
 from app.models.ar_view_session import ARViewSession
 from app.models.company import Company
@@ -31,7 +31,7 @@ from app.models.project import Project
 router = APIRouter()
 logger = structlog.get_logger()
 _ANALYTICS_CACHE_TTL = 60.0
-_ANALYTICS_CACHE: dict[int, dict[str, Any]] = {}
+_ANALYTICS_CACHE: dict[tuple, dict[str, Any]] = {}
 
 # Valid period values (days).  0 means "all time".
 _VALID_PERIODS = {7, 30, 90, 0}
@@ -63,19 +63,33 @@ def _empty_analytics() -> dict[str, Any]:
     }
 
 
-def _analytics_cache_is_fresh(period: int, now: float | None = None) -> bool:
+def _analytics_cache_key(period: int, current_user) -> tuple:
+    """Cache key includes the tenant so one tenant never reads another's data.
+
+    ARV-039: a per-period-only cache would let a tenant user read analytics
+    computed for another tenant (or the super-admin platform totals).
+    """
+    if current_user is None or is_super_admin(current_user):
+        return (period, "admin")
+    cid = getattr(current_user, "company_id", None)
+    return (period, cid if cid is not None else "none")
+
+
+def _analytics_cache_is_fresh(cache_key: tuple, now: float | None = None) -> bool:
     """Return whether cached analytics for the selected period is still fresh."""
     now = time.monotonic() if now is None else now
-    cached = _ANALYTICS_CACHE.get(period)
+    cached = _ANALYTICS_CACHE.get(cache_key)
     return bool(cached and (now - cached["timestamp"]) < _ANALYTICS_CACHE_TTL)
 
 
-async def _build_analytics_data(db: AsyncSession, period: int = _DEFAULT_PERIOD) -> dict[str, Any]:
+async def _build_analytics_data(db: AsyncSession, period: int = _DEFAULT_PERIOD, current_user=None) -> dict[str, Any]:
     """Collect all analytics data for the dashboard.
 
     Args:
         db: Async database session.
         period: Number of days to look back (0 = all time).
+        current_user: The authenticated user. When not a super admin the whole
+            dashboard is scoped to that user's company (ARV-039).
 
     Returns:
         Dictionary ready to be passed into the Jinja2 template context.
@@ -85,11 +99,28 @@ async def _build_analytics_data(db: AsyncSession, period: int = _DEFAULT_PERIOD)
         now = datetime.now(timezone.utc).replace(tzinfo=None)
         since = now - timedelta(days=period) if period > 0 else None
 
+        # ARV-039: the analytics dashboard was reachable by every authenticated
+        # role yet queried all tenants' data. Scope every query to the caller's
+        # company unless they are a super admin. A user with no company resolves
+        # to false() — fail closed, no platform-wide totals leak out.
+        is_admin = is_super_admin(current_user) if current_user is not None else True
+        tenant_company_id = None if is_admin else getattr(current_user, "company_id", None)
+
+        def _scope(stmt, model):
+            """Restrict *stmt* to the caller's tenant (or fail closed)."""
+            if is_admin:
+                return stmt
+            if tenant_company_id is None:
+                return stmt.where(false())
+            if model is Company:
+                return stmt.where(Company.id == tenant_company_id)
+            return stmt.where(model.company_id == tenant_company_id)
+
         def _time_filter(stmt):
-            """Append a ``created_at >= since`` clause when a period is set."""
+            """Append a ``created_at >= since`` clause and tenant scope."""
             if since is not None:
-                return stmt.where(ARViewSession.created_at >= since)
-            return stmt
+                stmt = stmt.where(ARViewSession.created_at >= since)
+            return _scope(stmt, ARViewSession)
 
         # --- Summary counts (total_views first — fallback depends on it) -------
         total_views = (
@@ -100,7 +131,7 @@ async def _build_analytics_data(db: AsyncSession, period: int = _DEFAULT_PERIOD)
         if total_views == 0:
             total_views = (
                 await db.execute(
-                    select(func.coalesce(func.sum(ARContent.views_count), 0))
+                    _scope(select(func.coalesce(func.sum(ARContent.views_count), 0)), ARContent)
                 )
             ).scalar() or 0
 
@@ -112,19 +143,28 @@ async def _build_analytics_data(db: AsyncSession, period: int = _DEFAULT_PERIOD)
         )
         unique_sessions = _r.scalar() or 0
         _r = await db.execute(
-            select(func.count()).select_from(ARContent).where(
-                ARContent.status.in_(["ready", "active"])
+            _scope(
+                select(func.count()).select_from(ARContent).where(
+                    ARContent.status.in_(["ready", "active"])
+                ),
+                ARContent,
             )
         )
         active_content = _r.scalar() or 0
-        _r = await db.execute(select(func.count()).select_from(ARContent))
+        _r = await db.execute(_scope(select(func.count()).select_from(ARContent), ARContent))
         total_content = _r.scalar() or 0
         _r = await db.execute(
-            select(func.count()).select_from(Company).where(Company.status == "active")
+            _scope(
+                select(func.count()).select_from(Company).where(Company.status == "active"),
+                Company,
+            )
         )
         active_companies = _r.scalar() or 0
         _r = await db.execute(
-            select(func.count()).select_from(Project).where(Project.status == "active")
+            _scope(
+                select(func.count()).select_from(Project).where(Project.status == "active"),
+                Project,
+            )
         )
         active_projects = _r.scalar() or 0
         _r = await db.execute(
@@ -282,7 +322,7 @@ async def _build_analytics_data(db: AsyncSession, period: int = _DEFAULT_PERIOD)
                 })
         else:
             # Fallback: use views_count from ARContent when no sessions recorded
-            fallback_top_q = (
+            fallback_top_q = _scope(
                 select(
                     ARContent.id,
                     ARContent.order_number,
@@ -292,7 +332,8 @@ async def _build_analytics_data(db: AsyncSession, period: int = _DEFAULT_PERIOD)
                 .join(Company, ARContent.company_id == Company.id, isouter=True)
                 .where(ARContent.views_count > 0)
                 .order_by(ARContent.views_count.desc())
-                .limit(10)
+                .limit(10),
+                ARContent,
             )
             fallback_rows = (await db.execute(fallback_top_q)).all()
             for row in fallback_rows:
@@ -322,7 +363,7 @@ async def _build_analytics_data(db: AsyncSession, period: int = _DEFAULT_PERIOD)
                 })
         else:
             # Fallback: aggregate views_count per company from ARContent
-            fallback_cq = (
+            fallback_cq = _scope(
                 select(
                     ARContent.company_id,
                     func.coalesce(func.sum(ARContent.views_count), 0).label("views"),
@@ -331,7 +372,8 @@ async def _build_analytics_data(db: AsyncSession, period: int = _DEFAULT_PERIOD)
                 .join(Company, ARContent.company_id == Company.id, isouter=True)
                 .group_by(ARContent.company_id, Company.name)
                 .having(func.sum(ARContent.views_count) > 0)
-                .order_by(func.sum(ARContent.views_count).desc())
+                .order_by(func.sum(ARContent.views_count).desc()),
+                ARContent,
             )
             fallback_crows = (await db.execute(fallback_cq)).all()
             for cid, views, cname in fallback_crows:
@@ -378,15 +420,16 @@ async def _build_analytics_data(db: AsyncSession, period: int = _DEFAULT_PERIOD)
         return data
 
 
-async def get_analytics_data(db: AsyncSession, period: int = _DEFAULT_PERIOD) -> dict[str, Any]:
+async def get_analytics_data(db: AsyncSession, period: int = _DEFAULT_PERIOD, current_user=None) -> dict[str, Any]:
     """Collect all analytics data for the dashboard with a short-lived cache."""
     now = time.monotonic()
-    if _analytics_cache_is_fresh(period, now):
+    cache_key = _analytics_cache_key(period, current_user)
+    if _analytics_cache_is_fresh(cache_key, now):
         logger.info("analytics_cache_hit", period=period)
-        return copy.deepcopy(_ANALYTICS_CACHE[period]["value"])
+        return copy.deepcopy(_ANALYTICS_CACHE[cache_key]["value"])
 
-    analytics_data = await _build_analytics_data(db, period=period)
-    _ANALYTICS_CACHE[period] = {
+    analytics_data = await _build_analytics_data(db, period=period, current_user=current_user)
+    _ANALYTICS_CACHE[cache_key] = {
         "value": copy.deepcopy(analytics_data),
         "timestamp": now,
     }
@@ -418,7 +461,7 @@ async def analytics_page(
         period = _DEFAULT_PERIOD
 
     try:
-        analytics_data = await get_analytics_data(db, period=period)
+        analytics_data = await get_analytics_data(db, period=period, current_user=current_user)
     except Exception as exc:
         logger.error("analytics_page_error", error=str(exc))
         analytics_data = _empty_analytics()

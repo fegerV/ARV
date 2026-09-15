@@ -10,7 +10,7 @@ from app.html.routes import logs as logs_route
 async def test_get_analytics_data_uses_cache(monkeypatch):
     calls = {"count": 0}
 
-    async def _fake_build(_db, period=30):
+    async def _fake_build(_db, period=30, **_kwargs):
         calls["count"] += 1
         return {"period": period, "total_views": calls["count"], "browser_stats": []}
 
@@ -18,8 +18,9 @@ async def test_get_analytics_data_uses_cache(monkeypatch):
     monkeypatch.setattr(analytics_route, "_ANALYTICS_CACHE", {})
     monkeypatch.setattr(analytics_route.time, "monotonic", lambda: 100.0)
 
-    first = await analytics_route.get_analytics_data(SimpleNamespace(is_super_admin=False, company_id=None), period=30)
-    second = await analytics_route.get_analytics_data(SimpleNamespace(is_super_admin=False, company_id=None), period=30)
+    user = SimpleNamespace(is_super_admin=False, company_id=None)
+    first = await analytics_route.get_analytics_data(None, period=30, current_user=user)
+    second = await analytics_route.get_analytics_data(None, period=30, current_user=user)
 
     assert calls["count"] == 1
     assert first == second
@@ -39,6 +40,8 @@ def test_summarize_log_entries_counts_levels():
         "warning": 1,
         "info": 1,
         "debug": 1,
+        "access": 0,
+        "noise": 0,
         "default": 1,
         "total": 5,
     }

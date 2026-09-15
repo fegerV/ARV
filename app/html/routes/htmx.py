@@ -13,11 +13,10 @@ from app.core.config import settings
 from app.core.redis import redis_client
 from app.utils.ar_content import compose_printable_qr
 from app.html.deps import get_html_db, CurrentActiveUser
-from app.api.routes.ar_content import (
-    get_ar_content_by_id,
-    update_ar_content,
-)
-from app.schemas.ar_content import ARContentUpdate
+from sqlalchemy import update
+
+from app.api.routes.ar_content import get_ar_content_by_id
+from app.models.ar_content import ARContent
 
 router = APIRouter(prefix="/htmx", tags=["htmx"])
 
@@ -120,18 +119,18 @@ async def get_ar_content_qr_code(
 @router.delete("/ar-content/{ar_content_id}", response_class=HTMLResponse)
 async def delete_ar_content_fragment(
     ar_content_id: str,
+    request: Request,
     db: AsyncSession = Depends(get_html_db),
     current_user=CurrentActiveUser,
 ):
     content = await get_ar_content_by_id(request=request, content_id=int(ar_content_id), db=db, current_user=current_user)
     if not content:
         raise HTTPException(status_code=404, detail="AR content not found")
-    await update_ar_content(
-        int(ar_content_id),
-        ARContentUpdate(status="deleted"),
-        db,
-        current_user,
+    # Owner is already verified by get_ar_content_by_id (403 for other tenants).
+    await db.execute(
+        update(ARContent).where(ARContent.id == int(ar_content_id)).values(status="deleted")
     )
+    await db.commit()
     # сброс кеша QR, если вдруг восстановят
     try:
         await redis_client.delete(f"qr:{ar_content_id}")
@@ -144,18 +143,18 @@ async def delete_ar_content_fragment(
 @router.put("/ar-content/{ar_content_id}/restore", response_class=HTMLResponse)
 async def restore_ar_content_fragment(
     ar_content_id: str,
+    request: Request,
     db: AsyncSession = Depends(get_html_db),
     current_user=CurrentActiveUser,
 ):
     content = await get_ar_content_by_id(request=request, content_id=int(ar_content_id), db=db, current_user=current_user)
     if not content:
         raise HTTPException(status_code=404, detail="AR content not found")
-    await update_ar_content(
-        int(ar_content_id),
-        ARContentUpdate(status="active"),
-        db,
-        current_user,
+    # Owner is already verified by get_ar_content_by_id (403 for other tenants).
+    await db.execute(
+        update(ARContent).where(ARContent.id == int(ar_content_id)).values(status="active")
     )
+    await db.commit()
     # при желании можно вернуть целую новую <tr>-строку,
     # чтобы заменить «Удалено» на «Активно», но пока просто
     # убираем UNDO-блок

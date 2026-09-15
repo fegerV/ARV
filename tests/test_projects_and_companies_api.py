@@ -5,15 +5,19 @@ import pytest
 def test_companies_and_projects_routes_are_registered():
     from app.main import app
 
-    routes = {route.path for route in app.routes}
+    # FastAPI nests included routers in ``_IncludedRouter`` objects and applies
+    # the ``/api`` prefix lazily, so the effective paths are not visible by
+    # walking ``app.routes`` directly. The OpenAPI schema always reflects the
+    # fully-prefixed, registered paths regardless of FastAPI's internal layout.
+    paths = set(app.openapi()["paths"].keys())
 
-    assert "/api/companies" in routes
-    assert "/api/companies/{company_id}" in routes
-    assert "/api/companies/{company_id}/yandex-auth-url" in routes
-    assert "/api/projects" in routes
-    assert "/api/projects/{project_id}" in routes
-    assert "/api/projects/by-company/{company_id}" in routes
-    assert "/api/companies/{company_id}/projects" in routes
+    assert "/api/companies" in paths
+    assert "/api/companies/{company_id}" in paths
+    assert "/api/companies/{company_id}/yandex-auth-url" in paths
+    assert "/api/projects" in paths
+    assert "/api/projects/{project_id}" in paths
+    assert "/api/projects/by-company/{company_id}" in paths
+    assert "/api/companies/{company_id}/projects" in paths
 
 
 @pytest.mark.asyncio

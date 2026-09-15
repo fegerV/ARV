@@ -162,13 +162,16 @@ async def test_send_expiry_warning_telegram_returns_true_on_200(monkeypatch):
         status_code = 200
 
     class FakeAsyncClient:
+        def __init__(self, *args, **kwargs):
+            pass
+
         async def __aenter__(self):
             return self
 
         async def __aexit__(self, exc_type, exc, tb):
             return False
 
-        async def post(self, url, json):
+        async def post(self, url, json, timeout=None):
             captured["url"] = url
             captured["json"] = json
             return FakeResponse()
@@ -202,13 +205,16 @@ async def test_send_expiry_warning_telegram_returns_false_on_non_200(monkeypatch
         status_code = 500
 
     class FakeAsyncClient:
+        def __init__(self, *args, **kwargs):
+            pass
+
         async def __aenter__(self):
             return self
 
         async def __aexit__(self, exc_type, exc, tb):
             return False
 
-        async def post(self, url, json):
+        async def post(self, url, json, timeout=None):
             return FakeResponse()
 
     monkeypatch.setattr(notification_service.httpx, "AsyncClient", FakeAsyncClient)
@@ -233,13 +239,16 @@ async def test_send_expiry_warning_telegram_returns_false_on_exception(monkeypat
     notification_service = _notification_service_module()
 
     class FakeAsyncClient:
+        def __init__(self, *args, **kwargs):
+            pass
+
         async def __aenter__(self):
             return self
 
         async def __aexit__(self, exc_type, exc, tb):
             return False
 
-        async def post(self, url, json):
+        async def post(self, url, json, timeout=None):
             raise RuntimeError("network down")
 
     monkeypatch.setattr(notification_service.httpx, "AsyncClient", FakeAsyncClient)
