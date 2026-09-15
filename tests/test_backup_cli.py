@@ -403,6 +403,7 @@ async def test_cmd_secrets_encrypts_and_removes_the_plaintext_archive(monkeypatc
     )
     monkeypatch.setattr(backup_cli, "run_command", _fake_run_command)
     monkeypatch.setattr(backup_cli, "send_heartbeat", _fake_heartbeat)
+    _stub_secrets_history(monkeypatch)
 
     args = backup_cli.build_parser().parse_args(["secrets", "--stage", str(stage)])
     try:
@@ -433,6 +434,7 @@ async def test_cmd_secrets_warns_when_encryption_is_disabled(monkeypatch):
         backup_cli, "SECRET_PATHS", ((str(secret_file), "app/.env", True, ()),)
     )
     monkeypatch.setattr(backup_cli, "send_heartbeat", _async_return(True))
+    _stub_secrets_history(monkeypatch)
 
     args = backup_cli.build_parser().parse_args(["secrets", "--stage", str(stage)])
     try:
@@ -468,6 +470,7 @@ async def test_cmd_secrets_pushes_to_the_secondary_remote(monkeypatch):
     monkeypatch.setattr(backup_cli, "SECRET_PATHS", ((str(secret_file), "app/.env", True, ()),))
     monkeypatch.setattr(backup_cli, "run_command", _fake_run_command)
     monkeypatch.setattr(backup_cli, "send_heartbeat", _async_return(True))
+    _stub_secrets_history(monkeypatch)
 
     args = backup_cli.build_parser().parse_args(["secrets", "--stage", str(stage)])
     try:
@@ -543,6 +546,7 @@ async def test_cmd_secrets_never_leaves_a_plaintext_archive_behind(monkeypatch):
     )
     monkeypatch.setattr(backup_cli, "run_command", _boom)
     monkeypatch.setattr(backup_cli, "send_heartbeat", _async_return(True))
+    _stub_secrets_history(monkeypatch)
 
     args = backup_cli.build_parser().parse_args(["secrets", "--stage", str(stage)])
     try:
@@ -566,6 +570,7 @@ async def test_cmd_secrets_fails_when_a_required_path_is_missing(monkeypatch):
         ((str(workdir / "absent.env"), "app/.env", True, ()),),
     )
     monkeypatch.setattr(backup_cli, "send_heartbeat", _async_return(True))
+    _stub_secrets_history(monkeypatch)
 
     args = backup_cli.build_parser().parse_args(["secrets", "--stage", str(stage)])
     try:
@@ -625,6 +630,7 @@ async def test_cmd_secrets_survives_an_unreadable_optional_path(monkeypatch):
     monkeypatch.setattr(backup_cli.tarfile, "open", _fake_open)
     monkeypatch.setattr(backup_cli, "run_command", _fake_run_command)
     monkeypatch.setattr(backup_cli, "send_heartbeat", _async_return(True))
+    _stub_secrets_history(monkeypatch)
 
     args = backup_cli.build_parser().parse_args(["secrets", "--stage", str(stage)])
     try:
@@ -850,6 +856,46 @@ async def test_cmd_status_applies_a_weekly_limit_to_the_secrets_archive(monkeypa
     assert await backup_cli.cmd_status(args) == 1
 
 
+@pytest.mark.asyncio
+async def test_cmd_secrets_succeeds_even_when_history_bookkeeping_fails(monkeypatch):
+    """The archive on disk is what matters; the row is only how we learn about it.
+
+    Exercising the real helpers (no stub) is also what proves the suite cannot
+    reach a live database through them: on the server, an unstubbed run wrote
+    junk rows into the production backup history.
+    """
+    workdir = Path(tempfile.mkdtemp(prefix="arv-secrets-nodb-"))
+    secret_file = workdir / "app.env"
+    secret_file.write_text("SECRET_KEY=super-secret\n")
+    stage = workdir / "stage"
+
+    class _BoomSession:
+        async def __aenter__(self):
+            raise RuntimeError("database is down")
+
+        async def __aexit__(self, *exc):
+            return False
+
+    async def _fake_run_command(cmd, **kwargs):
+        Path(cmd[cmd.index("--output") + 1]).write_bytes(b"encrypted")
+        return ""
+
+    monkeypatch.setattr(backup_cli, "settings", _cli_settings())
+    monkeypatch.setattr(
+        backup_cli, "SECRET_PATHS", ((str(secret_file), "app/.env", True, ()),)
+    )
+    monkeypatch.setattr(backup_cli, "run_command", _fake_run_command)
+    monkeypatch.setattr(backup_cli, "send_heartbeat", _async_return(True))
+    monkeypatch.setattr(backup_cli, "AsyncSessionLocal", lambda: _BoomSession())
+
+    args = backup_cli.build_parser().parse_args(["secrets", "--stage", str(stage)])
+    try:
+        assert await backup_cli.cmd_secrets(args) == 0
+        assert len(list(stage.glob("secrets_*.tar.gz.age"))) == 1
+    finally:
+        shutil.rmtree(workdir, ignore_errors=True)
+
+
 def test_main_returns_nonzero_when_a_command_raises(monkeypatch):
     async def _boom(args):
         raise backup_cli.CommandError("pg_dump exited with code 1")
@@ -941,6 +987,26 @@ def _async_return(value):
         return value
 
     return _inner
+
+
+def _stub_secrets_history(monkeypatch):
+    """Keep ``cmd_secrets`` off the database in tests.
+
+    The command records a ``backup_history`` row. Left unstubbed, these tests
+    write to whatever ``DATABASE_URL`` points at — which on the server is the
+    production database. A bare ``pytest`` run did exactly that and inserted
+    junk rows into the live backup history, one of them a ``failed`` row that
+    then made ``backup status`` report the secrets archive as broken.
+    """
+
+    async def _start(trigger):
+        return None
+
+    async def _finish(record_id, **kwargs):
+        return None
+
+    monkeypatch.setattr(backup_cli, "_start_secrets_record", _start)
+    monkeypatch.setattr(backup_cli, "_finish_secrets_record", _finish)
 
 
 def _patch_backup_settings(monkeypatch, company_id=4, yd_folder="backups"):
