@@ -7,6 +7,10 @@ import pytest
 @pytest.mark.asyncio
 async def test_create_get_delete_and_one_time_use(monkeypatch):
     store = mod.OAuthStateStore()
+    # Force the in-memory path so the test is deterministic regardless of
+    # whether Redis is reachable in the test environment (the store prefers
+    # Redis and only falls back to memory when Redis is unavailable).
+    store._redis_available = False
     monkeypatch.setattr(mod.secrets, "token_urlsafe", lambda size: "fixed-state-token")
     monkeypatch.setattr(mod.time, "time", lambda: 1000.0)
 
