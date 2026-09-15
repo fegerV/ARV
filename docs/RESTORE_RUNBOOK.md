@@ -13,7 +13,7 @@
 2. **Три уровня проверки, от дешёвого к опасному:** `verify` → `drill` → `restore`. Первые два прод **не трогают**. Третий пишет в БД.
 3. **Код отказывается восстанавливать поверх продовой БД.** `restore_to()` сравнивает имя целевой БД с именем из `DATABASE_URL` и падает с `RuntimeError`, если они совпадают. Восстановление идёт **всегда в отдельную БД**, а переключение прода на неё — отдельный осознанный шаг (§6).
 4. **Целевую БД нужно создать заранее.** `restore_to()` её **не создаёт** (в отличие от drill). Создание — на операторе.
-5. **Порядок обязателен: секреты → БД → медиа.** OAuth-токены в дампе зашифрованы `TOKEN_ENCRYPTION_KEY`; без `.env` восстановленная БД содержит нерасшифровываемые токены.
+5. **Порядок обязателен: секреты → БД → медиа.** OAuth-токены в дампе зашифрованы ключом, производным от `SECRET_KEY`; без `.env` восстановленная БД содержит нерасшифровываемые токены.
 6. ⚠️ **Главное ограничение:** штатный `restore` скачивает дамп с Yandex Disk, используя токен из **самой БД** (`companies.yandex_disk_token` → расшифровка ключом из `.env`). Значит при **полной потере БД** автоматический путь не работает — нужен ручной (§7).
 7. **Ключ шифрования бэкапов (`age`) на прод-сервере не хранится.** Сейчас дампы и так не шифруются (`encrypted=False`), но если шифрование включат — восстановление без ключа невозможно.
 
@@ -32,7 +32,43 @@
 
 **Практический вывод.** Сегодня реально восстановима **только БД**. Потеря сервера целиком приведёт к потере всех фото/видео клиентов (A2) — их нельзя перезалить, это физически отснятые материалы. Это осознанный технический долг, а не аварийная ситуация: см. §11.
 
-Состояние на момент последнего аудита (2026-09-15): `backup_history` — последний успех **id 136**, 68 544 Б, `app:/vertexart/backups/backup_20260915_153035.sql.gz`, ротация GFS `deleted=1`. Шифрование — `encrypted=False`.
+### Состояние прода, проверено на хосте 2026-09-15
+
+| Факт | Значение |
+|---|---|
+| Последний успешный бэкап | **id 139**, 68 462 Б, `backups/backup_20260915_215426.sql.gz` |
+| Восстановление проверено | **да** — `restore 139 --target-db vertex_ar_recovered` → `ok: True`, 15 таблиц, счётчики совпали с продом |
+| `verification_status` | **`ok`** (записано впервые 2026-09-15 22:14:27) |
+| `restore_test_status` | NULL — код `drill` не запускался (нет права `CREATEDB`, см. §2.3) |
+| Шифрование дампа | `encrypted = f` — **не шифруется** |
+| `media` / `secrets` бэкапы | `never run` |
+| Размер БД / медиа | 10 МБ / 217 МБ (`/opt/arv/storage`) |
+| Свободно на диске | 19 ГБ — запаса достаточно |
+| Роль `vertex_ar` | `rolcreatedb = f` → **`drill` упадёт** (см. §2.3) |
+| Владельцы объектов в `public` | все 15 таблиц / 13 последовательностей / 48 индексов → `vertex_ar` (нормализовано 2026-09-15) |
+| `pg_restore` | 16.11 (Ubuntu) = версия сервера → совместимо |
+| `age` / `restic` / `rclone` | **не установлены** |
+| `/var/backups/arv` | **не существует** (staging не создан) |
+| systemd-таймеры `arv-backup-*` | **0 установлено** |
+
+> **Что здесь было сломано и исправлено (2026-09-15).** Бэкап исправно создавался и выгружался на Яндекс Диск, но **вернуть его было нельзя** — падали все три уровня: `verify`, `drill`, `restore`. Две независимые причины, обе исправлены и проверены на проде:
+>
+> | Коммит | Причина | Симптом | Проверка |
+> |---|---|---|---|
+> | `6f60cc5` | `download_backup()` вызывал `provider.save_file()` — метод **загрузки** (открывает первый аргумент как локальный файл) вместо `get_file()` | `FileNotFoundError: 'backups/backup_....sql.gz'` → `verify`/`drill`/`restore` падали всегда | `verify` → `checksum=ok toc=ok entries=150` |
+> | `2b23b77` | `pg_restore` вызывался без `--no-owner`; дамп записывает владельцем `ai_jobs` роль `postgres`, а приложение подключается как `vertex_ar` | `ERROR: must be able to SET ROLE "postgres"`, и из-за `--exit-on-error` восстановление откатывалось целиком — в целевой БД оставалась 1 таблица | `restore 139` → `ok: True`, 15 таблиц |
+>
+> Оба дефекта жили незамеченными, потому что ни один бэкап никогда не проверялся: `verification_status` и `restore_test_status` были NULL у всех строк, а таймеры `verify`/`drill` не установлены. **Вывод для эксплуатации: непроверенный бэкап — это гипотеза, а не бэкап.**
+
+**Проверенный результат полного восстановления** (`restore 139` в отдельную БД, прод не тронут):
+
+```
+tables           15 = 15        companies  4 = 4
+projects          5 = 5         ar_content 61 = 61
+videos           71 = 71        users       2 = 2
+alembic: 20260914_1400_backup_verification (совпадает)
+orphan_ar_content: 0            null_company_id: 0
+```
 
 ---
 
@@ -72,8 +108,10 @@ sudo -u postgres psql -tAc \
   "SELECT rolname, rolcreatedb, rolsuper FROM pg_roles WHERE rolname='vertex_ar'"
 ```
 
-`rolcreatedb = f` → **drill и создание целевой БД упадут**. Дать право:
+`rolcreatedb = f` → **drill и создание целевой БД упадут** с `permission denied to create database`. На проде это так и есть. Дать право:
 `sudo -u postgres psql -c 'ALTER ROLE vertex_ar CREATEDB'` (drill создаёт и дропает одноразовую БД).
+
+Альтернатива без выдачи прав: создавать целевую БД вручную от `postgres` (для `restore` этого достаточно, `CREATEDB` роли не нужен — нужен только для автоматического `drill`).
 
 ### 2.4 Конфигурация бэкапа (без раскрытия секретов)
 
@@ -83,6 +121,8 @@ sudo -n grep -E '^(BACKUP_|DATABASE_URL|TOKEN_ENCRYPTION_KEY|SECRET_KEY|STORAGE_
 ```
 
 Что смотреть: `BACKUP_AGE_RECIPIENT` (пусто → дампы не шифруются), `BACKUP_AGE_IDENTITY_FILE` (нужен только для расшифровки), `BACKUP_MEDIA_ENABLED`, `BACKUP_RESTIC_REPOSITORY`, `BACKUP_SECONDARY_RCLONE_REMOTE` (пусто → второго off-site нет), `STORAGE_BASE_PATH`.
+
+На проде на 2026-09-15 ни одна из `BACKUP_*` переменных не задана; присутствуют только `ENVIRONMENT`, `DATABASE_URL`, `SECRET_KEY`, `STORAGE_BASE_PATH`, `REDIS_URL`. `TOKEN_ENCRYPTION_KEY` отсутствует — ключ шифрования токенов выводится из `SECRET_KEY` (см. §7 шаг 1). **`SECRET_KEY` — самый критичный секрет на этом хосте.**
 
 ### 2.5 Место на диске
 
@@ -106,7 +146,7 @@ sudo -u arv bash -c 'set -a; . /opt/arv/app/.env; cd /opt/arv/app; \
 Ожидаемый вывод на каждый бэкап:
 
 ```
-backup 136 (db): checksum=ok toc=ok entries=NNN
+backup 139 (db): checksum=ok toc=ok entries=150
 ```
 
 `checksum=FAIL` — байты не доехали/повреждены на Yandex Disk.
@@ -126,7 +166,7 @@ sudo -u arv bash -c 'set -a; . /opt/arv/app/.env; cd /opt/arv/app; \
   /opt/arv/venv/bin/python -m app.cli.backup drill --backup-type db'
 ```
 
-Ожидаемо: `drill on backup 136: {'ok': True, 'tables_restored': NN, 'duration_seconds': N, 'drill_database': 'arv_drill_...'}`
+Ожидаемо: `drill on backup 139: {'ok': True, 'tables_restored': 15, 'duration_seconds': N, 'drill_database': 'arv_drill_...'}`
 
 `ok: False` → смотреть `error` в выводе и журнал:
 `journalctl -u arv-backup-drill.service -n 100 --no-pager` (если таймер установлен) или stderr ручного запуска.
@@ -149,7 +189,7 @@ sudo -u postgres createdb -O vertex_ar vertex_ar_recovered
 
 # 2. восстановить в неё нужный бэкап
 sudo -u arv bash -c 'set -a; . /opt/arv/app/.env; cd /opt/arv/app; \
-  /opt/arv/venv/bin/python -m app.cli.backup restore 136 --target-db vertex_ar_recovered'
+  /opt/arv/venv/bin/python -m app.cli.backup restore 139 --target-db vertex_ar_recovered'
 
 # 3. вытащить нужное и перенести в прод точечно, например:
 sudo -u postgres psql -d vertex_ar_recovered -c \
@@ -191,15 +231,17 @@ sudo -u postgres psql -tAc "SELECT pg_size_pretty(pg_database_size('vertex_ar'))
 sudo -u postgres createdb -O vertex_ar vertex_ar_recovered
 
 sudo -u arv bash -c 'set -a; . /opt/arv/app/.env; cd /opt/arv/app; \
-  /opt/arv/venv/bin/python -m app.cli.backup restore 136 --target-db vertex_ar_recovered'
+  /opt/arv/venv/bin/python -m app.cli.backup restore 139 --target-db vertex_ar_recovered'
 ```
 
-Ожидаемо: `restore: {'ok': True, 'tables_restored': NN, 'target_database': 'vertex_ar_recovered', ...}`
+Ожидаемо: `restore: {'ok': True, 'tables_restored': 15, 'target_database': 'vertex_ar_recovered', 'duration_seconds': 1}`
+
+**Почему код передаёт `--no-owner`.** Дамп записывает владельца каждого объекта, и `pg_restore` воспроизводит это как `ALTER ... OWNER TO <роль>`, что требует от восстанавливающей роли права `SET ROLE` на эту роль. На проде `ai_jobs` и его последовательность/индексы были созданы ранней миграцией под `postgres`, а приложение подключается как `vertex_ar` — воспроизведение падало с `ERROR: must be able to SET ROLE "postgres"`, и `--exit-on-error` откатывал восстановление целиком (в целевой БД оставалась 1 таблица вместо 15). Владельцы объектов нормализованы на `vertex_ar` (2026-09-15), а флаг оставлен: он делает восстановление работоспособным и для старых дампов, и при смене роли. Тот же флаг нужен в ручных командах `pg_restore` (§7).
 
 Через хост-скрипт (интерактивный, с предупреждениями и подтверждением вводом имени БД):
 
 ```bash
-sudo -u arv /opt/arv/app/deploy/backup/restore.sh --backup-id 136 --target-db vertex_ar_recovered
+sudo -u arv /opt/arv/app/deploy/backup/restore.sh --backup-id 139 --target-db vertex_ar_recovered
 ```
 
 Скрипт предупредит, если `arv.service` ещё запущен, и проверит наличие `age`-идентичности (нужна только для зашифрованных дампов).
@@ -290,10 +332,13 @@ sudo -u postgres psql -c 'ALTER DATABASE vertex_ar RENAME TO vertex_ar_broken_20
 
 ```
 1. Взять .env из офсайт-хранилища оператора (менеджер паролей).
-   Нужны как минимум: DATABASE_URL, SECRET_KEY, TOKEN_ENCRYPTION_KEY, STORAGE_BASE_PATH.
-   ⚠️ Без TOKEN_ENCRYPTION_KEY восстановленная БД будет содержать
-      нерасшифровываемые OAuth-токены → все компании потеряют доступ к своим
-      хранилищам и должны будут переподключить Yandex Disk вручную.
+   Нужны как минимум: DATABASE_URL, SECRET_KEY, STORAGE_BASE_PATH.
+   ⚠️ Критичен именно SECRET_KEY. Ключ шифрования OAuth-токенов выводится как
+      `TOKEN_ENCRYPTION_KEY or SECRET_KEY` (app/core/config.py::token_encryption_secret),
+      а на проде TOKEN_ENCRYPTION_KEY НЕ задан — значит ключ целиком определяется
+      SECRET_KEY. Тот же SECRET_KEY подписывает JWT и подписи медиа-URL.
+      Потеря/замена SECRET_KEY ⇒ нерасшифровываемые токены (все компании
+      переподключают Яндекс Диск вручную) + разлогин всех сессий.
 
 2. Скачать дамп ВРУЧНУЮ (не через CLI):
    - войти в аккаунт Yandex, на который указывает prod-хранилище;
@@ -307,8 +352,15 @@ sudo -u postgres psql -c 'ALTER DATABASE vertex_ar RENAME TO vertex_ar_broken_20
    sudo -u postgres createdb -O vertex_ar vertex_ar
 
 4. Восстановить:
-   gunzip -c backup_20260915_153035.sql.gz > /tmp/restore.dump
-   sudo -u postgres pg_restore -j4 --exit-on-error -d vertex_ar /tmp/restore.dump
+   gunzip -c backup_20260915_215426.sql.gz > /tmp/restore.dump
+   sudo -u postgres pg_restore -j4 --no-owner --exit-on-error -d vertex_ar /tmp/restore.dump
+   ⚠️ --no-owner ОБЯЗАТЕЛЕН, если восстанавливаете не под суперпользователем
+      (см. §6.2). Без него pg_restore упадёт на
+      `ALTER TABLE public.ai_jobs OWNER TO postgres` →
+      `ERROR: must be able to SET ROLE "postgres"`, а --exit-on-error
+      откатит восстановление целиком: в БД останется одна таблица.
+      От владельца объектов зависит также, сможет ли приложение писать
+      в восстановленную БД.
 
 5. Довести схему до кода:  alembic upgrade head   (DATABASE_URL на vertex_ar)
 
@@ -330,7 +382,7 @@ sudo -u postgres psql -c 'ALTER DATABASE vertex_ar RENAME TO vertex_ar_broken_20
 секреты (.env)  →  база данных  →  медиа
 ```
 
-- **Секреты первыми.** Дамп БД не самодостаточен: `companies.yandex_disk_token` и `storage_connections` зашифрованы `TOKEN_ENCRYPTION_KEY` (Fernet), JWT подписываются `SECRET_KEY`. Восстановили БД без `.env` — получили «мёртвые» токены: пользователи видят подключённые хранилища, но они не работают. Проверка — §6.5, последний пункт.
+- **Секреты первыми.** Дамп БД не самодостаточен: `companies.yandex_disk_token` и `storage_connections` зашифрованы ключом Fernet, производным от `SECRET_KEY` (см. §7 шаг 1), JWT подписываются им же. Восстановили БД без `.env` — получили «мёртвые» токены: пользователи видят подключённые хранилища, но они не работают. Проверка — §6.5, последний пункт.
 - **БД второй.** Она ссылается на медиа путями (`STORAGE_BASE_PATH`), поэтому `.env` должен быть на месте до первого старта приложения, иначе пути уедут.
 - **Медиа последним.** Оно адресуется путями из БД; восстанавливать раньше бессмысленно, а `chown`/`chmod` нужно делать после распаковки:
   `sudo chown -R arv:arv /opt/arv/storage && sudo chmod -R a+rX /opt/arv/storage`
@@ -350,20 +402,22 @@ sudo -u postgres psql -c 'ALTER DATABASE vertex_ar RENAME TO vertex_ar_broken_20
 
 ---
 
-## 10. Известные ограничения (что проверить перед инцидентом)
+## 10. Известные ограничения (проверено на хосте 2026-09-15)
 
-| # | Ограничение | Последствие | Как закрыть |
-|---|---|---|---|
-| 1 | **Медиа не бэкапится** (`BACKUP_MEDIA_ENABLED=false`, restic не настроен) | Потеря сервера = потеря всех оригиналов фото/видео. Невосстановимо | Настроить `BACKUP_RESTIC_REPOSITORY` + `BACKUP_RESTIC_PASSWORD_FILE`, включить таймер |
-| 2 | **Секреты не бэкапятся** (таймер `arv-backup-secrets` не установлен) | `.env` существует в одном экземпляре на сервере. Потеря = нерасшифровываемые OAuth-токены | Держать `.env` в менеджере паролей **и** включить таймер |
-| 3 | **Дампы не шифруются** (`BACKUP_AGE_RECIPIENT` пуст) | Дамп с `users.hashed_password` лежит в облаке открытым текстом | Задать `BACKUP_AGE_RECIPIENT`, ключ хранить вне сервера |
-| 4 | **systemd-таймеры бэкапа не установлены** | Работает только планировщик внутри приложения: упало приложение — остановились и бэкапы | `deploy/systemd/arv-backup-*` → `/etc/systemd/system/`, `enable --now` |
-| 5 | **Второго off-site нет** (`BACKUP_SECONDARY_RCLONE_REMOTE` пуст) | Бэкап лежит на том же Yandex, что и прод-медиа. Один аккаунт = общая точка отказа | Настроить rclone-remote другого провайдера (B2/Selectel) |
-| 6 | **Restore drill не по расписанию** | «Бэкап, который не восстанавливали, — гипотеза» | Установить `arv-backup-drill.timer` (1-е число 06:00) |
-| 7 | **Автоматический restore требует живую БД** | При полной потере БД — только ручной путь (§7) | Дублировать токен Yandex/доступ к папке бэкапов в офсайт-хранилище оператора |
-| 8 | `backup_company_id=4` — единственный получатель | Бэкапы только для VertexART | Осознанное решение, см. §13.2 п.14 основного документа |
+| # | Ограничение | Доказательство | Последствие | Как закрыть |
+|---|---|---|---|---|
+| 1 | **Медиа не бэкапится** | `media: never run`; `restic` не установлен; `BACKUP_MEDIA_ENABLED` не задан | Потеря сервера = потеря всех оригиналов фото/видео. Невосстановимо | `apt install restic`, задать `BACKUP_RESTIC_REPOSITORY` + `BACKUP_RESTIC_PASSWORD_FILE`, включить таймер |
+| 2 | **Секреты не бэкапятся** | `secrets: never run`; таймер не установлен; `age` не установлен | `.env` существует в одном экземпляре на сервере. Потеря = нерасшифровываемые OAuth-токены | `apt install age`, держать `.env` в менеджере паролей, включить таймер |
+| 3 | **Дампы не шифруются** | `encrypted = f` у всех строк; `BACKUP_AGE_RECIPIENT` не задан | Дамп с `users.hashed_password` лежит в облаке открытым текстом | `apt install age`, задать `BACKUP_AGE_RECIPIENT`, приватный ключ хранить **вне** сервера |
+| 4 | **systemd-таймеры не установлены** | `systemctl list-timers 'arv-backup-*'` → `0 timers listed`; unit-файлов нет | Работает только планировщик внутри приложения: упало приложение — остановились и бэкапы | `deploy/systemd/arv-backup-*` → `/etc/systemd/system/`, `enable --now` |
+| 5 | **Проверки не автоматизированы** | `verify`/`drill` прогнаны вручную 2026-09-15; таймеры не установлены | Два дефекта пути восстановления (см. §1) жили незамеченными, пока никто не пытался восстановиться | Установить `arv-backup-verify.timer` и `arv-backup-drill.timer` |
+| 6 | **`drill` не может создаться БД** | `rolcreatedb = f` у роли `vertex_ar` | Автоматический ежемесячный drill будет падать всегда (полное восстановление при этом работает — §6 проверен) | `ALTER ROLE vertex_ar CREATEDB` (либо drill запускать от роли с этим правом) |
+| 7 | **Второго off-site нет** | `BACKUP_SECONDARY_RCLONE_REMOTE` не задан; `rclone` не установлен | Бэкап лежит на том же Яндекс Диске, что и прод-медиа. Один аккаунт = общая точка отказа | `apt install rclone`, настроить remote другого провайдера (B2/Selectel) |
+| 8 | **Staging-каталог не создан** | `/var/backups/arv` отсутствует | Ручные сценарии из §3–§6 не заработают «как есть» | `sudo install -d -m 0700 -o arv -g arv /var/backups/arv` (скрипты создают сами, но при первом ручном запуске проверить) |
+| 9 | **Автоматический restore требует живую БД** | `download_backup` → `_get_yd_provider` читает `companies` из БД | При полной потере БД — только ручной путь (§7) | Дублировать доступ к папке бэкапов и `.env` в офсайт-хранилище оператора |
+| 10 | `backup_company_id=4` — единственный получатель | настройки в `system_settings` | Бэкапы только для VertexART | Осознанное решение, см. §13.2 п.14 основного документа |
 
-Порядок закрытия по приоритету: **1 → 2 → 4 → 6** (это то, что делает восстановление вообще возможным), затем 3 → 5 (устойчивость), затем 7 → 8.
+Порядок закрытия по приоритету: **5 → 6 → 4 → 1 → 2** (это то, что делает восстановление возможным и проверенным), затем 3 → 7 (устойчивость), затем 8 → 9 → 10.
 
 ---
 
@@ -380,20 +434,30 @@ sudo -u arv bash -c 'set -a; . /opt/arv/app/.env; cd /opt/arv/app; /opt/arv/venv
 
 # --- восстановление в отдельную БД (опасно: пишет данные) ---
 sudo -u postgres createdb -O vertex_ar vertex_ar_recovered
-sudo -u arv bash -c 'set -a; . /opt/arv/app/.env; cd /opt/arv/app; /opt/arv/venv/bin/python -m app.cli.backup restore 136 --target-db vertex_ar_recovered'
+sudo -u arv bash -c 'set -a; . /opt/arv/app/.env; cd /opt/arv/app; /opt/arv/venv/bin/python -m app.cli.backup restore 139 --target-db vertex_ar_recovered'
 # или интерактивно:
-sudo -u arv /opt/arv/app/deploy/backup/restore.sh --backup-id 136 --target-db vertex_ar_recovered
+sudo -u arv /opt/arv/app/deploy/backup/restore.sh --backup-id 139 --target-db vertex_ar_recovered
 # список последних бэкапов:
 sudo -u arv /opt/arv/app/deploy/backup/restore.sh --list
 
 # --- ручной путь (когда БД потеряна) ---
-sudo -u postgres pg_restore -j4 --exit-on-error -d vertex_ar /tmp/restore.dump
+sudo -u postgres pg_restore -j4 --no-owner --exit-on-error -d vertex_ar /tmp/restore.dump
 pg_restore --list /tmp/restore.dump | head -50      # посмотреть оглавление без восстановления
 
 # --- диагностика ---
 sudo -n journalctl -u arv.service -p warning -n 50 --no-pager
 sudo -u postgres psql -d vertex_ar -c "SELECT * FROM backup_history ORDER BY id DESC LIMIT 5"
 df -h /var/backups /opt/arv
+
+# --- разблокировать проверяемое восстановление (закрывает ограничения 4,5,6,8) ---
+sudo apt-get install -y age restic rclone
+sudo install -d -m 0700 -o arv -g arv /var/backups/arv
+sudo -u postgres psql -c 'ALTER ROLE vertex_ar CREATEDB'
+sudo install -m 0755 /opt/arv/app/deploy/backup/*.sh /opt/arv/app/deploy/backup/
+sudo install -m 0644 /opt/arv/app/deploy/systemd/arv-backup-* /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now arv-backup-db.timer arv-backup-verify.timer arv-backup-drill.timer
+systemctl list-timers 'arv-backup-*'
 ```
 
 **Значения по умолчанию, о которые спотыкаются:**
