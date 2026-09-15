@@ -209,6 +209,10 @@ class Settings(BaseSettings):
 
     # Verify a restored copy at least this often; alert when overdue.
     BACKUP_MAX_AGE_HOURS: int = 26
+    # The secrets archive (class A3) is weekly, so the daily limit would flag it
+    # as stale six days out of seven. Kept as its own knob rather than loosening
+    # the daily rule for the jobs that actually run daily.
+    BACKUP_SECRETS_MAX_AGE_HOURS: int = 8 * 24
     BACKUP_DRILL_MAX_AGE_DAYS: int = 31
 
     # PostgreSQL client binaries used by the restore/drill path. They are

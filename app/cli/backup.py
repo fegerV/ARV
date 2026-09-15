@@ -26,6 +26,7 @@ import os
 import sys
 import tarfile
 import tempfile
+import time
 from datetime import datetime, UTC
 
 import structlog
@@ -33,7 +34,8 @@ import structlog
 from app.core.config import settings
 from app.core.database import AsyncSessionLocal
 from app.models.backup import BackupHistory
-from app.services.backup_service import BackupService
+from app.services.backup_metrics import record_failure, record_success
+from app.services.backup_service import BackupService, _utcnow_naive
 from app.services.media_backup_service import MediaBackupService
 from app.services.restore_service import RestoreService
 from app.utils.command import CommandError, run_command
@@ -131,6 +133,66 @@ async def cmd_media(args: argparse.Namespace) -> int:
     return 0 if record and record.status == "success" else 1
 
 
+async def _start_secrets_record(trigger: str) -> int | None:
+    """Create the ``backup_history`` row for a secrets run.
+
+    Without a row the A3 job is invisible: ``backup status`` reports
+    "secrets: never run" forever, so nothing can alert when it silently stops
+    running — the exact blind spot the db and media jobs already avoid.
+
+    Bookkeeping failure must never fail the backup itself, hence the broad
+    catch: the archive on disk is what matters, the row is what tells us about
+    it.
+    """
+    try:
+        async with AsyncSessionLocal() as session:
+            record = BackupHistory(
+                started_at=_utcnow_naive(),
+                status="running",
+                trigger=trigger,
+                backup_type="secrets",
+                target="primary" if settings.secondary_target_enabled else "local",
+                encrypted=bool(settings.encryption_enabled),
+            )
+            session.add(record)
+            await session.commit()
+            await session.refresh(record)
+            return record.id
+    except Exception as exc:  # noqa: BLE001 - never fail the backup for this
+        logger.warning("secrets_history_start_failed", error=str(exc))
+        return None
+
+
+async def _finish_secrets_record(
+    record_id: int | None,
+    *,
+    status: str,
+    artifact: str | None,
+    size_bytes: int | None,
+    checksum: str | None,
+    duration: int,
+    error_message: str | None = None,
+) -> None:
+    """Stamp the outcome of a secrets run onto its ``backup_history`` row."""
+    if record_id is None:
+        return
+    try:
+        async with AsyncSessionLocal() as session:
+            record = await session.get(BackupHistory, record_id)
+            if record is None:
+                return
+            record.finished_at = _utcnow_naive()
+            record.status = status
+            record.size_bytes = size_bytes
+            record.checksum = checksum
+            record.yd_path = artifact
+            record.duration_seconds = duration
+            record.error_message = error_message
+            await session.commit()
+    except Exception as exc:  # noqa: BLE001 - the archive is already on disk
+        logger.warning("secrets_history_finish_failed", error=str(exc))
+
+
 async def cmd_secrets(args: argparse.Namespace) -> int:
     """Archive and encrypt the configuration/secret material (class A3).
 
@@ -151,6 +213,11 @@ async def cmd_secrets(args: argparse.Namespace) -> int:
     tar_path = os.path.join(stage, f"secrets_{timestamp}.tar.gz")
     encrypted_path = tar_path + ".age"
     missing_required: list[str] = []
+
+    started_monotonic = time.monotonic()
+    record_id = await _start_secrets_record(args.trigger)
+    backup_type = "secrets"
+    target = "primary" if settings.secondary_target_enabled else "local"
 
     try:
         fd = os.open(tar_path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
@@ -230,9 +297,36 @@ async def cmd_secrets(args: argparse.Namespace) -> int:
                 timeout=3600,
             )
 
+        size_bytes = os.path.getsize(artifact)
+        checksum = await asyncio.to_thread(BackupService._sha256_file, artifact)
+        duration = int(time.monotonic() - started_monotonic)
+
+        await _finish_secrets_record(
+            record_id,
+            status="success",
+            artifact=artifact,
+            size_bytes=size_bytes,
+            checksum=checksum,
+            duration=duration,
+        )
+        record_success(backup_type, target, size_bytes, duration)
+
         print(f"secrets archive: {artifact}")
         await send_heartbeat("success", detail=os.path.basename(artifact))
         return 0
+    except Exception as exc:
+        duration = int(time.monotonic() - started_monotonic)
+        await _finish_secrets_record(
+            record_id,
+            status="failed",
+            artifact=None,
+            size_bytes=None,
+            checksum=None,
+            duration=duration,
+            error_message=str(exc)[:1000],
+        )
+        record_failure(backup_type, target)
+        raise
     finally:
         if os.path.exists(tar_path):
             if settings.encryption_enabled:
@@ -393,12 +487,25 @@ async def cmd_notify(args: argparse.Namespace) -> int:
 
 
 async def cmd_status(args: argparse.Namespace) -> int:
-    """Print the most recent run per backup type (operational dashboard)."""
+    """Print the most recent run per backup type (operational dashboard).
+
+    Each type gets its own staleness limit: the database and media jobs run
+    daily, the secrets archive weekly. Applying the daily limit to a weekly job
+    would report it as stale six days out of seven, which is a false alarm that
+    teaches operators to ignore the output.
+    """
     service = BackupService()
     exit_code = 0
 
+    daily = getattr(settings, "BACKUP_MAX_AGE_HOURS", 26)
+    limits = {
+        "db": daily,
+        "media": daily,
+        "secrets": getattr(settings, "BACKUP_SECRETS_MAX_AGE_HOURS", 8 * 24),
+    }
+
     async with AsyncSessionLocal() as session:
-        for backup_type in ("db", "media", "secrets"):
+        for backup_type, max_age_hours in limits.items():
             record = await service.get_last_status(session, backup_type=backup_type)
             if record is None:
                 print(f"{backup_type}: never run")
@@ -406,12 +513,15 @@ async def cmd_status(args: argparse.Namespace) -> int:
                 continue
 
             age_hours = _age_hours(record.finished_at or record.started_at)
-            stale = age_hours is not None and age_hours > settings.BACKUP_MAX_AGE_HOURS
+            stale = age_hours is not None and age_hours > max_age_hours
             if stale or record.status != "success":
                 exit_code = 1
 
             age_text = f"{age_hours:.1f}h" if age_hours is not None else "unknown"
-            print(f"{backup_type}: status={record.status} age={age_text}")
+            print(
+                f"{backup_type}: status={record.status} age={age_text} "
+                f"(limit {max_age_hours}h){' STALE' if stale else ''}"
+            )
             print(
                 f"    verified_at={record.verified_at} "
                 f"verification={record.verification_status} "

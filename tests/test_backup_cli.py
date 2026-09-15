@@ -27,6 +27,7 @@ def _cli_settings(**overrides) -> SimpleNamespace:
         "BACKUP_RCLONE_BINARY": "rclone",
         "BACKUP_SECONDARY_RCLONE_REMOTE": "",
         "BACKUP_MAX_AGE_HOURS": 26,
+        "BACKUP_SECRETS_MAX_AGE_HOURS": 8 * 24,
         "encryption_enabled": True,
         "secondary_target_enabled": False,
     }
@@ -712,6 +713,140 @@ async def test_cmd_status_flags_a_stale_or_failed_backup(monkeypatch):
 
     args = backup_cli.build_parser().parse_args(["status"])
     # Stale db run plus "never run" for media/secrets.
+    assert await backup_cli.cmd_status(args) == 1
+
+
+@pytest.mark.asyncio
+async def test_cmd_secrets_records_its_outcome_in_backup_history(monkeypatch):
+    """Without a row the A3 job is invisible.
+
+    ``backup status`` reported "secrets: never run" forever, so nothing could
+    alert when the job silently stopped running — the same blind spot the db and
+    media jobs already avoid.
+    """
+    workdir = Path(tempfile.mkdtemp(prefix="arv-secrets-record-"))
+    secret_file = workdir / "app.env"
+    secret_file.write_text("SECRET_KEY=super-secret\n")
+    stage = workdir / "stage"
+
+    captured: dict = {}
+
+    async def _start(trigger):
+        captured["trigger"] = trigger
+        return 4242
+
+    async def _finish(record_id, **kwargs):
+        captured["record_id"] = record_id
+        captured.update(kwargs)
+
+    async def _fake_run_command(cmd, **kwargs):
+        Path(cmd[cmd.index("--output") + 1]).write_bytes(b"encrypted")
+        return ""
+
+    monkeypatch.setattr(backup_cli, "settings", _cli_settings())
+    monkeypatch.setattr(
+        backup_cli, "SECRET_PATHS", ((str(secret_file), "app/.env", True, ()),)
+    )
+    monkeypatch.setattr(backup_cli, "_start_secrets_record", _start)
+    monkeypatch.setattr(backup_cli, "_finish_secrets_record", _finish)
+    monkeypatch.setattr(backup_cli, "run_command", _fake_run_command)
+    monkeypatch.setattr(backup_cli, "send_heartbeat", _async_return(True))
+
+    args = backup_cli.build_parser().parse_args(["secrets", "--stage", str(stage)])
+    try:
+        assert await backup_cli.cmd_secrets(args) == 0
+        assert captured["record_id"] == 4242
+        assert captured["trigger"] == "scheduled"
+        assert captured["status"] == "success"
+        assert captured["size_bytes"] > 0
+        assert captured["checksum"]
+        assert captured["artifact"].endswith(".age")
+        assert captured.get("error_message") is None
+    finally:
+        shutil.rmtree(workdir, ignore_errors=True)
+
+
+@pytest.mark.asyncio
+async def test_cmd_secrets_records_a_failed_run(monkeypatch):
+    workdir = Path(tempfile.mkdtemp(prefix="arv-secrets-record-fail-"))
+    secret_file = workdir / "app.env"
+    secret_file.write_text("SECRET_KEY=super-secret\n")
+    stage = workdir / "stage"
+
+    captured: dict = {}
+
+    async def _start(trigger):
+        return 4243
+
+    async def _finish(record_id, **kwargs):
+        captured.update(kwargs)
+
+    async def _boom(cmd, **kwargs):
+        raise CommandError("age: command not found")
+
+    monkeypatch.setattr(backup_cli, "settings", _cli_settings())
+    monkeypatch.setattr(
+        backup_cli, "SECRET_PATHS", ((str(secret_file), "app/.env", True, ()),)
+    )
+    monkeypatch.setattr(backup_cli, "_start_secrets_record", _start)
+    monkeypatch.setattr(backup_cli, "_finish_secrets_record", _finish)
+    monkeypatch.setattr(backup_cli, "run_command", _boom)
+    monkeypatch.setattr(backup_cli, "send_heartbeat", _async_return(True))
+
+    args = backup_cli.build_parser().parse_args(["secrets", "--stage", str(stage)])
+    try:
+        with pytest.raises(CommandError):
+            await backup_cli.cmd_secrets(args)
+        assert captured["status"] == "failed"
+        assert "age" in captured["error_message"]
+    finally:
+        shutil.rmtree(workdir, ignore_errors=True)
+
+
+@pytest.mark.asyncio
+async def test_cmd_status_applies_a_weekly_limit_to_the_secrets_archive(monkeypatch):
+    """A weekly job must not be judged by the daily limit.
+
+    With the daily rule a healthy secrets archive is reported stale six days out
+    of seven — a false alarm that trains operators to ignore `status`.
+    """
+    from datetime import timedelta
+
+    now = backup_cli.datetime.now(backup_cli.UTC).replace(tzinfo=None)
+    recent = SimpleNamespace(
+        status="success",
+        started_at=now - timedelta(hours=2),
+        finished_at=now - timedelta(hours=2),
+        verified_at=None,
+        verification_status=None,
+        restore_tested_at=None,
+        restore_test_status=None,
+    )
+    secrets = SimpleNamespace(
+        status="success",
+        started_at=now - timedelta(days=5),
+        finished_at=now - timedelta(days=5),
+        verified_at=None,
+        verification_status=None,
+        restore_tested_at=None,
+        restore_test_status=None,
+    )
+
+    async def _fake_get_last_status(self, session, backup_type=None):
+        return secrets if backup_type == "secrets" else recent
+
+    monkeypatch.setattr(
+        backup_cli.BackupService, "get_last_status", _fake_get_last_status
+    )
+    monkeypatch.setattr(backup_cli, "settings", _cli_settings())
+    monkeypatch.setattr(backup_cli, "AsyncSessionLocal", _sticky_session())
+
+    args = backup_cli.build_parser().parse_args(["status"])
+    # 5 days: fine for a weekly archive.
+    assert await backup_cli.cmd_status(args) == 0
+
+    # 9 days: overdue even for a weekly job.
+    secrets.started_at = secrets.finished_at = now - timedelta(days=9)
     assert await backup_cli.cmd_status(args) == 1
 
 
