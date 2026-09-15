@@ -40,7 +40,10 @@ def _cli_settings(**overrides) -> SimpleNamespace:
 def test_parser_exposes_every_operational_command():
     parser = backup_cli.build_parser()
 
-    for command in ("db", "media", "secrets", "verify", "drill", "restore", "status", "notify"):
+    for command in (
+        "db", "media", "secrets", "verify", "verify-media", "drill",
+        "restore", "status", "notify",
+    ):
         args = parser.parse_args([command] if command != "restore" else ["restore", "1", "--target-db", "x"])
         assert callable(args.func)
 
@@ -126,6 +129,163 @@ async def test_cmd_media_returns_zero_on_success(monkeypatch):
 
     args = backup_cli.build_parser().parse_args(["media"])
     assert await backup_cli.cmd_media(args) == 0
+
+
+@pytest.mark.asyncio
+async def test_cmd_verify_scopes_the_check_to_database_backups(monkeypatch):
+    """Media and secrets rows must never reach the ``pg_restore`` checks.
+
+    A media row has no ``yd_path`` and no ``checksum`` (restic manages its own
+    integrity), so including it would report a spurious failure and turn the
+    weekly verify timer permanently red.
+    """
+    captured: dict = {}
+
+    class _Service:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        async def list_backups(self, session, **kwargs):
+            captured.update(kwargs)
+            return []
+
+    monkeypatch.setattr(backup_cli, "BackupService", _Service)
+    monkeypatch.setattr(backup_cli, "AsyncSessionLocal", _FakeSession)
+
+    args = backup_cli.build_parser().parse_args(["verify", "--limit", "3"])
+
+    assert await backup_cli.cmd_verify(args) == 1  # nothing to verify
+    assert captured == {"limit": 3, "backup_type": "db"}
+
+
+@pytest.mark.asyncio
+async def test_cmd_verify_treats_a_skipped_toc_as_success(monkeypatch):
+    """No key on the host is not a verification failure."""
+    record = SimpleNamespace(id=139, backup_type="db")
+
+    class _Service:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        async def list_backups(self, session, **kwargs):
+            return [record]
+
+        async def verify_backup_integrity(self, backup_id):
+            return True
+
+    class _Restore:
+        async def verify_dump(self, backup_id):
+            return {"ok": False, "skipped": True, "reason": "no identity on host"}
+
+    monkeypatch.setattr(backup_cli, "BackupService", _Service)
+    monkeypatch.setattr(backup_cli, "RestoreService", _Restore)
+    monkeypatch.setattr(backup_cli, "AsyncSessionLocal", _FakeSession)
+
+    args = backup_cli.build_parser().parse_args(["verify"])
+
+    assert await backup_cli.cmd_verify(args) == 0
+
+
+@pytest.mark.asyncio
+async def test_cmd_verify_still_fails_on_a_checksum_mismatch(monkeypatch):
+    """Skipping the TOC must not mask a real checksum failure."""
+    record = SimpleNamespace(id=139, backup_type="db")
+
+    class _Service:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        async def list_backups(self, session, **kwargs):
+            return [record]
+
+        async def verify_backup_integrity(self, backup_id):
+            return False
+
+    class _Restore:
+        async def verify_dump(self, backup_id):
+            return {"ok": False, "skipped": True, "reason": "no identity on host"}
+
+    monkeypatch.setattr(backup_cli, "BackupService", _Service)
+    monkeypatch.setattr(backup_cli, "RestoreService", _Restore)
+    monkeypatch.setattr(backup_cli, "AsyncSessionLocal", _FakeSession)
+
+    args = backup_cli.build_parser().parse_args(["verify"])
+
+    assert await backup_cli.cmd_verify(args) == 1
+
+
+@pytest.mark.asyncio
+async def test_cmd_verify_media_reports_not_configured(monkeypatch):
+    monkeypatch.setattr(
+        backup_cli.MediaBackupService, "available", staticmethod(lambda: False)
+    )
+
+    args = backup_cli.build_parser().parse_args(["verify-media"])
+
+    assert await backup_cli.cmd_verify_media(args) == 2
+
+
+@pytest.mark.asyncio
+async def test_cmd_verify_media_passes_the_read_data_subset(monkeypatch):
+    captured: dict = {}
+
+    async def _check(self, read_data_subset="5%"):
+        captured["subset"] = read_data_subset
+        return False
+
+    monkeypatch.setattr(
+        backup_cli.MediaBackupService, "available", staticmethod(lambda: True)
+    )
+    monkeypatch.setattr(backup_cli.MediaBackupService, "check_integrity", _check)
+
+    args = backup_cli.build_parser().parse_args(
+        ["verify-media", "--read-data-subset", "2%"]
+    )
+
+    assert await backup_cli.cmd_verify_media(args) == 1
+    assert captured["subset"] == "2%"
+
+
+@pytest.mark.asyncio
+async def test_cmd_verify_media_returns_zero_when_the_repository_is_healthy(
+    monkeypatch,
+):
+    async def _check(self, read_data_subset="5%"):
+        return True
+
+    monkeypatch.setattr(
+        backup_cli.MediaBackupService, "available", staticmethod(lambda: True)
+    )
+    monkeypatch.setattr(backup_cli.MediaBackupService, "check_integrity", _check)
+
+    args = backup_cli.build_parser().parse_args(["verify-media"])
+
+    assert await backup_cli.cmd_verify_media(args) == 0
+
+
+@pytest.mark.asyncio
+async def test_cmd_drill_treats_a_skipped_drill_as_success(monkeypatch):
+    """A skipped drill must not trip OnFailure= on the monthly timer."""
+    record = SimpleNamespace(id=139)
+
+    class _Service:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        async def get_last_status(self, session, **kwargs):
+            return record
+
+    class _Restore:
+        async def restore_drill(self, backup_id):
+            return {"ok": False, "skipped": True, "reason": "no identity on host"}
+
+    monkeypatch.setattr(backup_cli, "BackupService", _Service)
+    monkeypatch.setattr(backup_cli, "RestoreService", _Restore)
+    monkeypatch.setattr(backup_cli, "AsyncSessionLocal", _FakeSession)
+
+    args = backup_cli.build_parser().parse_args(["drill"])
+
+    assert await backup_cli.cmd_drill(args) == 0
 
 
 @pytest.mark.asyncio

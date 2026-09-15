@@ -226,6 +226,89 @@ async def test_run_backup_marks_failure_and_pings_heartbeat(monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_run_backup_reads_its_record_before_closing_an_owned_session(monkeypatch):
+    """Regression: never touch the session after closing it.
+
+    ``run_backup`` closes the session it owns in ``finally``. Re-reading the
+    record afterwards starts a new transaction on a fresh pooled connection
+    that is never checked in, so the garbage collector tears it down at
+    interpreter exit. On prod that showed up as "greenlet is being finalized"
+    plus an SAWarning in the journal of every scheduled media backup.
+
+    The other ``run_backup`` tests inject a session, so ``owns_session`` is
+    False and the close path never runs — which is why this defect survived.
+    """
+    from app.services import media_backup_service
+
+    session = _FakeSession()
+
+    async def _fake_run_command(cmd, **kwargs):
+        if cmd[1] == "backup":
+            return json.dumps(
+                {
+                    "message_type": "summary",
+                    "snapshot_id": "snap-close",
+                    "total_bytes_processed": 7,
+                }
+            )
+        return ""
+
+    async def _fake_heartbeat(status="success", detail=""):
+        return True
+
+    monkeypatch.setattr(media_backup_service, "settings", _media_settings())
+    monkeypatch.setattr(media_backup_service, "binary_available", lambda _b: True)
+    monkeypatch.setattr(media_backup_service, "run_command", _fake_run_command)
+    monkeypatch.setattr(media_backup_service, "send_heartbeat", _fake_heartbeat)
+    monkeypatch.setattr(
+        media_backup_service, "AsyncSessionLocal", _sticky_factory(session)
+    )
+
+    # No session passed → the service owns it and must close it.
+    result = await media_backup_service.MediaBackupService().run_backup(
+        trigger="scheduled"
+    )
+
+    assert session.closed is True, "an owned session must be closed"
+    assert session.calls_after_close == [], (
+        "session used after close(): " + repr(session.calls_after_close)
+    )
+    assert result is not None
+    assert result.snapshot_id == "snap-close"
+
+
+@pytest.mark.asyncio
+async def test_run_backup_closes_an_owned_session_even_when_the_snapshot_fails(
+    monkeypatch,
+):
+    from app.services import media_backup_service
+
+    session = _FakeSession()
+
+    async def _boom(cmd, **kwargs):
+        raise CommandError("restic backup exited with code 1")
+
+    async def _fake_heartbeat(status="success", detail=""):
+        return True
+
+    monkeypatch.setattr(media_backup_service, "settings", _media_settings())
+    monkeypatch.setattr(media_backup_service, "binary_available", lambda _b: True)
+    monkeypatch.setattr(media_backup_service, "run_command", _boom)
+    monkeypatch.setattr(media_backup_service, "send_heartbeat", _fake_heartbeat)
+    monkeypatch.setattr(
+        media_backup_service, "AsyncSessionLocal", _sticky_factory(session)
+    )
+
+    result = await media_backup_service.MediaBackupService().run_backup(
+        trigger="scheduled"
+    )
+
+    assert session.closed is True
+    assert session.calls_after_close == [], repr(session.calls_after_close)
+    assert result is not None and result.status == "failed"
+
+
+@pytest.mark.asyncio
 async def test_check_integrity_reports_failure_without_raising(monkeypatch):
     from app.services import media_backup_service
 
@@ -299,6 +382,16 @@ class _FakeSession:
         self.get_map = get_map or {}
         self.execute_results = list(execute_results or [])
         self.commit_calls = 0
+        self.closed = False
+        #: Names of methods called *after* ``close()``. The real ``AsyncSession``
+        #: silently starts a fresh transaction on a new pooled connection in that
+        #: case, and the connection is never checked in — the leak this test
+        #: exists to catch.
+        self.calls_after_close: list[str] = []
+
+    def _note(self, name: str) -> None:
+        if self.closed:
+            self.calls_after_close.append(name)
 
     async def __aenter__(self):
         return self
@@ -306,13 +399,19 @@ class _FakeSession:
     async def __aexit__(self, exc_type, exc, tb):
         return False
 
+    async def close(self):
+        self.closed = True
+
     async def get(self, model, pk):
+        self._note("get")
         return self.get_map.get((model, pk))
 
     async def execute(self, _stmt):
+        self._note("execute")
         return self.execute_results.pop(0)
 
     async def commit(self):
+        self._note("commit")
         self.commit_calls += 1
 
     def add(self, obj):

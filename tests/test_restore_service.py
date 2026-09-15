@@ -260,6 +260,117 @@ async def test_verify_dump_reports_missing_binary(monkeypatch):
     assert "pg_restore" in report["error"]
 
 
+@pytest.mark.asyncio
+async def test_verify_dump_skips_when_encrypted_and_the_identity_is_absent(
+    monkeypatch, tmp_path
+):
+    """Encrypted + no key on the host is ``skipped``, not ``failed``.
+
+    The age identity is deliberately kept off the production host, so the weekly
+    verify timer can never open an encrypted dump there. Calling that a failure
+    would make the timer alarm every week forever — and a permanently red safety
+    net is worse than none, because it teaches operators to ignore the alert
+    that is supposed to catch a genuinely corrupt backup.
+    """
+    from app.services import restore_service
+
+    record = _record(
+        encrypted=True, yd_path="backups/backup_20260915_215426.sql.gz.age"
+    )
+    session = _FakeSession(get_map={(restore_service.BackupHistory, 77): record})
+
+    async def _unexpected(self, backup_id, workdir):
+        raise AssertionError("materialize_dump must not run without the identity")
+
+    monkeypatch.setattr(
+        restore_service,
+        "settings",
+        _restore_settings(BACKUP_AGE_IDENTITY_FILE=str(tmp_path / "absent.key")),
+    )
+    monkeypatch.setattr(restore_service, "AsyncSessionLocal", _sticky_factory(session))
+    monkeypatch.setattr(restore_service, "binary_available", lambda _b: True)
+    monkeypatch.setattr(
+        restore_service.RestoreService, "materialize_dump", _unexpected
+    )
+
+    report = await restore_service.RestoreService().verify_dump(77)
+
+    assert report["skipped"] is True
+    assert report["ok"] is False
+    assert "identity" in report["reason"]
+    assert record.verification_status == "no_identity"
+
+
+@pytest.mark.asyncio
+async def test_verify_dump_proceeds_when_encrypted_and_the_identity_is_present(
+    monkeypatch, tmp_path
+):
+    """With the key mounted the check must run for real, not be skipped."""
+    from app.services import restore_service
+
+    identity = tmp_path / "age.key"
+    identity.write_text("AGE-SECRET-KEY-1TESTONLY\n")
+
+    record = _record(
+        encrypted=True, yd_path="backups/backup_20260915_215426.sql.gz.age"
+    )
+    session = _FakeSession(get_map={(restore_service.BackupHistory, 77): record})
+    captured: dict = {}
+
+    async def _fake_materialize(self, backup_id, workdir):
+        captured["materialized"] = backup_id
+        path = Path(workdir) / "backup.dump"
+        path.write_bytes(b"archive")
+        return str(path)
+
+    async def _fake_run_command(cmd, **kwargs):
+        captured["cmd"] = cmd
+        return "; comment\n1; 0 TABLE public users\n2; 0 TABLE DATA public users\n"
+
+    monkeypatch.setattr(
+        restore_service,
+        "settings",
+        _restore_settings(BACKUP_AGE_IDENTITY_FILE=str(identity)),
+    )
+    monkeypatch.setattr(restore_service, "AsyncSessionLocal", _sticky_factory(session))
+    monkeypatch.setattr(restore_service, "binary_available", lambda _b: True)
+    monkeypatch.setattr(
+        restore_service.RestoreService, "materialize_dump", _fake_materialize
+    )
+    monkeypatch.setattr(restore_service, "run_command", _fake_run_command)
+
+    report = await restore_service.RestoreService().verify_dump(77)
+
+    assert captured["materialized"] == 77
+    assert report.get("skipped") is not True
+    assert report["ok"] is True
+    assert record.verification_status == "ok"
+
+
+def test_decryption_possible_tracks_the_identity_file(monkeypatch, tmp_path):
+    from app.services import restore_service
+
+    present = tmp_path / "age.key"
+    present.write_text("AGE-SECRET-KEY-1TESTONLY\n")
+
+    monkeypatch.setattr(
+        restore_service,
+        "settings",
+        _restore_settings(BACKUP_AGE_IDENTITY_FILE=str(present)),
+    )
+    assert restore_service.RestoreService.decryption_possible(False) is True
+    assert restore_service.RestoreService.decryption_possible(True) is True
+
+    monkeypatch.setattr(
+        restore_service,
+        "settings",
+        _restore_settings(BACKUP_AGE_IDENTITY_FILE=str(tmp_path / "absent.key")),
+    )
+    # A plain dump never needs a key; an encrypted one does.
+    assert restore_service.RestoreService.decryption_possible(False) is True
+    assert restore_service.RestoreService.decryption_possible(True) is False
+
+
 # ----------------------------------------------------------------------
 # Level 3: drill and real restore
 # ----------------------------------------------------------------------
@@ -383,6 +494,49 @@ async def test_restore_drill_fails_when_no_tables_came_back(monkeypatch):
 
     assert report["ok"] is False
     assert record.restore_test_status == "restore_failed"
+
+
+@pytest.mark.asyncio
+async def test_restore_drill_skips_without_touching_the_cluster(monkeypatch, tmp_path):
+    """An encrypted backup cannot be drilled while the key is off the host.
+
+    The drill must report ``skipped`` / ``no_identity`` and must not create a
+    throwaway database, and it must not push a failure into the drill metric:
+    ``arv_backup_restore_drill_last_timestamp_seconds`` has to keep saying "no
+    drill has proved this backup usable", not "the drill failed".
+    """
+    from app.services import restore_service
+
+    record = _record(
+        encrypted=True, yd_path="backups/backup_20260915_215426.sql.gz.age"
+    )
+    session = _FakeSession(get_map={(restore_service.BackupHistory, 77): record})
+    metric_calls: list[bool] = []
+
+    async def _unexpected(self, *args, **kwargs):
+        raise AssertionError("the drill must not touch the cluster without the key")
+
+    monkeypatch.setattr(
+        restore_service,
+        "settings",
+        _restore_settings(BACKUP_AGE_IDENTITY_FILE=str(tmp_path / "absent.key")),
+    )
+    monkeypatch.setattr(restore_service, "AsyncSessionLocal", _sticky_factory(session))
+    monkeypatch.setattr(
+        restore_service.RestoreService, "materialize_dump", _unexpected
+    )
+    monkeypatch.setattr(
+        restore_service.RestoreService, "_create_database", _unexpected
+    )
+    monkeypatch.setattr(
+        restore_service, "record_restore_drill", lambda ok: metric_calls.append(ok)
+    )
+
+    report = await restore_service.RestoreService().restore_drill(77)
+
+    assert report["skipped"] is True
+    assert record.restore_test_status == "no_identity"
+    assert metric_calls == [], "a skipped drill must not be recorded as a result"
 
 
 @pytest.mark.asyncio

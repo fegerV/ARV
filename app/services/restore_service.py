@@ -55,10 +55,19 @@ logger = structlog.get_logger()
 # A drill database name is interpolated into SQL, so it must be provably safe.
 _IDENTIFIER_RE = re.compile(r"^[a-z_][a-z0-9_]{0,50}$")
 
-# ``restore_test_status`` values persisted on the backup row.
+# ``verification_status`` / ``restore_test_status`` values persisted on the row.
 STATUS_OK = "ok"
 STATUS_LIST_FAILED = "list_failed"
 STATUS_RESTORE_FAILED = "restore_failed"
+# The artifact is encrypted and the age identity is, by design, not present on
+# this host (docs/BACKUP_AND_RECOVERY.md, "Encryption": the key must not live on
+# the production server). The archive therefore cannot be opened here. This is
+# deliberately NOT a failure status: nothing is wrong with the backup — the
+# operator has simply not mounted the key. Reporting it as a failure would make
+# the weekly verify and monthly drill alarm forever, and a permanently red
+# safety net is worse than none: it trains operators to ignore the alert that
+# is supposed to catch a genuinely corrupt backup.
+STATUS_NO_IDENTITY = "no_identity"
 
 
 class RestoreService:
@@ -124,6 +133,36 @@ class RestoreService:
                 basename = os.path.basename(record.yd_path)
             return encrypted, basename
 
+    @staticmethod
+    def decryption_possible(encrypted: bool) -> bool:
+        """True when this host is able to open an encrypted artifact.
+
+        Plain dumps are always readable. Encrypted ones need the ``age``
+        identity, which is deliberately kept off the production host, so
+        outside a restore window the expected answer is ``False``.
+        """
+        if not encrypted:
+            return True
+        identity = (getattr(settings, "BACKUP_AGE_IDENTITY_FILE", "") or "").strip()
+        return bool(identity) and os.path.exists(identity)
+
+    async def _skip_without_identity(self, backup_id: int) -> dict | None:
+        """Return a skip report when *backup_id* is encrypted and unopenable.
+
+        ``None`` means the caller may proceed normally.
+        """
+        encrypted, _ = await self._artifact_metadata(backup_id)
+        if self.decryption_possible(encrypted):
+            return None
+        return {
+            "ok": False,
+            "skipped": True,
+            "reason": (
+                "backup is encrypted and BACKUP_AGE_IDENTITY_FILE is not "
+                "available on this host; mount the age identity to verify it"
+            ),
+        }
+
     async def _decrypt_file(self, src: str, dst: str) -> None:
         """Decrypt *src* into *dst* with ``age`` using the restore identity."""
         identity = (
@@ -165,6 +204,16 @@ class RestoreService:
         ).strip()
         if not binary_available(binary):
             return {"ok": False, "error": f"{binary} not found on PATH"}
+
+        skip = await self._skip_without_identity(backup_id)
+        if skip is not None:
+            await self._record_verification(backup_id, STATUS_NO_IDENTITY)
+            logger.info(
+                "backup_dump_verify_skipped",
+                backup_id=backup_id,
+                reason=skip["reason"],
+            )
+            return skip
 
         workdir = tempfile.mkdtemp(prefix="arv-verify-")
         try:
@@ -215,7 +264,24 @@ class RestoreService:
         This is the monthly automated proof that the backup is usable. The
         throwaway database is dropped in a ``finally`` block, so a failed drill
         never leaves debris behind.
+
+        An encrypted backup cannot be drilled while the age identity is off the
+        host. That case returns ``skipped`` and is recorded as
+        ``no_identity`` — deliberately not as a failure, and deliberately
+        without touching the drill metric, so the "drill overdue" alert keeps
+        telling the truth (no drill has actually proved the backup usable)
+        instead of firing a false "drill failed" every month.
         """
+        skip = await self._skip_without_identity(backup_id)
+        if skip is not None:
+            await self._record_drill(backup_id, STATUS_NO_IDENTITY)
+            logger.info(
+                "backup_restore_drill_skipped",
+                backup_id=backup_id,
+                reason=skip["reason"],
+            )
+            return skip
+
         drill_db = self._drill_db_name()
         started = time.monotonic()
 

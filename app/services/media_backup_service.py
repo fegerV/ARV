@@ -145,6 +145,7 @@ class MediaBackupService:
         await session.refresh(record)
         record_id = record.id
 
+        result: BackupHistory | None = None
         try:
             snapshot_id, bytes_processed = await self._snapshot(paths)
             duration = int(time.monotonic() - started)
@@ -157,6 +158,7 @@ class MediaBackupService:
                 rec.size_bytes = bytes_processed
                 rec.duration_seconds = duration
                 await session.commit()
+            result = rec
 
             record_success("media", "primary", bytes_processed, duration)
             logger.info(
@@ -184,13 +186,21 @@ class MediaBackupService:
                 rec.error_message = str(exc)[:1000]
                 rec.duration_seconds = duration
                 await session.commit()
+            result = rec
             record_failure("media", "primary")
             await send_heartbeat("fail", detail=f"media:{str(exc)[:200]}")
         finally:
+            # Read the record *before* the session closes. A ``session.get()``
+            # issued after ``close()`` opens a fresh transaction on a new pooled
+            # connection that is then never checked in, so the garbage collector
+            # tears it down at interpreter exit — which is why every scheduled
+            # run logged "greenlet is being finalized" plus an SAWarning.
+            # ``backup_service.run_backup`` reads inside its ``try`` for the
+            # same reason.
             if owns_session:
                 await session.close()
 
-        return await session.get(BackupHistory, record_id)
+        return result
 
     async def _snapshot(self, paths: list[str]) -> tuple[str | None, int | None]:
         """Run ``restic backup`` and parse the summary message.

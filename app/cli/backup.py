@@ -11,7 +11,8 @@ Usage::
     python -m app.cli.backup db             # database dump
     python -m app.cli.backup media          # restic snapshot of media
     python -m app.cli.backup secrets        # tar + age of .env / TLS material
-    python -m app.cli.backup verify         # checksum + pg_restore --list
+    python -m app.cli.backup verify         # checksum + pg_restore --list (db)
+    python -m app.cli.backup verify-media   # restic check (media)
     python -m app.cli.backup drill          # restore into a throwaway database
     python -m app.cli.backup restore        # operator-initiated restore
     python -m app.cli.backup status         # last run per backup type
@@ -142,29 +143,69 @@ async def cmd_secrets(args: argparse.Namespace) -> int:
 
 
 async def cmd_verify(args: argparse.Namespace) -> int:
-    """Verify the newest backups: checksum, then archive table of contents."""
+    """Verify the newest backups: checksum, then archive table of contents.
+
+    Scoped to database dumps on purpose. Both checks below are about a
+    ``pg_dump`` custom-format archive, so a ``media`` or ``secrets`` row would
+    only ever report a spurious failure — media rows have no ``yd_path`` and no
+    ``checksum`` at all, because restic manages its own integrity. Media is
+    verified with ``restic check`` (see ``verify-media``) instead.
+    """
     async with AsyncSessionLocal() as session:
         service = BackupService()
-        records = await service.list_backups(session, limit=args.limit)
+        records = await service.list_backups(
+            session, limit=args.limit, backup_type=args.backup_type
+        )
         if not records:
-            print("no backups to verify", file=sys.stderr)
+            print(
+                f"no {args.backup_type} backups to verify",
+                file=sys.stderr,
+            )
             return 1
 
         failures = 0
         for record in records:
             checksum_ok = await service.verify_backup_integrity(record.id)
             listing = await RestoreService().verify_dump(record.id)
-            ok = checksum_ok and listing.get("ok", False)
+            skipped = bool(listing.get("skipped"))
+            # A skipped table-of-contents check is not a failure. The artifact
+            # is encrypted and the age identity is not on this host by design,
+            # so the archive cannot be opened here; the checksum still proves
+            # the bytes survived the trip to object storage.
+            ok = checksum_ok and (bool(listing.get("ok")) or skipped)
+            toc_text = "ok" if listing.get("ok") else ("skipped" if skipped else "FAIL")
             print(
                 f"backup {record.id} ({record.backup_type}): "
                 f"checksum={'ok' if checksum_ok else 'FAIL'} "
-                f"toc={'ok' if listing.get('ok') else 'FAIL'} "
+                f"toc={toc_text} "
                 f"entries={listing.get('entries', 0)}"
             )
             if not ok:
                 failures += 1
 
     return 0 if failures == 0 else 1
+
+
+async def cmd_verify_media(args: argparse.Namespace) -> int:
+    """Check the restic media repository for corruption (``restic check``).
+
+    ``--read-data-subset`` re-reads and re-hashes a slice of the repository
+    from the backend. That is the only way to catch bit rot or a silently
+    truncated upload; a plain ``restic check`` only validates metadata.
+    """
+    service = MediaBackupService()
+    if not service.available():
+        print(
+            "media backup is not configured "
+            "(set BACKUP_MEDIA_ENABLED and BACKUP_RESTIC_REPOSITORY)",
+            file=sys.stderr,
+        )
+        return 2
+
+    subset = args.read_data_subset
+    ok = await service.check_integrity(read_data_subset=subset)
+    print(f"media repository check (read-data-subset={subset}): {'ok' if ok else 'FAIL'}")
+    return 0 if ok else 1
 
 
 async def cmd_drill(args: argparse.Namespace) -> int:
@@ -179,6 +220,11 @@ async def cmd_drill(args: argparse.Namespace) -> int:
 
     report = await RestoreService().restore_drill(record.id)
     print(f"drill on backup {record.id}: {report}")
+    if report.get("skipped"):
+        # Not a failure: the backup is encrypted and the age identity is off
+        # the host (see RestoreService.STATUS_NO_IDENTITY). Returning non-zero
+        # would trip OnFailure= on the timer every month for a healthy backup.
+        return 0
     return 0 if report.get("ok") else 1
 
 
@@ -311,7 +357,19 @@ def build_parser() -> argparse.ArgumentParser:
 
     verify = sub.add_parser("verify", help="Verify recent backups end to end.")
     verify.add_argument("--limit", type=int, default=1)
+    verify.add_argument(
+        "--backup-type",
+        default="db",
+        choices=("db",),
+        help="Only database dumps have a pg_restore-verifiable archive.",
+    )
     verify.set_defaults(func=cmd_verify)
+
+    verify_media = sub.add_parser(
+        "verify-media", help="Check the restic media repository for corruption."
+    )
+    verify_media.add_argument("--read-data-subset", default="5%")
+    verify_media.set_defaults(func=cmd_verify_media)
 
     drill = sub.add_parser("drill", help="Restore into a throwaway database.")
     drill.add_argument("--backup-type", default="db")
