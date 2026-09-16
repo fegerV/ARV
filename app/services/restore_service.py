@@ -70,6 +70,27 @@ STATUS_RESTORE_FAILED = "restore_failed"
 STATUS_NO_IDENTITY = "no_identity"
 
 
+class ArtifactUnavailable(RuntimeError):
+    """The backup has no single file to hand out.
+
+    Raised for media backups: those are ``restic`` snapshots (a repository of
+    deduplicated chunks), not one artifact, so "download the file" has no
+    meaning for them. The API turns this into a 409 with the reason attached
+    rather than a 500, because the request is understood and simply does not
+    apply.
+    """
+
+
+class DecryptionUnavailable(RuntimeError):
+    """The artifact is encrypted and this host has no age identity.
+
+    Not an error in the backup — the key is deliberately kept off the
+    production host (docs/BACKUP_AND_RECOVERY.md, "Encryption"). The operator
+    either downloads the artifact as-is and decrypts it where the key lives, or
+    mounts the key and retries.
+    """
+
+
 class RestoreService:
     """Retrieve, validate and restore database backups."""
 
@@ -118,6 +139,89 @@ class RestoreService:
             raise RuntimeError(f"Materialised dump for backup {backup_id} is empty")
 
         return dump_path
+
+    async def fetch_artifact(
+        self,
+        backup_id: int,
+        workdir: str,
+        *,
+        decrypt: bool = False,
+    ) -> dict:
+        """Materialise backup *backup_id* as a single downloadable file.
+
+        This is the manual-download path. It deliberately stops one step
+        earlier than :meth:`materialize_dump`: the operator receives the
+        artifact exactly as it was stored — still gzipped, still
+        ``age``-encrypted. That is usually what is wanted, because the reason
+        to pull a backup by hand is to carry it somewhere the production host
+        cannot reach, and the encrypted artifact is the only form that is safe
+        to carry.
+
+        ``decrypt=True`` opens it in place, but only when the age identity is
+        present on this host; otherwise :class:`DecryptionUnavailable` is
+        raised rather than quietly returning the encrypted bytes under a name
+        that implies otherwise.
+
+        The caller owns *workdir* and must remove it.
+        """
+        os.makedirs(workdir, exist_ok=True)
+
+        async with AsyncSessionLocal() as session:
+            record = await session.get(BackupHistory, backup_id)
+            if record is None:
+                raise RuntimeError(f"Backup {backup_id} not found")
+            backup_type = getattr(record, "backup_type", "db") or "db"
+            yd_path = (record.yd_path or "").strip()
+            encrypted = bool(getattr(record, "encrypted", False))
+
+        if backup_type == "media":
+            raise ArtifactUnavailable(
+                "Media backups are restic snapshots, not a single file. "
+                "Restore them with `restic restore <snapshot> --target ...` "
+                "(docs/RESTORE_RUNBOOK.md §7)."
+            )
+        if not yd_path:
+            raise ArtifactUnavailable(f"Backup {backup_id} has no stored artifact path.")
+
+        filename = os.path.basename(yd_path) or f"backup_{backup_id}"
+        dest = os.path.join(workdir, filename)
+
+        # One column carries two storage shapes: db artifacts are relative
+        # paths on Yandex Disk, secrets archives are absolute paths inside the
+        # local staging directory (they are never uploaded when no secondary
+        # target is configured). Absolute-and-present therefore means local.
+        if os.path.isabs(yd_path) and os.path.exists(yd_path):
+            await asyncio.to_thread(shutil.copyfile, yd_path, dest)
+            os.chmod(dest, 0o600)
+        else:
+            await BackupService().download_backup(backup_id, dest)
+
+        # ``plaintext`` describes the file being returned, ``encrypted`` the
+        # file as stored. They differ exactly when the caller asked for and
+        # received a decrypted artifact.
+        plaintext = not encrypted
+        if decrypt and encrypted:
+            if not self.decryption_possible(True):
+                raise DecryptionUnavailable(
+                    "Backup is encrypted and BACKUP_AGE_IDENTITY_FILE is not "
+                    "available on this host. Download it as-is and decrypt it "
+                    "where the key lives, or mount the key and retry."
+                )
+            opened = dest[: -len(".age")] if dest.endswith(".age") else dest + ".plain"
+            await self._decrypt_file(dest, opened)
+            os.remove(dest)
+            dest = opened
+            filename = os.path.basename(dest)
+            plaintext = True
+
+        return {
+            "path": dest,
+            "filename": filename,
+            "encrypted": encrypted,
+            "plaintext": plaintext,
+            "size_bytes": os.path.getsize(dest),
+            "backup_type": backup_type,
+        }
 
     @staticmethod
     async def _artifact_metadata(backup_id: int) -> tuple[bool, str | None]:
@@ -317,13 +421,27 @@ class RestoreService:
         finally:
             shutil.rmtree(workdir, ignore_errors=True)
 
-    async def restore_to(self, backup_id: int, target_db: str) -> dict:
+    async def restore_to(
+        self,
+        backup_id: int,
+        target_db: str,
+        *,
+        create_if_missing: bool = False,
+    ) -> dict:
         """Restore *backup_id* into *target_db* (operator-initiated recovery).
 
         Refuses to run against the configured application database: restoring
         over live production data is the classic way an incident becomes worse,
         and the runbook (§10.1, step 0) requires the application to be stopped
         and the current state preserved first.
+
+        ``create_if_missing`` creates the target database when it is absent.
+        That removes the ``createdb`` step which previously had to happen by
+        hand before every restore — the single most common way the documented
+        procedure stalled. It is opt-in because the two callers want opposite
+        things: a drill must own the database it later drops, while an operator
+        restore must not silently conjure a database they did not mean to
+        target.
         """
         if not _IDENTIFIER_RE.match(target_db or ""):
             raise ValueError(f"Unsafe target database name: {target_db!r}")
@@ -337,14 +455,20 @@ class RestoreService:
 
         started = time.monotonic()
         workdir = tempfile.mkdtemp(prefix="arv-restore-")
+        created = False
         try:
             dump_path = await self.materialize_dump(backup_id, workdir)
+            if create_if_missing and not await self._database_exists(target_db):
+                await self._create_database(target_db)
+                created = True
+                logger.info("restore_target_created", target_database=target_db)
             await self._pg_restore_into(target_db, dump_path)
             table_count = await self._count_tables(target_db)
             report = {
                 "ok": True,
                 "tables_restored": table_count,
                 "target_database": target_db,
+                "created_database": created,
                 "duration_seconds": int(time.monotonic() - started),
             }
             logger.info("backup_restore_completed", backup_id=backup_id, **report)
@@ -353,6 +477,9 @@ class RestoreService:
             logger.error("backup_restore_failed", backup_id=backup_id, error=str(exc))
             return {"ok": False, "error": str(exc), "target_database": target_db}
         finally:
+            # A failed restore deliberately leaves a created database behind
+            # rather than dropping it: a half-restored database is evidence,
+            # and the operator can inspect or drop it explicitly.
             shutil.rmtree(workdir, ignore_errors=True)
 
     # ------------------------------------------------------------------
@@ -390,6 +517,15 @@ class RestoreService:
             capture_stdout=True,
         )
         return stdout.strip()
+
+    async def _database_exists(self, name: str) -> bool:
+        """True when *name* is already a database on this cluster."""
+        if not _IDENTIFIER_RE.match(name):
+            return False
+        raw = await self._psql(
+            f"SELECT 1 FROM pg_database WHERE datname = '{name}'", "postgres"
+        )
+        return raw.strip() == "1"
 
     async def _create_database(self, name: str) -> None:
         if not _IDENTIFIER_RE.match(name):

@@ -5,17 +5,41 @@ All endpoints require an authenticated admin session.
 
 from __future__ import annotations
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
-from sqlalchemy.ext.asyncio import AsyncSession
+import os
+import re
+import shutil
+import tempfile
 
-from app.api.deps_authz import require_company_access
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
+from fastapi.responses import FileResponse
+from sqlalchemy.ext.asyncio import AsyncSession
+from starlette.background import BackgroundTask
+
+from app.api.deps_authz import require_company_access, require_super_admin
 from app.api.routes.auth import get_current_active_user
 from app.core.database import get_db
 from app.models.user import User
 from app.services.backup_service import BackupService
+from app.services.restore_service import (
+    ArtifactUnavailable,
+    DecryptionUnavailable,
+    RestoreService,
+)
 from app.services.settings_service import SettingsService
 
 router = APIRouter()
+
+
+def _safe_filename(name: str, fallback: str) -> str:
+    """Reduce *name* to characters that are safe in a header and a path.
+
+    The name originates from a stored artifact path, so it is not attacker
+    controlled today — but it is also not something to trust implicitly in a
+    ``Content-Disposition`` header, where a stray quote or newline is enough to
+    corrupt the response.
+    """
+    cleaned = re.sub(r"[^A-Za-z0-9._-]", "_", os.path.basename(name or ""))
+    return cleaned or fallback
 
 
 @router.post("/run")
@@ -77,6 +101,7 @@ async def backup_history(
             "started_at": r.started_at.isoformat() if r.started_at else None,
             "finished_at": r.finished_at.isoformat() if r.finished_at else None,
             "status": r.status,
+            "backup_type": getattr(r, "backup_type", None) or "db",
             "size_bytes": r.size_bytes,
             "yd_path": r.yd_path,
             "company_id": r.company_id,
@@ -135,3 +160,48 @@ async def delete_backup(
     if not deleted:
         raise HTTPException(status_code=404, detail="Backup not found")
     return {"status": "deleted", "id": backup_id}
+
+
+@router.get("/{backup_id}/download")
+async def download_backup(
+    backup_id: int,
+    decrypt: bool = False,
+    current_user: User = Depends(require_super_admin),
+) -> FileResponse:
+    """Download a stored backup artifact as a file.
+
+    Super-admin only, and deliberately not widened to company scope: a database
+    artifact holds every tenant's data, and the secrets artifact holds
+    ``SECRET_KEY``. The page that offers the button is already super-admin, so
+    this matches the surface it lives on instead of exposing more.
+
+    The artifact is returned exactly as stored — age-encrypted for db and
+    secrets backups. ``?decrypt=true`` opens it only when the age identity is
+    mounted on this host; without the key the answer is 400 rather than an
+    encrypted file under a name implying it was decrypted.
+
+    Media backups are ``restic`` snapshots and have no single file, so they
+    answer 409 with the alternative.
+    """
+    workdir = tempfile.mkdtemp(prefix="arv-download-")
+    try:
+        info = await RestoreService().fetch_artifact(backup_id, workdir, decrypt=decrypt)
+    except ArtifactUnavailable as exc:
+        shutil.rmtree(workdir, ignore_errors=True)
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except DecryptionUnavailable as exc:
+        shutil.rmtree(workdir, ignore_errors=True)
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except (RuntimeError, ValueError) as exc:
+        shutil.rmtree(workdir, ignore_errors=True)
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+    return FileResponse(
+        info["path"],
+        filename=_safe_filename(info["filename"], f"backup_{backup_id}"),
+        media_type="application/octet-stream",
+        # The artifact is materialised into a temp directory purely to be sent;
+        # cleaning up after the response is the only place that can know the
+        # transfer finished.
+        background=BackgroundTask(shutil.rmtree, workdir, ignore_errors=True),
+    )

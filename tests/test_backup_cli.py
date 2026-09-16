@@ -678,10 +678,17 @@ async def test_cmd_notify_alerts_admins_and_trips_the_heartbeat(monkeypatch):
 async def test_cmd_restore_requires_target_db_and_delegates(monkeypatch):
     captured: dict = {}
 
-    async def _fake_restore_to(self, backup_id, target_db):
+    async def _fake_restore_to(self, backup_id, target_db, *, create_if_missing=False):
         captured["backup_id"] = backup_id
         captured["target_db"] = target_db
-        return {"ok": True}
+        captured["create_if_missing"] = create_if_missing
+        return {
+            "ok": True,
+            "tables_restored": 15,
+            "target_database": target_db,
+            "created_database": create_if_missing,
+            "duration_seconds": 1,
+        }
 
     monkeypatch.setattr(backup_cli.RestoreService, "restore_to", _fake_restore_to)
 
@@ -689,7 +696,142 @@ async def test_cmd_restore_requires_target_db_and_delegates(monkeypatch):
         ["restore", "42", "--target-db", "vertex_ar_recovered"]
     )
     assert await backup_cli.cmd_restore(args) == 0
-    assert captured == {"backup_id": 42, "target_db": "vertex_ar_recovered"}
+    assert captured == {
+        "backup_id": 42,
+        "target_db": "vertex_ar_recovered",
+        # Opt-in: without the flag the operator still owns database creation.
+        "create_if_missing": False,
+    }
+
+
+@pytest.mark.asyncio
+async def test_cmd_restore_passes_create_db_through(monkeypatch):
+    captured: dict = {}
+
+    async def _fake_restore_to(self, backup_id, target_db, *, create_if_missing=False):
+        captured["create_if_missing"] = create_if_missing
+        return {
+            "ok": True,
+            "tables_restored": 15,
+            "target_database": target_db,
+            "created_database": True,
+            "duration_seconds": 1,
+        }
+
+    monkeypatch.setattr(backup_cli.RestoreService, "restore_to", _fake_restore_to)
+
+    args = backup_cli.build_parser().parse_args(
+        ["restore", "42", "--target-db", "vertex_ar_recovered", "--create-db"]
+    )
+    assert await backup_cli.cmd_restore(args) == 0
+    assert captured["create_if_missing"] is True
+
+
+@pytest.mark.asyncio
+async def test_cmd_restore_fails_loudly(monkeypatch):
+    async def _fake_restore_to(self, backup_id, target_db, *, create_if_missing=False):
+        return {"ok": False, "error": "permission denied", "target_database": target_db}
+
+    monkeypatch.setattr(backup_cli.RestoreService, "restore_to", _fake_restore_to)
+
+    args = backup_cli.build_parser().parse_args(
+        ["restore", "42", "--target-db", "vertex_ar_recovered"]
+    )
+    assert await backup_cli.cmd_restore(args) == 1
+
+
+# ----------------------------------------------------------------------
+# download
+# ----------------------------------------------------------------------
+
+
+def _fetch_result(workdir: Path, name: str, payload: bytes, **overrides):
+    path = workdir / name
+    path.write_bytes(payload)
+    info = {
+        "path": str(path),
+        "filename": name,
+        "encrypted": True,
+        "plaintext": False,
+        "size_bytes": len(payload),
+        "backup_type": "db",
+    }
+    info.update(overrides)
+    return info
+
+
+@pytest.mark.asyncio
+async def test_cmd_download_writes_the_artifact_to_a_file(monkeypatch, tmp_path):
+    async def _fake_fetch(self, backup_id, workdir, *, decrypt=False):
+        return _fetch_result(Path(workdir), "backup_20260915.sql.gz.age", b"cipher")
+
+    monkeypatch.setattr(backup_cli.RestoreService, "fetch_artifact", _fake_fetch)
+
+    out = tmp_path / "pulled.age"
+    args = backup_cli.build_parser().parse_args(["download", "42", "--output", str(out)])
+
+    assert await backup_cli.cmd_download(args) == 0
+    assert out.read_bytes() == b"cipher"
+
+
+@pytest.mark.asyncio
+async def test_cmd_download_treats_the_output_as_a_directory(monkeypatch, tmp_path):
+    async def _fake_fetch(self, backup_id, workdir, *, decrypt=False):
+        return _fetch_result(Path(workdir), "b.sql.gz.age", b"x")
+
+    monkeypatch.setattr(backup_cli.RestoreService, "fetch_artifact", _fake_fetch)
+
+    args = backup_cli.build_parser().parse_args(
+        ["download", "42", "--output", str(tmp_path)]
+    )
+
+    assert await backup_cli.cmd_download(args) == 0
+    assert (tmp_path / "b.sql.gz.age").read_bytes() == b"x"
+
+
+@pytest.mark.asyncio
+async def test_cmd_download_passes_decrypt_through(monkeypatch, tmp_path):
+    seen: dict = {}
+
+    async def _fake_fetch(self, backup_id, workdir, *, decrypt=False):
+        seen["decrypt"] = decrypt
+        return _fetch_result(Path(workdir), "b.sql.gz", b"plain", plaintext=True)
+
+    monkeypatch.setattr(backup_cli.RestoreService, "fetch_artifact", _fake_fetch)
+
+    args = backup_cli.build_parser().parse_args(
+        ["download", "42", "--output", str(tmp_path), "--decrypt"]
+    )
+
+    assert await backup_cli.cmd_download(args) == 0
+    assert seen["decrypt"] is True
+
+
+@pytest.mark.asyncio
+async def test_cmd_download_reports_media_as_unavailable(monkeypatch):
+    from app.services import restore_service
+
+    async def _boom(self, backup_id, workdir, *, decrypt=False):
+        raise restore_service.ArtifactUnavailable("Media backups are restic snapshots")
+
+    monkeypatch.setattr(backup_cli.RestoreService, "fetch_artifact", _boom)
+
+    args = backup_cli.build_parser().parse_args(["download", "42"])
+    # 2 = "understood, but not applicable" — not a crash.
+    assert await backup_cli.cmd_download(args) == 2
+
+
+@pytest.mark.asyncio
+async def test_cmd_download_reports_a_missing_identity(monkeypatch):
+    from app.services import restore_service
+
+    async def _boom(self, backup_id, workdir, *, decrypt=False):
+        raise restore_service.DecryptionUnavailable("no identity on this host")
+
+    monkeypatch.setattr(backup_cli.RestoreService, "fetch_artifact", _boom)
+
+    args = backup_cli.build_parser().parse_args(["download", "42", "--decrypt"])
+    assert await backup_cli.cmd_download(args) == 2
 
 
 @pytest.mark.asyncio

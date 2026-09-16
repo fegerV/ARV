@@ -48,6 +48,7 @@
                     <thead class="bg-gray-50 dark:bg-gray-900/40">
                         <tr>
                             <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">{{ "Date" if is_en else "Дата" }}</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">{{ "Type" if is_en else "Тип" }}</th>
                             <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">{{ "Status" if is_en else "Статус" }}</th>
                             <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">{{ "Size" if is_en else "Размер" }}</th>
                             <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">{{ "Source" if is_en else "Источник" }}</th>
@@ -60,6 +61,18 @@
                         <tr>
                             <td class="px-4 py-3 text-sm text-gray-700 dark:text-gray-300 whitespace-nowrap">{{ r.started_at.strftime('%d.%m.%Y %H:%M') if r.started_at else '—' }}</td>
                             <td class="px-4 py-3 text-sm whitespace-nowrap">
+                                {% set btype = r.backup_type or 'db' %}
+                                {% if btype == 'db' %}
+                                <span class="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-full bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400"><span class="material-icons text-xs">storage</span>{{ "DB" if is_en else "БД" }}</span>
+                                {% elif btype == 'media' %}
+                                <span class="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-full bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400"><span class="material-icons text-xs">perm_media</span>{{ "Media" if is_en else "Медиа" }}</span>
+                                {% elif btype == 'secrets' %}
+                                <span class="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-full bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"><span class="material-icons text-xs">key</span>{{ "Secrets" if is_en else "Секреты" }}</span>
+                                {% else %}
+                                <span class="text-xs text-gray-500 dark:text-gray-400">{{ btype }}</span>
+                                {% endif %}
+                            </td>
+                            <td class="px-4 py-3 text-sm whitespace-nowrap">
                                 {% if r.status == 'success' %}
                                 <span class="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-full bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"><span class="material-icons text-xs">check_circle</span>{{ "Done" if is_en else "OK" }}</span>
                                 {% elif r.status == 'running' %}
@@ -71,13 +84,26 @@
                             <td class="px-4 py-3 text-sm text-gray-700 dark:text-gray-300">{% if r.size_bytes %}{{ (r.size_bytes / 1048576)|round(2) }} {{ "MB" if is_en else "МБ" }}{% else %}—{% endif %}</td>
                             <td class="px-4 py-3 text-sm text-gray-500 dark:text-gray-400">{{ "Auto" if r.trigger == 'scheduled' and is_en else "Авто" if r.trigger == 'scheduled' else "Manual" if is_en else "Вручную" }}</td>
                             <td class="px-4 py-3 text-xs text-gray-400 dark:text-gray-500 font-mono truncate max-w-[200px]" title="{{ r.yd_path or '' }}">{{ r.yd_path or '—' }}</td>
-                            <td class="px-4 py-3 text-right">
-                                <button @click="deleteBackup({{ r.id }})" class="inline-flex items-center px-2 py-1 text-xs font-medium text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20 rounded"><span class="material-icons text-sm">delete</span></button>
+                            <td class="px-4 py-3 text-right whitespace-nowrap">
+                                {% set btype = r.backup_type or 'db' %}
+                                {% if r.status == 'success' and btype in ('db', 'secrets') %}
+                                <a href="/api/backups/{{ r.id }}/download"
+                                   class="inline-flex items-center px-2 py-1 text-xs font-medium text-blue-600 hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-blue-900/20 rounded"
+                                   title="{{ 'Download the artifact (stored encrypted; decrypt where the key lives)' if is_en else 'Скачать артефакт (хранится зашифрованным; расшифровывать там, где лежит ключ)' }}">
+                                    <span class="material-icons text-sm">download</span>
+                                </a>
+                                {% elif r.status == 'success' and btype == 'media' %}
+                                <span class="inline-flex items-center px-2 py-1 text-xs text-gray-300 dark:text-gray-600 cursor-help"
+                                      title="{{ 'Media backups are restic snapshots - restore them with restic, they are not a single downloadable file' if is_en else 'Медиа-бэкап — это снапшот restic: восстанавливается через restic, файлом не скачивается' }}">
+                                    <span class="material-icons text-sm">info</span>
+                                </span>
+                                {% endif %}
+                                <button @click="deleteBackup({{ r.id }})" class="inline-flex items-center px-2 py-1 text-xs font-medium text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20 rounded" title="{{ 'Delete' if is_en else 'Удалить' }}"><span class="material-icons text-sm">delete</span></button>
                             </td>
                         </tr>
                         {% endfor %}
                         {% if not records %}
-                        <tr><td colspan="6" class="px-4 py-12 text-center text-sm text-gray-400">{{ "No backup records yet" if is_en else "Записей пока нет" }}</td></tr>
+                        <tr><td colspan="7" class="px-4 py-12 text-center text-sm text-gray-400">{{ "No backup records yet" if is_en else "Записей пока нет" }}</td></tr>
                         {% endif %}
                     </tbody>
                 </table>

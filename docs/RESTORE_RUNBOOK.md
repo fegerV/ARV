@@ -21,6 +21,7 @@
    - значит `drill` в автоматическом режиме **не доказывает** пригодность зашифрованного бэкапа. Раз в месяц его надо прогонять вручную с примонтированным ключом (§4).
 8. **`SECRET_KEY` — самый критичный секрет на хосте.** `TOKEN_ENCRYPTION_KEY` на проде не задан, поэтому ключ шифрования OAuth-токенов выводится из `SECRET_KEY`; им же подписываются JWT и медиа-URL. Он лежит в архиве секретов (§1, A3).
 9. **Глубина восстановления задаётся GFS 7/4/12/3, а не настройками в админке.** `backup_max_copies`/`backup_retention_days` в UI **не действуют** (§1.1). На 2026-09-16 по БД доступно ~7 точек, по медиа и секретам — по одной. Перед восстановлением брать актуальный список (§1.1), а не id из примеров: **id подвижны**, ротация удаляет и артефакт, и строку истории.
+10. **Восстановление — одна команда** (§6.0): `recover.sh --backup-id N --target-db X` восстанавливает, `--cutover` переключает прод с автооткатом при неудаче. Ручные шаги остались ниже как запасной путь. Артефакт можно **скачать вручную** — из админки (страница «Бэкапы», только супер-админ) или `backup download` (§3.1), не заходя в веб-интерфейс Яндекс Диска.
 
 ---
 
@@ -241,7 +242,7 @@ sudo -u arv bash -c 'set -a; . /opt/arv/app/.env; cd /opt/arv/app; \
 Ожидаемый вывод без ключа на хосте (обычное состояние прода):
 
 ```
-backup 143 (db): checksum=ok toc=skipped entries=0
+backup 148 (db): checksum=ok toc=skipped entries=0
 media repository check (read-data-subset=5%): ok
 ```
 
@@ -265,9 +266,48 @@ sudo -u arv bash -c 'set -a; . /opt/arv/app/.env; cd /opt/arv/app; \
 sudo shred -u /tmp/arv-age-id.key      # сразу убрать
 ```
 
-Ожидаемо: `backup 143 (db): checksum=ok toc=ok entries=150`
+Ожидаемо: `backup 148 (db): checksum=ok toc=ok entries=150`
 
 Результат пишется в `backup_history.verified_at` / `verification_status` (`ok` | `no_identity` | `list_failed` | `checksum_mismatch`).
+
+---
+
+### 3.1 Скачать артефакт вручную (без восстановления)
+
+Иногда нужен сам файл, а не восстановленная БД: унести копию в офсайт, отдать в аудит, восстановить на другой машине. Раньше для этого приходилось заходить в веб-интерфейс Яндекс Диска — то есть в тот самый интерфейс, который недоступен, когда потеряна БД с токеном хранилища.
+
+**Из админки.** Страница «Бэкапы» → иконка скачивания в строке. Доступна только супер-админу (артефакт БД содержит данные всех компаний, архив секретов — `SECRET_KEY`). Отдаётся артефакт **в том виде, в котором он сохранён** — зашифрованным. Это не недоработка: расшифрованный дамп, положенный в загрузки, — это утечка, а зашифрованный бесполезен без ключа, который лежит в другом месте.
+
+**Из CLI** (когда веб недоступен):
+
+```bash
+# в текущий каталог
+sudo -u arv bash -c 'set -a; . /opt/arv/app/.env; cd /opt/arv/app; \
+  /opt/arv/venv/bin/python -m app.cli.backup download 148 --output /tmp/'
+
+# в конкретный файл
+... backup download 148 --output /tmp/backup_148.sql.gz.age
+
+# расшифровать сразу — ТОЛЬКО если ключ примонтирован (см. §3)
+... backup download 148 --output /tmp/ --decrypt
+```
+
+Что нужно знать:
+
+| Ситуация | Поведение |
+|---|---|
+| Бэкап `db` | тянется с Яндекс Диска, отдаётся `backup_<ts>.sql.gz.age` |
+| Бэкап `secrets` | лежит локально в staging, отдаётся `secrets_<ts>.tar.gz.age`; файл создаётся с правами `0600` |
+| Бэкап `media` | **не скачивается**: это снапшот `restic`, а не файл. CLI вернёт код 2 и подскажет `restic restore`, админка покажет подсказку вместо кнопки |
+| `--decrypt` без ключа на хосте | код 2 / HTTP 400 с объяснением. **Не** отдаёт зашифрованный файл под именем, будто он расшифрован |
+
+Дальше зашифрованный артефакт открывается там, где лежит приватный ключ:
+
+```bash
+age --decrypt --identity /путь/к/arv-backup-age.key -o dump.gz backup_148.sql.gz.age
+```
+
+> ⚠️ **Скачанный артефакт — это копия всей базы (или `SECRET_KEY`).** Не оставлять в общих каталогах, не пересылать по открытым каналам, удалять после использования. CLI выставляет `0600`, но за дальнейшую судьбу файла отвечает оператор.
 
 ---
 
@@ -288,12 +328,12 @@ sudo -u arv bash -c 'set -a; . /opt/arv/app/.env; cd /opt/arv/app; \
 sudo shred -u /tmp/arv-age-id.key
 ```
 
-Ожидаемо: `drill on backup 143: {'ok': True, 'tables_restored': 15, 'duration_seconds': N, 'drill_database': 'arv_drill_...'}`
+Ожидаемо: `drill on backup 148: {'ok': True, 'tables_restored': 15, 'duration_seconds': N, 'drill_database': 'arv_drill_...'}`
 
 Без ключа ожидаемо (и это не ошибка):
 
 ```
-drill on backup 143: {'ok': False, 'skipped': True, 'reason': 'backup is encrypted and BACKUP_AGE_IDENTITY_FILE is not available on this host; mount the age identity to verify it'}
+drill on backup 148: {'ok': False, 'skipped': True, 'reason': 'backup is encrypted and BACKUP_AGE_IDENTITY_FILE is not available on this host; mount the age identity to verify it'}
 ```
 
 `ok: False` без `skipped` → смотреть `error` в выводе и журнал:
@@ -312,26 +352,25 @@ drill on backup 143: {'ok': False, 'skipped': True, 'reason': 'backup is encrypt
 Прод работает, потерян фрагмент данных. **Прод-БД не трогаем** — восстанавливаем в отдельную БД и забираем из неё нужное.
 
 ```bash
-# 1. отдельная БД под восстановление
-sudo -u postgres createdb -O vertex_ar vertex_ar_recovered
-
-# 2. ключ на время восстановления (без него зашифрованный дамп не открыть)
+# 1. ключ на время восстановления (без него зашифрованный дамп не открыть)
 sudo install -m 0600 -o arv -g arv /путь/к/arv-backup-age.key /tmp/arv-age-id.key
 
-# 3. восстановить в неё нужный бэкап
+# 2. восстановить нужный бэкап — --create-db создаст целевую БД сам
 sudo -u arv bash -c 'set -a; . /opt/arv/app/.env; cd /opt/arv/app; \
   BACKUP_AGE_IDENTITY_FILE=/tmp/arv-age-id.key \
-  /opt/arv/venv/bin/python -m app.cli.backup restore 143 --target-db vertex_ar_recovered'
+  /opt/arv/venv/bin/python -m app.cli.backup restore 148 --target-db vertex_ar_recovered --create-db'
 
-# 4. вытащить нужное и перенести в прод точечно, например:
+# 3. вытащить нужное и перенести в прод точечно, например:
 sudo -u postgres psql -d vertex_ar_recovered -c \
   "COPY (SELECT * FROM ar_content WHERE id = 1234) TO STDOUT WITH CSV HEADER" > /tmp/one_row.csv
 # ... вставить в прод явными INSERT'ами, предварительно посмотрев, что именно перезаписывается
 
-# 5. убрать временную БД и ключ, когда они больше не нужны
+# 4. убрать временную БД и ключ, когда они больше не нужны
 sudo -u postgres dropdb vertex_ar_recovered
 sudo shred -u /tmp/arv-age-id.key
 ```
+
+`--create-db` появился, чтобы убрать самый частый срыв процедуры: раньше `restore` падал на несуществующей целевой БД, и её приходилось создавать отдельной командой от `postgres`. Без флага поведение прежнее — цель создаёт оператор.
 
 Типовые случаи:
 
@@ -349,6 +388,34 @@ sudo shred -u /tmp/arv-age-id.key
 
 Самый частый «настоящий» сценарий: текущая БД повреждена или данные испорчены, нужно откатиться на вчерашнее состояние. **Прод останавливать обязательно** — иначе приложение будет писать поверх восстановленного.
 
+### 6.0 Быстрый путь: одна команда
+
+Раньше этот сценарий состоял из семи ручных шагов (создать БД, примонтировать ключ, восстановить, `alembic`, править `.env`, перезапуск, smoke) — и каждый шаг был возможностью ошибиться в самый неподходящий момент. Теперь это одна команда, запускаемая **от `aruser`** (остановка сервиса требует sudo, а `.env` и CLI — пользователя `arv`; скрипт сам переключается между ними):
+
+```bash
+# 1. восстановить в отдельную БД и посмотреть, что получилось
+sudo -u aruser /opt/arv/app/deploy/backup/recover.sh \
+    --backup-id 148 --target-db vertex_ar_recovered
+
+# 2. убедиться, что данные на месте, и переключить прод
+sudo -u aruser /opt/arv/app/deploy/backup/recover.sh \
+    --cutover --target-db vertex_ar_recovered
+```
+
+`--cutover` по шагам: снимает дамп **текущей** БД в staging (даже повреждённая БД — единственная копия того, что случилось после бэкапа) → останавливает `arv.service` → бэкапит `.env` и переписывает `DATABASE_URL` → запускает сервис → smoke-тест → печатает команду отката.
+
+Что скрипт делает намеренно:
+
+- **отказывается** работать, если `--target-db` совпадает с живой БД;
+- **отказывается** переключаться на БД, где нет таблиц в схеме `public`;
+- при падении `arv.service` после переключения **сам откатывает** `.env` и поднимает сервис;
+- требует ввести имя целевой БД руками (кроме `--yes`);
+- если не удалось переписать `DATABASE_URL` — возвращает `.env` и стартует сервис обратно.
+
+Коды возврата: `0` успех · `1` упало восстановление · `2` ошибка аргументов · `3` оператор отказался · `4` упал переключение · `77` окружение непригодно (нет sudo).
+
+Ниже — тот же процесс руками, для случая, когда скрипт недоступен или нужен пошаговый контроль.
+
 ### 6.1 Сохранить текущее состояние (не пропускать)
 
 ```bash
@@ -362,19 +429,20 @@ sudo -u postgres psql -tAc "SELECT pg_size_pretty(pg_database_size('vertex_ar'))
 ### 6.2 Создать целевую БД и восстановить
 
 ```bash
-sudo -u postgres createdb -O vertex_ar vertex_ar_recovered
-
 # ключ обязателен: дампы шифруются
 sudo install -m 0600 -o arv -g arv /путь/к/arv-backup-age.key /tmp/arv-age-id.key
 
+# --create-db создаёт целевую БД (раньше это был отдельный createdb от postgres)
 sudo -u arv bash -c 'set -a; . /opt/arv/app/.env; cd /opt/arv/app; \
   BACKUP_AGE_IDENTITY_FILE=/tmp/arv-age-id.key \
-  /opt/arv/venv/bin/python -m app.cli.backup restore 143 --target-db vertex_ar_recovered'
+  /opt/arv/venv/bin/python -m app.cli.backup restore 148 --target-db vertex_ar_recovered --create-db'
 
 sudo shred -u /tmp/arv-age-id.key
 ```
 
-Ожидаемо: `restore: {'ok': True, 'tables_restored': 15, 'target_database': 'vertex_ar_recovered', 'duration_seconds': 1}`
+Ожидаемо: `restore ok: 15 tables -> vertex_ar_recovered in 1s (database was created)`, после чего CLI сам печатает оставшиеся шаги переключения — чтобы не искать их в ранбуке в момент инцидента.
+
+> `--create-db` идемпотентен: если БД уже есть, она **не** пересоздаётся и не перезаписывается. Если восстановление упало, созданная БД намеренно **не** удаляется — это улика для разбора; убрать её можно явно (`dropdb`).
 
 **Почему код передаёт `--no-owner`.** Дамп записывает владельца каждого объекта, и `pg_restore` воспроизводит это как `ALTER ... OWNER TO <роль>`, что требует от восстанавливающей роли права `SET ROLE` на эту роль. На проде `ai_jobs` и его последовательность/индексы были созданы ранней миграцией под `postgres`, а приложение подключается как `vertex_ar` — воспроизведение падало с `ERROR: must be able to SET ROLE "postgres"`, и `--exit-on-error` откатывал восстановление целиком (в целевой БД оставалась 1 таблица вместо 15). Владельцы объектов нормализованы на `vertex_ar` (2026-09-15), а флаг оставлен: он делает восстановление работоспособным и для старых дампов, и при смене роли. Тот же флаг нужен в ручных командах `pg_restore` (§7).
 
@@ -401,6 +469,8 @@ sudo -u postgres psql -d vertex_ar_recovered -c "
   UNION ALL SELECT 'users', count(*) FROM users
   UNION ALL SELECT 'backup_history', count(*) FROM backup_history"
 ```
+
+> `alembic upgrade head` нужен **только** если код новее бэкапа. Дамп уже содержит и схему, и строку `alembic_version` — при восстановлении свежего бэкапа на тот же код ревизия совпадает и команда ничего не делает. Проверить: `sudo -u postgres psql -d <db> -tAc "SELECT version_num FROM alembic_version"`.
 
 Дополнительно проверить, что нет осиротевших связей и пустых `company_id`:
 
@@ -490,7 +560,11 @@ sudo -u postgres psql -c 'ALTER DATABASE vertex_ar RENAME TO vertex_ar_broken_20
    Если архива нет — .env только из резервной копии оператора. Восстанавливать
    SECRET_KEY «на глаз» нельзя.
 
-2. Скачать дамп БД ВРУЧНУЮ (не через CLI: он берёт токен из самой БД):
+2. Скачать дамп БД ВРУЧНУЮ — через веб-интерфейс Яндекс Диска, не через CLI.
+   ⚠️ Ни `backup download` (§3.1), ни кнопка скачивания в админке здесь НЕ помогут:
+      обе читают строку из `backup_history`, то есть из той самой потерянной БД.
+      Это ограничение осознанное — оно и есть причина, по которой ручной путь
+      остаётся в ранбуке. Поэтому папку бэкапов стоит продублировать в офсайт (§10 п. 7).
    - войти в аккаунт Yandex, на который указывает prod-хранилище;
    - папка бэкапов: /vertexart/backups/ (последний успешный артефакт, напр.
      backup_20260915_231904.sql.gz.age);
@@ -592,6 +666,7 @@ sudo -u postgres psql -c 'ALTER DATABASE vertex_ar RENAME TO vertex_ar_broken_20
 | 14 | **Планировщик бэкапа может молча не запуститься** — `init_scheduler()` ловит исключение и логирует `scheduler_init_failed`, приложение при этом стартует нормально | ⚠️ by design (но тихо) | A1 не бэкапится вообще, а «приложение работает» — внешне всё в порядке. Заметно только по `status` через 26 ч или по журналу | Проверка в §2.1 (`grep backup_scheduler_*`). Радикальное лечение — включить `arv-backup-db.timer` вместо APScheduler (см. п. 4) |
 | 15 | **Настройки хранения в админке не управляют хранением** — `backup_max_copies=30` / `backup_retention_days=30` показываются, но игнорируются; действует GFS 7/4/12/3 | ❌ **дефект, решение за оператором** | Оператор считает, что у него 30 точек хранения, а фактически 7 ежедневных. Окно восстановления по БД — ~7 дней (§1.1). Изменить окно через UI **нельзя**: `backup_keep_*` не выведены в UI/API, а `BACKUP_KEEP_*` в `.env` не действуют | Считать окно по GFS. Рабочий путь — записать `backup_keep_*` в `system_settings` напрямую. Корректная починка (продуктовое решение): вывести GFS-поля в UI, сделать их `int \| None = None` и убрать мёртвые настройки |
 | 16 | **Ротация удаляет строку `backup_history` вместе с артефактом** — `session.delete(record)` | ⚠️ by design | Списка «все бэкапы за всё время» в системе нет; по истории видно только выжившие. Нельзя доказать, что бэкап за конкретную дату когда-то существовал | Вести внешний журнал (или не удалять строку, а помечать `rotated_at`), если это требование аудита |
+| 17 | **Скачивание требует живую БД** — и `backup download`, и кнопка в админке читают строку `backup_history` | ⚠️ by design (то же, что п. 9) | При полной потере БД скачать артефакт можно **только** через веб-интерфейс Яндекс Диска | Дублировать папку бэкапов в офсайт-хранилище оператора (§10 п. 7) — тогда файл доступен без БД |
 
 **Итог.** Бэкап БД, медиа и секретов **создаётся, шифруется, проверяется и восстанавливается**: `verify` автоматизирован (БД + медиа), полное восстановление зашифрованного дампа пройдено end-to-end (§1), архив секретов расшифрован и проверен на содержимое. Все дефекты, которые делали восстановление невозможным, исправлены (§1).
 
@@ -615,13 +690,22 @@ sudo -u arv bash -c 'set -a; . /opt/arv/app/.env; cd /opt/arv/app; /opt/arv/venv
 #   BACKUP_AGE_IDENTITY_FILE=/tmp/arv-age-id.key ... verify --limit 1
 sudo -u arv bash -c 'set -a; . /opt/arv/app/.env; cd /opt/arv/app; /opt/arv/venv/bin/python -m app.cli.backup drill --backup-type db'
 
-# --- восстановление в отдельную БД (опасно: пишет данные) ---
-sudo -u postgres createdb -O vertex_ar vertex_ar_recovered
+# --- ВОССТАНОВЛЕНИЕ ОДНОЙ КОМАНДОЙ (рекомендуемый путь) ---
+# запускать от aruser: остановка сервиса требует sudo, .env и CLI — пользователя arv
+sudo -u aruser /opt/arv/app/deploy/backup/recover.sh --backup-id 148 --target-db vertex_ar_recovered
+sudo -u aruser /opt/arv/app/deploy/backup/recover.sh --cutover --target-db vertex_ar_recovered
+
+# --- скачать артефакт вручную (не восстанавливая) ---
+sudo -u arv bash -c 'set -a; . /opt/arv/app/.env; cd /opt/arv/app; \
+  /opt/arv/venv/bin/python -m app.cli.backup download 148 --output /tmp/'
+# или из админки: страница «Бэкапы» → иконка скачивания (только супер-админ)
+
+# --- восстановление в отдельную БД вручную (опасно: пишет данные) ---
 sudo -u arv bash -c 'set -a; . /opt/arv/app/.env; cd /opt/arv/app; \
   BACKUP_AGE_IDENTITY_FILE=/tmp/arv-age-id.key \
-  /opt/arv/venv/bin/python -m app.cli.backup restore 143 --target-db vertex_ar_recovered'
+  /opt/arv/venv/bin/python -m app.cli.backup restore 148 --target-db vertex_ar_recovered --create-db'
 # или интерактивно:
-sudo -u arv /opt/arv/app/deploy/backup/restore.sh --backup-id 143 --target-db vertex_ar_recovered
+sudo -u arv /opt/arv/app/deploy/backup/restore.sh --backup-id 148 --target-db vertex_ar_recovered
 # список последних бэкапов:
 sudo -u arv /opt/arv/app/deploy/backup/restore.sh --list
 

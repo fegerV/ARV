@@ -716,3 +716,286 @@ def _rmtree(path: str) -> None:
     import shutil
 
     shutil.rmtree(path, ignore_errors=True)
+
+
+# ----------------------------------------------------------------------
+# Manual download (fetch_artifact)
+# ----------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_fetch_artifact_returns_the_stored_db_artifact(monkeypatch):
+    from app.services import restore_service
+    from app.services.backup_service import BackupService
+
+    async def _fake_download(self, backup_id, dest_path):
+        Path(dest_path).write_bytes(b"encrypted-bytes")
+        return dest_path
+
+    session = _FakeSession(
+        get_map={
+            (restore_service.BackupHistory, 77): _record(
+                encrypted=True, yd_path="backups/backup_20260915.sql.gz.age"
+            )
+        }
+    )
+    monkeypatch.setattr(restore_service, "settings", _restore_settings())
+    monkeypatch.setattr(restore_service, "AsyncSessionLocal", _sticky_factory(session))
+    monkeypatch.setattr(BackupService, "download_backup", _fake_download)
+
+    workdir = tempfile.mkdtemp(prefix="arv-fetch-")
+    try:
+        info = await restore_service.RestoreService().fetch_artifact(77, workdir)
+
+        assert info["filename"] == "backup_20260915.sql.gz.age"
+        assert info["encrypted"] is True
+        # The whole point of the manual path: what comes out is exactly what
+        # was stored, so it stays useless to anyone without the key.
+        assert info["plaintext"] is False
+        assert Path(info["path"]).read_bytes() == b"encrypted-bytes"
+        assert info["size_bytes"] == len(b"encrypted-bytes")
+    finally:
+        _rmtree(workdir)
+
+
+@pytest.mark.asyncio
+async def test_fetch_artifact_serves_a_local_secrets_archive(monkeypatch):
+    """Secrets archives live in staging, not on Yandex Disk.
+
+    ``yd_path`` carries an absolute local path for them, so the download path
+    must copy from disk instead of asking the storage provider for a file that
+    was never uploaded.
+    """
+    from app.services import restore_service
+    from app.services.backup_service import BackupService
+
+    staging = tempfile.mkdtemp(prefix="arv-staging-")
+    archive = Path(staging) / "secrets_20260915_232500.tar.gz.age"
+    archive.write_bytes(b"local-secrets")
+
+    async def _unexpected(self, backup_id, dest_path):
+        raise AssertionError("a local artifact must not be re-downloaded")
+
+    session = _FakeSession(
+        get_map={
+            (restore_service.BackupHistory, 77): _record(
+                encrypted=True, backup_type="secrets", yd_path=str(archive)
+            )
+        }
+    )
+    monkeypatch.setattr(restore_service, "settings", _restore_settings())
+    monkeypatch.setattr(restore_service, "AsyncSessionLocal", _sticky_factory(session))
+    monkeypatch.setattr(BackupService, "download_backup", _unexpected)
+
+    workdir = tempfile.mkdtemp(prefix="arv-fetch-")
+    try:
+        info = await restore_service.RestoreService().fetch_artifact(77, workdir)
+
+        assert info["filename"] == archive.name
+        assert Path(info["path"]).read_bytes() == b"local-secrets"
+        # It carries SECRET_KEY; it must not land world-readable in a temp dir.
+        # Windows has no POSIX mode bits (chmod only toggles the read-only
+        # flag), so this can only be asserted where the bits exist.
+        if os.name == "posix":
+            assert (os.stat(info["path"]).st_mode & 0o077) == 0
+    finally:
+        _rmtree(workdir)
+        _rmtree(staging)
+
+
+@pytest.mark.asyncio
+async def test_fetch_artifact_refuses_media_snapshots(monkeypatch):
+    from app.services import restore_service
+
+    session = _FakeSession(
+        get_map={(restore_service.BackupHistory, 77): _record(backup_type="media")}
+    )
+    monkeypatch.setattr(restore_service, "settings", _restore_settings())
+    monkeypatch.setattr(restore_service, "AsyncSessionLocal", _sticky_factory(session))
+
+    workdir = tempfile.mkdtemp(prefix="arv-fetch-")
+    try:
+        with pytest.raises(restore_service.ArtifactUnavailable) as excinfo:
+            await restore_service.RestoreService().fetch_artifact(77, workdir)
+        # The operator must be told what to do instead, not just "no".
+        assert "restic" in str(excinfo.value)
+    finally:
+        _rmtree(workdir)
+
+
+@pytest.mark.asyncio
+async def test_fetch_artifact_decrypt_needs_the_identity(monkeypatch):
+    from app.services import restore_service
+    from app.services.backup_service import BackupService
+
+    async def _fake_download(self, backup_id, dest_path):
+        Path(dest_path).write_bytes(b"encrypted")
+        return dest_path
+
+    session = _FakeSession(
+        get_map={(restore_service.BackupHistory, 77): _record(encrypted=True)}
+    )
+    monkeypatch.setattr(
+        restore_service,
+        "settings",
+        _restore_settings(BACKUP_AGE_IDENTITY_FILE="/nonexistent/backup-age.key"),
+    )
+    monkeypatch.setattr(restore_service, "AsyncSessionLocal", _sticky_factory(session))
+    monkeypatch.setattr(BackupService, "download_backup", _fake_download)
+
+    workdir = tempfile.mkdtemp(prefix="arv-fetch-")
+    try:
+        with pytest.raises(restore_service.DecryptionUnavailable):
+            await restore_service.RestoreService().fetch_artifact(
+                77, workdir, decrypt=True
+            )
+    finally:
+        _rmtree(workdir)
+
+
+@pytest.mark.asyncio
+async def test_fetch_artifact_decrypts_when_the_identity_is_present(monkeypatch, tmp_path):
+    from app.services import restore_service
+    from app.services.backup_service import BackupService
+
+    identity = tmp_path / "backup-age.key"
+    identity.write_text("AGE-SECRET-KEY-1...")
+
+    async def _fake_download(self, backup_id, dest_path):
+        Path(dest_path).write_bytes(b"ciphertext")
+        return dest_path
+
+    async def _fake_decrypt(self, src, dst):
+        Path(dst).write_bytes(b"plaintext-dump")
+
+    session = _FakeSession(
+        get_map={
+            (restore_service.BackupHistory, 77): _record(
+                encrypted=True, yd_path="backups/b.sql.gz.age"
+            )
+        }
+    )
+    monkeypatch.setattr(
+        restore_service,
+        "settings",
+        _restore_settings(BACKUP_AGE_IDENTITY_FILE=str(identity)),
+    )
+    monkeypatch.setattr(restore_service, "AsyncSessionLocal", _sticky_factory(session))
+    monkeypatch.setattr(BackupService, "download_backup", _fake_download)
+    monkeypatch.setattr(restore_service.RestoreService, "_decrypt_file", _fake_decrypt)
+
+    workdir = tempfile.mkdtemp(prefix="arv-fetch-")
+    try:
+        info = await restore_service.RestoreService().fetch_artifact(
+            77, workdir, decrypt=True
+        )
+
+        assert info["plaintext"] is True
+        assert info["encrypted"] is True  # as stored, and reported as such
+        assert info["filename"] == "b.sql.gz"
+        assert Path(info["path"]).read_bytes() == b"plaintext-dump"
+        # The ciphertext must not be left sitting beside the plaintext.
+        assert not (Path(workdir) / "b.sql.gz.age").exists()
+    finally:
+        _rmtree(workdir)
+
+
+@pytest.mark.asyncio
+async def test_fetch_artifact_rejects_a_missing_backup(monkeypatch):
+    from app.services import restore_service
+
+    session = _FakeSession(get_map={})
+    monkeypatch.setattr(restore_service, "settings", _restore_settings())
+    monkeypatch.setattr(restore_service, "AsyncSessionLocal", _sticky_factory(session))
+
+    workdir = tempfile.mkdtemp(prefix="arv-fetch-")
+    try:
+        with pytest.raises(RuntimeError, match="not found"):
+            await restore_service.RestoreService().fetch_artifact(77, workdir)
+    finally:
+        _rmtree(workdir)
+
+
+# ----------------------------------------------------------------------
+# Target database creation (the step that used to be manual)
+# ----------------------------------------------------------------------
+
+
+def _stub_restore_pipeline(monkeypatch, restore_service, *, exists, count=15):
+    """Wire a RestoreService whose DB calls are all recorded, not executed."""
+    created: list[str] = []
+
+    async def _fake_materialize(self, backup_id, workdir):
+        path = Path(workdir) / "backup.dump"
+        path.write_bytes(b"archive")
+        return str(path)
+
+    async def _exists(self, name):
+        return exists
+
+    async def _create(self, name):
+        created.append(name)
+
+    async def _restore_into(self, database, dump_path):
+        return None
+
+    async def _count(self, database):
+        return count
+
+    monkeypatch.setattr(restore_service, "settings", _restore_settings())
+    monkeypatch.setattr(
+        restore_service.RestoreService, "materialize_dump", _fake_materialize
+    )
+    monkeypatch.setattr(restore_service.RestoreService, "_database_exists", _exists)
+    monkeypatch.setattr(restore_service.RestoreService, "_create_database", _create)
+    monkeypatch.setattr(
+        restore_service.RestoreService, "_pg_restore_into", _restore_into
+    )
+    monkeypatch.setattr(restore_service.RestoreService, "_count_tables", _count)
+    return created
+
+
+@pytest.mark.asyncio
+async def test_restore_to_creates_the_target_database_when_asked(monkeypatch):
+    from app.services import restore_service
+
+    created = _stub_restore_pipeline(monkeypatch, restore_service, exists=False)
+
+    report = await restore_service.RestoreService().restore_to(
+        77, "vertex_ar_recovered", create_if_missing=True
+    )
+
+    assert report["ok"] is True
+    assert report["created_database"] is True
+    assert created == ["vertex_ar_recovered"]
+
+
+@pytest.mark.asyncio
+async def test_restore_to_does_not_create_a_database_by_default(monkeypatch):
+    """Without --create-db the old behaviour stands: the operator owns the DB."""
+    from app.services import restore_service
+
+    created = _stub_restore_pipeline(monkeypatch, restore_service, exists=False)
+
+    report = await restore_service.RestoreService().restore_to(77, "vertex_ar_recovered")
+
+    assert report["ok"] is True
+    assert report["created_database"] is False
+    assert created == []
+
+
+@pytest.mark.asyncio
+async def test_restore_to_leaves_an_existing_database_alone(monkeypatch):
+    """--create-db must be idempotent, not a way to clobber a database."""
+    from app.services import restore_service
+
+    created = _stub_restore_pipeline(monkeypatch, restore_service, exists=True)
+
+    report = await restore_service.RestoreService().restore_to(
+        77, "vertex_ar_recovered", create_if_missing=True
+    )
+
+    assert report["ok"] is True
+    assert report["created_database"] is False
+    assert created == []
+

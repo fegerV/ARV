@@ -14,6 +14,7 @@ Usage::
     python -m app.cli.backup verify         # checksum + pg_restore --list (db)
     python -m app.cli.backup verify-media   # restic check (media)
     python -m app.cli.backup drill          # restore into a throwaway database
+    python -m app.cli.backup download       # save an artifact to a file
     python -m app.cli.backup restore        # operator-initiated restore
     python -m app.cli.backup status         # last run per backup type
 """
@@ -23,6 +24,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import os
+import shutil
 import sys
 import tarfile
 import tempfile
@@ -37,7 +39,11 @@ from app.models.backup import BackupHistory
 from app.services.backup_metrics import record_failure, record_success
 from app.services.backup_service import BackupService, _utcnow_naive
 from app.services.media_backup_service import MediaBackupService
-from app.services.restore_service import RestoreService
+from app.services.restore_service import (
+    ArtifactUnavailable,
+    DecryptionUnavailable,
+    RestoreService,
+)
 from app.utils.command import CommandError, run_command
 from app.utils.heartbeat import send_heartbeat
 
@@ -439,15 +445,93 @@ async def cmd_drill(args: argparse.Namespace) -> int:
     return 0 if report.get("ok") else 1
 
 
+def _print_cutover_hint(target_db: str) -> None:
+    """Print the steps that remain after a successful restore.
+
+    The restore is now a single command; what is left is the part that changes
+    production, and that must stay deliberate. Printing it here means an
+    operator in the middle of an incident does not have to go and read the
+    runbook to find the exact lines — which is when runbooks get skimmed and
+    steps get skipped.
+    """
+    print(
+        "\nRestored into a separate database. Production is NOT changed yet.\n"
+        f"  1. sanity-check the data:\n"
+        f"       sudo -u postgres psql -d {target_db} -c 'SELECT count(*) FROM ar_content'\n"
+        f"  2. cut over (stops the app, keeps a .env backup, smoke-tests, prints rollback):\n"
+        f"       sudo -u arv /opt/arv/app/deploy/backup/recover.sh --cutover --target-db {target_db}\n"
+        f"  3. rollback at any point: restore DATABASE_URL from the .env backup and restart."
+    )
+
+
 async def cmd_restore(args: argparse.Namespace) -> int:
     """Restore a specific backup into a separate database."""
     if not args.target_db:
         print("--target-db is required", file=sys.stderr)
         return 2
 
-    report = await RestoreService().restore_to(args.backup_id, args.target_db)
-    print(f"restore: {report}")
-    return 0 if report.get("ok") else 1
+    report = await RestoreService().restore_to(
+        args.backup_id,
+        args.target_db,
+        create_if_missing=args.create_db,
+    )
+    if not report.get("ok"):
+        print(f"restore FAILED: {report.get('error')}", file=sys.stderr)
+        return 1
+
+    created = " (database was created)" if report.get("created_database") else ""
+    print(
+        f"restore ok: {report['tables_restored']} tables -> "
+        f"{report['target_database']} in {report['duration_seconds']}s{created}"
+    )
+    _print_cutover_hint(report["target_database"])
+    return 0
+
+
+async def cmd_download(args: argparse.Namespace) -> int:
+    """Save a backup artifact to a file without restoring it.
+
+    Exists so a backup can be carried off the host — to a second site, another
+    machine, or an operator's workstation — without going through the Yandex
+    Disk web interface. That interface is exactly what is unavailable when the
+    database holding the storage token is the thing that was lost.
+    """
+    service = RestoreService()
+    workdir = tempfile.mkdtemp(prefix="arv-download-")
+    try:
+        try:
+            info = await service.fetch_artifact(
+                args.backup_id, workdir, decrypt=args.decrypt
+            )
+        except ArtifactUnavailable as exc:
+            print(f"cannot download backup {args.backup_id}: {exc}", file=sys.stderr)
+            return 2
+        except DecryptionUnavailable as exc:
+            print(f"cannot decrypt backup {args.backup_id}: {exc}", file=sys.stderr)
+            return 2
+
+        output = args.output
+        if not output:
+            output = os.path.join(os.getcwd(), info["filename"])
+        elif os.path.isdir(output):
+            output = os.path.join(output, info["filename"])
+
+        await asyncio.to_thread(shutil.copyfile, info["path"], output)
+        # An artifact carrying SECRET_KEY must not land world-readable just
+        # because the umask said so.
+        os.chmod(output, 0o600)
+
+        state = "plaintext" if info["plaintext"] else "age-encrypted"
+        print(f"saved {info['filename']} -> {output} ({info['size_bytes']} bytes, {state})")
+        if not info["plaintext"]:
+            print(
+                "note: the private key is not on this host by design. Decrypt "
+                "where it lives:\n"
+                f"  age --decrypt --identity <key> -o dump.gz {output}"
+            )
+        return 0
+    finally:
+        shutil.rmtree(workdir, ignore_errors=True)
 
 
 async def cmd_notify(args: argparse.Namespace) -> int:
@@ -609,7 +693,29 @@ def build_parser() -> argparse.ArgumentParser:
     restore = sub.add_parser("restore", help="Restore a backup into a target database.")
     restore.add_argument("backup_id", type=int)
     restore.add_argument("--target-db", required=True)
+    restore.add_argument(
+        "--create-db",
+        action="store_true",
+        help="Create the target database when it does not exist.",
+    )
     restore.set_defaults(func=cmd_restore)
+
+    download = sub.add_parser(
+        "download", help="Save a backup artifact to a file (no restore)."
+    )
+    download.add_argument("backup_id", type=int)
+    download.add_argument(
+        "--output",
+        "-o",
+        default=None,
+        help="Destination file or directory (default: current directory).",
+    )
+    download.add_argument(
+        "--decrypt",
+        action="store_true",
+        help="Decrypt with BACKUP_AGE_IDENTITY_FILE when it is available.",
+    )
+    download.set_defaults(func=cmd_download)
 
     status = sub.add_parser("status", help="Show the last run per backup type.")
     status.set_defaults(func=cmd_status)
