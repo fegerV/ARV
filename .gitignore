@@ -77,6 +77,8 @@ ARV/android/app/google-services.json
 
 # Runtime data
 data/alerts/queue.jsonl
+# Local storage root used by the test env (STORAGE_BASE_PATH=./storage)
+storage/
 
 # Pytest temp
 .pytest-temp/

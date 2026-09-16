@@ -1,7 +1,7 @@
 import json
 from pathlib import Path
 import shutil
-import uuid
+import tempfile
 
 import pytest
 from fastapi import HTTPException
@@ -168,8 +168,9 @@ def _async_return(value):
 
 
 def _make_workspace_tempdir() -> Path:
-    base = Path("codex_tmp_test")
-    base.mkdir(exist_ok=True)
-    path = base / f"video_utils_{uuid.uuid4().hex}"
-    path.mkdir()
-    return path
+    """Create a scratch directory outside the working tree.
+
+    This used to be ``codex_tmp_test/`` resolved against the current directory,
+    so every run dropped generated directories inside the checkout.
+    """
+    return Path(tempfile.mkdtemp(prefix="video-utils-"))

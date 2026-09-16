@@ -2,7 +2,7 @@ from pathlib import Path
 from types import SimpleNamespace
 import shutil
 import sys
-import uuid
+import tempfile
 
 import cv2
 import numpy as np
@@ -127,8 +127,9 @@ def _write_pattern_image(path: Path) -> Path:
 
 
 def _make_workspace_tempdir() -> Path:
-    base = Path("codex_tmp_test")
-    base.mkdir(exist_ok=True)
-    path = base / f"marker_{uuid.uuid4().hex}"
-    path.mkdir()
-    return path
+    """Create a scratch directory outside the working tree.
+
+    This used to be ``codex_tmp_test/`` resolved against the current directory,
+    so every run dropped generated directories inside the checkout.
+    """
+    return Path(tempfile.mkdtemp(prefix="marker-"))

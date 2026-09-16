@@ -2,7 +2,7 @@ from pathlib import Path
 from types import SimpleNamespace
 import io
 import shutil
-import uuid
+import tempfile
 
 import pytest
 from PIL import Image
@@ -222,11 +222,12 @@ def _write_sample_image(path: Path, size=(320, 320)) -> None:
 
 
 def _make_workspace_tempdir() -> Path:
-    base = Path("codex_tmp_test")
-    base.mkdir(exist_ok=True)
-    path = base / f"ar_content_{uuid.uuid4().hex}"
-    path.mkdir()
-    return path
+    """Create a scratch directory outside the working tree.
+
+    This used to be ``codex_tmp_test/`` resolved against the current directory,
+    so every run dropped generated directories inside the checkout.
+    """
+    return Path(tempfile.mkdtemp(prefix="ar-content-"))
 
 
 def _async_return(value):
