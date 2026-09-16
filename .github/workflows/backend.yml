@@ -6,18 +6,24 @@ on:
     paths:
       - "app/**"
       - "tests/**"
+      - "templates/**"
       - "alembic/**"
+      - "scripts/**"
       - "pytest.ini"
       - "requirements*.txt"
+      - ".env.test"
       - ".github/workflows/backend.yml"
   pull_request:
     branches: [main, develop]
     paths:
       - "app/**"
       - "tests/**"
+      - "templates/**"
       - "alembic/**"
+      - "scripts/**"
       - "pytest.ini"
       - "requirements*.txt"
+      - ".env.test"
       - ".github/workflows/backend.yml"
 
 defaults:
@@ -49,17 +55,18 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
+      # Source .env.test rather than repeating its values here: the committed
+      # test env also pins the backup/DR switches, and CI inheriting the
+      # defaults instead was exactly the drift .env.test exists to prevent.
       - name: Run migrations
-        run: alembic upgrade head
-        env:
-          DATABASE_URL: "sqlite+aiosqlite:///./test_vertex_ar.db"
-          SECRET_KEY: "test-secret-key-min-32-chars-long"
+        run: |
+          set -a
+          . ./.env.test
+          set +a
+          alembic upgrade head
 
       - name: Run tests
-        run: PYTHONPATH=${{ github.workspace }} pytest tests/ -v --tb=short
-        env:
-          DATABASE_URL: "sqlite+aiosqlite:///./test_vertex_ar.db"
-          SECRET_KEY: "test-secret-key-min-32-chars-long"
+        run: bash scripts/run_tests.sh -q --tb=short
 
   dependency-audit:
     runs-on: ubuntu-latest
