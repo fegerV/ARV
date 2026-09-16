@@ -1,7 +1,7 @@
 import importlib
+import tempfile
 from pathlib import Path
 from types import SimpleNamespace
-from uuid import uuid4
 
 import pytest
 from PIL import Image
@@ -379,9 +379,13 @@ def _thumbnail_service_module():
 
 
 def _make_temp_dir() -> Path:
-    root = Path("e:/Project/ARV/.pytest-temp") / f"thumbnail-service-{uuid4().hex}"
-    root.mkdir(parents=True, exist_ok=True)
-    return root
+    """Create a portable temporary directory.
+
+    Previously hardcoded to ``e:/Project/ARV/.pytest-temp``, which only existed
+    on the original developer's machine: on Windows it failed outright, and on
+    Linux the drive letter was silently read as a relative path.
+    """
+    return Path(tempfile.mkdtemp(prefix="thumbnail-service-"))
 
 
 def _create_image(path: Path, mode: str, size: tuple[int, int], image_format: str | None = None):

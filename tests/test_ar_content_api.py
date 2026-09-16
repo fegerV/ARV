@@ -1,3 +1,5 @@
+import os
+import tempfile
 from types import SimpleNamespace
 from uuid import uuid4
 
@@ -202,7 +204,13 @@ async def test_validate_marker_reports_missing_file(monkeypatch):
         marker_metadata={},
     )
     db = _FakeDb(get_map={(ar_content.ARContent, 51): content})
-    monkeypatch.setattr(ar_content.settings, "STORAGE_BASE_PATH", "e:/Project/ARV/.pytest-temp-storage")
+    # A path that is guaranteed not to exist, rather than the old hardcoded
+    # ``e:/Project/ARV/.pytest-temp-storage`` (an absent drive on most machines).
+    monkeypatch.setattr(
+        ar_content.settings,
+        "STORAGE_BASE_PATH",
+        os.path.join(tempfile.mkdtemp(prefix="ar-content-"), "missing"),
+    )
 
     with pytest.raises(HTTPException) as exc_info:
         await ar_content.validate_marker(ar_content_id=51, request=_MOCK_REQUEST, db=db, current_user=SimpleNamespace(is_super_admin=True, company_id=None))
