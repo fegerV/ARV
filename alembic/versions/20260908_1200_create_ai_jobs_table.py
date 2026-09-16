@@ -20,7 +20,11 @@ def upgrade() -> None:
     op.create_table(
         "ai_jobs",
         sa.Column("id", sa.Integer(), nullable=False),
-        sa.Column("job_id", sa.String(length=36), nullable=False, index=True),
+        # No ``index=True`` here: it makes ``create_table`` emit
+        # ``ix_ai_jobs_job_id`` itself, and the explicit ``create_index`` below
+        # then collides with it ("index ix_ai_jobs_job_id already exists"),
+        # which made ``alembic upgrade head`` fail on every fresh database.
+        sa.Column("job_id", sa.String(length=36), nullable=False),
         sa.Column("ar_content_id", sa.Integer(), nullable=False),
         sa.Column("company_id", sa.Integer(), nullable=False),
         sa.Column("status", sa.String(length=50), nullable=False, server_default="queued"),
