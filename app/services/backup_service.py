@@ -644,10 +644,14 @@ class BackupService:
     def _gfs_limits(backup_settings) -> dict[str, int] | None:
         """Return the GFS ladder when the deployment configures one.
 
-        Deployments that predate the GFS ladder only carry ``backup_max_copies``
-        / ``backup_retention_days``. Rather than inventing a ladder from
-        unrelated values we fall back to the legacy rule for them, and switch
-        to GFS as soon as the ladder is present.
+        ``BackupSettings`` declares non-None defaults for the ladder, and
+        :meth:`SettingsService.get_all_settings` always fills them in, so in
+        practice this always returns a ladder and the GFS rule always governs.
+        The ``None`` branch exists only for a caller that builds
+        ``BackupSettings`` with every ladder field explicitly ``None``; the
+        legacy ``backup_max_copies`` / ``backup_retention_days`` rule is
+        therefore dead code on any deployment configured through the settings
+        service or the admin panel.
 
         Returns keyword arguments ready for :func:`select_gfs_deletes`.
         """
@@ -681,9 +685,10 @@ class BackupService:
     ) -> None:
         """Remove backups that exceed the retention ladder.
 
-        Uses the GFS ladder (7 daily / 4 weekly / 12 monthly / 3 yearly) when
-        configured, otherwise the legacy ``max_copies`` + ``retention_days``
-        rule. Files are removed from every remote that holds a copy.
+        GFS (7 daily / 4 weekly / 12 monthly / 3 yearly by default) is the rule
+        that applies; see :meth:`_gfs_limits` for why the legacy
+        ``max_copies`` + ``retention_days`` branch is effectively unreachable.
+        Files are removed from every remote that holds a copy.
         """
         from app.services.settings_service import SettingsService
 

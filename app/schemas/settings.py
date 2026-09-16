@@ -119,15 +119,21 @@ class BackupSettings(BaseModel):
     backup_yd_folder: str = "backups"
     backup_schedule: str = "daily"
     backup_cron: str = "0 3 * * *"
+
+    # Legacy retention knobs. These are *not* applied: the GFS ladder below
+    # always governs, because these fields carry non-None defaults and so the
+    # ladder can never be "absent". They are kept only so existing
+    # ``system_settings`` rows and API payloads keep loading, and they are no
+    # longer exposed in the admin UI.
     backup_retention_days: int = 30
     backup_max_copies: int = 30
 
-    # GFS retention ladder (docs/BACKUP_AND_RECOVERY.md §8). When present,
-    # rotation keeps the newest artifact of each of the N newest days / ISO
-    # weeks / months / years instead of "the N newest copies", which is the only
-    # way to still have a restore point from a month ago. The legacy
-    # ``backup_max_copies`` / ``backup_retention_days`` rule applies only when
-    # the ladder is absent.
+    # GFS retention ladder (docs/BACKUP_AND_RECOVERY.md §8). Rotation keeps the
+    # newest artifact of each of the N newest days / ISO weeks / months / years
+    # instead of "the N newest copies", which is the only way to still have a
+    # restore point from a month ago. Zero is a valid value and means "keep
+    # nothing at this resolution"; all four at zero is rejected by the settings
+    # route because it would delete every backup.
     backup_keep_daily: int = 7
     backup_keep_weekly: int = 4
     backup_keep_monthly: int = 12

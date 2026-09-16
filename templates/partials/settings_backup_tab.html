@@ -54,16 +54,33 @@
                 </div>
             </div>
 
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
+            <div class="p-4 bg-gray-50 dark:bg-gray-900/30 rounded-xl border border-gray-200 dark:border-gray-700 space-y-4">
                 <div>
-                    <label for="backup_retention_days" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">{{ t("settings.backup.retention_days") }}</label>
-                    <input type="number" name="backup_retention_days" id="backup_retention_days" value="{{ settings.backup.backup_retention_days|default(30) }}" min="1" max="365" class="form-input">
+                    <h4 class="text-sm font-semibold text-gray-900 dark:text-white">{{ t("settings.backup.retention_heading") }}</h4>
+                    <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{{ t("settings.backup.retention_description") }}</p>
                 </div>
-                <div>
-                    <label for="backup_max_copies" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">{{ t("settings.backup.max_copies") }}</label>
-                    <input type="number" name="backup_max_copies" id="backup_max_copies" value="{{ settings.backup.backup_max_copies|default(30) }}" min="1" max="100" class="form-input">
-                    <p class="text-xs text-gray-400 dark:text-gray-500 mt-1">{{ t("settings.backup.max_copies_hint") }}</p>
+                <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                    <div>
+                        <label for="backup_keep_daily" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">{{ t("settings.backup.keep_daily") }}</label>
+                        <input type="number" name="backup_keep_daily" id="backup_keep_daily" value="{{ settings.backup.backup_keep_daily|default(7) }}" min="0" max="365" class="form-input">
+                    </div>
+                    <div>
+                        <label for="backup_keep_weekly" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">{{ t("settings.backup.keep_weekly") }}</label>
+                        <input type="number" name="backup_keep_weekly" id="backup_keep_weekly" value="{{ settings.backup.backup_keep_weekly|default(4) }}" min="0" max="104" class="form-input">
+                    </div>
+                    <div>
+                        <label for="backup_keep_monthly" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">{{ t("settings.backup.keep_monthly") }}</label>
+                        <input type="number" name="backup_keep_monthly" id="backup_keep_monthly" value="{{ settings.backup.backup_keep_monthly|default(12) }}" min="0" max="60" class="form-input">
+                    </div>
+                    <div>
+                        <label for="backup_keep_yearly" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">{{ t("settings.backup.keep_yearly") }}</label>
+                        <input type="number" name="backup_keep_yearly" id="backup_keep_yearly" value="{{ settings.backup.backup_keep_yearly|default(3) }}" min="0" max="20" class="form-input">
+                    </div>
                 </div>
+                <p class="text-xs text-gray-400 dark:text-gray-500">{{ t("settings.backup.keep_hint") }}</p>
+                {# Retained so a save round-trips the stored values; the GFS ladder above governs. #}
+                <input type="hidden" name="backup_retention_days" value="{{ settings.backup.backup_retention_days|default(30) }}">
+                <input type="hidden" name="backup_max_copies" value="{{ settings.backup.backup_max_copies|default(30) }}">
             </div>
 
             <div class="flex flex-col sm:flex-row justify-end gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">

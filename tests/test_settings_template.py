@@ -26,3 +26,28 @@ def test_settings_template_uses_partials_for_primary_tabs():
     assert 'x-ref="notificationsForm"' in notifications
     assert 'name="default_storage"' in storage
     assert 'action="/settings/backup"' in backup
+
+
+def test_backup_tab_exposes_the_gfs_ladder_that_actually_governs():
+    """The form must edit the rule rotation applies, not the dead legacy pair.
+
+    Rotation uses the GFS ladder; ``backup_retention_days`` /
+    ``backup_max_copies`` are ignored. Exposing only the legacy pair let an
+    operator change retention settings that did nothing.
+    """
+    backup = Path("templates/partials/settings_backup_tab.html").read_text(encoding="utf-8")
+
+    for field in (
+        "backup_keep_daily",
+        "backup_keep_weekly",
+        "backup_keep_monthly",
+        "backup_keep_yearly",
+    ):
+        assert f'name="{field}"' in backup
+        assert f'type="number" name="{field}"' in backup
+
+    # The legacy knobs survive only as hidden fields, so a save round-trips
+    # whatever is stored without advertising them as effective.
+    for legacy in ("backup_retention_days", "backup_max_copies"):
+        assert f'type="hidden" name="{legacy}"' in backup
+        assert f'type="number" name="{legacy}"' not in backup

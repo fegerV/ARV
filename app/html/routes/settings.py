@@ -289,6 +289,10 @@ async def update_backup_settings(
     backup_cron: str = Form("0 3 * * *"),
     backup_retention_days: int = Form(30),
     backup_max_copies: int = Form(30),
+    backup_keep_daily: int = Form(7),
+    backup_keep_weekly: int = Form(4),
+    backup_keep_monthly: int = Form(12),
+    backup_keep_yearly: int = Form(3),
 ):
     """Save backup settings and reschedule the APScheduler job."""
     redirect = require_super_admin(current_user)
@@ -298,6 +302,23 @@ async def update_backup_settings(
     is_enabled = backup_enabled == "on"
     effective_cron = _SCHEDULE_CRON_MAP.get(backup_schedule, "0 3 * * *") if backup_schedule != "custom" else backup_cron
     settings_service = SettingsService(db)
+
+    # The GFS ladder is the rule rotation actually applies, so a ladder of all
+    # zeros means "delete every backup" -- refuse it instead of wiping history.
+    ladder = {
+        "backup_keep_daily": backup_keep_daily,
+        "backup_keep_weekly": backup_keep_weekly,
+        "backup_keep_monthly": backup_keep_monthly,
+        "backup_keep_yearly": backup_keep_yearly,
+    }
+    if all(max(0, value) == 0 for value in ladder.values()):
+        return await _render_settings(
+            request,
+            db,
+            current_user,
+            active_section="backup",
+            error_message=translate("settings.backup.keep_all_zero", get_request_locale(request)),
+        )
 
     try:
         await settings_service.update_backup_settings(
@@ -309,6 +330,10 @@ async def update_backup_settings(
                 backup_cron=effective_cron,
                 backup_retention_days=max(1, backup_retention_days),
                 backup_max_copies=max(1, backup_max_copies),
+                backup_keep_daily=max(0, backup_keep_daily),
+                backup_keep_weekly=max(0, backup_keep_weekly),
+                backup_keep_monthly=max(0, backup_keep_monthly),
+                backup_keep_yearly=max(0, backup_keep_yearly),
             )
         )
 
