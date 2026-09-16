@@ -16,7 +16,7 @@
 
 | ID | Severity | Статус | Что сделано |
 |----|----------|--------|-------------|
-| ARV-001 | Critical | ✅ Fixed | `app/html/utils.py`: добавлены `is_super_admin()`, `user_can_access_company()`, `require_super_admin()`, `require_company_scope()`. Все 11 админ-роутов настроек переведены на `require_super_admin`. |
+| ARV-001 | Critical | ✅ Fixed | `app/html/utils.py`: добавлены `is_super_admin()`, `user_can_access_company()`, `require_super_admin()`, `require_company_scope()`. Все 11 админ-роутов настроек переведены на `require_super_admin`. ⚠️ Дополнено 2026-09-16: API-слой того же раздела — `/api/backups/run`, `/history`, `/status`, `DELETE /{id}` — оставался на `get_current_active_user` и скоупился по `backup_history.company_id` (это колонка «чей Яндекс.Диск хранит артефакт», а не «чей тенант владеет данными»), из-за чего пользователи компании-хранилища могли запускать, перечислять и удалять бэкапы платформы. Переведён на `require_super_admin`, как и `/backups` + вкладка настроек; регрессия закреплена `test_backup_endpoints_reject_non_super_admin`. |
 | ARV-002 | Critical | ✅ Fixed | `app/html/routes/ar_content.py`: прямой вызов `delete_ar_content_by_id(...)` теперь передаёт `request`, `background_tasks`, `db`, `current_user`; добавлена проверка `require_company_scope`. |
 | ARV-003 | Critical | ✅ Fixed | `app/api/deps_authz.py` переписан (fail-closed). Убран обход `company_id is None → allow` в 39 местах (6 файлов). `register_user` требует супер-админа + allow-list роли + `company_id`. Тесты обновлены. |
 | ARV-004 | Critical | ✅ Fixed | Новый `app/utils/signed_urls.py` (HMAC-SHA256, TTL 30 дней). `/api/storage/yd-file` требует валидную подпись `exp`+`sig`; URL строятся через `build_yd_file_url()`. |

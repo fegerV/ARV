@@ -3,10 +3,92 @@
 <section id="backups" class="mb-10">
     <h2 class="text-xl font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
         <span class="material-icons text-gray-500">backup</span>
-        {{ "Backups" if is_en else "Резервные копии" }}
+        {{ "Backups and restore" if is_en else "Резервные копии и восстановление" }}
     </h2>
-    <div class="space-y-4 text-gray-700 dark:text-gray-300">
-        <p>{% if is_en %}The <code class="text-sm bg-gray-100 dark:bg-gray-700 px-1 rounded">/backups</code> section shows backup history and run statuses.{% else %}Раздел <code class="text-sm bg-gray-100 dark:bg-gray-700 px-1 rounded">/backups</code> показывает историю резервных копий базы данных и позволяет отслеживать статус последних запусков.{% endif %}</p>
-        <p>{% if is_en %}From settings you can enable automatic backups, choose a company with Yandex Disk, define the destination folder, and configure the schedule.{% else %}На странице настроек можно включить автоматические бэкапы, выбрать компанию с Яндекс Диском, папку назначения и расписание.{% endif %}</p>
+
+    <div class="space-y-5 text-gray-700 dark:text-gray-300">
+        <p>{% if is_en %}Backups protect the platform from data loss. Copies are managed in <code class="text-sm bg-gray-100 dark:bg-gray-700 px-1 rounded">/backups</code> and in <code class="text-sm bg-gray-100 dark:bg-gray-700 px-1 rounded">Settings -> Backups</code>, and are stored outside the server on Yandex Disk.{% else %}Резервные копии защищают платформу от потери данных. Копии создаются и настраиваются в разделах <code class="text-sm bg-gray-100 dark:bg-gray-700 px-1 rounded">/backups</code> и <code class="text-sm bg-gray-100 dark:bg-gray-700 px-1 rounded">Настройки → Бэкапы</code>, а хранятся вне сервера — на Яндекс Диске.{% endif %}</p>
+
+        <div class="bg-gray-50 dark:bg-gray-800/60 border border-gray-200 dark:border-gray-700 rounded-xl p-4">
+            <h3 class="font-medium text-gray-900 dark:text-white mb-2">{{ "1. What gets backed up" if is_en else "1. Что попадает в копии" }}</h3>
+            <ul class="list-disc list-inside space-y-2 text-sm leading-6">
+                <li>{% if is_en %}<strong>Database</strong> — tables, settings, companies, projects and AR content. The dump is compressed and then encrypted.{% else %}<strong>База данных</strong> — таблицы, настройки, компании, проекты и AR-контент. Дамп сжимается и затем шифруется.{% endif %}</li>
+                <li>{% if is_en %}<strong>Media</strong> — original images and videos, stored as a restic snapshot.{% else %}<strong>Медиа</strong> — оригиналы изображений и видео, хранятся снапшотом restic.{% endif %}</li>
+                <li>{% if is_en %}<strong>Secrets</strong> — the environment file and TLS material, as a separate encrypted archive.{% else %}<strong>Секреты</strong> — файл окружения и TLS-материалы, отдельным зашифрованным архивом.{% endif %}</li>
+            </ul>
+        </div>
+
+        <div class="bg-gray-50 dark:bg-gray-800/60 border border-gray-200 dark:border-gray-700 rounded-xl p-4">
+            <h3 class="font-medium text-gray-900 dark:text-white mb-2">{{ "2. Automatic backups" if is_en else "2. Автоматическое создание" }}</h3>
+            <p class="text-sm leading-6 mb-3">{% if is_en %}Configured once in <strong>Settings -> Backups</strong>:{% else %}Настраивается один раз в разделе <strong>Настройки → Бэкапы</strong>:{% endif %}</p>
+            <ul class="list-disc list-inside space-y-2 text-sm leading-6">
+                <li>{% if is_en %}enable backups with the switch at the top of the tab;{% else %}включите бэкапы переключателем в начале вкладки;{% endif %}</li>
+                <li>{% if is_en %}pick the company whose Yandex Disk receives the copies;{% else %}выберите компанию, на Яндекс Диск которой будут складываться копии;{% endif %}</li>
+                <li>{% if is_en %}set the destination folder (default <code class="text-sm bg-gray-100 dark:bg-gray-700 px-1 rounded">backups</code>);{% else %}укажите папку назначения (по умолчанию <code class="text-sm bg-gray-100 dark:bg-gray-700 px-1 rounded">backups</code>);{% endif %}</li>
+                <li>{% if is_en %}choose the schedule — daily, twice a day, weekly, or your own cron expression (default <code class="text-sm bg-gray-100 dark:bg-gray-700 px-1 rounded">0 3 * * *</code>, i.e. 03:00 server time);{% else %}выберите расписание — ежедневно, дважды в день, еженедельно или свой cron (по умолчанию <code class="text-sm bg-gray-100 dark:bg-gray-700 px-1 rounded">0 3 * * *</code>, то есть 03:00 по времени сервера);{% endif %}</li>
+                <li>{% if is_en %}set retention — how many daily, weekly, monthly and yearly copies to keep;{% else %}задайте срок хранения — сколько дневных, недельных, месячных и годовых копий хранить;{% endif %}</li>
+                <li>{% if is_en %}save. The schedule is re-registered immediately, no restart needed.{% else %}сохраните. Расписание перерегистрируется сразу, перезапуск не нужен.{% endif %}</li>
+            </ul>
+        </div>
+
+        <div class="bg-gray-50 dark:bg-gray-800/60 border border-gray-200 dark:border-gray-700 rounded-xl p-4">
+            <h3 class="font-medium text-gray-900 dark:text-white mb-2">{{ "3. Creating a copy manually" if is_en else "3. Создание копии вручную" }}</h3>
+            <ol class="list-decimal list-inside space-y-2 text-sm leading-6">
+                <li>{% if is_en %}Open <code class="text-sm bg-gray-100 dark:bg-gray-700 px-1 rounded">/backups</code> and press <strong>Create backup</strong> — or press <strong>Run now</strong> on the Backups tab of the settings page.{% else %}Откройте <code class="text-sm bg-gray-100 dark:bg-gray-700 px-1 rounded">/backups</code> и нажмите <strong>Создать бэкап</strong> — либо кнопку <strong>Запустить сейчас</strong> на вкладке «Бэкапы» в настройках.{% endif %}</li>
+                <li>{% if is_en %}The copy is made in the background: the button reports that it has started, and the page can be refreshed in a minute.{% else %}Копия создаётся в фоне: кнопка сообщит о запуске, страницу можно обновить через минуту.{% endif %}</li>
+                <li>{% if is_en %}A new row appears in the run history with the date, type, status, size, trigger and storage path.{% else %}В истории запусков появится строка с датой, типом, статусом, размером, источником и путём в хранилище.{% endif %}</li>
+            </ol>
+            <p class="text-sm leading-6 mt-3">{% if is_en %}Manual runs are for a copy before a risky change, not a replacement for the schedule.{% else %}Ручной запуск нужен для копии перед рискованным изменением, а не вместо расписания.{% endif %}</p>
+        </div>
+
+        <div class="bg-gray-50 dark:bg-gray-800/60 border border-gray-200 dark:border-gray-700 rounded-xl p-4">
+            <h3 class="font-medium text-gray-900 dark:text-white mb-2">{{ "4. Checking that a copy is usable" if is_en else "4. Проверка, что копия пригодна" }}</h3>
+            <ul class="list-disc list-inside space-y-2 text-sm leading-6">
+                <li>{% if is_en %}A copy is only useful if it actually restores, so a green status is not enough on its own.{% else %}Копия полезна только тогда, когда из неё действительно можно восстановиться, поэтому зелёного статуса самого по себе недостаточно.{% endif %}</li>
+                <li>{% if is_en %}Check the status and a non-zero size in the history table.{% else %}Проверьте статус и ненулевой размер в таблице истории.{% endif %}</li>
+                <li>{% if is_en %}Database and secrets artifacts can be downloaded from the row — they are stored encrypted, so they are decrypted where the key lives.{% else %}Артефакты БД и секретов можно скачать из строки — они хранятся зашифрованными, поэтому расшифровываются там, где лежит ключ.{% endif %}</li>
+                <li>{% if is_en %}Media copies are restic snapshots: they are not a single downloadable file and are checked with <code class="text-sm bg-gray-100 dark:bg-gray-700 px-1 rounded">restic</code>.{% else %}Медиа-копии — это снапшоты restic: файлом они не скачиваются и проверяются средствами <code class="text-sm bg-gray-100 dark:bg-gray-700 px-1 rounded">restic</code>.{% endif %}</li>
+            </ul>
+        </div>
+
+        {% if is_super_admin %}
+        <div class="bg-gray-50 dark:bg-gray-800/60 border border-gray-200 dark:border-gray-700 rounded-xl p-4">
+            <h3 class="font-medium text-gray-900 dark:text-white mb-2">{{ "5. Restoring from a copy" if is_en else "5. Восстановление из копии" }}</h3>
+            <p class="text-sm leading-6 mb-3">{% if is_en %}There is deliberately no restore button in the interface: restoring over the live database is irreversible, so the switch is a separate, conscious step taken from the command line.{% else %}Кнопки «восстановить» в интерфейсе намеренно нет: восстановление поверх рабочей базы необратимо, поэтому переключение — отдельный осознанный шаг из командной строки.{% endif %}</p>
+            <p class="text-sm leading-6 mb-3">{% if is_en %}Always restore into a <strong>separate database</strong> first and check the data there.{% else %}Сначала всегда восстанавливайте в <strong>отдельную базу</strong> и проверяйте данные там.{% endif %}</p>
+            <p class="text-sm leading-6 mb-2 font-medium">{% if is_en %}Rehearsal, safe for production:{% else %}Проверочное восстановление, прод не затрагивается:{% endif %}</p>
+            <pre class="text-xs bg-gray-100 dark:bg-gray-900 rounded-lg p-3 overflow-x-auto mb-3"><code>cd /opt/arv/app &amp;&amp; set -a; . ./.env; set +a
+/opt/arv/venv/bin/python -m app.cli.backup restore &lt;id&gt; \
+    --target-db vertex_ar_recovered --create-db
+sudo -u postgres psql -d vertex_ar_recovered -tAc "SELECT count(*) FROM ar_content"
+sudo -u postgres psql -tAc "DROP DATABASE vertex_ar_recovered"</code></pre>
+            <p class="text-sm leading-6 mb-2 font-medium">{% if is_en %}When the database is already gone, go through a file: the normal path resolves the storage token <em>from</em> that database, so it cannot be the way back from losing it.{% else %}Если база уже потеряна — идите через файл: обычный путь берёт токен хранилища <em>из самой базы</em>, поэтому он не может быть способом вернуться после её потери.{% endif %}</p>
+            <pre class="text-xs bg-gray-100 dark:bg-gray-900 rounded-lg p-3 overflow-x-auto mb-3"><code>/opt/arv/venv/bin/python -m app.cli.backup download &lt;id&gt; \
+    -o /var/backups/arv/backup.sql.gz.age
+/opt/arv/venv/bin/python -m app.cli.backup restore \
+    --from-file /var/backups/arv/backup.sql.gz.age \
+    --target-db vertex_ar_recovered --create-db</code></pre>
+            <ul class="list-disc list-inside space-y-2 text-sm leading-6">
+                <li>{% if is_en %}Switch the application to the restored database only after the contents have been verified — it is a separate step, not part of the restore.{% else %}Переключайте приложение на восстановленную базу только после проверки содержимого — это отдельный шаг, а не часть восстановления.{% endif %}</li>
+                <li>{% if is_en %}An encrypted copy needs the private key; it is kept off the server on purpose, so bring it in for the restore window and remove it afterwards.{% else %}Для зашифрованной копии нужен приватный ключ; он намеренно хранится вне сервера, поэтому его приносят на время восстановления и убирают после.{% endif %}</li>
+                <li>{% if is_en %}After a restore, check that the number of tables and a few known records match what you expect.{% else %}После восстановления сверьте число таблиц и несколько известных записей с ожидаемым.{% endif %}</li>
+            </ul>
+        </div>
+        {% else %}
+        <div class="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-xl p-4 text-sm leading-6 text-blue-900 dark:text-blue-100">
+            <p>{% if is_en %}Restore is performed by the platform administrator from the server — there is no restore button in the interface, because restoring over the live database is irreversible. Contact your administrator if you need a copy restored.{% else %}Восстановление выполняет администратор платформы с сервера — кнопки восстановления в интерфейсе нет, так как восстановление поверх рабочей базы необратимо. Если нужно восстановить копию, обратитесь к администратору.{% endif %}</p>
+        </div>
+        {% endif %}
+
+        <div class="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-xl p-4 text-sm leading-6 text-blue-900 dark:text-blue-100">
+            <p class="font-medium mb-2">{{ "Important details" if is_en else "Важные детали" }}</p>
+            <ul class="list-disc list-inside space-y-2">
+                <li>{% if is_en %}Database copies are encrypted, and the private key does not live on the server. That is why an automatic check there confirms only older unencrypted copies — a real restore test is done by the administrator with the key temporarily in place.{% else %}Копии базы шифруются, а приватный ключ на сервере не хранится. Поэтому автоматическая проверка на сервере подтверждает только старые незашифрованные копии, а настоящую проверку восстановления делает администратор, временно положив ключ.{% endif %}</li>
+                <li>{% if is_en %}Retention deletes the history row together with the copy, so record ids are not permanent — refer to a copy by its date and type.{% else %}Ротация удаляет запись из истории вместе с самой копией, поэтому id записей непостоянны — ссылайтесь на копию по дате и типу.{% endif %}</li>
+                <li>{% if is_en %}The off-site copy lives on Yandex Disk only; there is no second storage location yet.{% else %}Внешняя копия существует только на Яндекс Диске; второго места хранения пока нет.{% endif %}</li>
+                <li>{% if is_en %}Deleting a copy from the interface removes it from storage and cannot be undone.{% else %}Удаление копии из интерфейса убирает её из хранилища и не отменяется.{% endif %}</li>
+                <li>{% if is_en %}After enabling the schedule, confirm that the first run really appeared in the history.{% else %}После включения расписания убедитесь, что первый запуск действительно появился в истории.{% endif %}</li>
+            </ul>
+        </div>
     </div>
 </section>

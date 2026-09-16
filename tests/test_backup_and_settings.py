@@ -194,6 +194,60 @@ async def test_backup_endpoints_require_auth():
         assert resp_status.status_code in (401, 403, 307, 303)
 
 
+class _TenantUser:
+    """An active, ordinary user of the company whose Yandex Disk holds backups."""
+
+    id = 42
+    company_id = 4
+    is_super_admin = False
+    is_active = True
+    email = "tenant@example.com"
+
+
+@pytest.mark.asyncio
+async def test_backup_endpoints_reject_non_super_admin():
+    """A tenant user must not reach the platform's backup API.
+
+    Regression: these endpoints used to accept any authenticated user and scope
+    themselves by ``backup_history.company_id``. That column records *whose
+    Yandex Disk holds the artifact*, not which tenant owns the data, so users of
+    the storage company could trigger, enumerate and delete every backup of the
+    platform — while ``/backups`` and the settings tab in front of the same data
+    were super-admin only. The two layers had drifted apart.
+    """
+    import httpx
+
+    from app.api.routes.auth import get_current_active_user
+    from app.main import app
+
+    async def fake_user():
+        return _TenantUser()
+
+    app.dependency_overrides[get_current_active_user] = fake_user
+    try:
+        transport = httpx.ASGITransport(app=app)
+        async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
+            client.cookies.set("access_token", "dummy")
+            client.cookies.set("csrf_token", "csrf-test-token")
+            csrf = {"X-CSRF-Token": "csrf-test-token"}
+
+            calls = [
+                ("POST", "/api/backups/run", csrf),
+                ("GET", "/api/backups/history", {}),
+                ("GET", "/api/backups/status", {}),
+                ("DELETE", "/api/backups/1", csrf),
+            ]
+            for method, path, headers in calls:
+                resp = await client.request(method, path, headers=headers)
+                assert resp.status_code == 403, f"{method} {path} -> {resp.status_code}"
+                detail = resp.json().get("detail", "")
+                # Must be the authorization guard, not the CSRF middleware —
+                # both answer 403, so the message is what tells them apart.
+                assert "Super admin" in detail, f"{method} {path} -> {detail!r}"
+    finally:
+        app.dependency_overrides.pop(get_current_active_user, None)
+
+
 # ---------------------------------------------------------------------------
 # Settings page smoke test
 # ---------------------------------------------------------------------------

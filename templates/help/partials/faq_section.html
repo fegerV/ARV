@@ -22,5 +22,13 @@
             <h3 class="font-medium text-gray-900 dark:text-white">{{ "Where are notifications delivered?" if is_en else "Куда приходят уведомления?" }}</h3>
             <p class="text-sm text-gray-600 dark:text-gray-400 mt-1">{% if is_en %}To Email and Telegram if these channels are configured in Settings.{% else %}В Email и Telegram, если эти каналы настроены в разделе «Настройки».{% endif %}</p>
         </div>
+        <div class="border-l-4 border-indigo-500 pl-4">
+            <h3 class="font-medium text-gray-900 dark:text-white">{{ "How often are backups created?" if is_en else "Как часто создаются резервные копии?" }}</h3>
+            <p class="text-sm text-gray-600 dark:text-gray-400 mt-1">{% if is_en %}On the schedule set in Settings -> Backups (daily at 03:00 server time by default). A copy can also be started by hand from <code class="text-sm bg-gray-100 dark:bg-gray-700 px-1 rounded">/backups</code>.{% else %}По расписанию из раздела «Настройки → Бэкапы» (по умолчанию ежедневно в 03:00 по времени сервера). Копию можно запустить и вручную со страницы <code class="text-sm bg-gray-100 dark:bg-gray-700 px-1 rounded">/backups</code>.{% endif %}</p>
+        </div>
+        <div class="border-l-4 border-indigo-500 pl-4">
+            <h3 class="font-medium text-gray-900 dark:text-white">{{ "How do I restore data from a backup?" if is_en else "Как восстановить данные из резервной копии?" }}</h3>
+            <p class="text-sm text-gray-600 dark:text-gray-400 mt-1">{% if is_en %}There is no restore button in the interface: the administrator restores from the server, checking the copy in a separate database first. See the Backups section.{% else %}Кнопки восстановления в интерфейсе нет: восстановление выполняет администратор с сервера, предварительно проверив копию в отдельной базе. Подробнее — в разделе «Резервные копии и восстановление».{% endif %}</p>
+        </div>
     </div>
 </section>

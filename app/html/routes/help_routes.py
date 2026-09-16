@@ -6,7 +6,7 @@ from pathlib import Path
 
 from app.api.routes.auth import get_current_user_optional
 from app.html.templating import templates
-from app.html.utils import require_active_user
+from app.html.utils import is_super_admin, require_active_user
 
 router = APIRouter()
 
@@ -33,7 +33,14 @@ async def help_page(
     if redirect:
         return redirect
 
+    # The backup guide splits in two: what every user may know about backups, and
+    # the operator procedure (host paths, CLI, key handling) that only a super
+    # admin can act on anyway — /backups and /settings are super-admin pages.
     return templates.TemplateResponse(
         "help.html",
-        {"request": request, "current_user": current_user},
+        {
+            "request": request,
+            "current_user": current_user,
+            "is_super_admin": is_super_admin(current_user),
+        },
     )
