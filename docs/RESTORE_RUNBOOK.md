@@ -30,7 +30,7 @@
 
 | Класс | Данные | Бэкапится? | Как восстановить |
 |---|---|---|---|
-| **A1** | PostgreSQL `vertex_ar` | ✅ **Да** — ежедневно 03:00 (APScheduler внутри приложения), `company_id=4`. Дамп шифруется (`age`). ⚠️ `arv-backup-db.timer` **не установлен** — бэкап делает планировщик внутри приложения; таймер теперь безопасно добавить (общий `flock`, §10 п. 4) | `python -m app.cli.backup restore <id> --target-db <db>` (нужен ключ — §3) |
+| **A1** | PostgreSQL `vertex_ar` | ✅ **Да** — ежедневно 03:00, `company_id=4`. Дамп шифруется (`age`). С 2026-09-16 задачу ставят **два** триггера: APScheduler внутри приложения и `arv-backup-db.timer`; оба берут один `flock`, поэтому дамп за сутки один, а таймер закрывает случай «приложение лежит в 03:00» (§10 п. 4) | `python -m app.cli.backup restore <id> --target-db <db>` (нужен ключ — §3) |
 | **A2** | Оригиналы медиа `/opt/arv/storage` | ✅ **Да** — ежедневно 03:30, `arv-backup-media.timer`, restic-снапшоты (дедупликация + шифрование на клиенте) | `restic restore <snapshot> --target /opt/arv/storage` (§7 шаг 7) |
 | **A3** | `.env`, `/etc/letsencrypt` (частично), `deploy/` | ✅ **Да** — еженедельно вс 04:00, `arv-backup-secrets.timer`, `tar` + `age` | Расшифровать архив и распаковать (§7 шаг 1) |
 | **B** | Производные медиа (`marker.mind`, `qr_code.png`, thumbnails) | ❌ Нет | Регенерируются из A2 |
@@ -49,13 +49,14 @@
 
 | Факт | Значение |
 |---|---|
-| БД | backup **148**, `encrypted=t`, 69 129 Б, `backups/backup_20260915_233642.sql.gz.age` |
+| БД | backup **154**, `encrypted=t`, 69 135 Б, `backups/backup_20260916_012916_395795.sql.gz.age` (предыдущий — 148) |
 | Медиа | backup **141**, `encrypted=t`, 225 702 549 Б, снапшот restic, репозиторий 195 МБ при 217 МБ исходников |
 | Секреты | backup **144**, `encrypted=t`, 11 741 Б, `target=local` (второго off-site нет) |
 | Восстановление БД проверено | **да** — `restore 143 --target-db vertex_ar_enc_probe` → `ok: True`, 15 таблиц; счётчики и `alembic_version` совпали с продом; прод не тронут, временная БД удалена. ⚠️ Артефакт 143 к 2026-09-16 уже удалён ротацией — доказательство относится к *методу*, а не к конкретному файлу; метод воспроизводится на любом текущем id |
+| Восстановление **зашифрованного** дампа проверено | **да, 2026-09-16, на актуальном на тот момент id 154** — ключ примонтирован в `/etc/arv/backup-age.key` (0640 `root:arv`), затем: `verify --limit 3` → 154 и 148 `checksum=ok toc=ok entries=150 tables=30`; `drill --backup-type db` → `backup_id=154 ok=True tables_restored=15`; `download 154 --decrypt` → 69 028 Б plaintext; `verify --from-file` → `entries=150 tables=30`; `restore --from-file --create-db` → 15 таблиц, `ar_content` 61 строка. Временная БД и plaintext-файл удалены, ключ с хоста снят. ⚠️ Строка 154 с тех пор удалена ротацией — как и предупреждает блок выше, доказательство относится к **методу**, а не к конкретному id. ⚠️ **Алерта «drill overdue» на проде нет** — правило живёт только в комментариях, `/metrics` не скрейпится; единственное, что держит проверку зашифрованных дампов честной, — описанная ниже ручная процедура |
 | Расшифровка архива секретов проверена | **да** — `age --decrypt` ключом оператора, внутри `app/.env` (с `SECRET_KEY`), `etc/letsencrypt/renewal/…`, `deploy/**` |
-| `verification_status` (db) | **`ok`**; медиа — **`ok`** (`restic check --read-data-subset=5%`) |
-| `restore_test_status` | `NULL` — drill на зашифрованном бэкапе автоматически не проходит, нужен ручной прогон с ключом (§4) |
+| `verification_status` (db) | **`ok`** у 154 и 148; медиа — **`ok`** (`restic check --read-data-subset=5%`) |
+| `restore_test_status` | **`ok` у 154** (после ручного прогона 2026-09-16). Автоматический месячный `drill` по-прежнему сообщает `no_identity`, пока ключа на хосте нет — это by design, см. §4 и §10 п. 12 |
 | Шифрование дампа | `encrypted = t` (`BACKUP_AGE_RECIPIENT` задан) |
 | Размер БД / медиа | 10 МБ / 217 МБ (`/opt/arv/storage`) |
 | Свободно на диске | 19 ГБ |
@@ -63,8 +64,8 @@
 | Владельцы объектов в `public` | все → `vertex_ar` (нормализовано 2026-09-15) |
 | `pg_restore` / `age` / `restic` / `rclone` | 16.11 / 1.1.1 / 0.16.4 / 1.60.1 — установлены |
 | `/var/backups/arv` | создан (0700, `arv:arv`); restic-репозиторий внутри |
-| systemd-таймеры | `arv-backup-media.timer` (ежедневно 03:30), `arv-backup-secrets.timer` (вс 04:00), `arv-backup-verify.timer` (вс 05:00), `arv-backup-drill.timer` (1-е 06:00) — установлены и проверены боевым запуском |
-| `arv-backup-db.timer` | **не установлен** — дамп делает APScheduler внутри приложения. С 2026-09-16 таймер можно добавить без риска дублей: оба берут один `flock` (§10 п. 4, 18) |
+| systemd-таймеры | `arv-backup-db.timer` (ежедневно 03:00), `arv-backup-media.timer` (ежедневно 03:30), `arv-backup-secrets.timer` (вс 04:00), `arv-backup-verify.timer` (вс 05:00), `arv-backup-drill.timer` (1-е 06:00) — все установлены и проверены боевым запуском |
+| `arv-backup-db.timer` | **установлен 2026-09-16**: `enabled` + `active`, следующий запуск 2026-09-17 03:00 MSK. Проверен боевым `systemctl start` → `Result=success`, создан бэкап и строка в `backup_history`. Срабатывает в тот же момент, что APScheduler внутри приложения, и берёт **тот же** `flock` `/var/lock/arv-db.lock` — поэтому дамп за сутки ровно один (§2.1, §10 п. 4, 18) |
 | Второй off-site | **механизм проверен, получателя нет** — см. §1.1 и §10 п. 7 |
 
 > ✅ **apt разблокирован (2026-09-16).** До этого лок-файл `/var/lib/apt/lists/lock` ~200 дней держал зависший `apt-get -qq -y update` (`apt-daily.service` в состоянии `activating` с 2026-02-28), из-за чего `apt-get install` не работал и **обновления безопасности ОС не приходили**. Устранено: `systemctl stop apt-daily.service` (таймер перезапустил его корректно) → `systemctl reset-failed` → `apt-get update`. После этого установлены `age 1.1.1`, `restic 0.16.4`, `rclone 1.60.1`.
@@ -165,7 +166,7 @@ sudo -n journalctl -u arv.service --since '-14 days' --no-pager \
 # плохо:    scheduler_init_failed  → бэкапы НЕ идут, хотя приложение работает
 #           backup_scheduler_skipped reason=disabled_or_no_company → см. §10 п. 4
 
-# установлены ли systemd-таймеры бэкапа (ожидаемо: media, secrets, verify, drill)
+# установлены ли systemd-таймеры бэкапа (ожидаемо: db, media, secrets, verify, drill)
 systemctl list-timers 'arv-backup-*' --all
 ls -1 /etc/systemd/system/arv-backup-* 2>/dev/null || echo "таймеры не установлены"
 
@@ -220,7 +221,7 @@ sudo -n grep -E '^(BACKUP_|DATABASE_URL|TOKEN_ENCRYPTION_KEY|SECRET_KEY|STORAGE_
   /opt/arv/app/.env | sed -E 's/=(.*)$/=<set>/'
 ```
 
-Что смотреть: `BACKUP_AGE_RECIPIENT` (задан → дампы шифруются), `BACKUP_AGE_IDENTITY_FILE` (нужен только для расшифровки/verify/drill, на проде **не задан** — ключа на сервере нет), `BACKUP_MEDIA_ENABLED`, `BACKUP_RESTIC_REPOSITORY`, `BACKUP_SECONDARY_RCLONE_REMOTE` (пусто → второго off-site нет), `STORAGE_BASE_PATH`.
+Что смотреть: `BACKUP_AGE_RECIPIENT` (задан → дампы шифруются), `BACKUP_AGE_IDENTITY_FILE` (нужен только для расшифровки/verify/drill; на проде **задан** и указывает на канонический путь `/etc/arv/backup-age.key`, но **самого файла на хосте нет** вне окна восстановления, поэтому `verify`/`drill` штатно сообщают `no_identity`), `BACKUP_MEDIA_ENABLED`, `BACKUP_RESTIC_REPOSITORY`, `BACKUP_SECONDARY_RCLONE_REMOTE` (пусто → второго off-site нет), `STORAGE_BASE_PATH`.
 
 На проде на 2026-09-16 заданы:
 
@@ -228,8 +229,22 @@ sudo -n grep -E '^(BACKUP_|DATABASE_URL|TOKEN_ENCRYPTION_KEY|SECRET_KEY|STORAGE_
 BACKUP_MEDIA_ENABLED=true
 BACKUP_RESTIC_REPOSITORY=/var/backups/arv/restic
 BACKUP_RESTIC_PASSWORD_FILE=/etc/arv/restic-password
-BACKUP_AGE_RECIPIENT=age1…          # публичный ключ, приватного на хосте нет
+BACKUP_AGE_RECIPIENT=age1…          # публичный ключ
+BACKUP_AGE_IDENTITY_FILE=/etc/arv/backup-age.key   # файла нет вне окна восстановления
 ```
+
+Приватный ключ age хранится **вне хоста**: `~/.arv-secrets/backup-age.key` на рабочей машине
+оператора (права — только владелец). Хост, соответствующий этому ключу, проверяется так:
+
+```bash
+age-keygen -y ~/.arv-secrets/backup-age.key   # должен совпасть с BACKUP_AGE_RECIPIENT
+```
+
+⚠️ Эскроу лежит на той же машине, что и рабочие логи сессий, поэтому его надо **перенести
+в менеджер паролей или на офлайн-носитель** — иначе при компрометации рабочей машины
+исторические дампы читаемы. Если это уже произошло, ключ считать скомпрометированным и
+ротировать (§10): новые дампы шифровать новым recipient, старые (148, 154) останутся
+читаемыми только старым ключом.
 
 `BACKUP_SECONDARY_RCLONE_REMOTE` пуст → второго off-site нет (§10). `TOKEN_ENCRYPTION_KEY` отсутствует — ключ шифрования токенов выводится из `SECRET_KEY` (§7 шаг 1). **`SECRET_KEY` — самый критичный секрет на этом хосте**, он же лежит в архиве секретов (A3).
 
@@ -753,7 +768,7 @@ sudo -u postgres psql -c 'ALTER DATABASE vertex_ar RENAME TO vertex_ar_broken_20
 | 11 | `backup_company_id=4` — единственный получатель | ⚠️ by design | Бэкапы только для VertexART | См. §13.2 п.14 основного документа |
 | 12 | **`drill` не проходит автоматически на зашифрованном бэкапе** | 🟡 by design, но ручной прогон стал одной командой | Таймер сообщает `no_identity` и не трогает метрику drill — честно, но пригодность бэкапа автоматически **не** доказывается | Прогонять `drill` вручную раз в месяц (§4). Теперь это одна команда, и ключ **не обязательно** монтировать на прод: `drill --from-file <артефакт>` работает на любой машине с `age`, `pg_restore` и кластером. С `--record-as <id>` результат ложится в `backup_history` и алерт закрывается |
 | 13 | **TLS-сертификаты в архив секретов не попадают** — `/etc/letsencrypt/live`, `archive`, `accounts`, `keys`, `csr` имеют режим `0700 root` | ⚠️ by design | В архиве только `cli.ini` и `renewal/`. При полной потере хоста сертификат нужно перевыпускать | `certbot renew --force-renewal`; либо запускать `deploy/backup/backup-secrets.sh` от root, чтобы забрать и `live/archive` |
-| 14 | **Планировщик бэкапа может молча не запуститься** — `init_scheduler()` ловит исключение и логирует `scheduler_init_failed`, приложение при этом стартует нормально | ⚠️ by design (но тихо) | A1 не бэкапится вообще, а «приложение работает» — внешне всё в порядке. Заметно только по `status` через 26 ч или по журналу | Проверка в §2.1 (`grep backup_scheduler_*`). Радикальное лечение — включить `arv-backup-db.timer` вместо APScheduler (см. п. 4) |
+| 14 | **Планировщик бэкапа может молча не запуститься** — `init_scheduler()` ловит исключение и логирует `scheduler_init_failed`, приложение при этом стартует нормально | ✅ **закрыто 2026-09-16** установкой `arv-backup-db.timer` | раньше: A1 не бэкапится вообще, а «приложение работает» — внешне всё в порядке. Теперь при молчаливом отказе планировщика дамп всё равно сделает таймер в 03:00 | Проверка в §2.1 (`grep backup_scheduler_*`). Если планировщик упал — смотреть журнал, но бэкап не пропадёт |
 | 15 | ~~Настройки хранения в админке не управляют хранением~~ | ✅ **закрыто** (2026-09-16) | Было: вкладка «Бэкапы» показывала `backup_retention_days` / `backup_max_copies`, которые ротация игнорирует (действует GFS 7/4/12/3), а сами `backup_keep_*` в UI отсутствовали — изменить окно хранения через админку было **нельзя**. Оператор считал, что у него 30 точек, а фактически было 7 ежедневных. Дополнительно найден **латентный дефект**: POST `/settings/backup` собирал `BackupSettings(...)` без `backup_keep_*`, поэтому каждое сохранение формы молча сбрасывало лестницу к дефолтам 7/4/12/3 — то есть любая настроенная лестница затиралась при первом же «Сохранить» | Вкладка теперь выводит четыре поля GFS (`backup_keep_daily/weekly/monthly/yearly`) — то, что действительно управляет ротацией; мёртвая пара осталась только скрытыми полями, чтобы сохранение не переписывало хранимые значения. POST-роут принимает и сохраняет лестницу (сброс устранён) и **отклоняет лестницу из одних нулей** — иначе ротация удалила бы все копии. Комментарии в `BackupSettings` и `_gfs_limits` больше не выдают мёртвую ветку за живую |
 | 16 | **Ротация удаляет строку `backup_history` вместе с артефактом** — `session.delete(record)` | ⚠️ by design | Списка «все бэкапы за всё время» в системе нет; по истории видно только выжившие. Нельзя доказать, что бэкап за конкретную дату когда-то существовал | Вести внешний журнал (или не удалять строку, а помечать `rotated_at`), если это требование аудита |
 | 17 | **Скачивание требует живую БД** — и `backup download`, и кнопка в админке читают строку `backup_history` | 🟡 **частично закрыто** | Скачать артефакт **из хранилища** при мёртвой БД по-прежнему нельзя (токен в БД). Но **восстановить** из уже имеющегося файла — можно (`restore --from-file`, §6.0), так что веб-интерфейс Яндекс Диска перестал быть единственным путём | Для скачивания — офсайт-копия папки бэкапов (п. 7/9). Для восстановления — уже закрыто |

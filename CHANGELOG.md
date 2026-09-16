@@ -21,8 +21,19 @@ All notable changes to this project will be documented in this file.
   (`app/services/backup_rotation.py`) — даёт точку восстановления месячной давности,
   чего правило «N новейших копий» не умело.
 - **CLI** `app/cli/backup.py`: `status`, `run`, `list`, `download`, `verify`, `drill`, `restore`.
-- **Метрики и алерты** Prometheus по бэкапам (`backup_metrics.py`, `prometheus/alert.rules.yml`).
-- **Юниты и таймеры** systemd: медиа, секреты, verify, drill.
+- **Метрики бэкапов** Prometheus (`app/services/backup_metrics.py`): возраст,
+  длительность, размер, счётчик провалов, timestamp последнего drill.
+  ⚠️ **Алертов по бэкапам в `prometheus/alert.rules.yml` нет** — там только
+  `HighAPIResponseTime`, `CeleryQueueBacklog`, `PostgresHighConnections`;
+  сам `prometheus.yml` остался шаблоном под docker-compose (`app:8000`,
+  `postgres-exporter`) и на прод-хосте не развёрнут. Единственный реально
+  работающий алерт — **`Backup job failed`** через `OnFailure=` systemd
+  (`python -m app.cli.backup notify`). Ни «бэкап устарел», ни «drill просрочен»
+  автоматически не сигналят.
+- **Юниты и таймеры** systemd: db, медиа, секреты, verify, drill.
+  `arv-backup-db.timer` поставлен на прод 2026-09-16 — он страхует случай
+  «приложение лежит в 03:00» и делит `flock` с планировщиком внутри приложения,
+  поэтому дамп за сутки остаётся один.
 
 ### Changed
 - **Админка теперь управляет тем, что действует.** Вкладка «Бэкапы» выводит четыре поля
@@ -56,6 +67,20 @@ All notable changes to this project will be documented in this file.
 - Удалён `/debug/storage-test`, светивший пути файловой системы в продакшене.
 - Удалён утёкший `/tmp/ARV_deploy.tar.gz` (305 МБ, режим `0644`, содержал `.env` и TLS-ключ).
   ⚠️ Ротация затронутых секретов — отдельная задача, порядок описан в `docs/RESTORE_RUNBOOK.md`.
+
+### Verified on production (2026-09-16)
+- **Зашифрованный дамп действительно восстанавливается.** Ключ `age` примонтирован
+  на хост, и на актуальном id: `verify` → `checksum=ok toc=ok entries=150 tables=30`;
+  `drill` → 15 таблиц; `download --decrypt` → 69 028 Б; `verify --from-file` → 150 записей;
+  `restore --from-file --create-db` → 15 таблиц, `ar_content` = 61 строка. Прод не тронут,
+  временная БД и plaintext-файл удалены, ключ с хоста снят. До этого проверялись только
+  незашифрованные дампы, поэтому пригодность актуальных бэкапов была гипотезой.
+- **Дубликат бэкапа закрыт.** Два параллельных процесса на том же entry point, что
+  выполняют два воркера gunicorn: один сделал дамп, второй написал
+  `scheduled_backup_skipped reason=another_process_is_running_it`. Оба видят один
+  лок `/var/lock/arv-db.lock`. Новая строка за сутки ровно одна, «success без артефакта» — 0.
+- **`arv-backup-db.timer` установлен и проверен боевым `systemctl start`** → `Result=success`.
+  Следующий запуск 2026-09-17 03:00 MSK.
 
 ## [2.2.0] - 2026-08-19
 

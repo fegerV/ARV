@@ -1,15 +1,27 @@
 [Unit]
-Description=ARV PostgreSQL backup timer (daily 03:00 UTC)
+Description=ARV PostgreSQL backup timer (daily 03:00 local time)
 
 [Timer]
+# No timezone suffix, so this is 03:00 in the host's local zone (Europe/Moscow
+# on production) — deliberately the same instant as the in-app APScheduler job,
+# whose cron is also read in local time. See the note on AccuracySec below.
 OnCalendar=*-*-* 03:00:00
 # If the host was powered off at 03:00, run as soon as it comes back instead of
 # silently skipping the day. This is the single most common cause of a "backup
 # gap" that nobody notices until a restore is needed.
 Persistent=true
-# Spread load across the fleet and avoid colliding with other 03:00 cron jobs.
-RandomizedDelaySec=300
-AccuracySec=1min
+# Fire on the exact second rather than "somewhere in the next minute", so this
+# coincides with the in-app job. Both take the same flock (the "db" lock in
+# deploy/backup/common.sh, which the scheduler mirrors in app/core/scheduler.py),
+# so whichever starts first runs the dump and the other skips. That gives exactly
+# one database backup per day, while keeping the timer as the fallback for the
+# case this unit exists for: the application being down at 03:00.
+#
+# Do NOT reintroduce a randomized delay here. An offset of minutes guarantees
+# the two triggers no longer overlap, so the second one finds the lock free and
+# runs a *second* dump the same day; GFS then keeps one and deletes the other,
+# which is wasted work and makes the day's artifact set confusing.
+AccuracySec=1s
 Unit=arv-backup-db.service
 
 [Install]
