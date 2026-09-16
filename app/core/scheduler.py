@@ -30,7 +30,27 @@ _JOB_ID = "db_backup"
 # ``acquire_lock "db"``. Sharing it means the in-app scheduler and the systemd
 # timer are mutually safe: whichever gets there first runs the backup and the
 # other skips, instead of both dumping the database.
-JOB_LOCK_PATH = os.environ.get("ARV_BACKUP_LOCK_PATH", "/var/lock/arv-db.lock")
+#
+# ``ARV_BACKUP_LOCK_DIR`` is honoured too, because that is the variable
+# ``deploy/backup/common.sh`` uses. If an operator relocates the lock directory
+# for the shell scripts, the scheduler has to follow, or the two would lock
+# different files and the mutual exclusion would quietly stop working.
+# ``ARV_BACKUP_LOCK_PATH`` overrides both when a full path is wanted.
+DEFAULT_LOCK_PATH = "/var/lock/arv-db.lock"
+
+
+def _resolve_lock_path(env) -> str:
+    """Work out which file to lock, mirroring ``deploy/backup/common.sh``."""
+    explicit = env.get("ARV_BACKUP_LOCK_PATH")
+    if explicit:
+        return explicit
+    lock_dir = env.get("ARV_BACKUP_LOCK_DIR")
+    if lock_dir:
+        return os.path.join(lock_dir, "arv-db.lock")
+    return DEFAULT_LOCK_PATH
+
+
+JOB_LOCK_PATH = _resolve_lock_path(os.environ)
 
 scheduler = AsyncIOScheduler()
 
@@ -58,6 +78,11 @@ class JobLock:
     between processes, and because the kernel releases the lock if the holder
     dies mid-run. Where the primitive is unavailable (Windows) it degrades to
     "always run", which is correct for single-process environments.
+
+    The failure direction is deliberate: this guard only ever *prevents a
+    duplicate*. If the lock file cannot even be opened it reports success and
+    lets the backup run, because silently skipping would stop backups entirely
+    — the one outcome worse than a duplicate.
     """
 
     def __init__(self, path: str):
@@ -72,8 +97,19 @@ class JobLock:
             if parent:
                 os.makedirs(parent, exist_ok=True)
             self._handle = open(self.path, "w")
+        except OSError as exc:
+            # The lock file itself is unusable — the directory is missing or
+            # not writable. Skipping would silently stop backups altogether, so
+            # run anyway: a duplicate backup is recoverable, a missing one is
+            # not. This is why a broken lock must not be conflated with
+            # contention below.
+            logger.warning("backup_lock_unavailable", path=self.path, error=str(exc))
+            self.release()
+            return True
+        try:
             fcntl.flock(self._handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
         except OSError:
+            # Someone else holds it — the expected duplicate case.
             self.release()
             return False
         return True

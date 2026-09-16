@@ -13,6 +13,7 @@ Observed in production on 2026-09-16 (backup 150, 404 from Yandex Disk).
 import os
 
 import pytest
+import structlog
 
 from app.core import scheduler as scheduler_mod
 
@@ -25,8 +26,10 @@ def test_lock_path_is_the_one_the_shell_script_uses():
     is there to prevent.
     """
     # deploy/backup/backup-db.sh calls `acquire_lock "db"`, and common.sh
-    # builds "${LOCK_DIR}/arv-${name}.lock".
-    assert scheduler_mod.JOB_LOCK_PATH.endswith("arv-db.lock")
+    # builds "${LOCK_DIR}/arv-${name}.lock" with LOCK_DIR defaulting to
+    # /var/lock. Assert the whole path, not just the basename: a different
+    # directory would break the exclusion just as thoroughly.
+    assert scheduler_mod._resolve_lock_path({}) == "/var/lock/arv-db.lock"
 
 
 @pytest.mark.asyncio
@@ -140,3 +143,53 @@ def test_lock_creates_its_parent_directory(tmp_path):
         assert os.path.exists(path)
     finally:
         lock.release()
+
+
+@pytest.mark.skipif(
+    scheduler_mod.fcntl is None, reason="flock is POSIX-only; production is Linux"
+)
+def test_unusable_lock_file_lets_the_backup_run(tmp_path):
+    """A broken lock must not silently stop backups.
+
+    Skipping is the right answer for contention and the wrong answer for a
+    lock we cannot create at all: the job would then never run again, and the
+    failure would be invisible because nothing raises.
+    """
+    # A directory where the lock file should be: open() cannot succeed.
+    path = str(tmp_path / "arv-db.lock")
+    os.mkdir(path)
+
+    lock = scheduler_mod.JobLock(path)
+
+    with structlog.testing.capture_logs() as captured:
+        assert lock.acquire() is True
+    lock.release()
+
+    # Running on is only acceptable if it is *loud*: the operator needs to be
+    # able to find out that the guard is not working.
+    assert any(e["event"] == "backup_lock_unavailable" for e in captured)
+
+
+def test_lock_dir_env_var_is_honoured():
+    """ARV_BACKUP_LOCK_DIR must move the scheduler with the shell scripts.
+
+    common.sh builds "${LOCK_DIR}/arv-${name}.lock" from this variable. If the
+    scheduler ignored it, relocating the lock directory would leave the two
+    locking different files — mutual exclusion gone, no error raised.
+    """
+    assert (
+        scheduler_mod._resolve_lock_path({"ARV_BACKUP_LOCK_DIR": "/run/mylock"})
+        == os.path.join("/run/mylock", "arv-db.lock")
+    )
+
+
+def test_explicit_lock_path_wins():
+    assert (
+        scheduler_mod._resolve_lock_path(
+            {
+                "ARV_BACKUP_LOCK_PATH": "/tmp/pinned.lock",
+                "ARV_BACKUP_LOCK_DIR": "/run/mylock",
+            }
+        )
+        == "/tmp/pinned.lock"
+    )
