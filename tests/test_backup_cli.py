@@ -1311,3 +1311,255 @@ def _patch_backup_settings(monkeypatch, company_id=4, yd_folder="backups"):
 
     monkeypatch.setattr(SettingsService, "get_all_settings", _get_all_settings)
     monkeypatch.setattr(backup_cli, "AsyncSessionLocal", _FakeSession)
+
+
+# ----------------------------------------------------------------------
+# verify / drill --from-file: prove a backup usable without the database
+# ----------------------------------------------------------------------
+#
+# The automated verify and drill cannot open an encrypted artifact — the age
+# identity is kept off the production host by design — so the strongest
+# automatic proof is a checksum. These commands let the operator take the
+# artifact to wherever the key is and finish the job.
+
+
+@pytest.mark.asyncio
+async def test_cmd_verify_from_file_needs_no_session(monkeypatch):
+    captured: dict = {}
+
+    async def _fake_verify_file(
+        self, artifact_path, *, encrypted=None, record_as=None
+    ):
+        captured["artifact_path"] = artifact_path
+        captured["encrypted"] = encrypted
+        captured["record_as"] = record_as
+        return {"ok": True, "entries": 12, "tables": 9, "source_file": artifact_path}
+
+    monkeypatch.setattr(backup_cli.RestoreService, "verify_file", _fake_verify_file)
+
+    args = backup_cli.build_parser().parse_args(
+        ["verify", "--from-file", "/tmp/backup.sql.gz.age"]
+    )
+    assert await backup_cli.cmd_verify(args) == 0
+    assert captured == {
+        "artifact_path": "/tmp/backup.sql.gz.age",
+        "encrypted": None,
+        "record_as": None,
+    }
+
+
+@pytest.mark.asyncio
+async def test_cmd_verify_from_file_passes_record_as(monkeypatch):
+    """--record-as is how a manual verify reaches the dashboard."""
+    captured: dict = {}
+
+    async def _fake_verify_file(
+        self, artifact_path, *, encrypted=None, record_as=None
+    ):
+        captured["record_as"] = record_as
+        captured["encrypted"] = encrypted
+        return {"ok": True, "entries": 1, "tables": 1, "source_file": artifact_path}
+
+    monkeypatch.setattr(backup_cli.RestoreService, "verify_file", _fake_verify_file)
+
+    args = backup_cli.build_parser().parse_args(
+        [
+            "verify",
+            "--from-file",
+            "/tmp/renamed.sql.gz",
+            "--encrypted",
+            "--record-as",
+            "148",
+        ]
+    )
+    assert await backup_cli.cmd_verify(args) == 0
+    assert captured == {"record_as": 148, "encrypted": True}
+
+
+@pytest.mark.asyncio
+async def test_cmd_verify_from_file_fails_loudly(monkeypatch):
+    async def _fake_verify_file(
+        self, artifact_path, *, encrypted=None, record_as=None
+    ):
+        return {"ok": False, "error": "Artifact not found: /tmp/nope.sql.gz"}
+
+    monkeypatch.setattr(backup_cli.RestoreService, "verify_file", _fake_verify_file)
+
+    args = backup_cli.build_parser().parse_args(
+        ["verify", "--from-file", "/tmp/nope.sql.gz"]
+    )
+    assert await backup_cli.cmd_verify(args) == 1
+
+
+@pytest.mark.asyncio
+async def test_cmd_drill_from_file_does_not_look_up_a_backup(monkeypatch):
+    """No session, so it works with the database gone."""
+    captured: dict = {}
+
+    async def _fake_drill_file(
+        self, artifact_path, *, encrypted=None, record_as=None
+    ):
+        captured["artifact_path"] = artifact_path
+        captured["record_as"] = record_as
+        return {
+            "ok": True,
+            "tables_restored": 15,
+            "duration_seconds": 3,
+            "source_file": artifact_path,
+        }
+
+    def _must_not_be_used(*_args, **_kwargs):
+        raise AssertionError("drill --from-file must not read the database")
+
+    monkeypatch.setattr(backup_cli.RestoreService, "drill_file", _fake_drill_file)
+    monkeypatch.setattr(backup_cli, "AsyncSessionLocal", _must_not_be_used)
+
+    args = backup_cli.build_parser().parse_args(
+        ["drill", "--from-file", "/tmp/backup.sql.gz.age", "--record-as", "148"]
+    )
+    assert await backup_cli.cmd_drill(args) == 0
+    assert captured == {
+        "artifact_path": "/tmp/backup.sql.gz.age",
+        "record_as": 148,
+    }
+
+
+@pytest.mark.asyncio
+async def test_cmd_drill_from_file_fails_loudly(monkeypatch):
+    async def _fake_drill_file(
+        self, artifact_path, *, encrypted=None, record_as=None
+    ):
+        return {"ok": False, "error": "pg_restore exited with code 1"}
+
+    monkeypatch.setattr(backup_cli.RestoreService, "drill_file", _fake_drill_file)
+
+    args = backup_cli.build_parser().parse_args(
+        ["drill", "--from-file", "/tmp/backup.sql.gz"]
+    )
+    assert await backup_cli.cmd_drill(args) == 1
+
+
+# ----------------------------------------------------------------------
+# verify / drill --from-file: prove a backup usable without the database
+# ----------------------------------------------------------------------
+#
+# The automated verify and drill cannot open an encrypted artifact — the age
+# identity is kept off the production host by design — so the strongest
+# automatic proof is a checksum. These commands let the operator take the
+# artifact to wherever the key is and finish the job.
+
+
+@pytest.mark.asyncio
+async def test_cmd_verify_from_file_needs_no_session(monkeypatch):
+    captured: dict = {}
+
+    async def _fake_verify_file(
+        self, artifact_path, *, encrypted=None, record_as=None
+    ):
+        captured["artifact_path"] = artifact_path
+        captured["encrypted"] = encrypted
+        captured["record_as"] = record_as
+        return {"ok": True, "entries": 12, "tables": 9, "source_file": artifact_path}
+
+    monkeypatch.setattr(backup_cli.RestoreService, "verify_file", _fake_verify_file)
+
+    args = backup_cli.build_parser().parse_args(
+        ["verify", "--from-file", "/tmp/backup.sql.gz.age"]
+    )
+    assert await backup_cli.cmd_verify(args) == 0
+    assert captured == {
+        "artifact_path": "/tmp/backup.sql.gz.age",
+        "encrypted": None,
+        "record_as": None,
+    }
+
+
+@pytest.mark.asyncio
+async def test_cmd_verify_from_file_passes_record_as(monkeypatch):
+    """--record-as is how a manual verify reaches the dashboard."""
+    captured: dict = {}
+
+    async def _fake_verify_file(
+        self, artifact_path, *, encrypted=None, record_as=None
+    ):
+        captured["record_as"] = record_as
+        captured["encrypted"] = encrypted
+        return {"ok": True, "entries": 1, "tables": 1, "source_file": artifact_path}
+
+    monkeypatch.setattr(backup_cli.RestoreService, "verify_file", _fake_verify_file)
+
+    args = backup_cli.build_parser().parse_args(
+        [
+            "verify",
+            "--from-file",
+            "/tmp/renamed.sql.gz",
+            "--encrypted",
+            "--record-as",
+            "148",
+        ]
+    )
+    assert await backup_cli.cmd_verify(args) == 0
+    assert captured == {"record_as": 148, "encrypted": True}
+
+
+@pytest.mark.asyncio
+async def test_cmd_verify_from_file_fails_loudly(monkeypatch):
+    async def _fake_verify_file(
+        self, artifact_path, *, encrypted=None, record_as=None
+    ):
+        return {"ok": False, "error": "Artifact not found: /tmp/nope.sql.gz"}
+
+    monkeypatch.setattr(backup_cli.RestoreService, "verify_file", _fake_verify_file)
+
+    args = backup_cli.build_parser().parse_args(
+        ["verify", "--from-file", "/tmp/nope.sql.gz"]
+    )
+    assert await backup_cli.cmd_verify(args) == 1
+
+
+@pytest.mark.asyncio
+async def test_cmd_drill_from_file_does_not_look_up_a_backup(monkeypatch):
+    """No session, so it works with the database gone."""
+    captured: dict = {}
+
+    async def _fake_drill_file(
+        self, artifact_path, *, encrypted=None, record_as=None
+    ):
+        captured["artifact_path"] = artifact_path
+        captured["record_as"] = record_as
+        return {
+            "ok": True,
+            "tables_restored": 15,
+            "duration_seconds": 3,
+            "source_file": artifact_path,
+        }
+
+    def _must_not_be_used(*_args, **_kwargs):
+        raise AssertionError("drill --from-file must not read the database")
+
+    monkeypatch.setattr(backup_cli.RestoreService, "drill_file", _fake_drill_file)
+    monkeypatch.setattr(backup_cli, "AsyncSessionLocal", _must_not_be_used)
+
+    args = backup_cli.build_parser().parse_args(
+        ["drill", "--from-file", "/tmp/backup.sql.gz.age", "--record-as", "148"]
+    )
+    assert await backup_cli.cmd_drill(args) == 0
+    assert captured == {
+        "artifact_path": "/tmp/backup.sql.gz.age",
+        "record_as": 148,
+    }
+
+
+@pytest.mark.asyncio
+async def test_cmd_drill_from_file_fails_loudly(monkeypatch):
+    async def _fake_drill_file(
+        self, artifact_path, *, encrypted=None, record_as=None
+    ):
+        return {"ok": False, "error": "pg_restore exited with code 1"}
+
+    monkeypatch.setattr(backup_cli.RestoreService, "drill_file", _fake_drill_file)
+
+    args = backup_cli.build_parser().parse_args(
+        ["drill", "--from-file", "/tmp/backup.sql.gz"]
+    )
+    assert await backup_cli.cmd_drill(args) == 1

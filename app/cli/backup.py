@@ -357,6 +357,23 @@ async def cmd_verify(args: argparse.Namespace) -> int:
     ``checksum`` at all, because restic manages its own integrity. Media is
     verified with ``restic check`` (see ``verify-media``) instead.
     """
+    if args.from_file:
+        # The whole point of this branch: prove an archive is readable without
+        # the database, on a machine that has the age key.
+        report = await RestoreService().verify_file(
+            args.from_file,
+            encrypted=True if args.encrypted else None,
+            record_as=args.record_as,
+        )
+        if not report.get("ok"):
+            print(f"verify FAILED: {report.get('error')}", file=sys.stderr)
+            return 1
+        print(
+            f"file {args.from_file}: entries={report['entries']} "
+            f"tables={report['tables']}"
+        )
+        return 0
+
     async with AsyncSessionLocal() as session:
         service = BackupService()
         records = await service.list_backups(
@@ -430,6 +447,25 @@ async def cmd_verify_media(args: argparse.Namespace) -> int:
 
 async def cmd_drill(args: argparse.Namespace) -> int:
     """Restore the newest backup into a throwaway database."""
+    if args.from_file:
+        # The only way to actually prove a backup restorable while the age
+        # identity stays off the production host: run the drill where the key
+        # is. --record-as lets that drill clear the 'drill overdue' alert.
+        report = await RestoreService().drill_file(
+            args.from_file,
+            encrypted=True if args.encrypted else None,
+            record_as=args.record_as,
+        )
+        if report.get("ok"):
+            print(
+                f"drill on {args.from_file}: {report['tables_restored']} tables "
+                f"restored in {report['duration_seconds']}s "
+                f"(throwaway database dropped)"
+            )
+            return 0
+        print(f"drill FAILED: {report.get('error')}", file=sys.stderr)
+        return 1
+
     async with AsyncSessionLocal() as session:
         record = await BackupService().get_last_status(
             session, backup_type=args.backup_type
@@ -670,6 +706,46 @@ def _print_record(record: BackupHistory | None) -> None:
         print(f"error: {record.error_message}", file=sys.stderr)
 
 
+def _add_from_file_args(
+    parser: argparse.ArgumentParser, *, with_record_as: bool = True
+) -> None:
+    """Add the ``--from-file`` options shared by verify, drill and restore.
+
+    Defined once so the three commands cannot drift apart in how they describe
+    or interpret the same options. ``with_record_as`` is off for restore, which
+    writes no verification status to record.
+    """
+    parser.add_argument(
+        "--from-file",
+        default=None,
+        metavar="PATH",
+        help=(
+            "Operate on an artifact already on this host instead of fetching "
+            "it from storage. Needs no database."
+        ),
+    )
+    parser.add_argument(
+        "--encrypted",
+        action="store_true",
+        help=(
+            "Force treating the artifact as age-encrypted. Only needed when "
+            "the file was renamed away from its .age suffix."
+        ),
+    )
+    if with_record_as:
+        parser.add_argument(
+            "--record-as",
+            type=int,
+            default=None,
+            metavar="BACKUP_ID",
+            help=(
+                "Also write the outcome onto this backup_history row, so a "
+                "manual drill can clear the 'drill overdue' alert. Requires "
+                "the database."
+            ),
+        )
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="python -m app.cli.backup",
@@ -707,6 +783,7 @@ def build_parser() -> argparse.ArgumentParser:
         choices=("db",),
         help="Only database dumps have a pg_restore-verifiable archive.",
     )
+    _add_from_file_args(verify)
     verify.set_defaults(func=cmd_verify)
 
     verify_media = sub.add_parser(
@@ -717,6 +794,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     drill = sub.add_parser("drill", help="Restore into a throwaway database.")
     drill.add_argument("--backup-type", default="db")
+    _add_from_file_args(drill)
     drill.set_defaults(func=cmd_drill)
 
     restore = sub.add_parser("restore", help="Restore a backup into a target database.")
@@ -733,25 +811,7 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Create the target database when it does not exist.",
     )
-    restore.add_argument(
-        "--from-file",
-        default=None,
-        metavar="PATH",
-        help=(
-            "Restore an artifact already on this host instead of fetching it "
-            "from storage. Needs no database, so it works when the database "
-            "itself is gone."
-        ),
-    )
-    restore.add_argument(
-        "--encrypted",
-        action="store_true",
-        help=(
-            "Force treating the --from-file artifact as age-encrypted. Only "
-            "needed when the file was renamed away from its .age suffix, which "
-            "would otherwise be read as a plain gzip and fail."
-        ),
-    )
+    _add_from_file_args(restore, with_record_as=False)
     restore.set_defaults(func=cmd_restore)
 
     download = sub.add_parser(

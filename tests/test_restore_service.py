@@ -1227,3 +1227,222 @@ async def test_restore_from_file_fails_loudly_without_the_age_identity(
 
     assert report["ok"] is False
     assert "BACKUP_AGE_IDENTITY_FILE" in report["error"]
+
+
+# ----------------------------------------------------------------------
+# verify_file / drill_file: prove a backup usable where the key is
+# ----------------------------------------------------------------------
+#
+# The automated verify and drill cannot open an encrypted artifact, because the
+# age identity is deliberately kept off the production host. These two entry
+# points let the operator carry the artifact somewhere the key *is* available
+# and prove it there — so the monthly drill stops being aspirational.
+
+
+def _archive_listing() -> str:
+    return "\n".join(
+        [
+            ";",
+            "; Archive created at 2026-09-16 03:00:00 UTC",
+            ";",
+            "3; 2615 2200 SCHEMA - public arv",
+            "200; 1259 16385 TABLE public companies arv",
+            "201; 1259 16390 TABLE public ar_content arv",
+            "202; 0 0 TABLE DATA public companies arv",
+        ]
+    )
+
+
+def _stub_pg_restore(monkeypatch, restore_service, listing=None):
+    """Stub the pg_restore binary and its output."""
+    monkeypatch.setattr(restore_service, "binary_available", lambda _b: True)
+
+    async def _fake_run_command(cmd, **kwargs):
+        return listing if listing is not None else _archive_listing()
+
+    monkeypatch.setattr(restore_service, "run_command", _fake_run_command)
+
+
+@pytest.mark.asyncio
+async def test_verify_file_lists_an_archive_without_a_database(monkeypatch, tmp_path):
+    from app.services import restore_service
+
+    monkeypatch.setattr(restore_service, "settings", _restore_settings())
+
+    def _no_session(*_args, **_kwargs):
+        raise AssertionError("verify_file must not open a database session")
+
+    monkeypatch.setattr(restore_service, "AsyncSessionLocal", _no_session)
+    _stub_pg_restore(monkeypatch, restore_service)
+
+    artifact = tmp_path / "backup_20260916_030000.sql.gz"
+    _write_gz_artifact(artifact, b"PGDMP archive")
+
+    report = await restore_service.RestoreService().verify_file(str(artifact))
+
+    assert report["ok"] is True
+    assert report["entries"] == 4  # comment lines excluded
+    assert report["tables"] == 3
+    assert report["source_file"] == str(artifact)
+
+
+@pytest.mark.asyncio
+async def test_verify_file_reports_a_missing_artifact(monkeypatch, tmp_path):
+    from app.services import restore_service
+
+    monkeypatch.setattr(restore_service, "settings", _restore_settings())
+    _stub_pg_restore(monkeypatch, restore_service)
+
+    report = await restore_service.RestoreService().verify_file(
+        str(tmp_path / "nope.sql.gz")
+    )
+
+    assert report["ok"] is False
+    assert "Artifact not found" in report["error"]
+
+
+@pytest.mark.asyncio
+async def test_verify_file_records_only_when_asked(monkeypatch, tmp_path):
+    """--record-as is opt-in: the default path must touch no database."""
+    from app.services import restore_service
+
+    recorded: list[tuple[int, str]] = []
+
+    async def _fake_record(backup_id, status):
+        recorded.append((backup_id, status))
+
+    monkeypatch.setattr(restore_service, "settings", _restore_settings())
+    # _record_verification is a staticmethod, so the replacement must be one too
+    # or the descriptor would pass `self` and the call would not match.
+    monkeypatch.setattr(
+        restore_service.RestoreService,
+        "_record_verification",
+        staticmethod(_fake_record),
+    )
+    _stub_pg_restore(monkeypatch, restore_service)
+
+    artifact = tmp_path / "backup.sql.gz"
+    _write_gz_artifact(artifact)
+
+    await restore_service.RestoreService().verify_file(str(artifact))
+    assert recorded == []
+
+    await restore_service.RestoreService().verify_file(str(artifact), record_as=77)
+    assert recorded == [(77, "ok")]
+
+
+@pytest.mark.asyncio
+async def test_drill_file_restores_and_drops_the_throwaway_database(
+    monkeypatch, tmp_path
+):
+    from app.services import restore_service
+
+    created: list[str] = []
+    dropped: list[str] = []
+    restored: list[bytes] = []
+
+    async def _create(self, name):
+        created.append(name)
+
+    async def _drop(self, name):
+        dropped.append(name)
+
+    async def _restore_into(self, database, dump_path):
+        restored.append(Path(dump_path).read_bytes())
+
+    async def _count(self, database):
+        return 15
+
+    monkeypatch.setattr(restore_service, "settings", _restore_settings())
+    monkeypatch.setattr(restore_service.RestoreService, "_create_database", _create)
+    monkeypatch.setattr(restore_service.RestoreService, "_drop_database", _drop)
+    monkeypatch.setattr(
+        restore_service.RestoreService, "_pg_restore_into", _restore_into
+    )
+    monkeypatch.setattr(restore_service.RestoreService, "_count_tables", _count)
+
+    artifact = tmp_path / "backup_20260916_030000.sql.gz"
+    _write_gz_artifact(artifact, b"PGDMP archive")
+
+    report = await restore_service.RestoreService().drill_file(str(artifact))
+
+    assert report["ok"] is True
+    assert report["tables_restored"] == 15
+    assert report["source_file"] == str(artifact)
+    assert created and created[0].startswith("arv_drill_")
+    # the throwaway database is always dropped
+    assert dropped == created
+    assert restored == [b"PGDMP archive"]
+
+
+@pytest.mark.asyncio
+async def test_drill_file_drops_the_database_even_when_the_restore_fails(
+    monkeypatch, tmp_path
+):
+    from app.services import restore_service
+
+    created: list[str] = []
+    dropped: list[str] = []
+
+    async def _create(self, name):
+        created.append(name)
+
+    async def _drop(self, name):
+        dropped.append(name)
+
+    async def _boom(self, database, dump_path):
+        raise RuntimeError("pg_restore exited with code 1")
+
+    monkeypatch.setattr(restore_service, "settings", _restore_settings())
+    monkeypatch.setattr(restore_service.RestoreService, "_create_database", _create)
+    monkeypatch.setattr(restore_service.RestoreService, "_drop_database", _drop)
+    monkeypatch.setattr(restore_service.RestoreService, "_pg_restore_into", _boom)
+
+    artifact = tmp_path / "backup.sql.gz"
+    _write_gz_artifact(artifact)
+
+    report = await restore_service.RestoreService().drill_file(str(artifact))
+
+    assert report["ok"] is False
+    assert "pg_restore exited" in report["error"]
+    # a failed drill must not leave a database behind
+    assert dropped == created
+
+
+@pytest.mark.asyncio
+async def test_drill_file_records_the_outcome_against_a_backup_row(
+    monkeypatch, tmp_path
+):
+    """This is what lets a manual drill clear the 'drill overdue' alert."""
+    from app.services import restore_service
+
+    recorded: list[tuple[int, str]] = []
+
+    async def _fake_record(backup_id, status):
+        recorded.append((backup_id, status))
+
+    async def _noop(self, *args):
+        return None
+
+    async def _count(self, database):
+        return 15
+
+    monkeypatch.setattr(restore_service, "settings", _restore_settings())
+    # staticmethod, as above: a plain function would receive `self`.
+    monkeypatch.setattr(
+        restore_service.RestoreService, "_record_drill", staticmethod(_fake_record)
+    )
+    monkeypatch.setattr(restore_service.RestoreService, "_create_database", _noop)
+    monkeypatch.setattr(restore_service.RestoreService, "_drop_database", _noop)
+    monkeypatch.setattr(restore_service.RestoreService, "_pg_restore_into", _noop)
+    monkeypatch.setattr(restore_service.RestoreService, "_count_tables", _count)
+
+    artifact = tmp_path / "backup.sql.gz"
+    _write_gz_artifact(artifact)
+
+    report = await restore_service.RestoreService().drill_file(
+        str(artifact), record_as=148
+    )
+
+    assert report["ok"] is True
+    assert recorded == [(148, "ok")]

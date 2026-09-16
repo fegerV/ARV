@@ -359,29 +359,7 @@ class RestoreService:
         workdir = tempfile.mkdtemp(prefix="arv-verify-")
         try:
             dump_path = await self.materialize_dump(backup_id, workdir)
-            listing = await run_command(
-                [binary, "--list", dump_path],
-                label="pg_restore --list",
-                timeout=self.LIST_TIMEOUT,
-                capture_stdout=True,
-            )
-
-            entries = [
-                line
-                for line in listing.splitlines()
-                if line and not line.startswith(";")
-            ]
-            tables = [
-                line
-                for line in entries
-                if re.search(r"\sTABLE\s", line) or " TABLE DATA " in line
-            ]
-
-            report = {
-                "ok": bool(entries),
-                "entries": len(entries),
-                "tables": len(tables),
-            }
+            report = await self._list_archive(dump_path, binary)
             await self._record_verification(
                 backup_id,
                 STATUS_OK if report["ok"] else STATUS_LIST_FAILED,
@@ -392,6 +370,80 @@ class RestoreService:
             logger.error("backup_dump_verify_failed", backup_id=backup_id, error=str(exc))
             await self._record_verification(backup_id, STATUS_LIST_FAILED)
             return {"ok": False, "error": str(exc)}
+        finally:
+            shutil.rmtree(workdir, ignore_errors=True)
+
+    async def _list_archive(self, dump_path: str, binary: str) -> dict:
+        """Read the archive's own table of contents.
+
+        Catches truncation and format problems without touching a server, which
+        is why it is cheap enough to run after every backup.
+        """
+        listing = await run_command(
+            [binary, "--list", dump_path],
+            label="pg_restore --list",
+            timeout=self.LIST_TIMEOUT,
+            capture_stdout=True,
+        )
+
+        entries = [
+            line
+            for line in listing.splitlines()
+            if line and not line.startswith(";")
+        ]
+        tables = [
+            line
+            for line in entries
+            if re.search(r"\sTABLE\s", line) or " TABLE DATA " in line
+        ]
+        return {"ok": bool(entries), "entries": len(entries), "tables": len(tables)}
+
+    async def verify_file(
+        self,
+        artifact_path: str,
+        *,
+        encrypted: bool | None = None,
+        record_as: int | None = None,
+    ) -> dict:
+        """Read the table of contents of an artifact that is already a file.
+
+        The same check as :meth:`verify_dump` minus the download. This is what
+        makes verification possible while the age identity stays off the
+        production host: carry the artifact somewhere the key is available and
+        prove the archive is readable there. Nothing about the production
+        database is touched — which is also why ``record_as`` is optional and
+        the only thing that needs it.
+        """
+        binary = (
+            getattr(settings, "BACKUP_PG_RESTORE_BINARY", "pg_restore") or "pg_restore"
+        ).strip()
+        if not binary_available(binary):
+            return {"ok": False, "error": f"{binary} not found on PATH"}
+
+        workdir = tempfile.mkdtemp(prefix="arv-verify-file-")
+        try:
+            dump_path = await self.materialize_artifact(
+                artifact_path, workdir, encrypted=encrypted, label="from_file"
+            )
+            report = await self._list_archive(dump_path, binary)
+            report["source_file"] = os.path.abspath(artifact_path)
+            if record_as is not None:
+                await self._record_verification(
+                    record_as, STATUS_OK if report["ok"] else STATUS_LIST_FAILED
+                )
+            logger.info("backup_file_verified", **report)
+            return report
+        except Exception as exc:
+            logger.error(
+                "backup_file_verify_failed", artifact_path=artifact_path, error=str(exc)
+            )
+            if record_as is not None:
+                await self._record_verification(record_as, STATUS_LIST_FAILED)
+            return {
+                "ok": False,
+                "error": str(exc),
+                "source_file": os.path.abspath(artifact_path),
+            }
         finally:
             shutil.rmtree(workdir, ignore_errors=True)
 
@@ -455,6 +507,71 @@ class RestoreService:
             await self._record_drill(backup_id, STATUS_RESTORE_FAILED)
             record_restore_drill(False)
             return {"ok": False, "error": str(exc)}
+        finally:
+            shutil.rmtree(workdir, ignore_errors=True)
+
+    async def drill_file(
+        self,
+        artifact_path: str,
+        *,
+        encrypted: bool | None = None,
+        record_as: int | None = None,
+    ) -> dict:
+        """Restore an artifact file into a throwaway database.
+
+        The strongest proof there is, and the only one available while the age
+        identity stays off the production host: mount the key, point this at
+        the artifact, and the backup is *proven* restorable rather than merely
+        assumed to be. The throwaway database is dropped either way, so a
+        failed drill leaves no debris.
+
+        ``record_as`` writes the outcome onto that backup row, which is what
+        lets the "drill overdue" alert clear after a manual drill. Without it
+        nothing but the local metric is touched — the point being that proving
+        a backup usable must not require the database that might be gone.
+        """
+        drill_db = self._drill_db_name()
+        started = time.monotonic()
+
+        workdir = tempfile.mkdtemp(prefix="arv-drill-file-")
+        try:
+            dump_path = await self.materialize_artifact(
+                artifact_path, workdir, encrypted=encrypted, label="from_file"
+            )
+            await self._create_database(drill_db)
+            try:
+                await self._pg_restore_into(drill_db, dump_path)
+                table_count = await self._count_tables(drill_db)
+            finally:
+                await self._drop_database(drill_db)
+
+            ok = table_count > 0
+            report = {
+                "ok": ok,
+                "tables_restored": table_count,
+                "duration_seconds": int(time.monotonic() - started),
+                "drill_database": drill_db,
+                "source_file": os.path.abspath(artifact_path),
+            }
+            if record_as is not None:
+                await self._record_drill(
+                    record_as, STATUS_OK if ok else STATUS_RESTORE_FAILED
+                )
+            record_restore_drill(ok)
+            logger.info("backup_file_drill_completed", **report)
+            return report
+        except Exception as exc:
+            logger.error(
+                "backup_file_drill_failed", artifact_path=artifact_path, error=str(exc)
+            )
+            if record_as is not None:
+                await self._record_drill(record_as, STATUS_RESTORE_FAILED)
+            record_restore_drill(False)
+            return {
+                "ok": False,
+                "error": str(exc),
+                "source_file": os.path.abspath(artifact_path),
+            }
         finally:
             shutil.rmtree(workdir, ignore_errors=True)
 
