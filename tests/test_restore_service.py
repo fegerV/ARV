@@ -999,3 +999,231 @@ async def test_restore_to_leaves_an_existing_database_alone(monkeypatch):
     assert report["created_database"] is False
     assert created == []
 
+
+
+# ----------------------------------------------------------------------
+# restore_from_file: the only path that works when the database is gone
+# ----------------------------------------------------------------------
+#
+# restore_to resolves its storage token from ``companies.yandex_disk_token``,
+# i.e. from the database. That makes it useless in the scenario recovery exists
+# for: the database is gone, so the token is gone, so the artifact cannot be
+# fetched. restore_from_file takes the artifact as a file instead and never
+# touches the database.
+
+
+def _stub_cluster(monkeypatch, restore_service, *, exists=False, count=15):
+    """Stub the cluster side, leaving materialisation real.
+
+    The point of these tests is the decrypt/decompress path, so only the
+    PostgreSQL calls are replaced. The dump is captured as *bytes*, not as a
+    path: the work directory is removed in the service's ``finally`` block, so
+    a recorded path would be gone by the time the test looks at it.
+    """
+    created: list[str] = []
+    restored: list[bytes] = []
+
+    async def _exists(self, name):
+        return exists
+
+    async def _create(self, name):
+        created.append(name)
+
+    async def _restore_into(self, database, dump_path):
+        restored.append(Path(dump_path).read_bytes())
+
+    async def _count(self, database):
+        return count
+
+    monkeypatch.setattr(restore_service.RestoreService, "_database_exists", _exists)
+    monkeypatch.setattr(restore_service.RestoreService, "_create_database", _create)
+    monkeypatch.setattr(
+        restore_service.RestoreService, "_pg_restore_into", _restore_into
+    )
+    monkeypatch.setattr(restore_service.RestoreService, "_count_tables", _count)
+    return created, restored
+
+
+def _write_gz_artifact(path: Path, payload: bytes = b"PGDMP archive") -> None:
+    with gzip.open(path, "wb") as handle:
+        handle.write(payload)
+
+
+@pytest.mark.asyncio
+async def test_restore_from_file_needs_no_database(monkeypatch, tmp_path):
+    """No session, no token, no database — that is the whole point."""
+    from app.services import restore_service
+
+    monkeypatch.setattr(restore_service, "settings", _restore_settings())
+
+    def _no_session(*_args, **_kwargs):
+        raise AssertionError("restore_from_file must not open a database session")
+
+    monkeypatch.setattr(restore_service, "AsyncSessionLocal", _no_session)
+    created, restored = _stub_cluster(monkeypatch, restore_service, exists=False)
+
+    artifact = tmp_path / "backup_20260916_030000.sql.gz"
+    _write_gz_artifact(artifact)
+
+    report = await restore_service.RestoreService().restore_from_file(
+        str(artifact), "vertex_ar_recovered", create_if_missing=True
+    )
+
+    assert report["ok"] is True
+    assert report["tables_restored"] == 15
+    assert report["created_database"] is True
+    assert report["source_file"] == str(artifact)
+    assert created == ["vertex_ar_recovered"]
+    # what reached pg_restore is the decompressed payload, not the gzip
+    assert restored == [b"PGDMP archive"]
+
+
+@pytest.mark.asyncio
+async def test_restore_from_file_decrypts_an_age_artifact(monkeypatch, tmp_path):
+    """A .age artifact is opened, and the source directory is left untouched.
+
+    The operator's copy may be the only one in existence and may sit in a
+    directory we have no business writing to, so decrypted output must land in
+    the work directory, never beside the source.
+    """
+    from app.services import restore_service
+
+    decrypted: list[tuple[str, str]] = []
+
+    async def _fake_decrypt(self, src, dst):
+        decrypted.append((src, dst))
+        _write_gz_artifact(Path(dst), b"PGDMP decrypted")
+
+    monkeypatch.setattr(restore_service, "settings", _restore_settings())
+    monkeypatch.setattr(
+        restore_service.RestoreService, "_decrypt_file", _fake_decrypt
+    )
+    _, restored = _stub_cluster(monkeypatch, restore_service, exists=False)
+
+    artifact = tmp_path / "backup_20260916_030000.sql.gz.age"
+    artifact.write_bytes(b"age ciphertext")
+    before = sorted(p.name for p in tmp_path.iterdir())
+
+    report = await restore_service.RestoreService().restore_from_file(
+        str(artifact), "vertex_ar_recovered", create_if_missing=True
+    )
+
+    assert report["ok"] is True
+    assert decrypted and decrypted[0][0] == str(artifact)
+    assert restored == [b"PGDMP decrypted"]
+    # nothing was written next to the source
+    assert sorted(p.name for p in tmp_path.iterdir()) == before
+
+
+@pytest.mark.asyncio
+async def test_restore_from_file_encrypted_override(monkeypatch, tmp_path):
+    """A renamed encrypted artifact must be decryptable on request.
+
+    Inference is by the .age suffix, so stripping the suffix would otherwise
+    send ciphertext to gzip and fail with a confusing error.
+    """
+    from app.services import restore_service
+
+    called: list[str] = []
+
+    async def _fake_decrypt(self, src, dst):
+        called.append(src)
+        _write_gz_artifact(Path(dst), b"PGDMP decrypted")
+
+    monkeypatch.setattr(restore_service, "settings", _restore_settings())
+    monkeypatch.setattr(
+        restore_service.RestoreService, "_decrypt_file", _fake_decrypt
+    )
+    _stub_cluster(monkeypatch, restore_service, exists=False)
+
+    artifact = tmp_path / "renamed_artifact.sql.gz"
+    artifact.write_bytes(b"age ciphertext")
+
+    report = await restore_service.RestoreService().restore_from_file(
+        str(artifact), "vertex_ar_recovered", create_if_missing=True, encrypted=True
+    )
+
+    assert report["ok"] is True
+    assert called == [str(artifact)]
+
+
+@pytest.mark.asyncio
+async def test_restore_from_file_still_refuses_the_live_database(monkeypatch, tmp_path):
+    """The live-database guard must hold on every restore entry point."""
+    from app.services import restore_service
+
+    monkeypatch.setattr(restore_service, "settings", _restore_settings())
+    artifact = tmp_path / "backup.sql.gz"
+    _write_gz_artifact(artifact)
+
+    with pytest.raises(RuntimeError, match="Refusing to restore over the live database"):
+        await restore_service.RestoreService().restore_from_file(
+            str(artifact), "vertex_ar"
+        )
+
+
+@pytest.mark.asyncio
+async def test_restore_from_file_rejects_unsafe_target_names(monkeypatch, tmp_path):
+    from app.services import restore_service
+
+    monkeypatch.setattr(restore_service, "settings", _restore_settings())
+    artifact = tmp_path / "backup.sql.gz"
+    _write_gz_artifact(artifact)
+
+    with pytest.raises(ValueError, match="Unsafe target database name"):
+        await restore_service.RestoreService().restore_from_file(
+            str(artifact), 'vertex_ar"; DROP DATABASE vertex_ar; --'
+        )
+
+
+@pytest.mark.asyncio
+async def test_restore_from_file_reports_a_missing_artifact(monkeypatch, tmp_path):
+    """A typo in the path must be a clear failure, not a crash."""
+    from app.services import restore_service
+
+    monkeypatch.setattr(restore_service, "settings", _restore_settings())
+
+    report = await restore_service.RestoreService().restore_from_file(
+        str(tmp_path / "nope.sql.gz"), "vertex_ar_recovered"
+    )
+
+    assert report["ok"] is False
+    assert "Artifact not found" in report["error"]
+
+
+@pytest.mark.asyncio
+async def test_restore_from_file_reports_an_empty_artifact(monkeypatch, tmp_path):
+    """A truncated download is a real failure mode; say so plainly."""
+    from app.services import restore_service
+
+    monkeypatch.setattr(restore_service, "settings", _restore_settings())
+    artifact = tmp_path / "backup.sql.gz"
+    artifact.write_bytes(b"")
+
+    report = await restore_service.RestoreService().restore_from_file(
+        str(artifact), "vertex_ar_recovered"
+    )
+
+    assert report["ok"] is False
+    assert "empty" in report["error"]
+
+
+@pytest.mark.asyncio
+async def test_restore_from_file_fails_loudly_without_the_age_identity(
+    monkeypatch, tmp_path
+):
+    """Encrypted and no key must not look like success."""
+    from app.services import restore_service
+
+    monkeypatch.setattr(
+        restore_service, "settings", _restore_settings(BACKUP_AGE_IDENTITY_FILE="")
+    )
+    artifact = tmp_path / "backup.sql.gz.age"
+    artifact.write_bytes(b"age ciphertext")
+
+    report = await restore_service.RestoreService().restore_from_file(
+        str(artifact), "vertex_ar_recovered"
+    )
+
+    assert report["ok"] is False
+    assert "BACKUP_AGE_IDENTITY_FILE" in report["error"]

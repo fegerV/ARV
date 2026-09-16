@@ -117,13 +117,50 @@ class RestoreService:
 
         await BackupService().download_backup(backup_id, artifact_path)
 
-        # 1. decrypt (age) when the artifact was encrypted before upload
+        return await self.materialize_artifact(
+            artifact_path,
+            workdir,
+            encrypted=encrypted,
+            label=f"backup_{backup_id}",
+        )
+
+    async def materialize_artifact(
+        self,
+        artifact_path: str,
+        workdir: str,
+        *,
+        encrypted: bool | None = None,
+        label: str = "artifact",
+    ) -> str:
+        """Turn a stored artifact file into a ``pg_restore``-readable dump.
+
+        :meth:`materialize_dump` downloads and then calls this; the
+        ``--from-file`` recovery path calls it directly. Sharing the step is
+        the point: a backup carried off the host by hand is decrypted and
+        decompressed by exactly the same code as one pulled from Yandex Disk,
+        so a restore from a USB stick cannot quietly take a different path.
+
+        ``encrypted=None`` infers the answer from the ``.age`` suffix, which is
+        what the upload path always appends. Decrypted output is always
+        written inside *workdir*, never beside the source — the source may be
+        the operator's only copy, sitting in a directory we must not touch.
+        """
+        if not os.path.exists(artifact_path):
+            raise ArtifactUnavailable(f"Artifact not found: {artifact_path}")
+        if os.path.getsize(artifact_path) == 0:
+            raise ArtifactUnavailable(f"Artifact is empty: {artifact_path}")
+
+        if encrypted is None:
+            encrypted = artifact_path.endswith(".age")
+
         if encrypted:
-            gz_path = (
-                artifact_path[: -len(".age")]
-                if artifact_path.endswith(".age")
-                else artifact_path + ".gz"
-            )
+            # 1. decrypt (age) when the artifact was encrypted before upload
+            gz_name = os.path.basename(artifact_path)
+            if gz_name.endswith(".age"):
+                gz_name = gz_name[: -len(".age")]
+            if not gz_name.endswith(".gz"):
+                gz_name += ".gz"
+            gz_path = os.path.join(workdir, gz_name)
             await self._decrypt_file(artifact_path, gz_path)
         else:
             gz_path = artifact_path
@@ -132,11 +169,11 @@ class RestoreService:
         #    Named deterministically: the stored artifact keeps a .sql.gz name
         #    for backward compatibility, which would otherwise yield a
         #    custom-format archive misleadingly called ".sql".
-        dump_path = os.path.join(workdir, f"backup_{backup_id}.dump")
+        dump_path = os.path.join(workdir, f"{label}.dump")
         await asyncio.to_thread(self._gunzip_file, gz_path, dump_path)
 
         if not os.path.exists(dump_path) or os.path.getsize(dump_path) == 0:
-            raise RuntimeError(f"Materialised dump for backup {backup_id} is empty")
+            raise RuntimeError(f"Materialised dump for {label} is empty")
 
         return dump_path
 
@@ -443,34 +480,14 @@ class RestoreService:
         restore must not silently conjure a database they did not mean to
         target.
         """
-        if not _IDENTIFIER_RE.match(target_db or ""):
-            raise ValueError(f"Unsafe target database name: {target_db!r}")
-
-        live_db = _parse_database_url(settings.DATABASE_URL)["dbname"]
-        if target_db == live_db:
-            raise RuntimeError(
-                f"Refusing to restore over the live database {live_db!r}. "
-                "Restore into a separate database and cut over deliberately."
-            )
-
+        self._validate_target_db(target_db)
         started = time.monotonic()
         workdir = tempfile.mkdtemp(prefix="arv-restore-")
-        created = False
         try:
             dump_path = await self.materialize_dump(backup_id, workdir)
-            if create_if_missing and not await self._database_exists(target_db):
-                await self._create_database(target_db)
-                created = True
-                logger.info("restore_target_created", target_database=target_db)
-            await self._pg_restore_into(target_db, dump_path)
-            table_count = await self._count_tables(target_db)
-            report = {
-                "ok": True,
-                "tables_restored": table_count,
-                "target_database": target_db,
-                "created_database": created,
-                "duration_seconds": int(time.monotonic() - started),
-            }
+            report = await self._restore_dump_into(
+                dump_path, target_db, create_if_missing=create_if_missing, started=started
+            )
             logger.info("backup_restore_completed", backup_id=backup_id, **report)
             return report
         except Exception as exc:
@@ -481,6 +498,98 @@ class RestoreService:
             # rather than dropping it: a half-restored database is evidence,
             # and the operator can inspect or drop it explicitly.
             shutil.rmtree(workdir, ignore_errors=True)
+
+    async def restore_from_file(
+        self,
+        artifact_path: str,
+        target_db: str,
+        *,
+        create_if_missing: bool = False,
+        encrypted: bool | None = None,
+    ) -> dict:
+        """Restore a backup artifact that is already on this host.
+
+        :meth:`restore_to` has a circular dependency that makes it useless in
+        the one scenario it matters most: it fetches the artifact using a token
+        from ``companies.yandex_disk_token`` — a token stored inside the very
+        database that is gone. So "one-command recovery" worked for a
+        *corrupted* database and not for an *absent* one.
+
+        This entry point breaks the circle. Given the artifact as a file —
+        from an off-site copy, a USB stick, wherever the operator kept it — it
+        restores without reading the database at all.
+
+        ``encrypted=None`` infers encryption from the ``.age`` suffix. Pass
+        ``encrypted=True`` explicitly for an artifact that was renamed.
+        """
+        self._validate_target_db(target_db)
+        started = time.monotonic()
+        workdir = tempfile.mkdtemp(prefix="arv-restore-file-")
+        try:
+            dump_path = await self.materialize_artifact(
+                artifact_path, workdir, encrypted=encrypted, label="from_file"
+            )
+            report = await self._restore_dump_into(
+                dump_path, target_db, create_if_missing=create_if_missing, started=started
+            )
+            report["source_file"] = os.path.abspath(artifact_path)
+            logger.info("backup_restore_from_file_completed", **report)
+            return report
+        except Exception as exc:
+            logger.error(
+                "backup_restore_from_file_failed",
+                artifact_path=artifact_path,
+                error=str(exc),
+            )
+            return {
+                "ok": False,
+                "error": str(exc),
+                "target_database": target_db,
+                "source_file": os.path.abspath(artifact_path),
+            }
+        finally:
+            shutil.rmtree(workdir, ignore_errors=True)
+
+    @staticmethod
+    def _validate_target_db(target_db: str) -> None:
+        """Reject an unsafe or live target database.
+
+        Shared by every restore entry point so a new caller cannot forget the
+        guard and overwrite production.
+        """
+        if not _IDENTIFIER_RE.match(target_db or ""):
+            raise ValueError(f"Unsafe target database name: {target_db!r}")
+
+        live_db = _parse_database_url(settings.DATABASE_URL)["dbname"]
+        if target_db == live_db:
+            raise RuntimeError(
+                f"Refusing to restore over the live database {live_db!r}. "
+                "Restore into a separate database and cut over deliberately."
+            )
+
+    async def _restore_dump_into(
+        self,
+        dump_path: str,
+        target_db: str,
+        *,
+        create_if_missing: bool,
+        started: float,
+    ) -> dict:
+        """Create the target if asked, restore, and count what landed."""
+        created = False
+        if create_if_missing and not await self._database_exists(target_db):
+            await self._create_database(target_db)
+            created = True
+            logger.info("restore_target_created", target_database=target_db)
+        await self._pg_restore_into(target_db, dump_path)
+        table_count = await self._count_tables(target_db)
+        return {
+            "ok": True,
+            "tables_restored": table_count,
+            "target_database": target_db,
+            "created_database": created,
+            "duration_seconds": int(time.monotonic() - started),
+        }
 
     # ------------------------------------------------------------------
     # PostgreSQL helpers

@@ -741,6 +741,147 @@ async def test_cmd_restore_fails_loudly(monkeypatch):
 
 
 # ----------------------------------------------------------------------
+# restore --from-file: the path that works when the database is gone
+# ----------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_cmd_restore_from_file_does_not_need_a_backup_id(monkeypatch):
+    """The whole point: no id, because the history table is unreachable."""
+    captured: dict = {}
+
+    async def _fake_from_file(
+        self, artifact_path, target_db, *, create_if_missing=False, encrypted=None
+    ):
+        captured["artifact_path"] = artifact_path
+        captured["target_db"] = target_db
+        captured["create_if_missing"] = create_if_missing
+        captured["encrypted"] = encrypted
+        return {
+            "ok": True,
+            "tables_restored": 15,
+            "target_database": target_db,
+            "created_database": create_if_missing,
+            "duration_seconds": 2,
+            "source_file": artifact_path,
+        }
+
+    def _must_not_be_used(*_args, **_kwargs):
+        raise AssertionError("restore_to must not run for --from-file")
+
+    monkeypatch.setattr(
+        backup_cli.RestoreService, "restore_from_file", _fake_from_file
+    )
+    monkeypatch.setattr(backup_cli.RestoreService, "restore_to", _must_not_be_used)
+
+    args = backup_cli.build_parser().parse_args(
+        [
+            "restore",
+            "--from-file",
+            "/var/backups/arv/backup_20260916_030000.sql.gz.age",
+            "--target-db",
+            "vertex_ar_recovered",
+            "--create-db",
+        ]
+    )
+    assert await backup_cli.cmd_restore(args) == 0
+    assert captured == {
+        "artifact_path": "/var/backups/arv/backup_20260916_030000.sql.gz.age",
+        "target_db": "vertex_ar_recovered",
+        "create_if_missing": True,
+        # Inference is by suffix, so no override unless asked for.
+        "encrypted": None,
+    }
+
+
+@pytest.mark.asyncio
+async def test_cmd_restore_from_file_passes_encrypted_override(monkeypatch):
+    captured: dict = {}
+
+    async def _fake_from_file(
+        self, artifact_path, target_db, *, create_if_missing=False, encrypted=None
+    ):
+        captured["encrypted"] = encrypted
+        return {
+            "ok": True,
+            "tables_restored": 1,
+            "target_database": target_db,
+            "created_database": False,
+            "duration_seconds": 1,
+            "source_file": artifact_path,
+        }
+
+    monkeypatch.setattr(
+        backup_cli.RestoreService, "restore_from_file", _fake_from_file
+    )
+
+    args = backup_cli.build_parser().parse_args(
+        [
+            "restore",
+            "--from-file",
+            "/tmp/renamed.sql.gz",
+            "--encrypted",
+            "--target-db",
+            "vertex_ar_recovered",
+        ]
+    )
+    assert await backup_cli.cmd_restore(args) == 0
+    assert captured["encrypted"] is True
+
+
+@pytest.mark.asyncio
+async def test_cmd_restore_rejects_both_id_and_from_file(monkeypatch):
+    """Two sources would silently mean one of them is ignored."""
+    args = backup_cli.build_parser().parse_args(
+        [
+            "restore",
+            "42",
+            "--from-file",
+            "/tmp/backup.sql.gz",
+            "--target-db",
+            "vertex_ar_recovered",
+        ]
+    )
+    assert await backup_cli.cmd_restore(args) == 2
+
+
+@pytest.mark.asyncio
+async def test_cmd_restore_requires_a_source(monkeypatch):
+    args = backup_cli.build_parser().parse_args(
+        ["restore", "--target-db", "vertex_ar_recovered"]
+    )
+    assert await backup_cli.cmd_restore(args) == 2
+
+
+@pytest.mark.asyncio
+async def test_cmd_restore_from_file_fails_loudly(monkeypatch):
+    async def _fake_from_file(
+        self, artifact_path, target_db, *, create_if_missing=False, encrypted=None
+    ):
+        return {
+            "ok": False,
+            "error": "Artifact not found: /tmp/nope.sql.gz",
+            "target_database": target_db,
+            "source_file": artifact_path,
+        }
+
+    monkeypatch.setattr(
+        backup_cli.RestoreService, "restore_from_file", _fake_from_file
+    )
+
+    args = backup_cli.build_parser().parse_args(
+        [
+            "restore",
+            "--from-file",
+            "/tmp/nope.sql.gz",
+            "--target-db",
+            "vertex_ar_recovered",
+        ]
+    )
+    assert await backup_cli.cmd_restore(args) == 1
+
+
+# ----------------------------------------------------------------------
 # download
 # ----------------------------------------------------------------------
 

@@ -468,23 +468,49 @@ def _print_cutover_hint(target_db: str) -> None:
 
 
 async def cmd_restore(args: argparse.Namespace) -> int:
-    """Restore a specific backup into a separate database."""
+    """Restore a backup into a separate database.
+
+    Two sources, one outcome. ``--from-file`` restores an artifact the operator
+    already has, which is the only route that works when the database is gone:
+    the normal path resolves its storage token *from* that database, so it
+    cannot be the way back from losing it.
+    """
     if not args.target_db:
         print("--target-db is required", file=sys.stderr)
         return 2
 
-    report = await RestoreService().restore_to(
-        args.backup_id,
-        args.target_db,
-        create_if_missing=args.create_db,
-    )
+    if args.from_file:
+        if args.backup_id is not None:
+            print(
+                "pass either a backup id or --from-file, not both",
+                file=sys.stderr,
+            )
+            return 2
+        report = await RestoreService().restore_from_file(
+            args.from_file,
+            args.target_db,
+            create_if_missing=args.create_db,
+            encrypted=True if args.encrypted else None,
+        )
+        source = args.from_file
+    else:
+        if args.backup_id is None:
+            print("a backup id or --from-file is required", file=sys.stderr)
+            return 2
+        report = await RestoreService().restore_to(
+            args.backup_id,
+            args.target_db,
+            create_if_missing=args.create_db,
+        )
+        source = f"backup {args.backup_id}"
+
     if not report.get("ok"):
         print(f"restore FAILED: {report.get('error')}", file=sys.stderr)
         return 1
 
     created = " (database was created)" if report.get("created_database") else ""
     print(
-        f"restore ok: {report['tables_restored']} tables -> "
+        f"restore ok: {report['tables_restored']} tables from {source} -> "
         f"{report['target_database']} in {report['duration_seconds']}s{created}"
     )
     _print_cutover_hint(report["target_database"])
@@ -694,12 +720,37 @@ def build_parser() -> argparse.ArgumentParser:
     drill.set_defaults(func=cmd_drill)
 
     restore = sub.add_parser("restore", help="Restore a backup into a target database.")
-    restore.add_argument("backup_id", type=int)
+    restore.add_argument(
+        "backup_id",
+        type=int,
+        nargs="?",
+        default=None,
+        help="Backup id to fetch from storage. Omit when using --from-file.",
+    )
     restore.add_argument("--target-db", required=True)
     restore.add_argument(
         "--create-db",
         action="store_true",
         help="Create the target database when it does not exist.",
+    )
+    restore.add_argument(
+        "--from-file",
+        default=None,
+        metavar="PATH",
+        help=(
+            "Restore an artifact already on this host instead of fetching it "
+            "from storage. Needs no database, so it works when the database "
+            "itself is gone."
+        ),
+    )
+    restore.add_argument(
+        "--encrypted",
+        action="store_true",
+        help=(
+            "Force treating the --from-file artifact as age-encrypted. Only "
+            "needed when the file was renamed away from its .age suffix, which "
+            "would otherwise be read as a plain gzip and fail."
+        ),
     )
     restore.set_defaults(func=cmd_restore)
 

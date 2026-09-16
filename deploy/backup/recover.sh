@@ -18,6 +18,17 @@
 #   recover.sh --backup-id 148 --target-db vertex_ar_recovered
 #       Restore only. Creates the target database, leaves production alone.
 #
+#   recover.sh --from-file /path/backup_20260916_030000.sql.gz.age \
+#              --target-db vertex_ar_recovered [--cutover]
+#       Same, but restore an artifact that is already on this host instead of
+#       downloading it. This is the ONLY form that works when the database is
+#       gone: the normal path reads the Yandex Disk token from the database
+#       itself, so it cannot be the way back from losing it. Use it with the
+#       copy of the artifact you keep off the host.
+#       The file must be readable by the 'arv' user.
+#       Encryption is inferred from the .age suffix; pass --encrypted if the
+#       file was renamed without it.
+#
 #   recover.sh --backup-id 148 --target-db vertex_ar_recovered --cutover
 #       Restore and then cut production over to it, end to end.
 #
@@ -43,6 +54,8 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/common.sh"
 
 BACKUP_ID=""
+FROM_FILE=""
+FORCE_ENCRYPTED=0
 TARGET_DB=""
 CUTOVER=0
 ASSUME_YES=0
@@ -50,13 +63,18 @@ DOMAIN="${ARV_DOMAIN:-ar.neuroimagen.ru}"
 ENV_FILE="${APP_DIR}/.env"
 
 usage() {
-    sed -n '3,42p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
+    # Print the header comment block. Derived from the file itself so it cannot
+    # drift when the header changes — the previous fixed line range silently
+    # printed code once the header grew.
+    awk 'NR > 2 { if ($0 !~ /^#/) exit; sub(/^# ?/, ""); print }' "${BASH_SOURCE[0]}"
     exit 2
 }
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --backup-id) BACKUP_ID="${2:-}"; shift 2 ;;
+        --from-file) FROM_FILE="${2:-}"; shift 2 ;;
+        --encrypted) FORCE_ENCRYPTED=1; shift ;;
         --target-db) TARGET_DB="${2:-}"; shift 2 ;;
         --cutover)   CUTOVER=1; shift ;;
         --domain)    DOMAIN="${2:-}"; shift 2 ;;
@@ -70,8 +88,12 @@ if [[ -z "${TARGET_DB}" ]]; then
     echo "--target-db is required" >&2
     usage
 fi
-if [[ -z "${BACKUP_ID}" && "${CUTOVER}" -ne 1 ]]; then
-    echo "nothing to do: pass --backup-id, --cutover, or both" >&2
+if [[ -n "${BACKUP_ID}" && -n "${FROM_FILE}" ]]; then
+    echo "pass either --backup-id or --from-file, not both" >&2
+    usage
+fi
+if [[ -z "${BACKUP_ID}" && -z "${FROM_FILE}" && "${CUTOVER}" -ne 1 ]]; then
+    echo "nothing to do: pass --backup-id, --from-file, --cutover, or a combination" >&2
     usage
 fi
 
@@ -144,6 +166,42 @@ if [[ ! -r "${ARV_AGE_IDENTITY_FILE:-/etc/arv/backup-age.key}" ]]; then
 fi
 
 # --- 1. restore ------------------------------------------------------------
+
+if [[ -n "${FROM_FILE}" ]]; then
+    if [[ ! -f "${FROM_FILE}" ]]; then
+        log "ERROR: no such artifact: ${FROM_FILE}"
+        exit 77
+    fi
+    # The CLI runs as arv, so the operator's own copy is not automatically
+    # readable by it. Check up front: discovering this after the confirmation
+    # prompt would waste the operator's attention at the worst moment.
+    if ! sudo -n -u arv test -r "${FROM_FILE}"; then
+        log "ERROR: ${FROM_FILE} is not readable by the 'arv' user."
+        log "       Copy it somewhere arv can read, e.g.:"
+        log "         sudo -n install -o arv -g arv -m 0600 ${FROM_FILE} /var/backups/arv/"
+        exit 77
+    fi
+
+    confirm "Restore artifact ${FROM_FILE} into '${TARGET_DB}'. Type the target name to confirm: " \
+            "${TARGET_DB}"
+
+    log "restoring ${FROM_FILE} into ${TARGET_DB} (no database needed)"
+    set +e
+    if [[ "${FORCE_ENCRYPTED}" -eq 1 ]]; then
+        run_cli_as_arv restore --from-file "${FROM_FILE}" --encrypted \
+            --target-db "${TARGET_DB}" --create-db
+    else
+        run_cli_as_arv restore --from-file "${FROM_FILE}" \
+            --target-db "${TARGET_DB}" --create-db
+    fi
+    restore_status=$?
+    set -e
+
+    if [[ "${restore_status}" -ne 0 ]]; then
+        log "restore FAILED (exit ${restore_status}); production was not touched"
+        exit 1
+    fi
+fi
 
 if [[ -n "${BACKUP_ID}" ]]; then
     confirm "Restore backup ${BACKUP_ID} into '${TARGET_DB}'. Type the target name to confirm: " \
