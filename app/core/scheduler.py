@@ -8,6 +8,8 @@ re-applied at runtime without restarting the application.
 
 from __future__ import annotations
 
+import os
+
 import structlog
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
@@ -15,17 +17,96 @@ from apscheduler.triggers.cron import CronTrigger
 from app.core.database import AsyncSessionLocal
 from app.services.settings_service import SettingsService
 
+try:  # POSIX only. Production is Linux; the test suite also runs on Windows.
+    import fcntl
+except ImportError:  # pragma: no cover - exercised on Windows only
+    fcntl = None  # type: ignore[assignment]
+
 logger = structlog.get_logger()
 
 _JOB_ID = "db_backup"
 
+# Deliberately the same file ``deploy/backup/backup-db.sh`` locks via
+# ``acquire_lock "db"``. Sharing it means the in-app scheduler and the systemd
+# timer are mutually safe: whichever gets there first runs the backup and the
+# other skips, instead of both dumping the database.
+JOB_LOCK_PATH = os.environ.get("ARV_BACKUP_LOCK_PATH", "/var/lock/arv-db.lock")
+
 scheduler = AsyncIOScheduler()
+
+
+class JobLock:
+    """Cross-process guard so exactly one worker runs the backup.
+
+    gunicorn runs several workers and each one starts its own APScheduler
+    during lifespan, so without this every worker fires the same cron job in
+    the same second. That is not merely wasteful — it corrupts the backup:
+
+    * the artifact name is derived from a timestamp with one-second
+      granularity, so the duplicates compute the *same* remote path and upload
+      to the same key;
+    * each run still writes its own ``backup_history`` row, so two rows end up
+      pointing at one artifact;
+    * rotation then sees two backups for the same day, deletes the older row,
+      and removes the artifact with it — leaving the surviving row marked
+      ``success`` while its file is gone.
+
+    Observed in production on 2026-09-16: backup 150 was ``success`` and its
+    artifact returned 404 from Yandex Disk.
+
+    ``flock`` is used rather than an in-process flag because the contention is
+    between processes, and because the kernel releases the lock if the holder
+    dies mid-run. Where the primitive is unavailable (Windows) it degrades to
+    "always run", which is correct for single-process environments.
+    """
+
+    def __init__(self, path: str):
+        self.path = path
+        self._handle = None
+
+    def acquire(self) -> bool:
+        if fcntl is None:
+            return True
+        try:
+            parent = os.path.dirname(self.path)
+            if parent:
+                os.makedirs(parent, exist_ok=True)
+            self._handle = open(self.path, "w")
+            fcntl.flock(self._handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except OSError:
+            self.release()
+            return False
+        return True
+
+    def release(self) -> None:
+        if self._handle is None:
+            return
+        try:
+            if fcntl is not None:
+                fcntl.flock(self._handle, fcntl.LOCK_UN)
+        finally:
+            self._handle.close()
+            self._handle = None
 
 
 async def _scheduled_backup_job() -> None:
     """Entry-point executed by APScheduler on each trigger."""
     logger.info("scheduled_backup_triggered")
 
+    lock = JobLock(JOB_LOCK_PATH)
+    if not lock.acquire():
+        logger.info(
+            "scheduled_backup_skipped", reason="another_process_is_running_it"
+        )
+        return
+
+    try:
+        await _run_scheduled_backup()
+    finally:
+        lock.release()
+
+
+async def _run_scheduled_backup() -> None:
     async with AsyncSessionLocal() as session:
         svc = SettingsService(session)
         all_settings = await svc.get_all_settings()

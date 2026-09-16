@@ -215,7 +215,10 @@ async def cmd_secrets(args: argparse.Namespace) -> int:
     stage = args.stage or settings.BACKUP_STAGING_DIR
     os.makedirs(stage, exist_ok=True)
 
-    timestamp = datetime.now(UTC).strftime("%Y%m%d_%H%M%S")
+    # Sub-second precision for the same reason as the db artifact name: two
+    # runs in one second would otherwise share a path, and one row's rotation
+    # would delete the archive another row still points at.
+    timestamp = datetime.now(UTC).strftime("%Y%m%d_%H%M%S_%f")
     tar_path = os.path.join(stage, f"secrets_{timestamp}.tar.gz")
     encrypted_path = tar_path + ".age"
     missing_required: list[str] = []

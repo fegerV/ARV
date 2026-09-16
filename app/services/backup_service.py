@@ -182,7 +182,16 @@ class BackupService:
                 checksum = await asyncio.to_thread(self._sha256_file, artifact_path)
 
                 # 4. Upload to the primary target
-                timestamp = _utcnow_naive().strftime("%Y%m%d_%H%M%S")
+                #    Sub-second precision is deliberate, not cosmetic. With
+                #    whole seconds, two runs starting in the same second
+                #    compute the same name, upload to the same remote key, and
+                #    leave two backup_history rows pointing at one artifact.
+                #    Rotation then deletes the older row *and the file the
+                #    other row still references*, so a row stays marked
+                #    `success` while its artifact is gone — observed in
+                #    production on 2026-09-16. Unique names make any remaining
+                #    duplication wasteful instead of destructive.
+                timestamp = _utcnow_naive().strftime("%Y%m%d_%H%M%S_%f")
                 suffix = ARTIFACT_SUFFIX_ENCRYPTED if enc_path else ARTIFACT_SUFFIX
                 remote_name = f"backup_{timestamp}{suffix}"
                 yd_remote_path = f"{yd_folder}/{remote_name}"
